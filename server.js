@@ -1,4 +1,5 @@
-// 📁 server.js
+require("dotenv").config();
+
 const express = require("express");
 const path = require("path");
 const multer = require("multer");
@@ -6,6 +7,17 @@ const mysql = require("mysql2");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const db = require("./db");
+
+app.get("/", async (req, res) => {
+  try {
+    const result = await db.query("SELECT NOW()");
+    res.send("✅ DB 연결 성공! 현재 시간: " + result.rows[0].now);
+  } catch (err) {
+    console.error("❌ DB 연결 실패:", err);
+    res.status(500).send("DB 연결 실패");
+  }
+});
 
 // 정적 파일 경로 설정
 app.use(express.static(path.join(__dirname, "public")));
@@ -31,7 +43,7 @@ const fieldsUpload = upload.fields([
 
 // MySQL 연결
 const db = mysql.createConnection({
-  host: "localhost",
+  host: "127.0.0.1",
   user: "root",
   password: "",
   database: "my_project",
@@ -41,18 +53,33 @@ const db = mysql.createConnection({
 db.connect((err) => {
   if (err) {
     console.error("❌ MySQL 연결 실패:", err);
-    return;
+    // 여기서 return 하지 않음!
+  } else {
+    console.log("✅ MySQL 연결 성공!");
   }
-  console.log("✅ MySQL 연결 성공!");
 });
 
 // [POST] 병원 정보 + 메뉴 저장
 app.post("/store", fieldsUpload, (req, res) => {
   const {
-    businessName, businessType, deliveryOption, businessHours,
-    serviceDetails, event1, event2, facility, pets, parking,
-    phoneNumber, homepage, instagram, facebook, additionalDesc,
-    postalCode, roadAddress, detailAddress,
+    businessName,
+    businessType,
+    deliveryOption,
+    businessHours,
+    serviceDetails,
+    event1,
+    event2,
+    facility,
+    pets,
+    parking,
+    phoneNumber,
+    homepage,
+    instagram,
+    facebook,
+    additionalDesc,
+    postalCode,
+    roadAddress,
+    detailAddress,
   } = req.body;
 
   const sqlInfo = `
@@ -64,11 +91,24 @@ app.post("/store", fieldsUpload, (req, res) => {
   `;
 
   const valuesInfo = [
-    businessName, businessType, deliveryOption, businessHours,
-    serviceDetails, event1, event2, facility, pets, parking,
-    phoneNumber, homepage, additionalDesc,
-    postalCode, roadAddress, detailAddress,
-    instagram, facebook
+    businessName,
+    businessType,
+    deliveryOption,
+    businessHours,
+    serviceDetails,
+    event1,
+    event2,
+    facility,
+    pets,
+    parking,
+    phoneNumber,
+    homepage,
+    additionalDesc,
+    postalCode,
+    roadAddress,
+    detailAddress,
+    instagram,
+    facebook,
   ];
 
   db.query(sqlInfo, valuesInfo, (err, result) => {
@@ -83,8 +123,16 @@ app.post("/store", fieldsUpload, (req, res) => {
     const menuPrices = req.body["menuPrice[]"];
     const menuImageFiles = req.files["menuImage[]"];
 
-    const safeNames = Array.isArray(menuNames) ? menuNames : menuNames ? [menuNames] : [];
-    const safePrices = Array.isArray(menuPrices) ? menuPrices : menuPrices ? [menuPrices] : [];
+    const safeNames = Array.isArray(menuNames)
+      ? menuNames
+      : menuNames
+      ? [menuNames]
+      : [];
+    const safePrices = Array.isArray(menuPrices)
+      ? menuPrices
+      : menuPrices
+      ? [menuPrices]
+      : [];
 
     let menuInserts = [];
 
@@ -172,7 +220,7 @@ app.get("/store/:id", (req, res) => {
           menuName: menu.menu_name,
           menuPrice: menu.menu_price,
           menuImageUrl: menu.menu_image,
-        }))
+        })),
       };
 
       res.json(data);
@@ -187,5 +235,5 @@ app.get("/", (req, res) => {
 
 // 서버 실행
 app.listen(PORT, () => {
-  console.log(`🚀 서버 실행: http://localhost:${PORT}`);
+  console.log("🚀 Cloudtype 서버 실행 중: https://www.hongbono1.com");
 });
