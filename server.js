@@ -3,11 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const multer = require("multer");
-const { Pool } = require("pg"); // PostgreSQL용
+const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const db = require("./db"); // db.js에 정의한 Pool 객체
+const db = require("./db"); // PostgreSQL 연결만 사용
 
 // 정적 파일 경로 설정
 app.use(express.static(path.join(__dirname, "public")));
