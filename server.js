@@ -3,12 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const multer = require("multer");
+const { Pool } = require("pg"); // PostgreSQL용
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// PostgreSQL 연결된 db.js 불러오기
-const db = require("./db");
+const db = require("./db"); // db.js에 정의한 Pool 객체
 
 // 정적 파일 경로 설정
 app.use(express.static(path.join(__dirname, "public")));
@@ -32,7 +31,7 @@ const fieldsUpload = upload.fields([
   { name: "menuImage[]", maxCount: 20 },
 ]);
 
-// 루트 경로 확인용
+// 연결 테스트 라우터
 app.get("/", async (req, res) => {
   try {
     const result = await db.query("SELECT NOW()");
@@ -43,7 +42,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-// 병원 정보 및 메뉴 저장
+// [POST] 병원 정보 + 메뉴 저장
 app.post("/store", fieldsUpload, async (req, res) => {
   const {
     businessName, businessType, deliveryOption, businessHours,
@@ -112,13 +111,12 @@ app.post("/store", fieldsUpload, async (req, res) => {
   }
 });
 
-// 병원 상세 조회
+// [GET] 병원 상세 정보 조회
 app.get("/store/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const infoResult = await db.query("SELECT * FROM hospital_info WHERE id = $1", [id]);
-
     if (infoResult.rows.length === 0) {
       return res.status(404).json({ error: "해당 ID의 병원 정보가 없습니다." });
     }
@@ -147,7 +145,7 @@ app.get("/store/:id", async (req, res) => {
       postalCode: info.postal_code,
       roadAddress: info.road_address,
       detailAddress: info.detail_address,
-      menuItems: menuResult.rows.map(menu => ({
+      menuItems: menuResult.rows.map((menu) => ({
         menuName: menu.menu_name,
         menuPrice: menu.menu_price,
         menuImageUrl: menu.menu_image,
@@ -156,7 +154,7 @@ app.get("/store/:id", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error("❌ 병원 상세 조회 실패:", err);
+    console.error("❌ 조회 실패:", err);
     res.status(500).json({ error: "DB 조회 실패" });
   }
 });
