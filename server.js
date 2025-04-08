@@ -3,21 +3,30 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const multer = require("multer");
-const { Pool } = require("pg");
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-const db = require("./db"); // PostgreSQL 연결만 사용
+const db = require("./db"); // PostgreSQL 연결 설정
 
-// 정적 파일 경로 설정
+// ✅ 연결 테스트 라우터 (가장 먼저 정의)
+app.get("/", async (req, res) => {
+  try {
+    const result = await db.query("SELECT NOW()");
+    res.send("✅ DB 연결 성공! 현재 시간: " + result.rows[0].now);
+  } catch (err) {
+    console.error("❌ DB 연결 실패:", err);
+    res.status(500).send("DB 연결 실패");
+  }
+});
+
+// ✅ 정적 파일 경로 설정
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
-// JSON & URL 인코딩 파싱
+// ✅ JSON 및 폼 데이터 파싱
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Multer 파일 업로드 설정
+// ✅ multer 설정: 이미지 업로드
 const storage = multer.diskStorage({
   destination: "public/uploads/",
   filename: (req, file, cb) => {
@@ -31,18 +40,7 @@ const fieldsUpload = upload.fields([
   { name: "menuImage[]", maxCount: 20 },
 ]);
 
-// 연결 테스트 라우터
-app.get("/", async (req, res) => {
-  try {
-    const result = await db.query("SELECT NOW()");
-    res.send("\u2705 DB \uc5f0\uacb0 \uc131\uacf5! \ud604\uc7ac \uc2dc\uac04: " + result.rows[0].now);
-  } catch (err) {
-    console.error("\u274c DB \uc5f0\uacb0 \uc2e4\ud328:", err);
-    res.status(500).send("DB \uc5f0\uacb0 \uc2e4\ud328");
-  }
-});
-
-// [POST] \ubcd1\uc6d0 \uc815\ubcf4 + \uba54\ub274 \uc800\uc7a5
+// ✅ 병원 정보 + 메뉴 저장
 app.post("/store", fieldsUpload, async (req, res) => {
   const {
     businessName, businessType, deliveryOption, businessHours,
@@ -104,25 +102,24 @@ app.post("/store", fieldsUpload, async (req, res) => {
       );
     }
 
-    res.json({ success: true, message: "\u2705 \ubcd1\uc6d0 \uc815\ubcf4 + \uba54\ub274 \uc800\uc7a5 \uc644\ub8cc!" });
+    res.json({ success: true, message: "✅ 병원 정보 + 메뉴 저장 완료!" });
   } catch (err) {
-    console.error("\u274c \uc800\uc7a5 \uc2e4\ud328:", err);
-    res.status(500).json({ error: "DB \uc800\uc7a5 \uc2e4\ud328" });
+    console.error("❌ 저장 실패:", err);
+    res.status(500).json({ error: "DB 저장 실패" });
   }
 });
 
-// [GET] \ubcd1\uc6d0 \uc0c1\uc138 \uc815\ubcf4 \uc870\ud68c
+// ✅ 병원 상세 정보 조회
 app.get("/store/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const infoResult = await db.query("SELECT * FROM hospital_info WHERE id = $1", [id]);
     if (infoResult.rows.length === 0) {
-      return res.status(404).json({ error: "\ud574\ub2f9 ID\uc758 \ubcd1\uc6d0 \uc815\ubcf4\uac00 \uc5c6\uc2b5\ub2c8\ub2e4." });
+      return res.status(404).json({ error: "해당 ID의 병원 정보가 없습니다." });
     }
 
     const info = infoResult.rows[0];
-
     const menuResult = await db.query("SELECT * FROM hospital_menu WHERE hospital_id = $1", [id]);
 
     const data = {
@@ -141,7 +138,7 @@ app.get("/store/:id", async (req, res) => {
       instagram: info.instagram,
       facebook: info.facebook,
       additionalDesc: info.additional_desc,
-      images: [],
+      images: [], // 필요시 추가
       postalCode: info.postal_code,
       roadAddress: info.road_address,
       detailAddress: info.detail_address,
@@ -154,12 +151,12 @@ app.get("/store/:id", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error("\u274c \uc870\ud68c \uc2e4\ud328:", err);
-    res.status(500).json({ error: "DB \uc870\ud68c \uc2e4\ud328" });
+    console.error("❌ 조회 실패:", err);
+    res.status(500).json({ error: "DB 조회 실패" });
   }
 });
 
-// \uc11c\ubc84 \uc2e4\ud589
+// ✅ 서버 실행
 app.listen(PORT, () => {
-  console.log("\ud83d\ude80 Cloudtype \uc11c\ubc84 \uc2e4\ud589 \uc911: https://www.hongbono1.com");
+  console.log(`🚀 Cloudtype 서버 실행 중: https://www.hongbono1.com`);
 });
