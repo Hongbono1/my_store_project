@@ -1,4 +1,4 @@
-require("dotenv").config();
+console.log("🚨 서버 시작 - PGHOST:", process.env.PGHOST);
 
 const express = require("express");
 const path = require("path");
