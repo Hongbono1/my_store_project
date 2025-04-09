@@ -1,4 +1,7 @@
 // db.js
+console.log("✅ PGHOST:", process.env.PGHOST);
+console.log("✅ PGPORT:", process.env.PGPORT);
+
 require('dotenv').config();
 const { Pool } = require('pg');
 
