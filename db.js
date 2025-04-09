@@ -1,6 +1,6 @@
 // db.js
-console.log("✅ PGHOST:", process.env.PGHOST);
-console.log("✅ PGPORT:", process.env.PGPORT);
+console.log("🚨 PGHOST 확인:", process.env.PGHOST || "❌ 환경변수 적용 안 됨!");
+console.log("🚨 PGPORT 확인:", process.env.PGPORT || "❌ 환경변수 적용 안 됨!");
 
 require('dotenv').config();
 const { Pool } = require('pg');
