@@ -136,6 +136,3 @@ app.get("/", (req, res) => {
   res.send("🚀 My Store Server is Running!");
 });
 
-app.get("/", (req, res) => {
-  res.send("🚀 My Store Server is Running!");
-});
