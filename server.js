@@ -166,11 +166,6 @@ app.get("/store/:id", async (req, res) => {
   }
 });
 
-/* 기본 루트 응답 */
-app.get("/", (req, res) => {
-  res.send("🚀 My Store Server is Running!");
-});
-
 /* ✅ 서버 실행 */
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
