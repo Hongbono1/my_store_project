@@ -27,6 +27,10 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.redirect("/iogin.html");
+});
+
 // 정적 파일 경로
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -169,8 +173,4 @@ app.get("/store/:id", async (req, res) => {
 /* ✅ 서버 실행 */
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
-});
-
-app.get("/", (req, res) => {
-  res.redirect("/iogin.html");
 });
