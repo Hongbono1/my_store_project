@@ -27,14 +27,24 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// 📁 public 폴더 안의 정적 파일(html, js 등)을 제공
+// 정적 파일 경로
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// 파일 업로드용 설정
+// 파일 업로드 설정
 const upload = multer({ dest: "uploads/" });
 
-// 병원 등록 API
+/* ✅ 로그인 라우터 추가 */
+app.post("/login", (req, res) => {
+  const { password } = req.body;
+  if (password === process.env.ADMIN_PASSWORD) {
+    res.status(200).json({ success: true });
+  } else {
+    res.status(401).json({ success: false, message: "비밀번호 틀림" });
+  }
+});
+
+/* ✅ 병원 등록 API */
 app.post("/store", upload.single("images[]"), async (req, res) => {
   const {
     businessName,
@@ -67,7 +77,6 @@ app.post("/store", upload.single("images[]"), async (req, res) => {
   const delivery = deliveryOption === "가능";
   const hours = businessHours;
   const description = serviceDetails;
-
   const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
@@ -111,7 +120,11 @@ app.post("/store", upload.single("images[]"), async (req, res) => {
       for (let i = 0; i < names.length; i++) {
         const menuNameTrimmed = names[i].trim();
         const priceCleaned = prices[i].replace(/,/g, "");
-        await client.query(insertMenu, [hospitalId, menuNameTrimmed, priceCleaned]);
+        await client.query(insertMenu, [
+          hospitalId,
+          menuNameTrimmed,
+          priceCleaned,
+        ]);
       }
     }
 
@@ -123,6 +136,7 @@ app.post("/store", upload.single("images[]"), async (req, res) => {
   }
 });
 
+/* ✅ 병원 조회 API */
 app.get("/store/:id", async (req, res) => {
   const hospitalId = req.params.id;
 
@@ -152,10 +166,12 @@ app.get("/store/:id", async (req, res) => {
   }
 });
 
+/* 기본 루트 응답 */
 app.get("/", (req, res) => {
   res.send("🚀 My Store Server is Running!");
 });
 
+/* ✅ 서버 실행 */
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
 });
