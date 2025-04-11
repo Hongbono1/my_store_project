@@ -32,22 +32,38 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 const upload = multer({ dest: "uploads/" });
 
 // 병원 등록 API
-app.post("/store", upload.single("image"), async (req, res) => {
+app.post("/store", upload.single("images[]"), async (req, res) => {
   const {
-    name,
-    category,
-    delivery,
-    hours,
-    description,
-    event,
+    businessName,
+    businessType,
+    deliveryOption,
+    businessHours,
+    serviceDetails,
+    event1,
+    event2,
     facility,
     pets,
     parking,
-    contact,
-    website,
-    address,
-    menuItems, // 배열 (name, price 포함)
+    phoneNumber,
+    homepage,
+    instagram,
+    facebook,
+    postalCode,
+    roadAddress,
+    detailAddress,
+    menuName,
+    menuPrice,
   } = req.body;
+
+  const address = `${postalCode} ${roadAddress} ${detailAddress}`;
+  const event = `${event1 || ""} ${event2 || ""}`;
+  const contact = phoneNumber;
+  const website = [homepage, instagram, facebook].filter(Boolean).join("\n");
+  const name = businessName;
+  const category = businessType;
+  const delivery = deliveryOption === "가능";
+  const hours = businessHours;
+  const description = serviceDetails;
 
   const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -65,13 +81,13 @@ app.post("/store", upload.single("image"), async (req, res) => {
     const result = await client.query(insertHospital, [
       name,
       category,
-      delivery === "true",
+      delivery,
       hours,
       description,
       event,
       facility,
-      pets === "true",
-      parking === "true",
+      pets === "가능",
+      parking === "가능",
       contact,
       website,
       address,
@@ -80,13 +96,19 @@ app.post("/store", upload.single("image"), async (req, res) => {
 
     const hospitalId = result.rows[0].id;
 
-    if (Array.isArray(menuItems)) {
+    if (menuName && menuPrice) {
       const insertMenu = `
         INSERT INTO hospital_menu (hospital_id, menu_name, price)
         VALUES ($1, $2, $3);
       `;
-      for (const item of menuItems) {
-        await client.query(insertMenu, [hospitalId, item.name, item.price]);
+
+      const names = Array.isArray(menuName) ? menuName : [menuName];
+      const prices = Array.isArray(menuPrice) ? menuPrice : [menuPrice];
+
+      for (let i = 0; i < names.length; i++) {
+        const menuNameTrimmed = names[i].trim();
+        const priceCleaned = prices[i].replace(/,/g, "");
+        await client.query(insertMenu, [hospitalId, menuNameTrimmed, priceCleaned]);
       }
     }
 
@@ -96,11 +118,6 @@ app.post("/store", upload.single("image"), async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false });
   }
-});
-
-// 서버 실행
-app.listen(port, () => {
-  console.log(`✅ Server running on port ${port}`);
 });
 
 app.get("/store/:id", async (req, res) => {
@@ -136,3 +153,6 @@ app.get("/", (req, res) => {
   res.send("🚀 My Store Server is Running!");
 });
 
+app.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
