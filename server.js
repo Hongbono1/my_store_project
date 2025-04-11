@@ -26,6 +26,9 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// 📁 public 폴더 안의 정적 파일(html, js 등)을 제공
+app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // 파일 업로드용 설정
