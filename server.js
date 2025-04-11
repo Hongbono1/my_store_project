@@ -27,6 +27,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+/* ✅ 루트 접근 시 로그인 페이지로 리디렉션 */
 app.get("/", (req, res) => {
   res.redirect("/iogin.html");
 });
