@@ -29,7 +29,7 @@ app.use(express.json());
 
 /* ✅ 루트 접근 시 로그인 페이지로 리디렉션 */
 app.get("/", (req, res) => {
-  res.redirect("/iogin.html");
+  res.redirect("/login.html");
 });
 
 // 정적 파일 경로
