@@ -327,21 +327,7 @@
 
     <!-- 자바스크립트 -->
     <script>
-      // ---------------------------------------------------------
-      // (1) 폼 "submit" 시 => 비동기로 서버에 전송 & 페이지는 유지
-      // ---------------------------------------------------------
-      const form = document.getElementById("businessForm");
-
-      // ---------------------------------------------------------
-      // (2) '수정' 버튼 기능 예시 (PUT/PATCH 등 서버 요청 필요)
-      // ---------------------------------------------------------
-      function updateData() {
-        alert("수정 버튼 클릭! 실제 수정 로직은 별도 구현 필요 (PUT/PATCH).");
-      }
-
-      // ---------------------------------------------------------
-      // (3) 이미지 미리보기 (최대 3장) - 가게 대표 이미지
-      // ---------------------------------------------------------
+      // 이미지 미리보기 (최대 3장)
       const imagesInput = document.getElementById("imagesInput");
       const imagesPreview = document.getElementById("imagesPreview");
       imagesInput.addEventListener("change", () => {
@@ -360,9 +346,7 @@
         });
       });
 
-      // ---------------------------------------------------------
-      // (4) 주소 검색 (다음 우편번호)
-      // ---------------------------------------------------------
+      // 주소 검색 (다음 우편번호)
       function openDaumPostcode() {
         new daum.Postcode({
           oncomplete: function (data) {
@@ -376,12 +360,9 @@
         });
       }
 
-      // ---------------------------------------------------------
-      // (5) 카카오 지도 표시 (주소 → 좌표 변환)
-      // ---------------------------------------------------------
+      // 지도 표시
       let map;
       let marker;
-
       function updateMap(address) {
         const mapContainer = document.getElementById("map");
         if (!map) {
@@ -407,7 +388,7 @@
         });
       }
 
-      // 상세 주소 입력 후 지도 재갱신
+      // 상세주소 입력 시 지도 갱신
       document
         .getElementById("detailAddress")
         .addEventListener("blur", function () {
@@ -418,9 +399,7 @@
           }
         });
 
-      // ---------------------------------------------------------
-      // (6) 가격 입력 시 숫자/소수점만 허용 + 3자리 콤마 + 최대 소수점 2자리
-      // ---------------------------------------------------------
+      // 가격 입력: 숫자, 콤마, 소수점 정리
       function formatCurrency(input) {
         let val = input.value;
         val = val.replace(/[^0-9.]/g, "");
@@ -430,31 +409,15 @@
         }
         let intPart = parts[0] || "";
         let decPart = parts[1] || "";
-        const splitVal = val.split(".");
-        intPart = splitVal[0] || "";
-        decPart = splitVal[1] || "";
         if (decPart.length > 2) {
           decPart = decPart.slice(0, 2);
         }
-        if (!intPart) {
-          intPart = "0";
-        } else {
-          intPart = String(parseInt(intPart, 10));
-          if (isNaN(intPart)) {
-            intPart = "0";
-          }
-        }
+        if (!intPart) intPart = "0";
         intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        if (decPart) {
-          input.value = intPart + "." + decPart;
-        } else {
-          input.value = intPart;
-        }
+        input.value = decPart ? intPart + "." + decPart : intPart;
       }
 
-      // ---------------------------------------------------------
-      // (7) 품목(메뉴) 입력 기능: 최대 20개
-      // ---------------------------------------------------------
+      // 품목 추가
       let itemCount = 0;
       function addItem() {
         if (itemCount >= 20) {
@@ -470,17 +433,20 @@
         menuImageInput.type = "file";
         menuImageInput.accept = "image/*";
         menuImageInput.name = "menuImage[]";
-        menuImageInput.className = "border border-gray-300 rounded px-2 py-1";
+        menuImageInput.className =
+          "border border-gray-300 rounded px-2 py-1";
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.placeholder = "품목 이름";
         nameInput.name = "menuName[]";
-        nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
+        nameInput.className =
+          "flex-1 border border-gray-300 rounded px-2 py-1";
         const priceInput = document.createElement("input");
         priceInput.type = "text";
         priceInput.placeholder = "가격";
         priceInput.name = "menuPrice[]";
-        priceInput.className = "w-32 border border-gray-300 rounded px-2 py-1";
+        priceInput.className =
+          "w-32 border border-gray-300 rounded px-2 py-1";
         priceInput.setAttribute("oninput", "formatCurrency(this)");
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
@@ -498,9 +464,7 @@
         itemList.appendChild(itemDiv);
       }
 
-      // ---------------------------------------------------------
-      // (8) 헤더, 푸터 자동 삽입
-      // ---------------------------------------------------------
+      // 헤더/푸터 삽입
       fetch("/components/header.html")
         .then((res) => res.text())
         .then((data) => {
@@ -512,19 +476,19 @@
           document.getElementById("footer-placeholder").innerHTML = data;
         });
 
+      // ✅ 최종 submit 핸들러 (이것만 하나 있어야 함)
+      const form = document.getElementById("businessForm");
       form.addEventListener("submit", async (event) => {
-        event.preventDefault(); // 기본 제출 막기
+        event.preventDefault();
 
         try {
           const formData = new FormData(form);
 
-          // ✅ menuPrice[] 필드를 숫자만 남기도록 정제
-          const priceInputs = form.querySelectorAll(
-            'input[name="menuPrice[]"]'
-          );
+          // 가격 정제: menuPrice[] 콤마 제거
+          const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
           priceInputs.forEach((input) => {
-            const raw = input.value.replace(/,/g, ""); // 콤마 제거
-            formData.append("menuPrice[]", raw); // 기존 값 대체
+            const raw = input.value.replace(/,/g, "");
+            formData.append("menuPrice[]", raw);
           });
 
           const response = await fetch("/store", {
