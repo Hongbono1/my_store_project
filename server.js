@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 // ✅ 환경변수 로드
 dotenv.config();
-console.log("✅ DATABASE_URL:", process.env.DATABASE_URL); // 로그 확인용
+console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
 
 // ✅ __dirname 대체 코드
 const __filename = fileURLToPath(import.meta.url);
@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Multer 설정
+// ✅ Multer 설정 (이미지 저장 위치/파일명)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
@@ -43,7 +43,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ POST /store
+// ✅ POST /store : 폼 제출 처리
 app.post(
   "/store",
   upload.fields([
@@ -118,14 +118,15 @@ app.post(
       const menuPrices = req.body["menuPrice[]"];
       const menuImages = req.files["menuImage[]"] || [];
 
+      // 보정: 메뉴 이름과 가격이 배열 형태가 아닐 경우 배열로 변환
       const names = Array.isArray(menuNames) ? menuNames : [menuNames];
       const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
 
       for (let i = 0; i < names.length; i++) {
         const name = names[i] ?? "";
-        const raw = prices[i];
-        const rawStr = typeof raw === "string" ? raw : String(raw ?? "0");
-        const price = parseInt(rawStr.replace(/,/g, ""), 10) || 0;
+        // 아래에서 prices[i]가 undefined, null일 경우 "0"으로 처리하고 문자열로 변환
+        const rawPrice = prices[i] != null ? String(prices[i]) : "0";
+        const price = parseInt(rawPrice.replace(/,/g, ""), 10) || 0;
         const image = menuImages[i]?.filename || null;
 
         await pool.query(
