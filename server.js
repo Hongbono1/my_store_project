@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+
 dotenv.config(); // ⬅️ 반드시 있어야 함!
 
 console.log("✅ DATABASE_URL:", process.env.DATABASE_URL); // ⬅️ 이 줄 추가해서 로그 확인
