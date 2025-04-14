@@ -1,14 +1,3 @@
-
-dotenv.config(); // ⬅️ 반드시 있어야 함!
-
-console.log("✅ DATABASE_URL:", process.env.DATABASE_URL); // ⬅️ 이 줄 추가해서 로그 확인
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-
-
 // 📁 server.js
 import express from "express";
 import pg from "pg";
@@ -20,6 +9,7 @@ import { fileURLToPath } from "url";
 
 // ✅ 환경변수 로드
 dotenv.config();
+console.log("✅ DATABASE_URL:", process.env.DATABASE_URL); // 로그 확인용
 
 // ✅ __dirname 대체 코드
 const __filename = fileURLToPath(import.meta.url);
@@ -43,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Multer 설정 (이미지 저장 위치/파일명)
+// ✅ Multer 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
@@ -53,79 +43,46 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ POST /store : 폼 제출 처리
+// ✅ POST /store
 app.post("/store", upload.fields([
   { name: "images[]", maxCount: 3 },
   { name: "menuImage[]", maxCount: 20 },
 ]), async (req, res) => {
   try {
     const {
-      businessName,
-      businessType,
-      deliveryOption,
-      businessHours,
-      serviceDetails,
-      event1,
-      event2,
-      facility,
-      pets,
-      parking,
-      phoneNumber,
-      homepage,
-      instagram,
-      facebook,
-      additionalDesc,
-      postalCode,
-      roadAddress,
-      detailAddress,
+      businessName, businessType, deliveryOption, businessHours,
+      serviceDetails, event1, event2, facility, pets, parking,
+      phoneNumber, homepage, instagram, facebook, additionalDesc,
+      postalCode, roadAddress, detailAddress
     } = req.body;
 
     const fullAddress = `${roadAddress} ${detailAddress}`.trim();
 
-    // ✅ 대표 이미지 파일명 배열
     const imagePaths = (req.files["images[]"] || []).map(file => file.filename);
 
-    // ✅ 병원 정보 DB 저장
     const storeResult = await pool.query(
-      `INSERT INTO hospital_info
-        (business_name, business_type, delivery_option, business_hours, service_details,
+      `INSERT INTO hospital_info (
+        business_name, business_type, delivery_option, business_hours, service_details,
         event1, event2, facility, pets, parking, phone_number,
         homepage, instagram, facebook, additional_desc, postal_code,
         road_address, detail_address, address, image_paths)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+               $11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       RETURNING id`,
       [
-        businessName,
-        businessType,
-        deliveryOption,
-        businessHours,
-        serviceDetails,
-        event1,
-        event2,
-        facility,
-        pets,
-        parking,
-        phoneNumber,
-        homepage,
-        instagram,
-        facebook,
-        additionalDesc,
-        postalCode,
-        roadAddress,
-        detailAddress,
-        imagePaths,
+        businessName, businessType, deliveryOption, businessHours, serviceDetails,
+        event1, event2, facility, pets, parking, phoneNumber,
+        homepage, instagram, facebook, additionalDesc, postalCode,
+        roadAddress, detailAddress, fullAddress, imagePaths
       ]
     );
 
     const storeId = storeResult.rows[0].id;
 
-    // ✅ 메뉴 정보 저장
     const menuNames = req.body["menuName[]"];
     const menuPrices = req.body["menuPrice[]"];
     const menuImages = req.files["menuImage[]"] || [];
 
-    // 배열 형태 보정 (1개만 있을 경우 string → array 변환)
     const names = Array.isArray(menuNames) ? menuNames : [menuNames];
     const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
 
@@ -142,6 +99,7 @@ app.post("/store", upload.fields([
     }
 
     res.status(200).json({ message: "등록 완료", storeId });
+
   } catch (err) {
     console.error("❌ 오류 발생:", err);
     res.status(500).json({ error: "서버 오류" });
