@@ -21,19 +21,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// ✅ multer 설정 (이미지 저장 폴더 및 이름 지정)
+// ✅ multer 설정 (이미지 저장 경로 및 파일 이름)
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
-  },
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
-// ✅ express 앱 설정
+// ✅ Express 앱 설정
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -43,12 +38,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ 테스트용 기본 라우트
+// ✅ 기본 라우트
 app.get("/", (req, res) => {
   res.send("서버 실행 중입니다.");
 });
 
-// ✅ 폼 데이터 저장 API
+// ✅ /store 라우트
 app.post("/store", upload.fields([
   { name: "images[]" },
   { name: "menuImage[]" },
@@ -79,11 +74,11 @@ app.post("/store", upload.fields([
 
     const fullAddress = `${postalCode} ${roadAddress} ${detailAddress}`;
 
-    // ✅ 대표 이미지 경로
+    // ✅ 대표 이미지 처리
     const imageFiles = req.files["images[]"] || [];
-    const imagePaths = imageFiles.map((file) => "/uploads/" + file.filename);
+    const imagePaths = imageFiles.map(file => "/uploads/" + file.filename);
 
-    // ✅ 가게 정보 저장
+    // ✅ 병원 정보 저장
     const storeResult = await pool.query(
       `INSERT INTO hospital_info (
         business_name, business_type, delivery_option, business_hours,
@@ -119,18 +114,19 @@ app.post("/store", upload.fields([
 
     // ✅ 메뉴 정보 저장
     const menuNames = req.body.menuName || [];
-    let menuPrices = req.body.menuPrice || [];
-    const menuImages = req.files["menuImage[]"] || [];
 
-    // menuPrices가 단일 문자열로 들어올 경우 배열로 변환
+    // ✅ menuPrices 방어 처리
+    let menuPrices = req.body.menuPrice;
     if (!Array.isArray(menuPrices)) {
-      menuPrices = [menuPrices];
+      menuPrices = menuPrices ? [menuPrices] : [];
     }
+
+    const menuImages = req.files["menuImage[]"] || [];
 
     for (let i = 0; i < menuNames.length; i++) {
       const name = menuNames[i] || "";
-      const rawPrice = menuPrices[i] || "0";
-      const cleanPrice = rawPrice.replace(/,/g, "");
+      const rawPrice = menuPrices[i] || "0";               // ✅ undefined 방지
+      const cleanPrice = rawPrice.replace(/,/g, "");        // ✅ 안전하게 replace 사용
       const price = parseInt(cleanPrice, 10) || 0;
 
       const imagePath = menuImages[i] ? "/uploads/" + menuImages[i].filename : null;
@@ -149,7 +145,7 @@ app.post("/store", upload.fields([
   }
 });
 
-// ✅ 서버 시작
+// ✅ 서버 실행
 app.listen(port, () => {
   console.log(`✅ 서버 실행 중: http://localhost:${port}`);
 });
