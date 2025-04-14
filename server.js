@@ -110,16 +110,18 @@ app.post(
       const menuNames = req.body.menuName || [];
       let menuPrices = req.body.menuPrice;
       if (!Array.isArray(menuPrices)) {
-        menuPrices = menuPrices ? [menuPrices] : [];
+        menuPrices = typeof menuPrices === "string" ? [menuPrices] : [];
       }
+
       const menuImages = req.files["menuImage[]"] || [];
 
       for (let i = 0; i < menuNames.length; i++) {
         const name = menuNames[i] || "";
 
-        // 💥 replace 오류 완전 방어
-        const rawPrice = (menuPrices && menuPrices[i]) ? menuPrices[i].toString() : "0";
-        const cleanPrice = rawPrice.replace(/[^\d.]/g, "");
+        const priceRaw = (menuPrices.length > i && typeof menuPrices[i] === "string")
+          ? menuPrices[i]
+          : "0";
+        const cleanPrice = priceRaw.replace(/[^\d.]/g, "");
         const price = parseInt(cleanPrice, 10) || 0;
 
         const imagePath = menuImages[i]
