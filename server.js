@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Multer 설정 (이미지 저장 위치/파일명)
+// ✅ Multer 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
@@ -43,7 +43,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ POST /store : 폼 제출 처리
+// ✅ POST /store
 app.post(
   "/store",
   upload.fields([
@@ -53,31 +53,15 @@ app.post(
   async (req, res) => {
     try {
       const {
-        businessName,
-        businessType,
-        deliveryOption,
-        businessHours,
-        serviceDetails,
-        event1,
-        event2,
-        facility,
-        pets,
-        parking,
-        phoneNumber,
-        homepage,
-        instagram,
-        facebook,
-        additionalDesc,
-        postalCode,
-        roadAddress,
-        detailAddress,
+        businessName, businessType, deliveryOption, businessHours,
+        serviceDetails, event1, event2, facility, pets, parking,
+        phoneNumber, homepage, instagram, facebook, additionalDesc,
+        postalCode, roadAddress, detailAddress
       } = req.body;
 
       const fullAddress = `${roadAddress} ${detailAddress}`.trim();
-      const imagePaths =
-        (req.files["images[]"] || []).map((file) => file.filename) || [];
+      const imagePaths = (req.files["images[]"] || []).map((file) => file.filename) || [];
 
-      // 병원 정보 DB 저장
       const storeResult = await pool.query(
         `INSERT INTO hospital_info (
           business_name, business_type, delivery_option, business_hours, service_details,
@@ -89,26 +73,10 @@ app.post(
           $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
         ) RETURNING id`,
         [
-          businessName,
-          businessType,
-          deliveryOption,
-          businessHours,
-          serviceDetails,
-          event1,
-          event2,
-          facility,
-          pets,
-          parking,
-          phoneNumber,
-          homepage,
-          instagram,
-          facebook,
-          additionalDesc,
-          postalCode,
-          roadAddress,
-          detailAddress,
-          fullAddress,
-          imagePaths,
+          businessName, businessType, deliveryOption, businessHours, serviceDetails,
+          event1, event2, facility, pets, parking, phoneNumber,
+          homepage, instagram, facebook, additionalDesc, postalCode,
+          roadAddress, detailAddress, fullAddress, imagePaths
         ]
       );
 
@@ -118,20 +86,18 @@ app.post(
       const menuPrices = req.body["menuPrice[]"];
       const menuImages = req.files["menuImage[]"] || [];
 
-      // 보정: 메뉴 이름과 가격을 배열 형태로 처리
-      const names = Array.isArray(menuNames) ? menuNames : [menuNames];
-      const prices = Array.isArray(menuPrices) ? menuPrices : menuPrices !== undefined ? [menuPrices] : [];
+      const names = Array.isArray(menuNames) ? menuNames : menuNames ? [menuNames] : [];
+      const prices = Array.isArray(menuPrices) ? menuPrices : menuPrices ? [menuPrices] : [];
 
-      // 배열 길이가 names보다 짧으면 기본값 "0" 채워넣기
       while (prices.length < names.length) {
         prices.push("0");
       }
 
       for (let i = 0; i < names.length; i++) {
         const name = names[i] ?? "";
-        // 안전하게 undefined를 방지하면서 가격 문자열로 변환 후 parseInt
-        const rawPrice = (prices[i]?.toString() ?? "0");
-        const price = parseInt(rawPrice.replace(/,/g, ""), 10) || 0;
+        const rawPrice = prices[i] ?? "0";
+        const clean = typeof rawPrice === "string" ? rawPrice.replace(/,/g, "") : "0";
+        const price = parseFloat(clean) || 0;
         const image = menuImages[i]?.filename || null;
 
         await pool.query(
