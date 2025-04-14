@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 // ✅ 환경변수 로드
 dotenv.config();
-console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
+console.log("✅ DATABASE_URL:", process.env.DATABASE_URL); // 로그 확인용
 
 // ✅ __dirname 대체 코드
 const __filename = fileURLToPath(import.meta.url);
@@ -74,10 +74,10 @@ app.post(
       } = req.body;
 
       const fullAddress = `${roadAddress} ${detailAddress}`.trim();
-
       const imagePaths =
         (req.files["images[]"] || []).map((file) => file.filename) || [];
 
+      // 병원 정보 DB 저장
       const storeResult = await pool.query(
         `INSERT INTO hospital_info (
           business_name, business_type, delivery_option, business_hours, service_details,
@@ -118,14 +118,19 @@ app.post(
       const menuPrices = req.body["menuPrice[]"];
       const menuImages = req.files["menuImage[]"] || [];
 
-      // 보정: 메뉴 이름과 가격이 배열 형태가 아닐 경우 배열로 변환
+      // 보정: 메뉴 이름과 가격을 배열 형태로 처리
       const names = Array.isArray(menuNames) ? menuNames : [menuNames];
-      const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
+      const prices = Array.isArray(menuPrices) ? menuPrices : menuPrices !== undefined ? [menuPrices] : [];
+
+      // 배열 길이가 names보다 짧으면 기본값 "0" 채워넣기
+      while (prices.length < names.length) {
+        prices.push("0");
+      }
 
       for (let i = 0; i < names.length; i++) {
         const name = names[i] ?? "";
-        // 아래에서 prices[i]가 undefined, null일 경우 "0"으로 처리하고 문자열로 변환
-        const rawPrice = prices[i] != null ? String(prices[i]) : "0";
+        // 안전하게 undefined를 방지하면서 가격 문자열로 변환 후 parseInt
+        const rawPrice = (prices[i]?.toString() ?? "0");
         const price = parseInt(rawPrice.replace(/,/g, ""), 10) || 0;
         const image = menuImages[i]?.filename || null;
 
