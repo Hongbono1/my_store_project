@@ -9,32 +9,23 @@ import { fileURLToPath } from "url";
 
 // ✅ 환경변수 로드
 dotenv.config();
-console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
 
-// ✅ __dirname 대체
+// ✅ __dirname 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ DB 연결
+// ✅ PostgreSQL 연결 설정 (Neon)
 const { Pool } = pg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// ✅ Express 앱 초기화
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "public")));
-
-// ✅ Multer 설정
+// ✅ multer 설정 (이미지 저장 폴더 및 이름 지정)
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
   filename: (req, file, cb) => {
     const uniqueName = Date.now() + "-" + file.originalname;
     cb(null, uniqueName);
@@ -42,78 +33,119 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ POST /store
+// ✅ express 앱 설정
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ✅ 테스트용 기본 라우트
+app.get("/", (req, res) => {
+  res.send("서버 실행 중입니다.");
+});
+
+// ✅ 폼 데이터 저장 API
 app.post("/store", upload.fields([
-  { name: "images[]", maxCount: 3 },
-  { name: "menuImage[]", maxCount: 20 },
+  { name: "images[]" },
+  { name: "menuImage[]" },
 ]), async (req, res) => {
   try {
+    console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
+
     const {
-      businessName, businessType, deliveryOption, businessHours,
-      serviceDetails, event1, event2, facility, pets, parking,
-      phoneNumber, homepage, instagram, facebook, additionalDesc,
-      postalCode, roadAddress, detailAddress,
+      businessName,
+      businessType,
+      deliveryOption,
+      businessHours,
+      serviceDetails,
+      event1,
+      event2,
+      facility,
+      pets,
+      parking,
+      phoneNumber,
+      homepage,
+      instagram,
+      facebook,
+      additionalDesc,
+      postalCode,
+      roadAddress,
+      detailAddress
     } = req.body;
 
-    const fullAddress = `${roadAddress} ${detailAddress}`.trim();
-    const imagePaths = (req.files["images[]"] || []).map(file => file.filename);
+    const fullAddress = `${postalCode} ${roadAddress} ${detailAddress}`;
 
+    // ✅ 대표 이미지 경로
+    const imageFiles = req.files["images[]"] || [];
+    const imagePaths = imageFiles.map((file) => "/uploads/" + file.filename);
+
+    // ✅ 가게 정보 저장
     const storeResult = await pool.query(
       `INSERT INTO hospital_info (
-        business_name, business_type, delivery_option, business_hours, service_details,
-        event1, event2, facility, pets, parking, phone_number,
-        homepage, instagram, facebook, additional_desc, postal_code,
-        road_address, detail_address, address, image_paths)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-              $11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        business_name, business_type, delivery_option, business_hours,
+        service_details, event1, event2, facility, pets, parking,
+        phone_number, homepage, instagram, facebook,
+        additional_desc, address, image1, image2, image3
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING id`,
       [
-        businessName, businessType, deliveryOption, businessHours, serviceDetails,
-        event1, event2, facility, pets, parking, phoneNumber,
-        homepage, instagram, facebook, additionalDesc, postalCode,
-        roadAddress, detailAddress, fullAddress, imagePaths
+        businessName,
+        businessType,
+        deliveryOption,
+        businessHours,
+        serviceDetails,
+        event1,
+        event2,
+        facility,
+        pets,
+        parking,
+        phoneNumber,
+        homepage,
+        instagram,
+        facebook,
+        additionalDesc,
+        fullAddress,
+        imagePaths[0] || null,
+        imagePaths[1] || null,
+        imagePaths[2] || null,
       ]
     );
 
     const storeId = storeResult.rows[0].id;
 
-    // ✅ 메뉴 입력값 확인
-    const menuNames = req.body["menuName[]"];
-    const menuPrices = req.body["menuPrice[]"];
+    // ✅ 메뉴 정보 저장
+    const menuNames = req.body.menuName || [];
+    let menuPrices = req.body.menuPrice || [];
     const menuImages = req.files["menuImage[]"] || [];
 
-    console.log("🧪 메뉴 이름:", menuNames);
-    console.log("🧪 메뉴 가격:", menuPrices);
-
-    // 빈 값 방지 + 배열 강제 변환
-    const names = Array.isArray(menuNames) ? menuNames : (menuNames ? [menuNames] : []);
-    const prices = Array.isArray(menuPrices) ? menuPrices : (menuPrices ? [menuPrices] : []);
-
-    // name 길이에 맞춰 price 채우기
-    while (prices.length < names.length) {
-      prices.push("0");
+    // menuPrices가 단일 문자열로 들어올 경우 배열로 변환
+    if (!Array.isArray(menuPrices)) {
+      menuPrices = [menuPrices];
     }
 
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i] ?? "";
-      const rawPrice = prices[i] ?? "0";
-      const clean = typeof rawPrice === "string" ? rawPrice.replace(/,/g, "") : "0";
-      const price = parseFloat(clean) || 0;
-      const image = menuImages[i]?.filename || null;
+    for (let i = 0; i < menuNames.length; i++) {
+      const name = menuNames[i] || "";
+      const rawPrice = menuPrices[i] || "0";
+      const cleanPrice = rawPrice.replace(/,/g, "");
+      const price = parseInt(cleanPrice, 10) || 0;
 
-      console.log(`🧾 ${i + 1}번 메뉴 → 이름: ${name}, 가격: ${price}, 이미지: ${image}`);
+      const imagePath = menuImages[i] ? "/uploads/" + menuImages[i].filename : null;
 
       await pool.query(
-        `INSERT INTO hospital_menu (store_id, name, price, image_path)
+        `INSERT INTO hospital_menu (hospital_id, menu_name, menu_price, menu_image)
          VALUES ($1, $2, $3, $4)`,
-        [storeId, name, price, image]
+        [storeId, name, price, imagePath]
       );
     }
 
-    res.status(200).json({ message: "등록 완료", storeId });
-  } catch (err) {
-    console.error("❌ 오류 발생:", err);
-    res.status(500).json({ error: "서버 오류" });
+    res.json({ message: "등록 성공", storeId });
+  } catch (error) {
+    console.error("❌ 오류 발생:", error);
+    res.status(500).json({ message: "서버 오류" });
   }
 });
 
