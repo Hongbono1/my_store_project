@@ -44,68 +44,103 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // ✅ POST /store
-app.post("/store", upload.fields([
-  { name: "images[]", maxCount: 3 },
-  { name: "menuImage[]", maxCount: 20 },
-]), async (req, res) => {
-  try {
-    const {
-      businessName, businessType, deliveryOption, businessHours,
-      serviceDetails, event1, event2, facility, pets, parking,
-      phoneNumber, homepage, instagram, facebook, additionalDesc,
-      postalCode, roadAddress, detailAddress
-    } = req.body;
+app.post(
+  "/store",
+  upload.fields([
+    { name: "images[]", maxCount: 3 },
+    { name: "menuImage[]", maxCount: 20 },
+  ]),
+  async (req, res) => {
+    try {
+      const {
+        businessName,
+        businessType,
+        deliveryOption,
+        businessHours,
+        serviceDetails,
+        event1,
+        event2,
+        facility,
+        pets,
+        parking,
+        phoneNumber,
+        homepage,
+        instagram,
+        facebook,
+        additionalDesc,
+        postalCode,
+        roadAddress,
+        detailAddress,
+      } = req.body;
 
-    const fullAddress = `${roadAddress} ${detailAddress}`.trim();
+      const fullAddress = `${roadAddress} ${detailAddress}`.trim();
 
-    const imagePaths = (req.files["images[]"] || []).map(file => file.filename);
+      const imagePaths =
+        (req.files["images[]"] || []).map((file) => file.filename) || [];
 
-    const storeResult = await pool.query(
-      `INSERT INTO hospital_info (
-        business_name, business_type, delivery_option, business_hours, service_details,
-        event1, event2, facility, pets, parking, phone_number,
-        homepage, instagram, facebook, additional_desc, postal_code,
-        road_address, detail_address, address, image_paths)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-               $11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-       RETURNING id`,
-      [
-        businessName, businessType, deliveryOption, businessHours, serviceDetails,
-        event1, event2, facility, pets, parking, phoneNumber,
-        homepage, instagram, facebook, additionalDesc, postalCode,
-        roadAddress, detailAddress, fullAddress, imagePaths
-      ]
-    );
-
-    const storeId = storeResult.rows[0].id;
-
-    const menuNames = req.body["menuName[]"];
-    const menuPrices = req.body["menuPrice[]"];
-    const menuImages = req.files["menuImage[]"] || [];
-
-    const names = Array.isArray(menuNames) ? menuNames : [menuNames];
-    const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
-
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i] ?? "";
-      const rawPrice = prices[i] ?? "0";
-      const price = parseInt(String(rawPrice).replace(/,/g, ""), 10) || 0;
-      const image = menuImages[i]?.filename || null;
-
-      await pool.query(
-        `INSERT INTO hospital_menu (store_id, name, price, image_path)
-         VALUES ($1, $2, $3, $4)`,
-        [storeId, name, price, image]
+      const storeResult = await pool.query(
+        `INSERT INTO hospital_info (
+          business_name, business_type, delivery_option, business_hours, service_details,
+          event1, event2, facility, pets, parking, phone_number,
+          homepage, instagram, facebook, additional_desc, postal_code,
+          road_address, detail_address, address, image_paths
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+        ) RETURNING id`,
+        [
+          businessName,
+          businessType,
+          deliveryOption,
+          businessHours,
+          serviceDetails,
+          event1,
+          event2,
+          facility,
+          pets,
+          parking,
+          phoneNumber,
+          homepage,
+          instagram,
+          facebook,
+          additionalDesc,
+          postalCode,
+          roadAddress,
+          detailAddress,
+          fullAddress,
+          imagePaths,
+        ]
       );
+
+      const storeId = storeResult.rows[0].id;
+
+      const menuNames = req.body["menuName[]"];
+      const menuPrices = req.body["menuPrice[]"];
+      const menuImages = req.files["menuImage[]"] || [];
+
+      const names = Array.isArray(menuNames) ? menuNames : [menuNames];
+      const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
+
+      for (let i = 0; i < names.length; i++) {
+        const name = names[i] ?? "";
+        const rawPrice = prices[i] ?? "0";
+        const price = parseInt(rawPrice.replace(/,/g, ""), 10) || 0;
+        const image = menuImages[i]?.filename || null;
+
+        await pool.query(
+          `INSERT INTO hospital_menu (store_id, name, price, image_path)
+           VALUES ($1, $2, $3, $4)`,
+          [storeId, name, price, image]
+        );
+      }
+
+      res.status(200).json({ message: "등록 완료", storeId });
+    } catch (err) {
+      console.error("❌ 오류 발생:", err);
+      res.status(500).json({ error: "서버 오류" });
     }
-
-    res.status(200).json({ message: "등록 완료", storeId });
-
-  } catch (err) {
-    console.error("❌ 오류 발생:", err);
-    res.status(500).json({ error: "서버 오류" });
   }
-});
+);
 
 // ✅ 서버 시작
 app.listen(port, () => {
