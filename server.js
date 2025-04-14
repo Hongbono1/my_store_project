@@ -87,9 +87,9 @@ app.post("/store", upload.fields([
     const prices = Array.isArray(menuPrices) ? menuPrices : [menuPrices];
 
     for (let i = 0; i < names.length; i++) {
-      const name = names[i];
-      const rawPrice = prices[i] || "0"; // ✅ null 또는 undefined 방지
-      const price = parseInt(rawPrice.replace(/,/g, ""), 10) || 0;
+      const name = names[i] ?? "";
+      const rawPrice = prices[i] ?? "0";
+      const price = parseInt(String(rawPrice).replace(/,/g, ""), 10) || 0;
       const image = menuImages[i]?.filename || null;
 
       await pool.query(
