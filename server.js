@@ -21,8 +21,7 @@ const pool = new Pool({
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
@@ -72,7 +71,6 @@ app.post(
 
       const fullAddress = `${postalCode} ${roadAddress} ${detailAddress}`;
 
-      // 대표 이미지 처리
       const imageFiles = req.files["images[]"] || [];
       const imagePaths = imageFiles.map(file => "/uploads/" + file.filename);
 
@@ -110,20 +108,17 @@ app.post(
       const storeId = storeResult.rows[0].id;
 
       const menuNames = req.body.menuName || [];
-
-      // ✅ menuPrice 배열 보정 (string 하나만 와도 배열로 바꿔줌)
       let menuPrices = req.body.menuPrice;
       if (!Array.isArray(menuPrices)) {
         menuPrices = menuPrices ? [menuPrices] : [];
       }
-
       const menuImages = req.files["menuImage[]"] || [];
 
       for (let i = 0; i < menuNames.length; i++) {
         const name = menuNames[i] || "";
 
-        // ✅ undefined 방지 + 안전한 숫자 처리
-        const rawPrice = (menuPrices[i] ?? "0").toString();
+        // 💥 replace 오류 완전 방어
+        const rawPrice = (menuPrices && menuPrices[i]) ? menuPrices[i].toString() : "0";
         const cleanPrice = rawPrice.replace(/[^\d.]/g, "");
         const price = parseInt(cleanPrice, 10) || 0;
 
