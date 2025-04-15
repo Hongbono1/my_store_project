@@ -1,331 +1,359 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <title>홍길동동물병원 상세 페이지</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#1DA1F2',
-            secondary: '#657786'
-          }
-        }
-      }
-    };
-  </script>
-  
-  <!-- 카카오 지도 API -->
-  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services" defer></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
-  <!-- 헤더 -->
-  <header class="bg-white shadow-md py-4">
-    <div class="container mx-auto px-4 flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-gray-800">My Website</h1>
-      <nav class="space-x-4">
-        <a href="#" class="text-gray-600 hover:text-primary">Home</a>
-        <a href="#" class="text-gray-600 hover:text-primary">List</a>
-        <a href="#" class="text-gray-600 hover:text-primary">Contact</a>
-      </nav>
-    </div>
-  </header>
-  
-  <!-- 메인 -->
-  <main class="container mx-auto px-4 py-8 flex-1">
-    <!-- 좌우 섹션 (grid에 h-full, items-stretch 적용) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-stretch">
-      <!-- 왼쪽 섹션 -->
-      <section class="bg-white p-6 rounded shadow flex flex-col gap-6 h-full">
-        <!-- 이미지 슬라이더 -->
-        <div class="relative">
-          <!-- 기본 더미 이미지 (초기 로딩 시) -->
-          <img
-            id="sliderImage"
-            src="https://via.placeholder.com/600x400?text=IMAGE1"
-            alt="가게 이미지"
-            class="w-full h-64 object-cover rounded shadow mb-2"
-          />
-          <button
-            id="prevBtn"
-            class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
-          >
-            이전
-          </button>
-          <button
-            id="nextBtn"
-            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
-          >
-            다음
-          </button>
-        </div>
-        
-        <!-- 지도 -->
-        <div class="bg-gray-200 border border-gray-400 rounded-lg p-4">
-          <h2 class="text-lg font-semibold mb-2">가게 위치</h2>
-          <!-- 주소는 fetch 후 업데이트 -->
-          <p id="addressText" class="text-sm text-gray-700 mb-2">주소 없음</p>
-          <div id="map" class="w-full h-40 bg-gray-300 flex items-center justify-center text-gray-700">
-            지도 로드 중...
-          </div>
-          <button
-            onclick="openKakaoMap()"
-            class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-          >
-            카카오맵으로 보기
-          </button>
-        </div>
-        
-        <!-- 메뉴 박스 -->
-        <div
-          id="menuBox"
-          class="bg-gray-50 border border-gray-300 rounded p-4 overflow-hidden transition-all duration-300 max-h-[13rem] hover:max-h-[2000px]"
-        >
-          <h2 class="text-lg font-bold mb-4">메뉴</h2>
-          <!-- 메뉴 항목들은 fetch 후 동적 생성 -->
-          <ul id="menuList" class="space-y-2"></ul>
-        </div>
-      </section>
-      
-      <!-- 오른쪽 섹션 (기존 틀 그대로; fetch 후 값으로 업데이트) -->
-      <section class="bg-white p-6 rounded shadow flex flex-col gap-4 h-full">
-        <!-- 가게명은 fetch 후 업데이트 -->
-        <h2
-          id="businessNameHeader"
-          class="text-3xl font-bold text-gray-800 border-b pb-3"
-        >
-          상호명
-        </h2>
-        <div>
-          <p id="businessType" class="text-lg">
-            <strong>업종:</strong>
-          </p>
-          <p id="deliveryOption" class="text-lg">
-            <strong>배달:</strong>
-          </p>
-          <p id="businessHours" class="text-lg">
-            <strong>영업시간:</strong>
-          </p>
-        </div>
-        <div class="bg-gray-50 p-4 rounded border">
-          <h3 class="text-xl font-bold mb-2">서비스 내용</h3>
-          <p id="serviceDetails" class="text-gray-700"></p>
-        </div>
-        <div class="bg-gray-50 p-4 rounded border">
-          <h3 class="text-xl font-bold mb-2">이벤트</h3>
-          <ul id="eventsList" class="list-disc pl-6 space-y-1"></ul>
-        </div>
-        <div class="bg-gray-50 p-4 rounded border">
-          <h3 class="text-xl font-bold mb-2">추가 정보</h3>
-          <ul id="additionalInfoList" class="list-disc pl-6 space-y-1"></ul>
-        </div>
-        <div class="bg-gray-50 p-4 rounded border">
-          <h3 class="text-xl font-bold mb-2">연락처</h3>
-          <p id="contactPhone"></p>
-          <p id="contactHomepage"></p>
-          <!-- 인스타그램, 페이스북 추가 가능 -->
-        </div>
-        <div class="bg-gray-50 p-4 rounded border">
-          <h3 class="text-xl font-bold mb-2">추가 설명</h3>
-          <p id="additionalDesc" class="text-gray-700"></p>
-        </div>
-      </section>
-    </div>
-  </main>
-  
-  <!-- 푸터 -->
-  <footer class="bg-gray-200 py-4">
-    <div class="container mx-auto px-4 text-center text-gray-600">
-      © 2025 MyWebsite. All rights reserved.
-    </div>
-  </footer>
-  
-  <!-- 고정형 장바구니/결제창 (화면 우측 하단에 fixed) -->
-  <div
-    id="cartBox"
-    class="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg border border-gray-300 w-80 max-h-96 overflow-y-auto p-4 hidden z-50"
-  >
-    <h3 class="text-xl font-bold mb-2">🛒 장바구니</h3>
-    <ul id="cartList" class="space-y-2"></ul>
-    <div class="border-t mt-3 pt-3 text-right">
-      <p class="font-semibold">
-        총합: <span id="totalPrice">0</span>원
-      </p>
-      <button
-        id="checkoutBtn"
-        class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
-      >
-        결제하기
-      </button>
-    </div>
-  </div>
-  
-  <!-- 스크립트 -->
-  <script>
-    // =============================
-    // 1. 이미지 슬라이더 (기본 더미 -> 서버 업데이트 시 교체)
-    let images = [
-      "https://via.placeholder.com/600x400?text=IMAGE1",
-      "https://via.placeholder.com/600x400?text=IMAGE2",
-      "https://via.placeholder.com/600x400?text=IMAGE3"
-    ];
-    let currentIndex = 0;
-    const sliderImage = document.getElementById("sliderImage");
-    const prevBtn = document.getElementById("prevBtn");
-    const nextBtn = document.getElementById("nextBtn");
+  <head>
+    <meta charset="UTF-8" />
+    <title>홍길동동물병원 상세 페이지</title>
 
-    prevBtn.addEventListener("click", () => {
-      currentIndex = (currentIndex - 1 + images.length) % images.length;
-      sliderImage.src = images[currentIndex];
-    });
-    nextBtn.addEventListener("click", () => {
-      currentIndex = (currentIndex + 1) % images.length;
-      sliderImage.src = images[currentIndex];
-    });
-    
-    // =============================
-    // 2. 카카오맵: 주소를 기반으로 지도 표시 & "카카오맵으로 보기" 버튼
-    function openKakaoMap() {
-      const addr = document.getElementById("addressText").textContent;
-      const url = `https://map.kakao.com/?q=${encodeURIComponent(addr)}`;
-      window.open(url, "_blank");
-    }
-    
-    window.addEventListener("DOMContentLoaded", () => {
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#1DA1F2",
+              secondary: "#657786",
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- 카카오 지도 API -->
+    <script
+      src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+      defer
+    ></script>
+    <script
+      src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"
+      defer
+    ></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- 헤더 -->
+    <header class="bg-white shadow-md py-4">
+      <div class="container mx-auto px-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">My Website</h1>
+        <nav class="space-x-4">
+          <a href="#" class="text-gray-600 hover:text-primary">Home</a>
+          <a href="#" class="text-gray-600 hover:text-primary">List</a>
+          <a href="#" class="text-gray-600 hover:text-primary">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- 메인 -->
+    <main class="container mx-auto px-4 py-8 flex-1">
+      <!-- 좌우 섹션 (grid에 h-full, items-stretch 적용) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-stretch">
+        <!-- 왼쪽 섹션 -->
+        <section class="bg-white p-6 rounded shadow flex flex-col gap-6 h-full">
+          <!-- 이미지 슬라이더 -->
+          <div class="relative">
+            <!-- 기본 더미 이미지 (초기 로딩 시) -->
+            <img
+              id="sliderImage"
+              alt="가게 이미지"
+              class="w-full h-64 object-cover rounded shadow mb-2"
+            />
+            <button
+              id="prevBtn"
+              class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
+            >
+              이전
+            </button>
+            <button
+              id="nextBtn"
+              class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
+            >
+              다음
+            </button>
+          </div>
+
+          <!-- 지도 -->
+          <div class="bg-gray-200 border border-gray-400 rounded-lg p-4">
+            <h2 class="text-lg font-semibold mb-2">가게 위치</h2>
+            <!-- 주소는 fetch 후 업데이트 -->
+            <p id="addressText" class="text-sm text-gray-700 mb-2">주소 없음</p>
+            <div
+              id="map"
+              class="w-full h-40 bg-gray-300 flex items-center justify-center text-gray-700"
+            >
+              지도 로드 중...
+            </div>
+            <button
+              onclick="openKakaoMap()"
+              class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+            >
+              카카오맵으로 보기
+            </button>
+          </div>
+
+          <!-- 메뉴 박스 -->
+          <div
+            id="menuBox"
+            class="bg-gray-50 border border-gray-300 rounded p-4 overflow-hidden transition-all duration-300 max-h-[13rem] hover:max-h-[2000px]"
+          >
+            <h2 class="text-lg font-bold mb-4">메뉴</h2>
+            <!-- 메뉴 항목들은 fetch 후 동적 생성 -->
+            <ul id="menuList" class="space-y-2"></ul>
+          </div>
+        </section>
+
+        <!-- 오른쪽 섹션 (기존 틀 그대로; fetch 후 값으로 업데이트) -->
+        <section class="bg-white p-6 rounded shadow flex flex-col gap-4 h-full">
+          <!-- 가게명은 fetch 후 업데이트 -->
+          <h2
+            id="businessNameHeader"
+            class="text-3xl font-bold text-gray-800 border-b pb-3"
+          >
+            상호명
+          </h2>
+          <div>
+            <p id="businessType" class="text-lg">
+              <strong>업종:</strong>
+            </p>
+            <p id="deliveryOption" class="text-lg">
+              <strong>배달:</strong>
+            </p>
+            <p id="businessHours" class="text-lg">
+              <strong>영업시간:</strong>
+            </p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded border">
+            <h3 class="text-xl font-bold mb-2">서비스 내용</h3>
+            <p id="serviceDetails" class="text-gray-700"></p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded border">
+            <h3 class="text-xl font-bold mb-2">이벤트</h3>
+            <ul id="eventsList" class="list-disc pl-6 space-y-1"></ul>
+          </div>
+          <div class="bg-gray-50 p-4 rounded border">
+            <h3 class="text-xl font-bold mb-2">추가 정보</h3>
+            <ul id="additionalInfoList" class="list-disc pl-6 space-y-1"></ul>
+          </div>
+          <div class="bg-gray-50 p-4 rounded border">
+            <h3 class="text-xl font-bold mb-2">연락처</h3>
+            <p id="contactPhone"></p>
+            <p id="contactHomepage"></p>
+            <!-- 인스타그램, 페이스북 추가 가능 -->
+          </div>
+          <div class="bg-gray-50 p-4 rounded border">
+            <h3 class="text-xl font-bold mb-2">추가 설명</h3>
+            <p id="additionalDesc" class="text-gray-700"></p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="bg-gray-200 py-4">
+      <div class="container mx-auto px-4 text-center text-gray-600">
+        © 2025 MyWebsite. All rights reserved.
+      </div>
+    </footer>
+
+    <!-- 고정형 장바구니/결제창 (화면 우측 하단에 fixed) -->
+    <div
+      id="cartBox"
+      class="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg border border-gray-300 w-80 max-h-96 overflow-y-auto p-4 hidden z-50"
+    >
+      <h3 class="text-xl font-bold mb-2">🛒 장바구니</h3>
+      <ul id="cartList" class="space-y-2"></ul>
+      <div class="border-t mt-3 pt-3 text-right">
+        <p class="font-semibold">총합: <span id="totalPrice">0</span>원</p>
+        <button
+          id="checkoutBtn"
+          class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
+        >
+          결제하기
+        </button>
+      </div>
+    </div>
+
+    <!-- 스크립트 -->
+    <script>
       // =============================
-      // 3. 서버에서 동적 데이터 불러오기
-      const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get("id") || 1; // id 없으면 기본값 1
-      const baseUrl = location.origin;
-      
-      fetch(`${baseUrl}/store/${id}`)
-        .then(res => res.json())
-        .then(data => {
-          // 서버에서 반환된 데이터 구조: { hospital: { ... }, menu: [ ... ] }
-          const hospital = data.hospital;
-          const menuData = data.menu;
-          
-          // 3-1. 오른쪽 섹션 (가게 정보) 동적 업데이트
-          document.getElementById("businessNameHeader").textContent = hospital.businessName;
-          document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${hospital.businessType}`;
-          document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${hospital.deliveryOption}`;
-          document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${hospital.businessHours}`;
-          document.getElementById("serviceDetails").textContent = hospital.serviceDetails;
-          document.getElementById("eventsList").innerHTML = `
+      // 1. 이미지 슬라이더 (기본 더미 -> 서버 업데이트 시 교체)
+      let images = [];
+      let currentIndex = 0;
+      const sliderImage = document.getElementById("sliderImage");
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+
+      prevBtn.addEventListener("click", () => {
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        sliderImage.src = images[currentIndex];
+      });
+      nextBtn.addEventListener("click", () => {
+        currentIndex = (currentIndex + 1) % images.length;
+        sliderImage.src = images[currentIndex];
+      });
+
+      // =============================
+      // 2. 카카오맵: 주소를 기반으로 지도 표시 & "카카오맵으로 보기" 버튼
+      function openKakaoMap() {
+        const addr = document.getElementById("addressText").textContent;
+        const url = `https://map.kakao.com/?q=${encodeURIComponent(addr)}`;
+        window.open(url, "_blank");
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        // =============================
+        // 3. 서버에서 동적 데이터 불러오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get("id") || 1; // id 없으면 기본값 1
+        const baseUrl = location.origin;
+
+        fetch(`${baseUrl}/store/${id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            // 서버에서 반환된 데이터 구조: { hospital: { ... }, menu: [ ... ] }
+            const hospital = data.hospital;
+            const menuData = data.menu;
+
+            // 3-1. 오른쪽 섹션 (가게 정보) 동적 업데이트
+            document.getElementById("businessNameHeader").textContent =
+              hospital.businessName;
+            document.getElementById(
+              "businessType"
+            ).innerHTML = `<strong>업종:</strong> ${hospital.businessType}`;
+            document.getElementById(
+              "deliveryOption"
+            ).innerHTML = `<strong>배달:</strong> ${hospital.deliveryOption}`;
+            document.getElementById(
+              "businessHours"
+            ).innerHTML = `<strong>영업시간:</strong> ${hospital.businessHours}`;
+            document.getElementById("serviceDetails").textContent =
+              hospital.serviceDetails;
+            document.getElementById("eventsList").innerHTML = `
             <li>${hospital.event1}</li>
             <li>${hospital.event2}</li>
           `;
-          document.getElementById("additionalInfoList").innerHTML = `
+            document.getElementById("additionalInfoList").innerHTML = `
             <li><strong>장애인 편의시설:</strong> ${hospital.facility}</li>
             <li><strong>반려동물 출입:</strong> ${hospital.pets}</li>
             <li><strong>주차:</strong> ${hospital.parking}</li>
           `;
-          document.getElementById("contactPhone").innerHTML = `<strong>전화번호:</strong> ${hospital.contactPhone}`;
-          document.getElementById("contactHomepage").innerHTML = `
+            document.getElementById(
+              "contactPhone"
+            ).innerHTML = `<strong>전화번호:</strong> ${hospital.contactPhone}`;
+            document.getElementById("contactHomepage").innerHTML = `
             <strong>홈페이지:</strong> 
             <a href="${hospital.homepage}" target="_blank" class="text-blue-600 underline">
               ${hospital.homepage}
             </a>
           `;
-          document.getElementById("additionalDesc").textContent = hospital.additionalDesc;
-          
-          // 3-2. 왼쪽 섹션 - 지도 주소 업데이트 및 지도 재표시
-          document.getElementById("addressText").textContent = hospital.address;
-          const mapContainer = document.getElementById("map");
-          const mapOption = {
-            center: new kakao.maps.LatLng(37.5665, 126.9780),
-            level: 3
-          };
-          const map = new kakao.maps.Map(mapContainer, mapOption);
-          const geocoder = new kakao.maps.services.Geocoder();
-          geocoder.addressSearch(hospital.address, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-              const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-              new kakao.maps.Marker({ map: map, position: coords });
-              map.setCenter(coords);
+            document.getElementById("additionalDesc").textContent =
+              hospital.additionalDesc;
+
+            // 3-2. 왼쪽 섹션 - 지도 주소 업데이트 및 지도 재표시
+            document.getElementById("addressText").textContent =
+              hospital.address;
+            const mapContainer = document.getElementById("map");
+            const mapOption = {
+              center: new kakao.maps.LatLng(37.5665, 126.978),
+              level: 3,
+            };
+            const map = new kakao.maps.Map(mapContainer, mapOption);
+            const geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(hospital.address, (result, status) => {
+              if (status === kakao.maps.services.Status.OK) {
+                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                new kakao.maps.Marker({ map: map, position: coords });
+                map.setCenter(coords);
+              }
+            });
+
+            // 3-3. 왼쪽 섹션 - 이미지 슬라이더 업데이트
+            //     (서버에서 이미지 3장이 있다고 가정: ["/uploads/hospital1.jpg", "...", "..."])
+            if (
+              hospital.images &&
+              Array.isArray(hospital.images) &&
+              hospital.images.length > 0
+            ) {
+              // DB에 "/uploads/..." 형태로 저장된 경로를 실제 접근 가능한 URL로 변환
+              images = hospital.images.map((img) => `${location.origin}${img}`);
+              currentIndex = 0;
+              sliderImage.src = images[currentIndex];
             }
-          });
-          
-          // 3-3. 왼쪽 섹션 - 이미지 슬라이더 업데이트
-          //     (서버에서 이미지 3장이 있다고 가정: ["/uploads/hospital1.jpg", "...", "..."])
-          if (hospital.images && Array.isArray(hospital.images) && hospital.images.length > 0) {
-            // DB에 "/uploads/..." 형태로 저장된 경로를 실제 접근 가능한 URL로 변환
-            images = hospital.images.map(img => `${location.origin}${img}`);
-            currentIndex = 0;
-            sliderImage.src = images[currentIndex];
-          }
-          
-          // 3-4. 왼쪽 섹션 - 메뉴 동적 생성 (서버에서 메뉴 데이터 사용; 예: 3개 메뉴)
-          const menuList = document.getElementById("menuList");
-          menuList.innerHTML = "";
-          if (menuData && Array.isArray(menuData) && menuData.length > 0) {
-            menuData.forEach((item) => {
-              const li = document.createElement("li");
-              li.className = "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
-              li.dataset.name = item.menuName;
-              li.dataset.price = item.menuPrice;
-              li.innerHTML = `
+
+            // 3-4. 왼쪽 섹션 - 메뉴 동적 생성 (서버에서 메뉴 데이터 사용; 예: 3개 메뉴)
+            const menuList = document.getElementById("menuList");
+            menuList.innerHTML = "";
+            if (menuData && Array.isArray(menuData) && menuData.length > 0) {
+              menuData.forEach((item) => {
+                const li = document.createElement("li");
+                li.className =
+                  "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
+                li.dataset.name = item.menuName;
+                li.dataset.price = item.menuPrice;
+                li.innerHTML = `
                 <img
-                  src="${item.menuImageUrl || 'https://via.placeholder.com/80?text=NOIMAGE'}"
+                  src="${
+                    item.menuImageUrl ||
+                    "https://via.placeholder.com/80?text=NOIMAGE"
+                  }"
                   alt="${item.menuName}"
                   class="w-16 h-16 object-cover rounded border"
                 >
-                <span class="font-semibold text-gray-800">${item.menuName}</span>
-                <span class="ml-auto text-gray-600">${Number(item.menuPrice).toLocaleString()}원</span>
+                <span class="font-semibold text-gray-800">${
+                  item.menuName
+                }</span>
+                <span class="ml-auto text-gray-600">${Number(
+                  item.menuPrice
+                ).toLocaleString()}원</span>
                 <div
                   class="absolute left-0 top-full mt-1 w-max opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white border p-2 shadow-lg z-50"
                 >
-                  <p class="text-sm text-gray-800">${item.menuName} 추가 설명</p>
+                  <p class="text-sm text-gray-800">${
+                    item.menuName
+                  } 추가 설명</p>
                 </div>
               `;
-              menuList.appendChild(li);
-            });
-            // 메뉴 동적 생성 후 이벤트 바인딩
-            bindMenuItemEvents();
-          } else {
-            menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
-          }
-        })
-        .catch(err => {
-          console.error("데이터 로딩 실패", err);
-          alert("서버에서 데이터를 가져오는 데 실패했습니다.");
-        });
-    });
-    
-    // =============================
-    // 4. 메뉴 항목 클릭 시 장바구니에 추가 (고정형 결제창)
-    let cart = [];
-    function bindMenuItemEvents() {
-      document.querySelectorAll('.menu-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const name = item.dataset.name;
-          const price = parseInt(item.dataset.price, 10);
-          const found = cart.find(i => i.name === name);
-          if (found) {
-            found.quantity++;
-          } else {
-            cart.push({ name, price, quantity: 1 });
-          }
-          updateCart();
-        });
+                menuList.appendChild(li);
+              });
+              // 메뉴 동적 생성 후 이벤트 바인딩
+              bindMenuItemEvents();
+            } else {
+              menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
+            }
+          })
+          .catch((err) => {
+            console.error("데이터 로딩 실패", err);
+            alert("서버에서 데이터를 가져오는 데 실패했습니다.");
+          });
       });
-    }
-    
-    function updateCart() {
-      const cartList = document.getElementById("cartList");
-      const totalPriceEl = document.getElementById("totalPrice");
-      cartList.innerHTML = "";
-      let total = 0;
-      cart.forEach((item, idx) => {
-        total += item.price * item.quantity;
-        const div = document.createElement("div");
-        div.className = "flex items-center justify-between border-b pb-2";
-        div.innerHTML = `
+
+      // =============================
+      // 4. 메뉴 항목 클릭 시 장바구니에 추가 (고정형 결제창)
+      let cart = [];
+      function bindMenuItemEvents() {
+        document.querySelectorAll(".menu-item").forEach((item) => {
+          item.addEventListener("click", () => {
+            const name = item.dataset.name;
+            const price = parseInt(item.dataset.price, 10);
+            const found = cart.find((i) => i.name === name);
+            if (found) {
+              found.quantity++;
+            } else {
+              cart.push({ name, price, quantity: 1 });
+            }
+            updateCart();
+          });
+        });
+      }
+
+      function updateCart() {
+        const cartList = document.getElementById("cartList");
+        const totalPriceEl = document.getElementById("totalPrice");
+        cartList.innerHTML = "";
+        let total = 0;
+        cart.forEach((item, idx) => {
+          total += item.price * item.quantity;
+          const div = document.createElement("div");
+          div.className = "flex items-center justify-between border-b pb-2";
+          div.innerHTML = `
           <div>
             <span class="font-semibold">${item.name}</span>
             <span class="ml-2 text-gray-600">${item.price}원</span>
@@ -337,32 +365,34 @@
             <button class="delete border px-2 ml-2 text-red-500">삭제</button>
           </div>
         `;
-        div.querySelector(".increase").onclick = () => {
-          item.quantity++;
-          updateCart();
-        };
-        div.querySelector(".decrease").onclick = () => {
-          item.quantity--;
-          if (item.quantity <= 0) cart.splice(idx, 1);
-          updateCart();
-        };
-        div.querySelector(".delete").onclick = () => {
-          cart.splice(idx, 1);
-          updateCart();
-        };
-        cartList.appendChild(div);
-      });
-      totalPriceEl.textContent = total.toLocaleString();
-      const cartBox = document.getElementById("cartBox");
-      cartBox.classList.toggle("hidden", cart.length === 0);
-    }
-    
-    document.getElementById("checkoutBtn").addEventListener("click", () => {
-      if (cart.length === 0) {
-        return alert("장바구니가 비어 있습니다.");
+          div.querySelector(".increase").onclick = () => {
+            item.quantity++;
+            updateCart();
+          };
+          div.querySelector(".decrease").onclick = () => {
+            item.quantity--;
+            if (item.quantity <= 0) cart.splice(idx, 1);
+            updateCart();
+          };
+          div.querySelector(".delete").onclick = () => {
+            cart.splice(idx, 1);
+            updateCart();
+          };
+          cartList.appendChild(div);
+        });
+        totalPriceEl.textContent = total.toLocaleString();
+        const cartBox = document.getElementById("cartBox");
+        cartBox.classList.toggle("hidden", cart.length === 0);
       }
-      alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
-    });
-  </script>
-</body>
+
+      document.getElementById("checkoutBtn").addEventListener("click", () => {
+        if (cart.length === 0) {
+          return alert("장바구니가 비어 있습니다.");
+        }
+        alert(
+          `총 ${document.getElementById("totalPrice").textContent}원 결제 진행`
+        );
+      });
+    </script>
+  </body>
 </html>
