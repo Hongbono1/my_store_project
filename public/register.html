@@ -28,16 +28,32 @@
         <form id="businessForm" enctype="multipart/form-data" class="space-y-6">
           <input type="hidden" id="storeId" name="storeId" value="" />
 
-          <!-- [추가] 사업자 등록 인증 섹션 -->
+          <!-- [추가] 사업자 등록 인증 섹션 (방법 B: 3칸 입력) -->
           <div class="border rounded p-4 bg-yellow-50">
             <h2 class="text-xl font-semibold mb-4">사업자 등록 인증</h2>
             <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label for="bizNumber" class="w-32 font-medium">사업자 번호</label>
+              <label class="w-32 font-medium">사업자 번호</label>
               <input
                 type="text"
-                id="bizNumber"
-                name="bizNumber"
-                placeholder="10자리 숫자"
+                id="bizNumber1"
+                name="bizNumber1"
+                placeholder="예: 336"
+                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
+              />
+              <span>-</span>
+              <input
+                type="text"
+                id="bizNumber2"
+                name="bizNumber2"
+                placeholder="예: 12"
+                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
+              />
+              <span>-</span>
+              <input
+                type="text"
+                id="bizNumber3"
+                name="bizNumber3"
+                placeholder="예: 12365"
                 class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
               />
               <button
@@ -435,7 +451,8 @@
           reader.onload = (e) => {
             const img = document.createElement("img");
             img.src = e.target.result;
-            img.className = "w-32 h-20 object-cover border border-gray-300 rounded";
+            img.className =
+              "w-32 h-20 object-cover border border-gray-300 rounded";
             imagesPreview.appendChild(img);
           };
           reader.readAsDataURL(file);
@@ -484,13 +501,15 @@
       }
 
       // 상세주소 입력 후 지도 갱신
-      document.getElementById("detailAddress").addEventListener("blur", function () {
-        const baseAddr = document.getElementById("roadAddress").value.trim();
-        const detailAddr = this.value.trim();
-        if (baseAddr !== "" || detailAddr !== "") {
-          updateMap(baseAddr + " " + detailAddr);
-        }
-      });
+      document
+        .getElementById("detailAddress")
+        .addEventListener("blur", function () {
+          const baseAddr = document.getElementById("roadAddress").value.trim();
+          const detailAddr = this.value.trim();
+          if (baseAddr !== "" || detailAddr !== "") {
+            updateMap(baseAddr + " " + detailAddr);
+          }
+        });
 
       // 가격 입력: 숫자, 콤마, 소수점 정리 + 0도 지워지게 처리
       function formatCurrency(input) {
@@ -522,27 +541,32 @@
         itemCount++;
         const itemList = document.getElementById("itemList");
         const itemDiv = document.createElement("div");
-        itemDiv.className = "flex flex-col md:flex-row md:items-center gap-2 border p-2 rounded";
+        itemDiv.className =
+          "flex flex-col md:flex-row md:items-center gap-2 border p-2 rounded";
         const menuImageInput = document.createElement("input");
         menuImageInput.type = "file";
         menuImageInput.accept = "image/*";
         menuImageInput.name = "menuImage[]";
-        menuImageInput.className = "border border-gray-300 rounded px-2 py-1";
+        menuImageInput.className =
+          "border border-gray-300 rounded px-2 py-1";
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.placeholder = "품목 이름";
         nameInput.name = "menuName[]";
-        nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
+        nameInput.className =
+          "flex-1 border border-gray-300 rounded px-2 py-1";
         const priceInput = document.createElement("input");
         priceInput.type = "text";
         priceInput.placeholder = "가격";
         priceInput.name = "menuPrice[]";
-        priceInput.className = "w-32 border border-gray-300 rounded px-2 py-1";
+        priceInput.className =
+          "w-32 border border-gray-300 rounded px-2 py-1";
         priceInput.setAttribute("oninput", "formatCurrency(this)");
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.textContent = "삭제";
-        removeBtn.className = "bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1 rounded";
+        removeBtn.className =
+          "bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1 rounded";
         removeBtn.onclick = function () {
           itemDiv.remove();
           itemCount--;
@@ -554,13 +578,17 @@
         itemList.appendChild(itemDiv);
       }
 
-      // 사업자 등록번호 인증 처리
+      // 사업자 등록번호 인증 처리 (방법 B)
       async function verifyBizNumber() {
-        const bizNo = document.getElementById("bizNumber").value.trim();
+        const part1 = document.getElementById("bizNumber1").value.trim();
+        const part2 = document.getElementById("bizNumber2").value.trim();
+        const part3 = document.getElementById("bizNumber3").value.trim();
+        const combined = part1 + part2 + part3;
         const resultEl = document.getElementById("bizVerifyResult");
         const bizNameInput = document.getElementById("businessName");
-        if (!/^\d{10}$/.test(bizNo)) {
-          resultEl.textContent = "올바른 사업자번호를 입력하세요 (10자리 숫자)";
+        if (!/^\d{10}$/.test(combined)) {
+          resultEl.textContent =
+            "올바른 사업자번호를 입력하세요 (총 10자리 숫자)";
           resultEl.className = "text-sm text-red-600";
           return;
         }
@@ -570,7 +598,7 @@
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ b_no: [bizNo] })
+              body: JSON.stringify({ b_no: [combined] }),
             }
           );
           const data = await response.json();
@@ -591,31 +619,36 @@
       }
 
       // 휴대전화 인증 처리 (테스트 시뮬레이션)
-      document.getElementById("verifyPhoneButton").addEventListener("click", async function() {
-        // 휴대전화 인증은 업주 정보 섹션의 "ownerPhone"을 사용
-        const ownerPhone = document.getElementById("ownerPhone").value.trim();
-        const phoneResultEl = document.getElementById("phoneVerifyResult");
-        if (!ownerPhone) {
-          phoneResultEl.textContent = "핸드폰 번호를 입력해주세요.";
-          phoneResultEl.className = "text-sm text-red-600";
-          return;
-        }
-        // 실제 API 대신 테스트용 인증번호 "123456" 발송 시뮬레이션
-        phoneResultEl.textContent = "인증번호가 발송되었습니다. (테스트 코드: 123456)";
-        phoneResultEl.className = "text-sm text-green-600";
-      });
-
-      document.getElementById("phoneAuth").addEventListener("blur", function() {
-        const code = this.value.trim();
-        const phoneResultEl = document.getElementById("phoneVerifyResult");
-        if (code === "123456") {
-          phoneResultEl.textContent = "휴대전화 인증 성공.";
+      document
+        .getElementById("verifyPhoneButton")
+        .addEventListener("click", async function () {
+          // 휴대전화 인증은 업주 정보 섹션의 "ownerPhone"을 사용
+          const ownerPhone = document.getElementById("ownerPhone").value.trim();
+          const phoneResultEl = document.getElementById("phoneVerifyResult");
+          if (!ownerPhone) {
+            phoneResultEl.textContent = "핸드폰 번호를 입력해주세요.";
+            phoneResultEl.className = "text-sm text-red-600";
+            return;
+          }
+          // 실제 API 대신 테스트용 인증번호 "123456" 발송 시뮬레이션
+          phoneResultEl.textContent =
+            "인증번호가 발송되었습니다. (테스트 코드: 123456)";
           phoneResultEl.className = "text-sm text-green-600";
-        } else {
-          phoneResultEl.textContent = "인증번호가 일치하지 않습니다.";
-          phoneResultEl.className = "text-sm text-red-600";
-        }
-      });
+        });
+
+      document
+        .getElementById("phoneAuth")
+        .addEventListener("blur", function () {
+          const code = this.value.trim();
+          const phoneResultEl = document.getElementById("phoneVerifyResult");
+          if (code === "123456") {
+            phoneResultEl.textContent = "휴대전화 인증 성공.";
+            phoneResultEl.className = "text-sm text-green-600";
+          } else {
+            phoneResultEl.textContent = "인증번호가 일치하지 않습니다.";
+            phoneResultEl.className = "text-sm text-red-600";
+          }
+        });
 
       // 헤더/푸터 삽입 (외부 파일 사용)
       fetch("/components/header.html")
@@ -642,7 +675,10 @@
             const raw = input.value.replace(/,/g, "");
             formData.append("menuPrice[]", raw);
           });
-          const response = await fetch("/store", { method: "POST", body: formData });
+          const response = await fetch("/store", {
+            method: "POST",
+            body: formData,
+          });
           if (!response.ok) throw new Error("서버 응답 에러");
           const result = await response.json();
           console.log("서버 응답 (등록)", result);
@@ -670,7 +706,10 @@
             const raw = input.value.replace(/,/g, "");
             formData.append("menuPrice[]", raw);
           });
-          const response = await fetch(`/store/${storeId}`, { method: "PUT", body: formData });
+          const response = await fetch(`/store/${storeId}`, {
+            method: "PUT",
+            body: formData,
+          });
           if (!response.ok) throw new Error("서버 응답 에러 (수정)");
           const result = await response.json();
           console.log("서버 응답 (수정)", result);
