@@ -1,685 +1,488 @@
 <!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>정보 입력</title>
-    <!-- Tailwind CSS CDN (개발 중에는 괜찮지만, 프로덕션에서는 빌드된 CSS 사용 권장) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 다음 우편번호 검색 API -->
-    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <!-- 카카오 지도 API (YOUR_API_KEY 부분을 실제 앱 키로 교체) -->
-    <script
-      type="text/javascript"
-      src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"
-    ></script>
-  </head>
-  <body class="bg-gray-200 flex flex-col min-h-screen">
-    <div id="header-placeholder"></div>
-    <!-- 메인 영역 -->
-    <main class="flex-grow container mx-auto px-4 py-8">
-      <div
-        class="bg-white w-full max-w-4xl p-6 rounded-lg shadow-lg border-2 border-gray-300 mx-auto"
-      >
-        <!-- 제목 -->
-        <div class="flex justify-center items-center mb-6">
-          <h2 class="text-3xl font-bold text-gray-800">정보 입력</h2>
-        </div>
-        <!-- 입력 폼 -->
-        <!-- Hidden input: storeId가 있으면 수정 모드로 인식 -->
-        <form id="businessForm" enctype="multipart/form-data" class="space-y-6">
-          <input type="hidden" id="storeId" name="storeId" value="" />
 
-          <!-- [추가] 사업자 등록 인증 섹션 (방법 B: 3칸 입력) -->
-          <div class="border rounded p-4 bg-yellow-50">
-            <h2 class="text-xl font-semibold mb-4">사업자 등록 인증</h2>
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label class="w-20 font-medium leading-tight text-center">
-                <span class="block">사업자</span>
-                <span class="block">번 호</span>
-              </label>
-              <input
-                type="text"
-                id="bizNumber1"
-                name="bizNumber1"
-                placeholder="예: 336"
-                maxlength="4"
-                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
-              />
-              <span>-</span>
-              <input
-                type="text"
-                id="bizNumber2"
-                name="bizNumber2"
-                placeholder="예: 4"
-                maxlength="4"
-                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
-              />
-              <span>-</span>
-              <input
-                type="text"
-                id="bizNumber3"
-                name="bizNumber3"
-                placeholder="예: 12365"
-                maxlength="6"
-                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
-              />
-              <button
-                type="button"
-                id="verifyBizButton"
-                class="ml-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded"
-                onclick="verifyBizNumber()"
-              >
-                인증
-              </button>
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-2">
-              <label for="businessCertImage" class="w-32 font-medium"
-                >등록증 이미지</label
-              >
-              <input
-                type="file"
-                id="businessCertImage"
-                name="businessCertImage"
-                accept="image/*,application/pdf"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200"
-              />
-            </div>
-            <p class="mt-2 text-sm text-center">
-              *사업자 등록증은 <span class="text-red-600">3개월 이내</span> 발급
-              받은 것만 유효*
-            </p>
-            <p id="bizVerifyResult" class="text-sm text-gray-600"></p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정보 입력</title>
+  <!-- Tailwind CSS CDN (개발 중에는 괜찮지만, 프로덕션에서는 빌드된 CSS 사용 권장) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 다음 우편번호 검색 API -->
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <!-- 카카오 지도 API (YOUR_API_KEY 부분을 실제 앱 키로 교체) -->
+  <script type="text/javascript"
+    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
+</head>
+
+<body class="bg-gray-200 flex flex-col min-h-screen">
+  <div id="header-placeholder"></div>
+  <!-- 메인 영역 -->
+  <main class="flex-grow container mx-auto px-4 py-8">
+    <div class="bg-white w-full max-w-4xl p-6 rounded-lg shadow-lg border-2 border-gray-300 mx-auto">
+      <!-- 제목 -->
+      <div class="flex justify-center items-center mb-6">
+        <h2 class="text-3xl font-bold text-gray-800">정보 입력</h2>
+      </div>
+      <!-- 입력 폼 -->
+      <!-- Hidden input: storeId가 있으면 수정 모드로 인식 -->
+      <form id="businessForm" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" id="storeId" name="storeId" value="" />
+
+        <!-- [추가] 사업자 등록 인증 섹션 (방법 B: 3칸 입력) -->
+        <div class="border rounded p-4 bg-yellow-50">
+          <h2 class="text-xl font-semibold mb-4">사업자 등록 인증</h2>
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+            <label class="w-20 font-medium leading-tight text-center">
+              <span class="block">사업자</span>
+              <span class="block">번 호</span>
+            </label>
+            <input type="text" id="bizNumber1" name="bizNumber1" placeholder="예: 336" maxlength="4"
+              oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200" />
+            <span>-</span>
+            <input type="text" id="bizNumber2" name="bizNumber2" placeholder="예: 4" maxlength="4"
+              oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200" />
+            <span>-</span>
+            <input type="text" id="bizNumber3" name="bizNumber3" placeholder="예: 12365" maxlength="6"
+              oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200" />
+            <button type="button" id="verifyBizButton"
+              class="ml-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded"
+              onclick="verifyBizNumber()">
+              인증
+            </button>
           </div>
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-2">
+            <label for="businessCertImage" class="w-32 font-medium">등록증 이미지</label>
+            <input type="file" id="businessCertImage" name="businessCertImage" accept="image/*,application/pdf"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-yellow-200" />
+          </div>
+          <p class="mt-2 text-sm text-center">
+            *사업자 등록증은 <span class="text-red-600">3개월 이내</span> 발급
+            받은 것만 유효*
+          </p>
+          <p id="bizVerifyResult" class="text-sm text-gray-600"></p>
+        </div>
 
-          <!-- [추가] 업주 정보 섹션 -->
-          <div class="border rounded p-4 bg-indigo-100">
-            <h2 class="text-xl font-semibold mb-4">대표 정보</h2>
+        <!-- [추가] 업주 정보 섹션 -->
+        <div class="border rounded p-4 bg-indigo-100">
+          <h2 class="text-xl font-semibold mb-4">대표 정보</h2>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="ownerName" class="w-32 font-medium">대표자 성함</label>
+            <input type="text" id="ownerName" name="ownerName" placeholder="예: 홍길동"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
+          </div>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="birthDate" class="w-32 font-medium">생년월일</label>
+            <input type="date" id="birthDate" name="birthDate"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
+          </div>
+          <div class="flex items-center gap-2 mb-4">
+            <!-- 이메일 (한 줄) -->
             <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="ownerName" class="w-32 font-medium"
-                >대표자 성함</label
-              >
-              <input
-                type="text"
-                id="ownerName"
-                name="ownerName"
-                placeholder="예: 홍길동"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="birthDate" class="w-32 font-medium">생년월일</label>
-              <input
-                type="date"
-                id="birthDate"
-                name="birthDate"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-              />
-            </div>
-            <div class="flex items-center gap-2 mb-4">
-              <!-- 이메일 (한 줄) -->
-              <div class="flex flex-col md:flex-row md:items-center mb-3">
-                <!-- 라벨: 다른 라벨과 동일 폭 (예: w-32) -->
-                <label for="emailId" class="w-32 font-medium">이메일</label>
+              <!-- 라벨: 다른 라벨과 동일 폭 (예: w-32) -->
+              <label for="emailId" class="w-32 font-medium">이메일</label>
 
-                <!-- 오른쪽: 아이디 + @ + 도메인 -->
-                <div class="flex-1 flex items-center gap-2">
-                  <!-- 아이디 입력 -->
-                  <input
-                    type="text"
-                    id="emailId"
-                    placeholder="아이디"
+              <!-- 오른쪽: 아이디 + @ + 도메인 -->
+              <div class="flex-1 flex items-center gap-2">
+                <!-- 아이디 입력 -->
+                <input type="text" id="emailId" placeholder="아이디"
+                  class="w-80 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
+                  oninput="updateEmail()" />
+
+                <!-- @ 기호 (고정) -->
+                <span class="font-semibold text-gray-600 mx-1">@</span>
+
+                <!-- 도메인 (select ↔ input 토글 영역) -->
+                <div class="relative flex-1">
+                  <!-- 선택 박스 (기본 보임) -->
+                  <select id="emailDomainSelect"
                     class="w-80 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-                    oninput="updateEmail()"
-                  />
+                    onchange="handleDomainChange(this)">
+                    <option value="">선택하세요</option>
+                    <option value="naver.com">naver.com</option>
+                    <option value="gmail.com">gmail.com</option>
+                    <option value="daum.net">daum.net</option>
+                    <option value="kakao.com">kakao.com</option>
+                    <option value="nate.com">nate.com</option>
+                    <option value="custom">직접입력</option>
+                  </select>
 
-                  <!-- @ 기호 (고정) -->
-                  <span class="font-semibold text-gray-600 mx-1">@</span>
-
-                  <!-- 도메인 (select ↔ input 토글 영역) -->
-                  <div class="relative flex-1">
-                    <!-- 선택 박스 (기본 보임) -->
-                    <select
-                      id="emailDomainSelect"
-                      class="w-80 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-                      onchange="handleDomainChange(this)"
-                    >
-                      <option value="">선택하세요</option>
-                      <option value="naver.com">naver.com</option>
-                      <option value="gmail.com">gmail.com</option>
-                      <option value="daum.net">daum.net</option>
-                      <option value="kakao.com">kakao.com</option>
-                      <option value="nate.com">nate.com</option>
-                      <option value="custom">직접입력</option>
-                    </select>
-
-                    <!-- 직접 입력 칸 (기본 hidden) -->
-                    <input
-                      type="text"
-                      id="customDomainInput"
-                      placeholder="도메인 입력"
-                      class="absolute inset-0 w-full h-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200 hidden"
-                      oninput="updateEmail()"
-                    />
-                  </div>
+                  <!-- 직접 입력 칸 (기본 hidden) -->
+                  <input type="text" id="customDomainInput" placeholder="도메인 입력"
+                    class="absolute inset-0 w-full h-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200 hidden"
+                    oninput="updateEmail()" />
                 </div>
               </div>
-
-              <!-- 최종 실제 전송용 숨김 필드 -->
-              <input type="hidden" id="ownerEmail" name="ownerEmail" />
             </div>
 
-            <!-- 실제 전송될 이메일 전체 주소 -->
+            <!-- 최종 실제 전송용 숨김 필드 -->
             <input type="hidden" id="ownerEmail" name="ownerEmail" />
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="ownerAddress" class="w-32 font-medium"
-                >대표 주소</label
-              >
-              <input
-                type="text"
-                id="ownerAddress"
-                name="ownerAddress"
-                placeholder="예: 서울시 강남구 ..."
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center">
-              <label for="ownerPhone" class="w-32 font-medium"
-                >핸드폰 번호</label
-              >
-              <input
-                type="text"
-                id="ownerPhone"
-                name="ownerPhone"
-                placeholder="ex) 010-1234-5678"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-              />
-            </div>
           </div>
 
-          <!-- [추가] 휴대전화 인증 섹션 -->
-          <div class="border rounded p-4 bg-indigo-50">
-            <h2 class="text-xl font-semibold mb-4">휴대전화 인증</h2>
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label for="phoneAuth" class="w-32 font-medium">인증번호</label>
-              <input
-                type="text"
-                id="phoneAuth"
-                name="phoneAuth"
-                placeholder="인증번호 입력"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
-              />
-              <button
-                type="button"
-                id="verifyPhoneButton"
-                class="ml-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded"
-              >
-                인증 요청
-              </button>
-            </div>
-            <p id="phoneVerifyResult" class="text-sm text-gray-600"></p>
+          <!-- 실제 전송될 이메일 전체 주소 -->
+          <input type="hidden" id="ownerEmail" name="ownerEmail" />
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="ownerAddress" class="w-32 font-medium">대표 주소</label>
+            <input type="text" id="ownerAddress" name="ownerAddress" placeholder="예: 서울시 강남구 ..."
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
           </div>
-
-          <!-- 기본 정보 (가게 관련 정보) -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">기본 정보</h2>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="businessName" class="w-32 font-medium">상호</label>
-              <input
-                type="text"
-                id="businessName"
-                name="businessName"
-                placeholder="ex) OO 식당, 카페 XX 등"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="businessType" class="w-32 font-medium">업종</label>
-              <input
-                type="text"
-                id="businessType"
-                name="businessType"
-                placeholder="ex) 음식점, 카페, 기타"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="deliveryOption" class="w-32 font-medium"
-                >배송/테이크아웃</label
-              >
-              <select
-                id="deliveryOption"
-                name="deliveryOption"
-                class="mt-1 md:mt-0 flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              >
-                <option value="가능">가능</option>
-                <option value="불가능">불가능</option>
-              </select>
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center">
-              <label for="businessHours" class="w-32 font-medium"
-                >영업시간</label
-              >
-              <input
-                type="text"
-                id="businessHours"
-                name="businessHours"
-                placeholder="ex) 09:00 ~ 22:00"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
+          <div class="flex flex-col md:flex-row md:items-center">
+            <label for="ownerPhone" class="w-32 font-medium">핸드폰 번호</label>
+            <input type="text" id="ownerPhone" name="ownerPhone" placeholder="ex) 010-1234-5678"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
           </div>
+        </div>
 
-          <!-- 서비스 내용 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">서비스 내용</h2>
-            <textarea
-              id="serviceDetails"
-              name="serviceDetails"
-              placeholder="서비스 관련 상세 설명, 메뉴, 예약 정보 등을 입력하세요."
-              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              rows="4"
-            ></textarea>
-          </div>
-
-          <!-- 고객 이벤트 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">고객 이벤트</h2>
-            <div class="mb-3">
-              <label for="event1" class="block font-medium mb-1"
-                >이벤트 내용 1</label
-              >
-              <input
-                type="text"
-                id="event1"
-                name="event1"
-                placeholder="이벤트 내용 1"
-                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div>
-              <label for="event2" class="block font-medium mb-1"
-                >이벤트 내용 2</label
-              >
-              <input
-                type="text"
-                id="event2"
-                name="event2"
-                placeholder="이벤트 내용 2"
-                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-          </div>
-
-          <!-- 기타 정보 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">기타 정보</h2>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="facility" class="w-32 font-medium"
-                >장애인 편의시설</label
-              >
-              <input
-                type="text"
-                id="facility"
-                name="facility"
-                placeholder="예: 있음 / 없음 / 간단 설명"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="pets" class="w-32 font-medium">반려동물 출입</label>
-              <input
-                type="text"
-                id="pets"
-                name="pets"
-                placeholder="예: 가능(소형견만) / 불가능 등"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center">
-              <label for="parking" class="w-32 font-medium">주차정보</label>
-              <input
-                type="text"
-                id="parking"
-                name="parking"
-                placeholder="예: 전용주차장 / 유료주차 / 불가능 등"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-          </div>
-
-          <!-- 품목 입력 (최대 20개) -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">품목 입력 (최대 20개)</h2>
-            <div id="itemList" class="space-y-4"></div>
-            <button
-              type="button"
-              class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
-              onclick="addItem()"
-            >
-              +
+        <!-- [추가] 휴대전화 인증 섹션 -->
+        <div class="border rounded p-4 bg-indigo-50">
+          <h2 class="text-xl font-semibold mb-4">휴대전화 인증</h2>
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+            <label for="phoneAuth" class="w-32 font-medium">인증번호</label>
+            <input type="text" id="phoneAuth" name="phoneAuth" placeholder="인증번호 입력"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
+            <button type="button" id="verifyPhoneButton"
+              class="ml-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded">
+              인증 요청
             </button>
           </div>
+          <p id="phoneVerifyResult" class="text-sm text-gray-600"></p>
+        </div>
 
-          <!-- 연락처 (가게 관련 연락 정보) -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">연락처</h2>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="phoneNumber" class="w-32 font-medium">대표전화</label>
-              <input
-                type="text"
-                id="phoneNumber"
-                name="phoneNumber"
-                placeholder="ex) 02-123-4567"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="homepage" class="w-32 font-medium"
-                >홈페이지/블로그</label
-              >
-              <input
-                type="text"
-                id="homepage"
-                name="homepage"
-                placeholder="URL을 입력하세요"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <!-- 인스타그램 주소 입력 -->
-            <div class="flex flex-col md:flex-row md:items-center mb-3">
-              <label for="instagram" class="w-32 font-medium">인스타그램</label>
-              <input
-                type="text"
-                id="instagram"
-                name="instagram"
-                placeholder="인스타그램 URL"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <!-- 페이스북 주소 입력 -->
-            <div class="flex flex-col md:flex-row md:items-center">
-              <label for="facebook" class="w-32 font-medium">페이스북</label>
-              <input
-                type="text"
-                id="facebook"
-                name="facebook"
-                placeholder="페이스북 URL"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
+        <!-- 기본 정보 (가게 관련 정보) -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">기본 정보</h2>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="businessName" class="w-32 font-medium">상호</label>
+            <input type="text" id="businessName" name="businessName" placeholder="ex) OO 식당, 카페 XX 등"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
           </div>
-
-          <!-- 추가 설명 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">추가 설명</h2>
-            <textarea
-              id="additionalDesc"
-              name="additionalDesc"
-              placeholder="추가 설명을 입력하세요."
-              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              rows="4"
-            ></textarea>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="businessType" class="w-32 font-medium">업종</label>
+            <input type="text" id="businessType" name="businessType" placeholder="ex) 음식점, 카페, 기타"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
           </div>
-
-          <!-- 이미지 등록 (최대 3장) : 가게 대표 이미지 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">이미지 등록 (최대 3장)</h2>
-            <input
-              type="file"
-              id="imagesInput"
-              name="images[]"
-              accept="image/*"
-              multiple
-              class="block w-full mb-3 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
-            />
-            <div id="imagesPreview" class="flex gap-3"></div>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="deliveryOption" class="w-32 font-medium">배송/테이크아웃</label>
+            <select id="deliveryOption" name="deliveryOption"
+              class="mt-1 md:mt-0 flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200">
+              <option value="가능">가능</option>
+              <option value="불가능">불가능</option>
+            </select>
           </div>
-
-          <!-- 주소 입력 -->
-          <div class="border rounded p-4 bg-gray-50">
-            <h2 class="text-xl font-semibold mb-4">주소 입력</h2>
-            <!-- 우편번호 및 주소 검색 버튼 -->
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label for="postalCode" class="w-32 font-medium">우편번호</label>
-              <input
-                type="text"
-                id="postalCode"
-                name="postalCode"
-                placeholder="우편번호"
-                readonly
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-              <button
-                type="button"
-                onclick="openDaumPostcode()"
-                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded"
-              >
-                주소 찾기
-              </button>
-            </div>
-            <!-- 도로명 주소 -->
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label for="roadAddress" class="w-32 font-medium"
-                >도로명 주소</label
-              >
-              <input
-                type="text"
-                id="roadAddress"
-                name="roadAddress"
-                placeholder="도로명 주소"
-                readonly
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <!-- 상세 주소 -->
-            <div class="flex flex-col md:flex-row md:items-center gap-2">
-              <label for="detailAddress" class="w-32 font-medium"
-                >상세 주소</label
-              >
-              <input
-                type="text"
-                id="detailAddress"
-                name="detailAddress"
-                placeholder="상세 주소를 입력하세요"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </div>
-            <!-- 지도 영역 -->
-            <div
-              id="map"
-              class="mt-4 w-full h-64 border border-gray-300 rounded"
-            ></div>
+          <div class="flex flex-col md:flex-row md:items-center">
+            <label for="businessHours" class="w-32 font-medium">영업시간</label>
+            <input type="text" id="businessHours" name="businessHours" placeholder="ex) 09:00 ~ 22:00"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
           </div>
+        </div>
 
-          <!-- 제출 및 수정 버튼 -->
-          <div class="text-center space-x-4">
-            <!-- 입력 완료 버튼 -->
-            <button
-              type="submit"
-              class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded"
-            >
-              입력 완료
-            </button>
-            <!-- 수정 버튼 -->
-            <button
-              type="button"
-              class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded"
-              onclick="updateData()"
-            >
-              수정
+        <!-- 서비스 내용 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">서비스 내용</h2>
+          <textarea id="serviceDetails" name="serviceDetails" placeholder="서비스 관련 상세 설명, 메뉴, 예약 정보 등을 입력하세요."
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
+            rows="4"></textarea>
+        </div>
+
+        <!-- 고객 이벤트 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">고객 이벤트</h2>
+          <div class="mb-3">
+            <label for="event1" class="block font-medium mb-1">이벤트 내용 1</label>
+            <input type="text" id="event1" name="event1" placeholder="이벤트 내용 1"
+              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <div>
+            <label for="event2" class="block font-medium mb-1">이벤트 내용 2</label>
+            <input type="text" id="event2" name="event2" placeholder="이벤트 내용 2"
+              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+        </div>
+
+        <!-- 기타 정보 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">기타 정보</h2>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="facility" class="w-32 font-medium">장애인 편의시설</label>
+            <input type="text" id="facility" name="facility" placeholder="예: 있음 / 없음 / 간단 설명"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="pets" class="w-32 font-medium">반려동물 출입</label>
+            <input type="text" id="pets" name="pets" placeholder="예: 가능(소형견만) / 불가능 등"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <div class="flex flex-col md:flex-row md:items-center">
+            <label for="parking" class="w-32 font-medium">주차정보</label>
+            <input type="text" id="parking" name="parking" placeholder="예: 전용주차장 / 유료주차 / 불가능 등"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+        </div>
+
+        <!-- 품목 입력 (최대 20개) -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">품목 입력 (최대 20개)</h2>
+          <div id="itemList" class="space-y-4"></div>
+          <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
+            onclick="addItem()">
+            +
+          </button>
+        </div>
+
+        <!-- 연락처 (가게 관련 연락 정보) -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">연락처</h2>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="phoneNumber" class="w-32 font-medium">대표전화</label>
+            <input type="text" id="phoneNumber" name="phoneNumber" placeholder="ex) 02-123-4567"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="homepage" class="w-32 font-medium">홈페이지/블로그</label>
+            <input type="text" id="homepage" name="homepage" placeholder="URL을 입력하세요"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <!-- 인스타그램 주소 입력 -->
+          <div class="flex flex-col md:flex-row md:items-center mb-3">
+            <label for="instagram" class="w-32 font-medium">인스타그램</label>
+            <input type="text" id="instagram" name="instagram" placeholder="인스타그램 URL"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <!-- 페이스북 주소 입력 -->
+          <div class="flex flex-col md:flex-row md:items-center">
+            <label for="facebook" class="w-32 font-medium">페이스북</label>
+            <input type="text" id="facebook" name="facebook" placeholder="페이스북 URL"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+        </div>
+
+        <!-- 추가 설명 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">추가 설명</h2>
+          <textarea id="additionalDesc" name="additionalDesc" placeholder="추가 설명을 입력하세요."
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
+            rows="4"></textarea>
+        </div>
+
+        <!-- 이미지 등록 (최대 3장) : 가게 대표 이미지 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">이미지 등록 (최대 3장)</h2>
+          <input type="file" id="imagesInput" name="images[]" accept="image/*" multiple
+            class="block w-full mb-3 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" />
+          <div id="imagesPreview" class="flex gap-3"></div>
+        </div>
+
+        <!-- 주소 입력 -->
+        <div class="border rounded p-4 bg-gray-50">
+          <h2 class="text-xl font-semibold mb-4">주소 입력</h2>
+          <!-- 우편번호 및 주소 검색 버튼 -->
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+            <label for="postalCode" class="w-32 font-medium">우편번호</label>
+            <input type="text" id="postalCode" name="postalCode" placeholder="우편번호" readonly
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+            <button type="button" onclick="openDaumPostcode()"
+              class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded">
+              주소 찾기
             </button>
           </div>
-        </form>
-      </div>
-    </main>
+          <!-- 도로명 주소 -->
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+            <label for="roadAddress" class="w-32 font-medium">도로명 주소</label>
+            <input type="text" id="roadAddress" name="roadAddress" placeholder="도로명 주소" readonly
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <!-- 상세 주소 -->
+          <div class="flex flex-col md:flex-row md:items-center gap-2">
+            <label for="detailAddress" class="w-32 font-medium">상세 주소</label>
+            <input type="text" id="detailAddress" name="detailAddress" placeholder="상세 주소를 입력하세요"
+              class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200" />
+          </div>
+          <!-- 지도 영역 -->
+          <div id="map" class="mt-4 w-full h-64 border border-gray-300 rounded"></div>
+        </div>
 
-    <div id="footer-placeholder"></div>
+        <!-- 제출 및 수정 버튼 -->
+        <div class="text-center space-x-4">
+          <!-- 입력 완료 버튼 -->
+          <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded">
+            입력 완료
+          </button>
+          <!-- 수정 버튼 -->
+          <button type="button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded"
+            onclick="updateData()">
+            수정
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
 
-    <!-- 자바스크립트 -->
-    <script>
-      // 이미지 미리보기 (최대 3장)
-      const imagesInput = document.getElementById("imagesInput");
-      const imagesPreview = document.getElementById("imagesPreview");
-      imagesInput.addEventListener("change", () => {
-        imagesPreview.innerHTML = "";
-        const files = Array.from(imagesInput.files).slice(0, 3);
-        files.forEach((file) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const img = document.createElement("img");
-            img.src = e.target.result;
-            img.className =
-              "w-32 h-20 object-cover border border-gray-300 rounded";
-            imagesPreview.appendChild(img);
-          };
-          reader.readAsDataURL(file);
+  <div id="footer-placeholder"></div>
+
+  <!-- 자바스크립트 -->
+  <script>
+    // 이미지 미리보기 (최대 3장)
+    const imagesInput = document.getElementById("imagesInput");
+    const imagesPreview = document.getElementById("imagesPreview");
+    imagesInput.addEventListener("change", () => {
+      imagesPreview.innerHTML = "";
+      const files = Array.from(imagesInput.files).slice(0, 3);
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement("img");
+          img.src = e.target.result;
+          img.className =
+            "w-32 h-20 object-cover border border-gray-300 rounded";
+          imagesPreview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    // 주소 검색 (다음 우편번호)
+    function openDaumPostcode() {
+      new daum.Postcode({
+        oncomplete: function (data) {
+          document.getElementById("postalCode").value = data.zonecode;
+          document.getElementById("roadAddress").value = data.roadAddress;
+          updateMap(data.roadAddress);
+          document.getElementById("detailAddress").focus();
+        },
+      }).open({ autoClose: true });
+    }
+
+    // 지도 표시 관련 변수
+    let map;
+    let marker;
+    // 지도 업데이트 함수 (주소를 받아 지도 중앙과 마커 위치 갱신)
+    function updateMap(address) {
+      const mapContainer = document.getElementById("map");
+      if (!map) {
+        map = new kakao.maps.Map(mapContainer, {
+          center: new kakao.maps.LatLng(37.5665, 126.978),
+          level: 3,
         });
+      }
+      const geocoder = new kakao.maps.services.Geocoder();
+      geocoder.addressSearch(address, function (result, status) {
+        if (status === kakao.maps.services.Status.OK) {
+          const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+          map.setCenter(coords);
+          if (marker) {
+            marker.setPosition(coords);
+          } else {
+            marker = new kakao.maps.Marker({
+              map: map,
+              position: coords,
+            });
+          }
+        }
+      });
+    }
+
+    // 상세주소 입력 후 지도 갱신
+    document
+      .getElementById("detailAddress")
+      .addEventListener("blur", function () {
+        const baseAddr = document.getElementById("roadAddress").value.trim();
+        const detailAddr = this.value.trim();
+        if (baseAddr !== "" || detailAddr !== "") {
+          updateMap(baseAddr + " " + detailAddr);
+        }
       });
 
-      // 주소 검색 (다음 우편번호)
-      function openDaumPostcode() {
-        new daum.Postcode({
-          oncomplete: function (data) {
-            document.getElementById("postalCode").value = data.zonecode;
-            document.getElementById("roadAddress").value = data.roadAddress;
-            updateMap(data.roadAddress);
-            document.getElementById("detailAddress").focus();
-          },
-        }).open({ autoClose: true });
+    // 가격 입력: 숫자, 콤마, 소수점 정리 + 0도 지워지게 처리
+    function formatCurrency(input) {
+      let val = input.value.replace(/[^0-9.]/g, "");
+      const parts = val.split(".");
+      if (parts.length > 2) {
+        val = parts[0] + "." + parts.slice(1).join("");
       }
+      let intPart = parts[0] || "";
+      let decPart = parts[1] || "";
+      if (!intPart && decPart === "") {
+        input.value = "";
+        return;
+      }
+      if (decPart.length > 2) {
+        decPart = decPart.slice(0, 2);
+      }
+      intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      input.value = decPart ? intPart + "." + decPart : intPart;
+    }
 
-      // 지도 표시 관련 변수
-      let map;
-      let marker;
-      // 지도 업데이트 함수 (주소를 받아 지도 중앙과 마커 위치 갱신)
-      function updateMap(address) {
-        const mapContainer = document.getElementById("map");
-        if (!map) {
-          map = new kakao.maps.Map(mapContainer, {
-            center: new kakao.maps.LatLng(37.5665, 126.978),
-            level: 3,
-          });
-        }
-        const geocoder = new kakao.maps.services.Geocoder();
-        geocoder.addressSearch(address, function (result, status) {
-          if (status === kakao.maps.services.Status.OK) {
-            const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-            map.setCenter(coords);
-            if (marker) {
-              marker.setPosition(coords);
-            } else {
-              marker = new kakao.maps.Marker({
-                map: map,
-                position: coords,
-              });
-            }
-          }
+    // 품목 추가 (최대 20개)
+    let itemCount = 0;
+    function addItem() {
+      if (itemCount >= 20) {
+        alert("최대 20개까지 입력할 수 있습니다.");
+        return;
+      }
+      itemCount++;
+      const itemList = document.getElementById("itemList");
+      const itemDiv = document.createElement("div");
+      itemDiv.className =
+        "flex flex-col md:flex-row md:items-center gap-2 border p-2 rounded";
+      const menuImageInput = document.createElement("input");
+      menuImageInput.type = "file";
+      menuImageInput.accept = "image/*";
+      menuImageInput.name = "menuImage[]";
+      menuImageInput.className = "border border-gray-300 rounded px-2 py-1";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.placeholder = "품목 이름";
+      nameInput.name = "menuName[]";
+      nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
+      const priceInput = document.createElement("input");
+      priceInput.type = "text";
+      priceInput.placeholder = "가격";
+      priceInput.name = "menuPrice[]";
+      priceInput.className = "w-32 border border-gray-300 rounded px-2 py-1";
+      priceInput.setAttribute("oninput", "formatCurrency(this)");
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "삭제";
+      removeBtn.className =
+        "bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1 rounded";
+      removeBtn.onclick = function () {
+        itemDiv.remove();
+        itemCount--;
+      };
+      itemDiv.appendChild(menuImageInput);
+      itemDiv.appendChild(nameInput);
+      itemDiv.appendChild(priceInput);
+      itemDiv.appendChild(removeBtn);
+      itemList.appendChild(itemDiv);
+    }
+
+    // 사업자 등록번호 인증 처리 (방법 B)
+    async function verifyBizNumber() {
+      const part1 = document.getElementById("bizNumber1").value.trim();
+      const part2 = document.getElementById("bizNumber2").value.trim();
+      const part3 = document.getElementById("bizNumber3").value.trim();
+      const combined = part1 + part2 + part3;
+      const resultEl = document.getElementById("bizVerifyResult");
+      const bizNameInput = document.getElementById("businessName");
+      if (!/^\d{10}$/.test(combined)) {
+        resultEl.textContent =
+          "올바른 사업자번호를 입력하세요 (총 10자리 숫자)";
+        resultEl.className = "text-sm text-red-600";
+        return;
+      }
+      try {
+        const response = await fetch("/verify-biz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ b_no: [combined] }),
         });
-      }
 
-      // 상세주소 입력 후 지도 갱신
-      document
-        .getElementById("detailAddress")
-        .addEventListener("blur", function () {
-          const baseAddr = document.getElementById("roadAddress").value.trim();
-          const detailAddr = this.value.trim();
-          if (baseAddr !== "" || detailAddr !== "") {
-            updateMap(baseAddr + " " + detailAddr);
-          }
-        });
+        const data = await response.json();
 
-      // 가격 입력: 숫자, 콤마, 소수점 정리 + 0도 지워지게 처리
-      function formatCurrency(input) {
-        let val = input.value.replace(/[^0-9.]/g, "");
-        const parts = val.split(".");
-        if (parts.length > 2) {
-          val = parts[0] + "." + parts.slice(1).join("");
-        }
-        let intPart = parts[0] || "";
-        let decPart = parts[1] || "";
-        if (!intPart && decPart === "") {
-          input.value = "";
-          return;
-        }
-        if (decPart.length > 2) {
-          decPart = decPart.slice(0, 2);
-        }
-        intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        input.value = decPart ? intPart + "." + decPart : intPart;
-      }
-
-      // 품목 추가 (최대 20개)
-      let itemCount = 0;
-      function addItem() {
-        if (itemCount >= 20) {
-          alert("최대 20개까지 입력할 수 있습니다.");
-          return;
-        }
-        itemCount++;
-        const itemList = document.getElementById("itemList");
-        const itemDiv = document.createElement("div");
-        itemDiv.className =
-          "flex flex-col md:flex-row md:items-center gap-2 border p-2 rounded";
-        const menuImageInput = document.createElement("input");
-        menuImageInput.type = "file";
-        menuImageInput.accept = "image/*";
-        menuImageInput.name = "menuImage[]";
-        menuImageInput.className = "border border-gray-300 rounded px-2 py-1";
-        const nameInput = document.createElement("input");
-        nameInput.type = "text";
-        nameInput.placeholder = "품목 이름";
-        nameInput.name = "menuName[]";
-        nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
-        const priceInput = document.createElement("input");
-        priceInput.type = "text";
-        priceInput.placeholder = "가격";
-        priceInput.name = "menuPrice[]";
-        priceInput.className = "w-32 border border-gray-300 rounded px-2 py-1";
-        priceInput.setAttribute("oninput", "formatCurrency(this)");
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.textContent = "삭제";
-        removeBtn.className =
-          "bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1 rounded";
-        removeBtn.onclick = function () {
-          itemDiv.remove();
-          itemCount--;
-        };
-        itemDiv.appendChild(menuImageInput);
-        itemDiv.appendChild(nameInput);
-        itemDiv.appendChild(priceInput);
-        itemDiv.appendChild(removeBtn);
-        itemList.appendChild(itemDiv);
-      }
-
-      // 사업자 등록번호 인증 처리 (방법 B)
-      async function verifyBizNumber() {
-        const part1 = document.getElementById("bizNumber1").value.trim();
-        const part2 = document.getElementById("bizNumber2").value.trim();
-        const part3 = document.getElementById("bizNumber3").value.trim();
-        const combined = part1 + part2 + part3;
-        const resultEl = document.getElementById("bizVerifyResult");
-        const bizNameInput = document.getElementById("businessName");
-        if (!/^\d{10}$/.test(combined)) {
-          resultEl.textContent =
-            "올바른 사업자번호를 입력하세요 (총 10자리 숫자)";
-          resultEl.className = "text-sm text-red-600";
-          return;
-        }
-        try {
-          const response = await fetch(
-            "https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=YOUR_API_KEY",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ b_no: [combined] }),
-            }
-          );
-          const data = await response.json();
+        const info = data.data[0];
+        if (data && data.data && data.data.length > 0) {
           const info = data.data[0];
           if (info.b_stt_cd === "01" && info.biz_name) {
             bizNameInput.value = info.biz_name;
@@ -689,119 +492,125 @@
             resultEl.textContent = "❌ 등록되지 않았거나 폐업된 사업자입니다.";
             resultEl.className = "text-sm text-red-600";
           }
-        } catch (err) {
-          console.error("사업자 인증 실패", err);
-          resultEl.textContent = "서버 오류로 인증에 실패했습니다.";
+        } else {
+          resultEl.textContent = "❌ 인증 응답이 올바르지 않습니다.";
           resultEl.className = "text-sm text-red-600";
         }
+
+      } catch (err) {
+        console.error("사업자 인증 실패", err);
+        resultEl.textContent = "서버 오류로 인증에 실패했습니다.";
+        resultEl.className = "text-sm text-red-600";
       }
+    }
 
-      // 휴대전화 인증 처리 (테스트 시뮬레이션)
-      document
-        .getElementById("verifyPhoneButton")
-        .addEventListener("click", async function () {
-          // 휴대전화 인증은 업주 정보 섹션의 "ownerPhone"을 사용
-          const ownerPhone = document.getElementById("ownerPhone").value.trim();
-          const phoneResultEl = document.getElementById("phoneVerifyResult");
-          if (!ownerPhone) {
-            phoneResultEl.textContent = "핸드폰 번호를 입력해주세요.";
-            phoneResultEl.className = "text-sm text-red-600";
-            return;
-          }
-          // 실제 API 대신 테스트용 인증번호 "123456" 발송 시뮬레이션
-          phoneResultEl.textContent =
-            "인증번호가 발송되었습니다. (테스트 코드: 123456)";
+    // 휴대전화 인증 처리 (테스트 시뮬레이션)
+    document
+      .getElementById("verifyPhoneButton")
+      .addEventListener("click", async function () {
+        // 휴대전화 인증은 업주 정보 섹션의 "ownerPhone"을 사용
+        const ownerPhone = document.getElementById("ownerPhone").value.trim();
+        const phoneResultEl = document.getElementById("phoneVerifyResult");
+        if (!ownerPhone) {
+          phoneResultEl.textContent = "핸드폰 번호를 입력해주세요.";
+          phoneResultEl.className = "text-sm text-red-600";
+          return;
+        }
+        // 실제 API 대신 테스트용 인증번호 "123456" 발송 시뮬레이션
+        phoneResultEl.textContent =
+          "인증번호가 발송되었습니다. (테스트 코드: 123456)";
+        phoneResultEl.className = "text-sm text-green-600";
+      });
+
+    document
+      .getElementById("phoneAuth")
+      .addEventListener("blur", function () {
+        const code = this.value.trim();
+        const phoneResultEl = document.getElementById("phoneVerifyResult");
+        if (code === "123456") {
+          phoneResultEl.textContent = "휴대전화 인증 성공.";
           phoneResultEl.className = "text-sm text-green-600";
-        });
-
-      document
-        .getElementById("phoneAuth")
-        .addEventListener("blur", function () {
-          const code = this.value.trim();
-          const phoneResultEl = document.getElementById("phoneVerifyResult");
-          if (code === "123456") {
-            phoneResultEl.textContent = "휴대전화 인증 성공.";
-            phoneResultEl.className = "text-sm text-green-600";
-          } else {
-            phoneResultEl.textContent = "인증번호가 일치하지 않습니다.";
-            phoneResultEl.className = "text-sm text-red-600";
-          }
-        });
-
-      // 헤더/푸터 삽입 (외부 파일 사용)
-      fetch("/components/header.html")
-        .then((res) => res.text())
-        .then((data) => {
-          document.getElementById("header-placeholder").innerHTML = data;
-        });
-      fetch("/components/footer.html")
-        .then((res) => res.text())
-        .then((data) => {
-          document.getElementById("footer-placeholder").innerHTML = data;
-        });
-
-      // ✅ 최종 submit 핸들러 - 신규 등록 (POST)
-      const form = document.getElementById("businessForm");
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        try {
-          const formData = new FormData(form);
-          // 가격 정제: menuPrice[] 콤마 제거 → 기존 필드 제거 후 재추가
-          const priceInputs = form.querySelectorAll(
-            'input[name="menuPrice[]"]'
-          );
-          formData.delete("menuPrice[]");
-          priceInputs.forEach((input) => {
-            const raw = input.value.replace(/,/g, "");
-            formData.append("menuPrice[]", raw);
-          });
-          const response = await fetch("/store", {
-            method: "POST",
-            body: formData,
-          });
-          if (!response.ok) throw new Error("서버 응답 에러");
-          const result = await response.json();
-          console.log("서버 응답 (등록)", result);
-          alert("등록이 완료되었습니다!");
-          document.getElementById("storeId").value = result.storeId;
-          window.location.href = `detail.html?id=${result.storeId}`;
-        } catch (error) {
-          console.error("에러 발생 (등록)", error);
-          alert("데이터 전송 중 에러가 발생했습니다!");
+        } else {
+          phoneResultEl.textContent = "인증번호가 일치하지 않습니다.";
+          phoneResultEl.className = "text-sm text-red-600";
         }
       });
 
-      // ✅ updateData 핸들러 - 수정 (PUT)
-      async function updateData() {
-        const storeId = document.getElementById("storeId").value;
-        if (!storeId) {
-          alert("수정할 데이터가 없습니다. 먼저 등록을 진행하세요.");
-          return;
-        }
-        try {
-          const formData = new FormData(form);
-          const priceInputs = form.querySelectorAll(
-            'input[name="menuPrice[]"]'
-          );
-          formData.delete("menuPrice[]");
-          priceInputs.forEach((input) => {
-            const raw = input.value.replace(/,/g, "");
-            formData.append("menuPrice[]", raw);
-          });
-          const response = await fetch(`/store/${storeId}`, {
-            method: "PUT",
-            body: formData,
-          });
-          if (!response.ok) throw new Error("서버 응답 에러 (수정)");
-          const result = await response.json();
-          console.log("서버 응답 (수정)", result);
-          alert("수정이 완료되었습니다!");
-          window.location.href = `detail.html?id=${storeId}`;
-        } catch (error) {
-          console.error("에러 발생 (수정)", error);
-          alert("데이터 수정 중 에러가 발생했습니다!");
-        }
+    // 헤더/푸터 삽입 (외부 파일 사용)
+    fetch("/components/header.html")
+      .then((res) => res.text())
+      .then((data) => {
+        document.getElementById("header-placeholder").innerHTML = data;
+      });
+    fetch("/components/footer.html")
+      .then((res) => res.text())
+      .then((data) => {
+        document.getElementById("footer-placeholder").innerHTML = data;
+      });
+
+    // ✅ 최종 submit 핸들러 - 신규 등록 (POST)
+    const form = document.getElementById("businessForm");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const formData = new FormData(form);
+        // 가격 정제: menuPrice[] 콤마 제거 → 기존 필드 제거 후 재추가
+        const priceInputs = form.querySelectorAll(
+          'input[name="menuPrice[]"]'
+        );
+        formData.delete("menuPrice[]");
+        priceInputs.forEach((input) => {
+          const raw = input.value.replace(/,/g, "");
+          formData.append("menuPrice[]", raw);
+        });
+        const response = await fetch("/store", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) throw new Error("서버 응답 에러");
+        const result = await response.json();
+        console.log("서버 응답 (등록)", result);
+        alert("등록이 완료되었습니다!");
+        document.getElementById("storeId").value = result.storeId;
+        window.location.href = `detail.html?id=${result.storeId}`;
+      } catch (error) {
+        console.error("에러 발생 (등록)", error);
+        alert("데이터 전송 중 에러가 발생했습니다!");
       }
-    </script>
-  </body>
+    });
+
+    // ✅ updateData 핸들러 - 수정 (PUT)
+    async function updateData() {
+      const storeId = document.getElementById("storeId").value;
+      if (!storeId) {
+        alert("수정할 데이터가 없습니다. 먼저 등록을 진행하세요.");
+        return;
+      }
+      try {
+        const formData = new FormData(form);
+        const priceInputs = form.querySelectorAll(
+          'input[name="menuPrice[]"]'
+        );
+        formData.delete("menuPrice[]");
+        priceInputs.forEach((input) => {
+          const raw = input.value.replace(/,/g, "");
+          formData.append("menuPrice[]", raw);
+        });
+        const response = await fetch(`/store/${storeId}`, {
+          method: "PUT",
+          body: formData,
+        });
+        if (!response.ok) throw new Error("서버 응답 에러 (수정)");
+        const result = await response.json();
+        console.log("서버 응답 (수정)", result);
+        alert("수정이 완료되었습니다!");
+        window.location.href = `detail.html?id=${storeId}`;
+      } catch (error) {
+        console.error("에러 발생 (수정)", error);
+        alert("데이터 수정 중 에러가 발생했습니다!");
+      }
+    }
+  </script>
+</body>
+
 </html>
