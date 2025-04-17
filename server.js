@@ -56,7 +56,7 @@ app.post("/verify-biz", async (req, res) => {
     const { b_no } = req.body;
     console.log("요청된 사업자번호:", b_no); // 추가
 
-    const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
+    const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.NTS_KEY}`;
     const response = await fetch(ntsUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
