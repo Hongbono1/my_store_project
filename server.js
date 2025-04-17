@@ -12,7 +12,7 @@ import fetch from "node-fetch";           // ✅ 국세청 API 중계용 fetch
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 /* ───────────────────────────────────
    📦 1. PostgreSQL 연결
@@ -28,14 +28,14 @@ const pool = new Pool({
 ───────────────────────────────────*/
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename  : (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
 /* ───────────────────────────────────
    🚀 3. Express 기본 설정
 ───────────────────────────────────*/
-const app  = express();
+const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(
@@ -53,20 +53,18 @@ app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 -------------------------------------------------------------------*/
 app.post("/verify-biz", async (req, res) => {
   try {
-    let { b_no } = req.body;                 // ▶️ 배열 or 문자열 둘 다 허용
-    if (!Array.isArray(b_no)) b_no = [b_no]; //   ⇒ 항상 배열로 변환
+    const { b_no } = req.body;
+    console.log("요청된 사업자번호:", b_no); // 추가
 
-    console.log("요청된 사업자번호:", b_no); // ▶️ 요청 로깅
-
-    const ntsUrl   = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.NTS_KEY}`;
+    const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.NTS_KEY}`;
     const response = await fetch(ntsUrl, {
-      method : "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body   : JSON.stringify({ b_no }),
+      body: JSON.stringify({ b_no: [b_no] }),
     });
 
     const data = await response.json();
-    console.log("국세청 응답:", JSON.stringify(data, null, 2)); // ▶️ 응답 로깅
+    console.log("국세청 응답:", JSON.stringify(data, null, 2)); // 추가
 
     res.json(data);
   } catch (err) {
@@ -103,13 +101,13 @@ app.post(
       const imageFiles = req.files["images[]"] || [];
       const imagePaths = imageFiles.map(f => "/uploads/" + f.filename);
 
-      const certFile  = req.files["businessCertImage"]?.[0];
-      const certPath  = certFile ? "/uploads/" + certFile.filename : null;
+      const certFile = req.files["businessCertImage"]?.[0];
+      const certPath = certFile ? "/uploads/" + certFile.filename : null;
 
       /* 5‑3. 민감정보 단방향 암호화 */
-      const salt            = await bcrypt.genSalt(10);
-      const hashedBizNumber = await bcrypt.hash(bizNumber,   salt);
-      const hashedOwnerPhone= await bcrypt.hash(ownerPhone,  salt);
+      const salt = await bcrypt.genSalt(10);
+      const hashedBizNumber = await bcrypt.hash(bizNumber, salt);
+      const hashedOwnerPhone = await bcrypt.hash(ownerPhone, salt);
 
       const client = await pool.connect();
       try {
@@ -122,7 +120,7 @@ app.post(
            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
           [
             hashedBizNumber, ownerName, birthDate, ownerEmail,
-            ownerAddress,   hashedOwnerPhone, certPath,
+            ownerAddress, hashedOwnerPhone, certPath,
           ]
         );
         const ownerId = ownerResult.rows[0].id;
@@ -138,18 +136,18 @@ app.post(
                    $12,$13,$14,$15,$16,$17,$18,$19,$20)
            RETURNING id`,
           [
-            ownerId,businessName,businessType,deliveryOption,businessHours,
-            serviceDetails,event1,event2,facility,pets,parking,
-            phoneNumber,homepage,instagram,facebook,
-            additionalDesc,fullStoreAddress,
-            imagePaths[0] || null,imagePaths[1] || null,imagePaths[2] || null,
+            ownerId, businessName, businessType, deliveryOption, businessHours,
+            serviceDetails, event1, event2, facility, pets, parking,
+            phoneNumber, homepage, instagram, facebook,
+            additionalDesc, fullStoreAddress,
+            imagePaths[0] || null, imagePaths[1] || null, imagePaths[2] || null,
           ]
         );
         const storeId = storeResult.rows[0].id;
 
         /* ③ store_menu */
-        const menuNames  = req.body.menuName  || [];
-        let   menuPrices = req.body.menuPrice || [];
+        const menuNames = req.body.menuName || [];
+        let menuPrices = req.body.menuPrice || [];
 
         if (!Array.isArray(menuPrices))
           menuPrices = typeof menuPrices === "string" ? [menuPrices] : [];
@@ -157,10 +155,10 @@ app.post(
         const menuImages = req.files["menuImage[]"] || [];
 
         for (let i = 0; i < menuNames.length; i++) {
-          const name     = menuNames[i] || "";
+          const name = menuNames[i] || "";
           const rawPrice = (menuPrices[i] || "0").toString();
-          const price    = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
-          const imgPath  = menuImages[i] ? "/uploads/" + menuImages[i].filename : null;
+          const price = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
+          const imgPath = menuImages[i] ? "/uploads/" + menuImages[i].filename : null;
 
           await client.query(
             `INSERT INTO store_menu (store_id, menu_name, menu_price, menu_image)
@@ -195,7 +193,7 @@ app.get("/store/:id", async (req, res) => {
     if (!storeQ.rowCount)
       return res.status(404).json({ message: "가게 정보를 찾을 수 없습니다." });
 
-    const menuQ  = await pool.query(
+    const menuQ = await pool.query(
       `SELECT menu_name, menu_price, menu_image
          FROM store_menu WHERE store_id=$1`, [id]
     );
@@ -203,21 +201,21 @@ app.get("/store/:id", async (req, res) => {
     const s = storeQ.rows[0];
     res.json({
       store: {
-        businessName : s.business_name,
-        businessType : s.business_type,
+        businessName: s.business_name,
+        businessType: s.business_type,
         deliveryOption: s.delivery_option,
-        businessHours : s.business_hours,
+        businessHours: s.business_hours,
         serviceDetails: s.service_details,
-        event1 : s.event1, event2: s.event2,
+        event1: s.event1, event2: s.event2,
         facility: s.facility, pets: s.pets, parking: s.parking,
         contactPhone: s.phone_number,
         homepage: s.homepage, instagram: s.instagram, facebook: s.facebook,
         additionalDesc: s.additional_desc,
         address: s.address,
-        images : [s.image1, s.image2, s.image3].filter(Boolean),
+        images: [s.image1, s.image2, s.image3].filter(Boolean),
       },
       menu: menuQ.rows.map(m => ({
-        menuName : m.menu_name,
+        menuName: m.menu_name,
         menuPrice: m.menu_price,
         menuImageUrl: m.menu_image,
       })),
