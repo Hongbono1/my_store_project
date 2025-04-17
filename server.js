@@ -53,25 +53,31 @@ app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 -------------------------------------------------------------------*/
 app.post("/verify-biz", async (req, res) => {
   try {
-    const { b_no } = req.body;
-    console.log("요청된 사업자번호:", b_no); // 추가
+    let { b_no } = req.body;
+    console.log("요청된 사업자번호:", b_no);
+
+    // 배열로 강제 변환
+    const businessNumbers = Array.isArray(b_no) ? b_no : [b_no];
 
     const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
     const response = await fetch(ntsUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ b_no: [b_no] }),
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json;charset=UTF-8"
+      },
+      body: JSON.stringify({ b_no: businessNumbers }),
     });
 
     const data = await response.json();
-    console.log("국세청 응답:", JSON.stringify(data, null, 2)); // 추가
-
+    console.log("국세청 응답:", JSON.stringify(data, null, 2));
     res.json(data);
   } catch (err) {
     console.error("❌ 사업자 인증 오류:", err);
     res.status(500).json({ message: "서버 오류" });
   }
 });
+
 
 /* ------------------------------------------------------------------
    🔄 5. 가게 정보 등록 API  (/store)
