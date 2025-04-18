@@ -92,8 +92,12 @@ app.post(
   async (req, res) => {
     try {
       /* 5‑1. 폼 데이터 파싱 */
+      const bizNumber =
+        (req.body.bizNumber1 || "") +
+        (req.body.bizNumber2 || "") +
+        (req.body.bizNumber3 || "");
       const {
-        bizNumber, ownerName, birthDate, ownerEmail, ownerAddress, ownerPhone,
+        ownerName, birthDate, ownerEmail, ownerAddress, ownerPhone,
         businessName, businessType, deliveryOption, businessHours,
         serviceDetails, event1, event2, facility, pets, parking,
         phoneNumber, homepage, instagram, facebook, additionalDesc,
