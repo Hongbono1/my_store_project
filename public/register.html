@@ -122,7 +122,6 @@
           </div>
 
           <!-- 실제 전송될 이메일 전체 주소 -->
-          <input type="hidden" id="ownerEmail" name="ownerEmail" />
           <div class="flex flex-col md:flex-row md:items-center mb-3">
             <label for="ownerAddress" class="w-32 font-medium">대표 주소</label>
             <input type="text" id="ownerAddress" name="ownerAddress" placeholder="예: 서울시 강남구 ..."
@@ -341,7 +340,6 @@
 
     function handleDomainChange(selectEl) {
       const customInput = document.getElementById("customDomainInput");
-
       if (selectEl.value === "custom") {
         customInput.classList.remove("hidden");
         customInput.focus();
@@ -351,9 +349,7 @@
       }
     }
 
-    /* ----------------------------------------------------
-       이미지 미리보기 (최대 3장)
-    ---------------------------------------------------- */
+    /* 이미지 미리보기 */
     const imagesInput = document.getElementById("imagesInput");
     const imagesPreview = document.getElementById("imagesPreview");
     imagesInput.addEventListener("change", () => {
@@ -372,9 +368,7 @@
       });
     });
 
-    /* ----------------------------------------------------
-       주소 검색 (다음 우편번호) + 지도
-    ---------------------------------------------------- */
+    /* 주소 검색 + 지도 */
     function openDaumPostcode() {
       new daum.Postcode({
         oncomplete: function (data) {
@@ -415,9 +409,7 @@
       if (base || detail) updateMap(`${base} ${detail}`);
     });
 
-    /* ----------------------------------------------------
-       숫자 입력 포맷 (가격)
-    ---------------------------------------------------- */
+    /* 숫자 입력 콤마 */
     function formatCurrency(input) {
       let val = input.value.replace(/[^0-9.]/g, "");
       const parts = val.split(".");
@@ -433,9 +425,7 @@
       input.value = decPart ? `${intPart}.${decPart}` : intPart;
     }
 
-    /* ----------------------------------------------------
-       품목 추가 (최대 20개)
-    ---------------------------------------------------- */
+    /* 품목 추가 */
     let itemCount = 0;
     function addItem() {
       if (itemCount >= 20) {
@@ -458,8 +448,7 @@
       nameInput.type = "text";
       nameInput.name = "menuName[]";
       nameInput.placeholder = "품목 이름";
-      nameInput.className =
-        "flex-1 border border-gray-300 rounded px-2 py-1";
+      nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
 
       const priceInput = document.createElement("input");
       priceInput.type = "text";
@@ -482,9 +471,7 @@
       itemList.appendChild(itemDiv);
     }
 
-    /* ----------------------------------------------------
-       사업자등록번호 인증
-    ---------------------------------------------------- */
+    /* 사업자등록 인증 */
     async function verifyBizNumber() {
       const n1 = document.getElementById("bizNumber1").value.trim();
       const n2 = document.getElementById("bizNumber2").value.trim();
@@ -531,9 +518,7 @@
       }
     }
 
-    /* ----------------------------------------------------
-       휴대전화 인증 (테스트)
-    ---------------------------------------------------- */
+    /* 휴대폰 인증 */
     document
       .getElementById("verifyPhoneButton")
       .addEventListener("click", () => {
@@ -561,9 +546,7 @@
       }
     });
 
-    /* ----------------------------------------------------
-       헤더/푸터 동적 로드
-    ---------------------------------------------------- */
+    /* 헤더/푸터 포함 */
     fetch("/components/header.html")
       .then((r) => r.text())
       .then((d) => (document.getElementById("header-placeholder").innerHTML = d));
@@ -580,7 +563,19 @@
       try {
         const fd = new FormData(form);
 
-        // 가격에서 콤마 제거
+        // ✅ 사업자번호 병합 → 추가
+        const n1 = document.getElementById("bizNumber1").value.trim();
+        const n2 = document.getElementById("bizNumber2").value.trim();
+        const n3 = document.getElementById("bizNumber3").value.trim();
+        const fullBiz = n1 + n2 + n3;
+        fd.append("bizNumber", fullBiz);
+
+        // ✅ 이메일 중복 제거 후 추가
+        fd.delete("ownerEmail");
+        const email = document.getElementById("ownerEmail").value;
+        fd.append("ownerEmail", email);
+
+        // ✅ 콤마 제거된 가격
         const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
         fd.delete("menuPrice[]");
         priceInputs.forEach((inp) =>
@@ -599,9 +594,7 @@
       }
     });
 
-    /* ----------------------------------------------------
-       데이터 수정 (PUT)
-    ---------------------------------------------------- */
+    /* 수정 로직 */
     async function updateData() {
       const storeId = document.getElementById("storeId").value;
       if (!storeId) {
@@ -615,6 +608,10 @@
         priceInputs.forEach((inp) =>
           fd.append("menuPrice[]", inp.value.replace(/,/g, ""))
         );
+
+        for (let [k, v] of fd.entries()) {
+          console.log(k, v);
+        }
 
         const res = await fetch(`/store/${storeId}`, {
           method: "PUT",
@@ -630,5 +627,3 @@
       }
     }
   </script>
-</body>
-</html>
