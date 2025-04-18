@@ -321,9 +321,39 @@
 
   <div id="footer-placeholder"></div>
 
-  <!-- 자바스크립트 -->
   <script>
-    // 이미지 미리보기 (최대 3장)
+    /* ----------------------------------------------------
+       공통 이메일 유틸
+    ---------------------------------------------------- */
+    function updateEmail() {
+      const id = document.getElementById("emailId").value.trim();
+      const domainSelect = document.getElementById("emailDomainSelect");
+      const customDomain = document
+        .getElementById("customDomainInput")
+        .value.trim();
+
+      const domain =
+        domainSelect.value === "custom" ? customDomain : domainSelect.value;
+
+      const email = domain ? `${id}@${domain}` : "";
+      document.getElementById("ownerEmail").value = email;
+    }
+
+    function handleDomainChange(selectEl) {
+      const customInput = document.getElementById("customDomainInput");
+
+      if (selectEl.value === "custom") {
+        customInput.classList.remove("hidden");
+        customInput.focus();
+      } else {
+        customInput.classList.add("hidden");
+        updateEmail();
+      }
+    }
+
+    /* ----------------------------------------------------
+       이미지 미리보기 (최대 3장)
+    ---------------------------------------------------- */
     const imagesInput = document.getElementById("imagesInput");
     const imagesPreview = document.getElementById("imagesPreview");
     imagesInput.addEventListener("change", () => {
@@ -342,7 +372,9 @@
       });
     });
 
-    // 주소 검색 (다음 우편번호)
+    /* ----------------------------------------------------
+       주소 검색 (다음 우편번호) + 지도
+    ---------------------------------------------------- */
     function openDaumPostcode() {
       new daum.Postcode({
         oncomplete: function (data) {
@@ -354,10 +386,7 @@
       }).open({ autoClose: true });
     }
 
-    // 지도 표시 관련 변수
-    let map;
-    let marker;
-    // 지도 업데이트 함수 (주소를 받아 지도 중앙과 마커 위치 갱신)
+    let map, marker;
     function updateMap(address) {
       const mapContainer = document.getElementById("map");
       if (!map) {
@@ -374,47 +403,39 @@
           if (marker) {
             marker.setPosition(coords);
           } else {
-            marker = new kakao.maps.Marker({
-              map: map,
-              position: coords,
-            });
+            marker = new kakao.maps.Marker({ map, position: coords });
           }
         }
       });
     }
 
-    // 상세주소 입력 후 지도 갱신
-    document
-      .getElementById("detailAddress")
-      .addEventListener("blur", function () {
-        const baseAddr = document.getElementById("roadAddress").value.trim();
-        const detailAddr = this.value.trim();
-        if (baseAddr !== "" || detailAddr !== "") {
-          updateMap(baseAddr + " " + detailAddr);
-        }
-      });
+    document.getElementById("detailAddress").addEventListener("blur", () => {
+      const base = document.getElementById("roadAddress").value.trim();
+      const detail = document.getElementById("detailAddress").value.trim();
+      if (base || detail) updateMap(`${base} ${detail}`);
+    });
 
-    // 가격 입력: 숫자, 콤마, 소수점 정리 + 0도 지워지게 처리
+    /* ----------------------------------------------------
+       숫자 입력 포맷 (가격)
+    ---------------------------------------------------- */
     function formatCurrency(input) {
       let val = input.value.replace(/[^0-9.]/g, "");
       const parts = val.split(".");
-      if (parts.length > 2) {
-        val = parts[0] + "." + parts.slice(1).join("");
-      }
+      if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
       let intPart = parts[0] || "";
       let decPart = parts[1] || "";
-      if (!intPart && decPart === "") {
+      if (!intPart && !decPart) {
         input.value = "";
         return;
       }
-      if (decPart.length > 2) {
-        decPart = decPart.slice(0, 2);
-      }
+      if (decPart.length > 2) decPart = decPart.slice(0, 2);
       intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      input.value = decPart ? intPart + "." + decPart : intPart;
+      input.value = decPart ? `${intPart}.${decPart}` : intPart;
     }
 
-    // 품목 추가 (최대 20개)
+    /* ----------------------------------------------------
+       품목 추가 (최대 20개)
+    ---------------------------------------------------- */
     let itemCount = 0;
     function addItem() {
       if (itemCount >= 20) {
@@ -426,174 +447,161 @@
       const itemDiv = document.createElement("div");
       itemDiv.className =
         "flex flex-col md:flex-row md:items-center gap-2 border p-2 rounded";
-      const menuImageInput = document.createElement("input");
-      menuImageInput.type = "file";
-      menuImageInput.accept = "image/*";
-      menuImageInput.name = "menuImage[]";
-      menuImageInput.className = "border border-gray-300 rounded px-2 py-1";
+
+      const menuImage = document.createElement("input");
+      menuImage.type = "file";
+      menuImage.accept = "image/*";
+      menuImage.name = "menuImage[]";
+      menuImage.className = "border border-gray-300 rounded px-2 py-1";
+
       const nameInput = document.createElement("input");
       nameInput.type = "text";
-      nameInput.placeholder = "품목 이름";
       nameInput.name = "menuName[]";
-      nameInput.className = "flex-1 border border-gray-300 rounded px-2 py-1";
+      nameInput.placeholder = "품목 이름";
+      nameInput.className =
+        "flex-1 border border-gray-300 rounded px-2 py-1";
+
       const priceInput = document.createElement("input");
       priceInput.type = "text";
-      priceInput.placeholder = "가격";
       priceInput.name = "menuPrice[]";
+      priceInput.placeholder = "가격";
       priceInput.className = "w-32 border border-gray-300 rounded px-2 py-1";
       priceInput.setAttribute("oninput", "formatCurrency(this)");
+
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.textContent = "삭제";
       removeBtn.className =
         "bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1 rounded";
-      removeBtn.onclick = function () {
+      removeBtn.onclick = () => {
         itemDiv.remove();
         itemCount--;
       };
-      itemDiv.appendChild(menuImageInput);
-      itemDiv.appendChild(nameInput);
-      itemDiv.appendChild(priceInput);
-      itemDiv.appendChild(removeBtn);
+
+      itemDiv.append(menuImage, nameInput, priceInput, removeBtn);
       itemList.appendChild(itemDiv);
     }
 
-    // 사업자 등록번호 인증 처리 (방법 B)
+    /* ----------------------------------------------------
+       사업자등록번호 인증
+    ---------------------------------------------------- */
     async function verifyBizNumber() {
-      const part1 = document.getElementById("bizNumber1").value.trim();
-      const part2 = document.getElementById("bizNumber2").value.trim();
-      const part3 = document.getElementById("bizNumber3").value.trim();
-      const combined = part1 + part2 + part3;
+      const n1 = document.getElementById("bizNumber1").value.trim();
+      const n2 = document.getElementById("bizNumber2").value.trim();
+      const n3 = document.getElementById("bizNumber3").value.trim();
+      const combined = n1 + n2 + n3;
       const resultEl = document.getElementById("bizVerifyResult");
       const bizNameInput = document.getElementById("businessName");
+
       if (!/^\d{10}$/.test(combined)) {
-        resultEl.textContent =
-          "올바른 사업자번호를 입력하세요 (총 10자리 숫자)";
+        resultEl.textContent = "올바른 사업자번호를 입력하세요 (총 10자리 숫자)";
         resultEl.className = "text-sm text-red-600";
         return;
       }
+
       try {
-        const response = await fetch("/verify-biz", {
+        const res = await fetch("/verify-biz", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ b_no: [combined] }),
         });
+        const data = await res.json();
+        const info = data?.data?.[0];
 
-        const data = await response.json();
+        if (info && info.b_stt_cd === "01") {
+          resultEl.textContent = `✅ 인증 완료: ${info.b_no}`;
+          resultEl.className = "text-sm text-green-600 text-center";
 
-        if (data && data.data && data.data.length > 0) {
-          const info = data.data[0];
-          if (info.b_stt_cd === "01") {
-            console.log("인증 응답 전체:", info);  // 🔍 추가
-            resultEl.textContent = `✅ 인증 완료: ${info.b_no}`;
-            resultEl.className = "text-sm text-green-600 text-center";
-
-            // ✅ 상호명 자동입력 또는 실패 안내
-            if (info.b_stt_cd === "01") {
-              resultEl.textContent = `✅ 인증 완료: ${info.b_no}`;
-              resultEl.className = "text-sm text-green-600 text-center";
-
-              // ✅ 상호명 자동입력 또는 실패 안내
-              if (info.b_nm) {
-                bizNameInput.value = info.b_nm;
-              } else {
-                bizNameInput.value = "";
-                bizNameInput.placeholder = "자동입력 실패 - 상호명을 직접 입력하세요";
-              }
-            }
+          if (info.b_nm) {
+            bizNameInput.value = info.b_nm;
           } else {
-            resultEl.textContent = "❌ 등록되지 않았거나 폐업된 사업자입니다.";
-            resultEl.className = "text-sm text-red-600 text-center";
+            bizNameInput.value = "";
+            bizNameInput.placeholder =
+              "자동입력 실패 - 상호명을 직접 입력하세요";
           }
-
         } else {
-          resultEl.textContent = "❌ 인증 응답이 올바르지 않습니다.";
+          resultEl.textContent =
+            "❌ 등록되지 않았거나 폐업된 사업자입니다.";
           resultEl.className = "text-sm text-red-600 text-center";
         }
-
       } catch (err) {
-        console.error("사업자 인증 실패", err);
+        console.error("사업자 인증 실패:", err);
         resultEl.textContent = "서버 오류로 인증에 실패했습니다.";
         resultEl.className = "text-sm text-red-600 text-center";
       }
     }
 
-    // 휴대전화 인증 처리 (테스트 시뮬레이션)
+    /* ----------------------------------------------------
+       휴대전화 인증 (테스트)
+    ---------------------------------------------------- */
     document
       .getElementById("verifyPhoneButton")
-      .addEventListener("click", async function () {
-        // 휴대전화 인증은 업주 정보 섹션의 "ownerPhone"을 사용
+      .addEventListener("click", () => {
         const ownerPhone = document.getElementById("ownerPhone").value.trim();
-        const phoneResultEl = document.getElementById("phoneVerifyResult");
+        const resultEl = document.getElementById("phoneVerifyResult");
         if (!ownerPhone) {
-          phoneResultEl.textContent = "핸드폰 번호를 입력해주세요.";
-          phoneResultEl.className = "text-sm text-red-600";
+          resultEl.textContent = "핸드폰 번호를 입력해주세요.";
+          resultEl.className = "text-sm text-red-600";
           return;
         }
-        // 실제 API 대신 테스트용 인증번호 "123456" 발송 시뮬레이션
-        phoneResultEl.textContent =
+        resultEl.textContent =
           "인증번호가 발송되었습니다. (테스트 코드: 123456)";
-        phoneResultEl.className = "text-sm text-green-600";
+        resultEl.className = "text-sm text-green-600";
       });
 
-    document
-      .getElementById("phoneAuth")
-      .addEventListener("blur", function () {
-        const code = this.value.trim();
-        const phoneResultEl = document.getElementById("phoneVerifyResult");
-        if (code === "123456") {
-          phoneResultEl.textContent = "휴대전화 인증 성공.";
-          phoneResultEl.className = "text-sm text-green-600";
-        } else {
-          phoneResultEl.textContent = "인증번호가 일치하지 않습니다.";
-          phoneResultEl.className = "text-sm text-red-600";
-        }
-      });
+    document.getElementById("phoneAuth").addEventListener("blur", function () {
+      const code = this.value.trim();
+      const resultEl = document.getElementById("phoneVerifyResult");
+      if (code === "123456") {
+        resultEl.textContent = "휴대전화 인증 성공.";
+        resultEl.className = "text-sm text-green-600";
+      } else {
+        resultEl.textContent = "인증번호가 일치하지 않습니다.";
+        resultEl.className = "text-sm text-red-600";
+      }
+    });
 
-    // 헤더/푸터 삽입 (외부 파일 사용)
+    /* ----------------------------------------------------
+       헤더/푸터 동적 로드
+    ---------------------------------------------------- */
     fetch("/components/header.html")
-      .then((res) => res.text())
-      .then((data) => {
-        document.getElementById("header-placeholder").innerHTML = data;
-      });
+      .then((r) => r.text())
+      .then((d) => (document.getElementById("header-placeholder").innerHTML = d));
     fetch("/components/footer.html")
-      .then((res) => res.text())
-      .then((data) => {
-        document.getElementById("footer-placeholder").innerHTML = data;
-      });
+      .then((r) => r.text())
+      .then((d) => (document.getElementById("footer-placeholder").innerHTML = d));
 
-    // ✅ 최종 submit 핸들러 - 신규 등록 (POST)
+    /* ----------------------------------------------------
+       폼 제출 (등록)
+    ---------------------------------------------------- */
     const form = document.getElementById("businessForm");
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
       try {
-        const formData = new FormData(form);
-        // 가격 정제: menuPrice[] 콤마 제거 → 기존 필드 제거 후 재추가
-        const priceInputs = form.querySelectorAll(
-          'input[name="menuPrice[]"]'
+        const fd = new FormData(form);
+
+        // 가격에서 콤마 제거
+        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
+        fd.delete("menuPrice[]");
+        priceInputs.forEach((inp) =>
+          fd.append("menuPrice[]", inp.value.replace(/,/g, ""))
         );
-        formData.delete("menuPrice[]");
-        priceInputs.forEach((input) => {
-          const raw = input.value.replace(/,/g, "");
-          formData.append("menuPrice[]", raw);
-        });
-        const response = await fetch("/store", {
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok) throw new Error("서버 응답 에러");
-        const result = await response.json();
-        console.log("서버 응답 (등록)", result);
+
+        const res = await fetch("/store", { method: "POST", body: fd });
+        if (!res.ok) throw new Error("서버 응답 에러");
+        const result = await res.json();
         alert("등록이 완료되었습니다!");
         document.getElementById("storeId").value = result.storeId;
         window.location.href = `detail.html?id=${result.storeId}`;
-      } catch (error) {
-        console.error("에러 발생 (등록)", error);
+      } catch (err) {
+        console.error("에러 발생 (등록):", err);
         alert("데이터 전송 중 에러가 발생했습니다!");
       }
     });
 
-    // ✅ updateData 핸들러 - 수정 (PUT)
+    /* ----------------------------------------------------
+       데이터 수정 (PUT)
+    ---------------------------------------------------- */
     async function updateData() {
       const storeId = document.getElementById("storeId").value;
       if (!storeId) {
@@ -601,54 +609,26 @@
         return;
       }
       try {
-        const formData = new FormData(form);
-        const priceInputs = form.querySelectorAll(
-          'input[name="menuPrice[]"]'
+        const fd = new FormData(form);
+        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
+        fd.delete("menuPrice[]");
+        priceInputs.forEach((inp) =>
+          fd.append("menuPrice[]", inp.value.replace(/,/g, ""))
         );
-        formData.delete("menuPrice[]");
-        priceInputs.forEach((input) => {
-          const raw = input.value.replace(/,/g, "");
-          formData.append("menuPrice[]", raw);
-        });
-        const response = await fetch(`/store/${storeId}`, {
+
+        const res = await fetch(`/store/${storeId}`, {
           method: "PUT",
-          body: formData,
+          body: fd,
         });
-        if (!response.ok) throw new Error("서버 응답 에러 (수정)");
-        const result = await response.json();
-        console.log("서버 응답 (수정)", result);
+        if (!res.ok) throw new Error("서버 응답 에러 (수정)");
+        const result = await res.json();
         alert("수정이 완료되었습니다!");
         window.location.href = `detail.html?id=${storeId}`;
-      } catch (error) {
-        console.error("에러 발생 (수정)", error);
+      } catch (err) {
+        console.error("에러 발생 (수정):", err);
         alert("데이터 수정 중 에러가 발생했습니다!");
       }
-
-      function updateEmail() {
-        const id = document.getElementById("emailId").value.trim();
-        const domainSelect = document.getElementById("emailDomainSelect");
-        const customDomain = document.getElementById("customDomainInput").value.trim();
-
-        const domain = domainSelect.value === "custom" ? customDomain : domainSelect.value;
-
-        const email = domain ? `${id}@${domain}` : "";
-        document.getElementById("ownerEmail").value = email;
-      }
-
-      function handleDomainChange(selectEl) {
-        const customInput = document.getElementById("customDomainInput");
-
-        if (selectEl.value === "custom") {
-          customInput.classList.remove("hidden");
-          customInput.focus();
-        } else {
-          customInput.classList.add("hidden");
-          updateEmail(); // 선택된 도메인으로 이메일 값 업데이트
-        }
-      }
-
     }
   </script>
 </body>
-
 </html>

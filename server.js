@@ -7,7 +7,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcrypt";
-import fetch from "node-fetch";           // ✅ 국세청 API 중계용 fetch
+import fetch from "node-fetch"; // ✅ 국세청 API 중계용 fetch
 
 dotenv.config();
 
@@ -56,15 +56,14 @@ app.post("/verify-biz", async (req, res) => {
     let { b_no } = req.body;
     console.log("요청된 사업자번호:", b_no);
 
-    // 배열로 강제 변환
     const businessNumbers = Array.isArray(b_no) ? b_no : [b_no];
 
     const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
     const response = await fetch(ntsUrl, {
       method: "POST",
       headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json;charset=UTF-8"
+        Accept: "application/json",
+        "Content-Type": "application/json;charset=UTF-8",
       },
       body: JSON.stringify({ b_no: businessNumbers }),
     });
@@ -73,11 +72,10 @@ app.post("/verify-biz", async (req, res) => {
     console.log("국세청 응답:", JSON.stringify(data, null, 2));
     res.json(data);
   } catch (err) {
-    console.error("❌ 사업자 인증 오류:", err);
+    console.error("❌ 사업자 인증 오류:", err.message, err.stack);
     res.status(500).json({ message: "서버 오류" });
   }
 });
-
 
 /* ------------------------------------------------------------------
    🔄 5. 가게 정보 등록 API  (/store)
@@ -96,20 +94,41 @@ app.post(
         (req.body.bizNumber1 || "") +
         (req.body.bizNumber2 || "") +
         (req.body.bizNumber3 || "");
+
       const {
-        ownerName, birthDate, ownerEmail, ownerAddress, ownerPhone,
-        businessName, businessType, deliveryOption, businessHours,
-        serviceDetails, event1, event2, facility, pets, parking,
-        phoneNumber, homepage, instagram, facebook, additionalDesc,
-        postalCode, roadAddress, detailAddress,
+        ownerName,
+        birthDate,
+        ownerEmail,
+        ownerAddress,
+        ownerPhone,
+        businessName,
+        businessType,
+        deliveryOption,
+        businessHours,
+        serviceDetails,
+        event1,
+        event2,
+        facility,
+        pets,
+        parking,
+        phoneNumber,
+        homepage,
+        instagram,
+        facebook,
+        additionalDesc,
+        postalCode,
+        roadAddress,
+        detailAddress,
       } = req.body;
 
-      const fullStoreAddress =
-        `${postalCode} ${roadAddress} ${detailAddress}`.trim();
+      console.log("✅ 등록 요청 본문:", req.body);
+      console.log("✅ 업로드된 파일 목록:", req.files);
+
+      const fullStoreAddress = `${postalCode} ${roadAddress} ${detailAddress}`.trim();
 
       /* 5‑2. 파일 업로드 경로 */
       const imageFiles = req.files["images[]"] || [];
-      const imagePaths = imageFiles.map(f => "/uploads/" + f.filename);
+      const imagePaths = imageFiles.map((f) => "/uploads/" + f.filename);
 
       const certFile = req.files["businessCertImage"]?.[0];
       const certPath = certFile ? "/uploads/" + certFile.filename : null;
@@ -117,7 +136,7 @@ app.post(
       /* 5‑3. 민감정보 단방향 암호화 */
       const salt = await bcrypt.genSalt(10);
       const hashedBizNumber = await bcrypt.hash(bizNumber, salt);
-      const hashedOwnerPhone = await bcrypt.hash(ownerPhone, salt);
+      const hashedOwnerPhone = await bcrypt.hash(ownerPhone || "", salt);
 
       const client = await pool.connect();
       try {
@@ -129,8 +148,13 @@ app.post(
            (biz_number, name, birth_date, email, address, phone, cert_image)
            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
           [
-            hashedBizNumber, ownerName, birthDate, ownerEmail,
-            ownerAddress, hashedOwnerPhone, certPath,
+            hashedBizNumber,
+            ownerName,
+            birthDate,
+            ownerEmail,
+            ownerAddress,
+            hashedOwnerPhone,
+            certPath,
           ]
         );
         const ownerId = ownerResult.rows[0].id;
@@ -146,21 +170,42 @@ app.post(
                    $12,$13,$14,$15,$16,$17,$18,$19,$20)
            RETURNING id`,
           [
-            ownerId, businessName, businessType, deliveryOption, businessHours,
-            serviceDetails, event1, event2, facility, pets, parking,
-            phoneNumber, homepage, instagram, facebook,
-            additionalDesc, fullStoreAddress,
-            imagePaths[0] || null, imagePaths[1] || null, imagePaths[2] || null,
+            ownerId,
+            businessName,
+            businessType,
+            deliveryOption,
+            businessHours,
+            serviceDetails,
+            event1,
+            event2,
+            facility,
+            pets,
+            parking,
+            phoneNumber,
+            homepage,
+            instagram,
+            facebook,
+            additionalDesc,
+            fullStoreAddress,
+            imagePaths[0] || null,
+            imagePaths[1] || null,
+            imagePaths[2] || null,
           ]
         );
         const storeId = storeResult.rows[0].id;
 
         /* ③ store_menu */
-        const menuNames = req.body.menuName || [];
-        let menuPrices = req.body.menuPrice || [];
+        const menuNames = Array.isArray(req.body.menuName)
+          ? req.body.menuName
+          : req.body.menuName
+          ? [req.body.menuName]
+          : [];
 
-        if (!Array.isArray(menuPrices))
-          menuPrices = typeof menuPrices === "string" ? [menuPrices] : [];
+        let menuPrices = Array.isArray(req.body.menuPrice)
+          ? req.body.menuPrice
+          : req.body.menuPrice
+          ? [req.body.menuPrice]
+          : [];
 
         const menuImages = req.files["menuImage[]"] || [];
 
@@ -168,7 +213,8 @@ app.post(
           const name = menuNames[i] || "";
           const rawPrice = (menuPrices[i] || "0").toString();
           const price = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
-          const imgPath = menuImages[i] ? "/uploads/" + menuImages[i].filename : null;
+          const imgPath =
+            menuImages[i]?.filename ? "/uploads/" + menuImages[i].filename : null;
 
           await client.query(
             `INSERT INTO store_menu (store_id, menu_name, menu_price, menu_image)
@@ -181,13 +227,13 @@ app.post(
         res.json({ message: "등록 성공", storeId });
       } catch (err) {
         await client.query("ROLLBACK");
-        console.error("❌ 등록 트랜잭션 오류:", err);
+        console.error("❌ 등록 트랜잭션 오류:", err.message, err.stack);
         res.status(500).json({ message: "서버 오류" });
       } finally {
         client.release();
       }
     } catch (err) {
-      console.error("❌ 등록 처리 오류:", err);
+      console.error("❌ 등록 처리 오류:", err.message, err.stack);
       res.status(500).json({ message: "서버 오류" });
     }
   }
@@ -205,7 +251,8 @@ app.get("/store/:id", async (req, res) => {
 
     const menuQ = await pool.query(
       `SELECT menu_name, menu_price, menu_image
-         FROM store_menu WHERE store_id=$1`, [id]
+         FROM store_menu WHERE store_id=$1`,
+      [id]
     );
 
     const s = storeQ.rows[0];
@@ -216,22 +263,27 @@ app.get("/store/:id", async (req, res) => {
         deliveryOption: s.delivery_option,
         businessHours: s.business_hours,
         serviceDetails: s.service_details,
-        event1: s.event1, event2: s.event2,
-        facility: s.facility, pets: s.pets, parking: s.parking,
+        event1: s.event1,
+        event2: s.event2,
+        facility: s.facility,
+        pets: s.pets,
+        parking: s.parking,
         contactPhone: s.phone_number,
-        homepage: s.homepage, instagram: s.instagram, facebook: s.facebook,
+        homepage: s.homepage,
+        instagram: s.instagram,
+        facebook: s.facebook,
         additionalDesc: s.additional_desc,
         address: s.address,
         images: [s.image1, s.image2, s.image3].filter(Boolean),
       },
-      menu: menuQ.rows.map(m => ({
+      menu: menuQ.rows.map((m) => ({
         menuName: m.menu_name,
         menuPrice: m.menu_price,
         menuImageUrl: m.menu_image,
       })),
     });
   } catch (err) {
-    console.error("❌ 상세 조회 오류:", err);
+    console.error("❌ 상세 조회 오류:", err.message, err.stack);
     res.status(500).json({ message: "서버 오류" });
   }
 });
