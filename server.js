@@ -195,17 +195,22 @@ app.post(
         const storeId = storeResult.rows[0].id;
 
         /* ③ store_menu */
+        const categories = Array.isArray(req.body.category)
+          ? req.body.category
+          : req.body.category
+            ? [req.body.category]
+            : [];
         const menuNames = Array.isArray(req.body.menuName)
           ? req.body.menuName
           : req.body.menuName
-          ? [req.body.menuName]
-          : [];
+            ? [req.body.menuName]
+            : [];
 
         let menuPrices = Array.isArray(req.body.menuPrice)
           ? req.body.menuPrice
           : req.body.menuPrice
-          ? [req.body.menuPrice]
-          : [];
+            ? [req.body.menuPrice]
+            : [];
 
         const menuImages = req.files["menuImage[]"] || [];
 
@@ -215,13 +220,16 @@ app.post(
           const price = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
           const imgPath =
             menuImages[i]?.filename ? "/uploads/" + menuImages[i].filename : null;
-
+        
+          const category =
+            categories[Math.floor(i)] || "기타"; // 범위 초과 방지
+        
           await client.query(
-            `INSERT INTO store_menu (store_id, menu_name, menu_price, menu_image)
-             VALUES ($1,$2,$3,$4)`,
-            [storeId, name, price, imgPath]
+            `INSERT INTO store_menu (store_id, menu_name, menu_price, menu_image, category)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [storeId, name, price, imgPath, category]
           );
-        }
+        }        
 
         await client.query("COMMIT");
         res.json({ message: "등록 성공", storeId });
