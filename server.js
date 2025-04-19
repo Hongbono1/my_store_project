@@ -244,14 +244,7 @@ app.post(
               ]
             );
           } 
-
-          await client.query(
-            `INSERT INTO store_menu (store_id, category, menu_name, menu_price, menu_image, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-            [storeId, category, name, price, imgPath, descriptions[i] || ""]
-          );
-        }
-
+  
         await client.query("COMMIT");
         res.json({ message: "등록 성공", storeId });
       } catch (err) {
