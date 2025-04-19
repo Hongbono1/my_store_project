@@ -212,6 +212,12 @@ app.post(
             ? [req.body.menuPrice]
             : [];
 
+        const descriptions = Array.isArray(req.body.menuDesc)
+          ? req.body.menuDesc
+          : req.body.menuDesc
+            ? [req.body.menuDesc]
+            : [];
+
         const menuImages = req.files["menuImage[]"] || [];
 
         for (let i = 0; i < menuNames.length; i++) {
@@ -225,9 +231,9 @@ app.post(
             categories[Math.floor(i)] || "기타"; // 범위 초과 방지
 
           await client.query(
-            `INSERT INTO store_menu (store_id, menu_name, menu_price, menu_image, category)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [storeId, name, price, imgPath, category]
+            `INSERT INTO store_menu (store_id, category, menu_name, menu_price, menu_image, description)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+            [storeId, category, name, price, imgPath, descriptions[i] || ""]
           );
         }
 
