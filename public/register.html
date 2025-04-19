@@ -12,6 +12,44 @@
   <!-- 다음 우편번호 / Kakao 지도 -->
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script defer src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_KEY&libraries=services"></script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
 </head>
 
 <body class="bg-gray-200 flex flex-col min-h-screen">
@@ -176,11 +214,11 @@
         <section class="border rounded p-4 bg-gray-50">
           <h3 class="text-xl font-semibold mb-4">고객 이벤트</h3>
           <div class="mb-3">
-            <label class="block font-medium mb-1" for="event1">이벤트 내용 1</label>
+            <label class="block font-medium mb-1" for="event1">이벤트 내용 1</label>
             <input id="event1" name="event1" placeholder="이벤트 내용 1" class="w-full border rounded px-3 py-2">
           </div>
           <div>
-            <label class="block font-medium mb-1" for="event2">이벤트 내용 2</label>
+            <label class="block font-medium mb-1" for="event2">이벤트 내용 2</label>
             <input id="event2" name="event2" placeholder="이벤트 내용 2" class="w-full border rounded px-3 py-2">
           </div>
         </section>
@@ -204,7 +242,7 @@
 
         <!-- ───────────────── 8. 메뉴 등록 ───────────────── -->
         <section class="bg-white p-4 rounded shadow">
-          <h3 class="text-xl font-semibold mb-2">STEP 5. 메뉴 등록</h3>
+          <h3 class="text-xl font-semibold mb-2">STEP 5. 메뉴 등록</h3>
 
           <!-- 카테고리 입력 -->
           <div class="flex items-center gap-2 mb-4">
@@ -480,39 +518,45 @@
 
     /* 품목(메뉴) 추가 : 파일선택 → 메뉴명 → 가격 */
     function addMenu(catContainerId, catName) {
-      if (totalMenuCount >= MAX_MENUS) {
-        alert('메뉴는 최대 50개까지만 추가할 수 있습니다.');
-        return;
-      }
-      totalMenuCount++;
+  if (totalMenuCount >= MAX_MENUS) {
+    alert('메뉴는 최대 50개까지만 추가할 수 있습니다.');
+    return;
+  }
+  totalMenuCount++;
 
-      const cont = document.getElementById(catContainerId);
-      const row = document.createElement('div');
-      row.className = 'flex flex-col gap-2 mb-4';
+  const cont = document.getElementById(catContainerId);
+  const row = document.createElement('div');
 
-      row.innerHTML = `
-        <!-- 히든 필드 그대로 -->
-        <input type="hidden" name="menuCategory[]" value="\${catName}">
+  // ★ flex-col 로 세로 스택, gap-2 로 줄 사이 간격, mb-4 로 블록간 간격 지정
+  row.className = 'flex flex-col gap-2 mb-4';
 
-        <!-- ① 윗줄: flex 컨테이너 -->
-        <div class="flex flex-wrap items-center gap-2 mb-2">
-          <input type="file" name="menuImage[]" … class="w-1/3 …" />
-          <input type="text" name="menuName[]" … class="flex-1 …" />
-          <input type="text" name="menuPrice[]" … class="w-32 …" />
-          <button type="button" onclick="removeMenu(this)" …>🗑️</button>
-        </div>
+  row.innerHTML = `
+    <!-- ① 카테고리 히든 필드 -->
+    <input type="hidden" name="menuCategory[]" value="${catName}">
 
-        <!-- ② 아랫줄: flex 컨테이너 바깥의 블록 레벨 요소 -->
-        <div class="w-full mb-4">
-          <input type="text"
-                 name="menuDesc[]"
-                 placeholder="메뉴 설명을 입력하세요"
-                 class="block w-full border rounded px-3 py-2" />
-        </div>
-      `;
+    <!-- ② 윗줄: 파일 / 메뉴명 / 가격 / 삭제 -->
+    <div class="flex items-center gap-2">
+      <input type="file" name="menuImage[]" accept="image/*"
+             class="w-1/3 border border-gray-300 rounded px-2 py-1"/>
+      <input type="text" name="menuName[]" placeholder="메뉴명"
+             class="flex-1 border border-gray-300 rounded px-2 py-1"/>
+      <input type="text" name="menuPrice[]" placeholder="가격"
+             class="w-32 border border-gray-300 rounded px-2 py-1"
+             oninput="formatCurrency(this)"/>
+      <button type="button" onclick="removeMenu(this)"
+              class="text-red-500 text-lg">🗑️</button>
+    </div>
 
-      cont.appendChild(row);
-    }
+    <!-- ③ 아랫줄: 메뉴 설명 (block 레벨로 강제 줄바꿈) -->
+    <div>
+      <input type="text" name="menuDesc[]" placeholder="메뉴 설명을 입력하세요"
+             class="block w-full border border-gray-300 rounded px-3 py-2"/>
+    </div>
+  `;
+
+  cont.appendChild(row);
+}
+
 
     function removeMenu(btn) {
       btn.parentElement.remove();
