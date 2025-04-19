@@ -230,6 +230,21 @@ app.post(
           const category =
             categories[Math.floor(i)] || "기타"; // 범위 초과 방지
 
+            await client.query(
+              `INSERT INTO store_menu
+                 (store_id, category, menu_name, menu_price, menu_image, menu_desc)
+               VALUES ($1,      $2,       $3,        $4,         $5,         $6)`,
+              [
+                storeId,           // $1
+                category,          // $2
+                name,              // $3
+                price,             // $4
+                imgPath,           // $5
+                descriptions[i] || "" // $6
+              ]
+            );
+          } 
+
           await client.query(
             `INSERT INTO store_menu (store_id, category, menu_name, menu_price, menu_image, description)
                VALUES ($1, $2, $3, $4, $5, $6)`,
