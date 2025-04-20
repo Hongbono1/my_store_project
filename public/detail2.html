@@ -8,7 +8,7 @@
   <!-- 다음 우편번호 API -->
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
   <!-- Kakao 지도 SDK -->
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services" defer></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 </head>
 
 <body class="bg-gray-100 min-h-screen flex flex-col">
@@ -137,20 +137,22 @@
   
           // ✅ 지도
           document.getElementById("addressText").textContent = store.address || "";
-          if (store.address && window.kakao && kakao.maps) {
-            const map = new kakao.maps.Map(document.getElementById("map"), {
-              center: new kakao.maps.LatLng(37.5665, 126.978),
-              level: 3
-            });
-            const geocoder = new kakao.maps.services.Geocoder();
-            geocoder.addressSearch(store.address, (result, status) => {
-              if (status === kakao.maps.services.Status.OK) {
-                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                new kakao.maps.Marker({ map, position: coords });
-                map.setCenter(coords);
-              }
-            });
-          }
+          kakao.maps.load(() => {
+  if (store.address && kakao.maps) {
+    const map = new kakao.maps.Map(document.getElementById("map"), {
+      center: new kakao.maps.LatLng(37.5665, 126.978),
+      level: 3
+    });
+
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(store.address, (result, status) => {
+      if (status === kakao.maps.services.Status.OK) {
+        const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+        new kakao.maps.Marker({ map, position: coords });
+        map.setCenter(coords);
+      }
+    });
+  }
   
           window.openKakaoMap = () => {
             const addr = document.getElementById("addressText").textContent;
@@ -256,13 +258,20 @@
           };
   
           document.getElementById("checkoutBtn").addEventListener("click", () => {
-            if (!cart.length) return alert("장바구니가 비어있습니다.");
-            alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
+            const total = document.getElementById("totalPrice").textContent;
+            if (!cart.length) {
+              alert("장바구니가 비어있습니다.");
+            } else {
+              alert(`총 ${total}원 결제 진행`);
+            }
+
           });
         })
         .catch((err) => {
           console.error("데이터 로딩 실패", err);
         });
     });
+});
   </script>
-  
+</body>
+</html>
