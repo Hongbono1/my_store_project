@@ -84,58 +84,58 @@
 
   <div id="footer-placeholder"></div>
 
-  <!-- Script -->
   <script>
     window.addEventListener("DOMContentLoaded", () => {
+      // 🔗 헤더/푸터 동적 삽입
       fetch("https://www.hongbono1.com/components/header.html")
         .then(res => res.text())
         .then(data => {
           document.getElementById("header-placeholder").innerHTML = data;
         });
-
+  
       fetch("https://www.hongbono1.com/components/footer.html")
         .then(res => res.text())
         .then(data => {
           document.getElementById("footer-placeholder").innerHTML = data;
         });
-
+  
       const baseUrl = "https://www.hongbono1.com";
       const urlParams = new URLSearchParams(window.location.search);
       const id = urlParams.get("id") || 1;
-
+  
       fetch(`${baseUrl}/store/${id}`)
         .then(res => res.json())
         .then(data => {
-          const store = data.storeInfo || {};
-          const menuData = data.storeMenu || [];
-
-          // 이미지 처리
+          const store = data.store || data.storeInfo || {};
+          const menuData = data.menu || data.storeMenu || [];
+  
+          // ✅ 이미지 슬라이더
           const imageList = [store.image1, store.image2, store.image3].filter(Boolean);
           console.log("✅ 받아온 이미지 배열:", imageList);
-
+  
           let images = [];
           let currentIndex = 0;
-
+  
           const sliderImage = document.getElementById("sliderImage");
           const prevBtn = document.getElementById("prevBtn");
           const nextBtn = document.getElementById("nextBtn");
-
+  
           if (imageList.length) {
             images = imageList.map(img => img.startsWith("http") ? img : `${baseUrl}${img}`);
             sliderImage.src = images[currentIndex];
-
+  
             prevBtn.addEventListener("click", () => {
               currentIndex = (currentIndex - 1 + images.length) % images.length;
               sliderImage.src = images[currentIndex];
             });
-
+  
             nextBtn.addEventListener("click", () => {
               currentIndex = (currentIndex + 1) % images.length;
               sliderImage.src = images[currentIndex];
             });
           }
-
-          // 지도
+  
+          // ✅ 지도
           document.getElementById("addressText").textContent = store.address || "";
           if (store.address && window.kakao && kakao.maps) {
             const map = new kakao.maps.Map(document.getElementById("map"), {
@@ -151,22 +151,24 @@
               }
             });
           }
-
+  
           window.openKakaoMap = () => {
             const addr = document.getElementById("addressText").textContent;
             window.open(`https://map.kakao.com/?q=${encodeURIComponent(addr)}`, "_blank");
           };
-
-          // 가게 정보
+  
+          // ✅ 가게 정보
           document.getElementById("businessNameHeader").textContent = store.businessName || "";
           document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || ""}`;
           document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || ""}`;
           document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || ""}`;
           document.getElementById("serviceDetails").textContent = store.serviceDetails || "";
           document.getElementById("contactPhone").textContent = store.contactPhone || "";
-          document.getElementById("contactHomepage").innerHTML = store.homepage ? `<a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>` : "";
+          document.getElementById("contactHomepage").innerHTML = store.homepage
+            ? `<a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>`
+            : "";
           document.getElementById("additionalDesc").textContent = store.additionalDesc || "";
-
+  
           document.getElementById("eventsList").innerHTML = `
             ${store.event1 ? `<li>${store.event1}</li>` : ""}
             ${store.event2 ? `<li>${store.event2}</li>` : ""}
@@ -176,11 +178,11 @@
             <li><strong>반려동물 출입:</strong> ${store.pets || ""}</li>
             <li><strong>주차:</strong> ${store.parking || ""}</li>
           `;
-
-          // 메뉴
+  
+          // ✅ 메뉴 목록 + 장바구니
           const menuList = document.getElementById("menuList");
           let cart = [];
-
+  
           if (menuData.length) {
             const categories = {};
             menuData.forEach(item => {
@@ -188,13 +190,13 @@
               if (!categories[cat]) categories[cat] = [];
               categories[cat].push(item);
             });
-
+  
             Object.entries(categories).forEach(([cat, items]) => {
               const header = document.createElement("li");
               header.textContent = cat;
               header.className = "font-bold text-blue-700 pt-2";
               menuList.appendChild(header);
-
+  
               items.forEach(menu => {
                 const li = document.createElement("li");
                 li.className = "flex items-center gap-3 border-b pb-2 cursor-pointer";
@@ -215,22 +217,20 @@
           } else {
             menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
           }
-
+  
           const updateCart = () => {
             const cartBox = document.getElementById("cartBox");
             const cartList = document.getElementById("cartList");
             const totalPriceEl = document.getElementById("totalPrice");
             cartList.innerHTML = "";
             let total = 0;
-
+  
             cart.forEach((item, idx) => {
               total += item.price * item.quantity;
               const row = document.createElement("li");
               row.className = "flex justify-between items-center";
               row.innerHTML = `
-                <div>
-                  ${item.name} (${item.price.toLocaleString()}원)
-                </div>
+                <div>${item.name} (${item.price.toLocaleString()}원)</div>
                 <div class="flex items-center gap-2">
                   <button class="decrease px-2 border">-</button>
                   <span>${item.quantity}</span>
@@ -239,15 +239,22 @@
                 </div>
               `;
               row.querySelector(".increase").onclick = () => { item.quantity++; updateCart(); };
-              row.querySelector(".decrease").onclick = () => { item.quantity--; if (item.quantity <= 0) cart.splice(idx, 1); updateCart(); };
-              row.querySelector(".delete").onclick = () => { cart.splice(idx, 1); updateCart(); };
+              row.querySelector(".decrease").onclick = () => {
+                item.quantity--;
+                if (item.quantity <= 0) cart.splice(idx, 1);
+                updateCart();
+              };
+              row.querySelector(".delete").onclick = () => {
+                cart.splice(idx, 1);
+                updateCart();
+              };
               cartList.appendChild(row);
             });
-
+  
             totalPriceEl.textContent = total.toLocaleString();
             cartBox.classList.toggle("hidden", cart.length === 0);
           };
-
+  
           document.getElementById("checkoutBtn").addEventListener("click", () => {
             if (!cart.length) return alert("장바구니가 비어있습니다.");
             alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
@@ -258,5 +265,4 @@
         });
     });
   </script>
-</body>
-</html>
+  
