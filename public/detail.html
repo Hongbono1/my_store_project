@@ -119,9 +119,8 @@
 
 <!-- 스크립트 -->
 <script>
-
-  // ✅ 헤더 / 푸터 fetch 연결
   window.addEventListener("DOMContentLoaded", () => {
+    // 헤더/푸터 로딩
     fetch("https://www.hongbono1.com/components/header.html")
       .then((res) => res.text())
       .then((html) => {
@@ -134,216 +133,202 @@
         document.getElementById("footer-placeholder").innerHTML = html;
       });
 
-    // 아래에 기존 fetch(`/store/${id}`) 등 로직이 오면 됨
-  });
-  // =============================
-  // 1. 이미지 슬라이더 (기본 더미 → 서버 업데이트 시 교체)
-  let images = [];
-  let currentIndex = 0;
-  const sliderImage = document.getElementById("sliderImage");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
+    // 이미지 슬라이더 준비
+    let images = [];
+    let currentIndex = 0;
+    const sliderImage = document.getElementById("sliderImage");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
 
-  prevBtn.addEventListener("click", () => {
-    currentIndex = (currentIndex - 1 + images.length) % images.length;
-    sliderImage.src = images[currentIndex];
-  });
-  nextBtn.addEventListener("click", () => {
-    currentIndex = (currentIndex + 1) % images.length;
-    sliderImage.src = images[currentIndex];
-  });
+    prevBtn.addEventListener("click", () => {
+      currentIndex = (currentIndex - 1 + images.length) % images.length;
+      sliderImage.src = images[currentIndex];
+    });
 
-  // =============================
-  // 2. 카카오맵: 주소를 기반으로 지도 표시 & "카카오맵으로 보기" 버튼
-  function openKakaoMap() {
-    const addr = document.getElementById("addressText").textContent;
-    const url = `https://map.kakao.com/?q=${encodeURIComponent(addr)}`;
-    window.open(url, "_blank");
-  }
+    nextBtn.addEventListener("click", () => {
+      currentIndex = (currentIndex + 1) % images.length;
+      sliderImage.src = images[currentIndex];
+    });
 
-  // =============================
-  // 3. 서버에서 동적 데이터 불러오기
-  window.addEventListener("DOMContentLoaded", () => {
+    // 카카오맵 링크 열기
+    window.openKakaoMap = function () {
+      const addr = document.getElementById("addressText").textContent;
+      const url = `https://map.kakao.com/?q=${encodeURIComponent(addr)}`;
+      window.open(url, "_blank");
+    };
+
+    // fetch 데이터 불러오기
     const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get("id") || 1; // id 없으면 기본값 1
+    const id = urlParams.get("id") || 1;
     const baseUrl = "https://www.hongbono1.com";
+
     fetch(`${baseUrl}/store/${id}`)
       .then((res) => res.json())
       .then((data) => {
-        // 서버에서 반환된 데이터 구조: { hospital: { ... }, menu: [ ... ] }
-        const hospital = data.hospital;
+        const store = data.store;
         const menuData = data.menu;
 
-        // 오른쪽 섹션 (가게 정보) 동적 업데이트
-        document.getElementById("businessNameHeader").textContent =
-          hospital.businessName;
-        document.getElementById("businessType").innerHTML =
-          `<strong>업종:</strong> ${hospital.businessType}`;
-        document.getElementById("deliveryOption").innerHTML =
-          `<strong>배달:</strong> ${hospital.deliveryOption}`;
-        document.getElementById("businessHours").innerHTML =
-          `<strong>영업시간:</strong> ${hospital.businessHours}`;
-        document.getElementById("serviceDetails").textContent =
-          hospital.serviceDetails;
-        document.getElementById("eventsList").innerHTML = `
-              <li>${hospital.event1}</li>
-              <li>${hospital.event2}</li>
-            `;
-        document.getElementById("additionalInfoList").innerHTML = `
-              <li><strong>장애인 편의시설:</strong> ${hospital.facility}</li>
-              <li><strong>반려동물 출입:</strong> ${hospital.pets}</li>
-              <li><strong>주차:</strong> ${hospital.parking}</li>
-            `;
-        document.getElementById("contactPhone").innerHTML =
-          `<strong>전화번호:</strong> ${hospital.contactPhone}`;
-        document.getElementById("contactHomepage").innerHTML = `
-              <strong>홈페이지:</strong> 
-              <a href="${hospital.homepage}" target="_blank" class="text-blue-600 underline">
-                ${hospital.homepage}
-              </a>
-            `;
-        document.getElementById("additionalDesc").textContent =
-          hospital.additionalDesc;
-
-        // 왼쪽 섹션 - 지도 주소 업데이트
-        document.getElementById("addressText").textContent =
-          hospital.address;
-
-        // 왼쪽 섹션 - 이미지 슬라이더 업데이트
-        if (
-          hospital.images &&
-          Array.isArray(hospital.images) &&
-          hospital.images.length > 0
-        ) {
-          images = hospital.images.map((img) => `${location.origin}${img}`);
-          currentIndex = 0;
-          sliderImage.src = images[currentIndex];
+        if (!store) {
+          alert("가게 정보를 불러오지 못했습니다.");
+          return;
         }
 
-        // 왼쪽 섹션 - 메뉴 동적 생성
+        // 가게 정보 출력
+        document.getElementById("businessNameHeader").textContent = store.businessName || "";
+        document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || ""}`;
+        document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || ""}`;
+        document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || ""}`;
+        document.getElementById("serviceDetails").textContent = store.serviceDetails || "";
+        document.getElementById("eventsList").innerHTML = `
+          <li>${store.event1 || ""}</li>
+          <li>${store.event2 || ""}</li>
+        `;
+        document.getElementById("additionalInfoList").innerHTML = `
+          <li><strong>장애인 편의시설:</strong> ${store.facility || ""}</li>
+          <li><strong>반려동물 출입:</strong> ${store.pets || ""}</li>
+          <li><strong>주차:</strong> ${store.parking || ""}</li>
+        `;
+        document.getElementById("contactPhone").innerHTML = `<strong>전화번호:</strong> ${store.contactPhone || ""}`;
+        document.getElementById("contactHomepage").innerHTML = store.homepage
+          ? `<strong>홈페이지:</strong> <a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>`
+          : "";
+        document.getElementById("additionalDesc").textContent = store.additionalDesc || "";
+        document.getElementById("addressText").textContent = store.address || "";
+
+        // 이미지 설정
+        if (store.images && Array.isArray(store.images) && store.images.length > 0) {
+          images = store.images.map((img) =>
+            img.startsWith("http") ? img : `${location.origin}${img}`
+          );
+          currentIndex = 0;
+          sliderImage.src = images[currentIndex];
+        } else {
+          sliderImage.src = "https://via.placeholder.com/600x400?text=NO+IMAGE";
+        }
+
+        // 메뉴 출력
         const menuList = document.getElementById("menuList");
         menuList.innerHTML = "";
-        if (menuData && Array.isArray(menuData) && menuData.length > 0) {
+        if (Array.isArray(menuData) && menuData.length > 0) {
+          const categorizedMenus = {};
           menuData.forEach((item) => {
-            const li = document.createElement("li");
-            li.className =
-              "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
-            li.dataset.name = item.menuName;
-            li.dataset.price = item.menuPrice;
-            li.innerHTML = `
-                  <img
-                    src="${item.menuImageUrl ||
-              "https://via.placeholder.com/80?text=NOIMAGE"
-              }"
-                    alt="${item.menuName}"
-                    class="w-16 h-16 object-cover rounded border"
-                  >
-                  <span class="font-semibold text-gray-800">${item.menuName}</span>
-                  <span class="ml-auto text-gray-600">${Number(
-                item.menuPrice
-              ).toLocaleString()}원</span>
-                  <div
-                    class="absolute left-0 top-full mt-1 w-max opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white border p-2 shadow-lg z-50"
-                  >
-                    <p class="text-sm text-gray-800">${item.menuName} 추가 설명</p>
-                  </div>
-                `;
-            menuList.appendChild(li);
+            const category = item.category || "기타";
+            if (!categorizedMenus[category]) categorizedMenus[category] = [];
+            categorizedMenus[category].push(item);
           });
-          // 메뉴 클릭 이벤트 바인딩 (장바구니에 추가)
+
+          Object.entries(categorizedMenus).forEach(([category, items]) => {
+            const catHeader = document.createElement("li");
+            catHeader.textContent = category;
+            catHeader.className = "font-bold text-blue-600 pt-4";
+            menuList.appendChild(catHeader);
+
+            items.forEach((item) => {
+              const li = document.createElement("li");
+              li.className = "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
+              li.dataset.name = item.menuName;
+              li.dataset.price = item.menuPrice;
+              li.innerHTML = `
+                <img src="${item.menuImageUrl || "https://via.placeholder.com/80?text=NOIMAGE"}" alt="${item.menuName}" class="w-16 h-16 object-cover rounded border">
+                <span class="font-semibold text-gray-800">${item.menuName}</span>
+                <span class="ml-auto text-gray-600">${Number(item.menuPrice).toLocaleString()}원</span>
+              `;
+              menuList.appendChild(li);
+            });
+          });
+
           bindMenuItemEvents();
         } else {
           menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
         }
+
+        // 카카오 지도
+        kakao.maps.load(() => {
+          const container = document.getElementById("map");
+          const map = new kakao.maps.Map(container, {
+            center: new kakao.maps.LatLng(37.5665, 126.978),
+            level: 3,
+          });
+          const geocoder = new kakao.maps.services.Geocoder();
+          geocoder.addressSearch(store.address, (result, status) => {
+            if (status === kakao.maps.services.Status.OK) {
+              const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+              new kakao.maps.Marker({ map: map, position: coords });
+              map.setCenter(coords);
+            }
+          });
+        });
       })
       .catch((err) => {
         console.error("데이터 로딩 실패", err);
         alert("서버에서 데이터를 가져오는 데 실패했습니다.");
       });
-  });
 
-  // =============================
-  // 4. 메뉴 항목 클릭 시 장바구니에 추가
-  let cart = [];
-  function bindMenuItemEvents() {
-    document.querySelectorAll(".menu-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        const name = item.dataset.name;
-        const price = parseInt(item.dataset.price, 10);
-        const found = cart.find((i) => i.name === name);
-        if (found) {
-          found.quantity++;
-        } else {
-          cart.push({ name, price, quantity: 1 });
-        }
-        updateCart();
+    // 장바구니
+    let cart = [];
+    function bindMenuItemEvents() {
+      document.querySelectorAll(".menu-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          const name = item.dataset.name;
+          const price = parseInt(item.dataset.price, 10);
+          const found = cart.find((i) => i.name === name);
+          if (found) {
+            found.quantity++;
+          } else {
+            cart.push({ name, price, quantity: 1 });
+          }
+          updateCart();
+        });
       });
-    });
-  }
-
-  function updateCart() {
-    const cartList = document.getElementById("cartList");
-    const totalPriceEl = document.getElementById("totalPrice");
-    cartList.innerHTML = "";
-    let total = 0;
-    cart.forEach((item, idx) => {
-      total += item.price * item.quantity;
-      const div = document.createElement("div");
-      div.className = "flex items-center justify-between border-b pb-2";
-      div.innerHTML = `
-            <div>
-              <span class="font-semibold">${item.name}</span>
-              <span class="ml-2 text-gray-600">${item.price}원</span>
-            </div>
-            <div class="flex items-center">
-              <button class="decrease border px-2">-</button>
-              <span class="mx-2">${item.quantity}</span>
-              <button class="increase border px-2">+</button>
-              <button class="delete border px-2 ml-2 text-red-500">삭제</button>
-            </div>
-          `;
-      div.querySelector(".increase").onclick = () => {
-        item.quantity++;
-        updateCart();
-      };
-      div.querySelector(".decrease").onclick = () => {
-        item.quantity--;
-        if (item.quantity <= 0) cart.splice(idx, 1);
-        updateCart();
-      };
-      div.querySelector(".delete").onclick = () => {
-        cart.splice(idx, 1);
-        updateCart();
-      };
-      cartList.appendChild(div);
-    });
-    totalPriceEl.textContent = total.toLocaleString();
-    const cartBox = document.getElementById("cartBox");
-    cartBox.classList.toggle("hidden", cart.length === 0);
-  }
-
-  document.getElementById("checkoutBtn").addEventListener("click", () => {
-    if (cart.length === 0) {
-      return alert("장바구니가 비어 있습니다.");
     }
-    alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
-  });
 
-  const mapContainer = document.getElementById("map");
-  const mapOption = {
-    center: new kakao.maps.LatLng(37.5665, 126.978),
-    level: 3,
-  };
-  const map = new kakao.maps.Map(mapContainer, mapOption);
-  const geocoder = new kakao.maps.services.Geocoder();
-  geocoder.addressSearch(hospital.address, (result, status) => {
-    if (status === kakao.maps.services.Status.OK) {
-      const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-      new kakao.maps.Marker({ map: map, position: coords });
-      map.setCenter(coords);
+    function updateCart() {
+      const cartList = document.getElementById("cartList");
+      const totalPriceEl = document.getElementById("totalPrice");
+      cartList.innerHTML = "";
+      let total = 0;
+
+      cart.forEach((item, idx) => {
+        total += item.price * item.quantity;
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between border-b pb-2";
+        div.innerHTML = `
+          <div>
+            <span class="font-semibold">${item.name}</span>
+            <span class="ml-2 text-gray-600">${item.price}원</span>
+          </div>
+          <div class="flex items-center">
+            <button class="decrease border px-2">-</button>
+            <span class="mx-2">${item.quantity}</span>
+            <button class="increase border px-2">+</button>
+            <button class="delete border px-2 ml-2 text-red-500">삭제</button>
+          </div>
+        `;
+        div.querySelector(".increase").onclick = () => { item.quantity++; updateCart(); };
+        div.querySelector(".decrease").onclick = () => {
+          item.quantity--;
+          if (item.quantity <= 0) cart.splice(idx, 1);
+          updateCart();
+        };
+        div.querySelector(".delete").onclick = () => {
+          cart.splice(idx, 1);
+          updateCart();
+        };
+        cartList.appendChild(div);
+      });
+
+      totalPriceEl.textContent = total.toLocaleString();
+      const cartBox = document.getElementById("cartBox");
+      cartBox.classList.toggle("hidden", cart.length === 0);
     }
+
+    document.getElementById("checkoutBtn").addEventListener("click", () => {
+      if (cart.length === 0) {
+        return alert("장바구니가 비어 있습니다.");
+      }
+      alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
+    });
   });
-</script>
+ </script>
 </body>
-
 </html>
