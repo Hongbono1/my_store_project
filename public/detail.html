@@ -173,126 +173,119 @@
           return;
         }
 
-        // 가게 정보 출력
-        document.getElementById("businessNameHeader").textContent = store.businessName || "";
-        document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || ""}`;
-        document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || ""}`;
-        document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || ""}`;
-        document.getElementById("serviceDetails").textContent = store.serviceDetails || "";
-        document.getElementById("eventsList").innerHTML = `
-          <li>${store.event1 || ""}</li>
-          <li>${store.event2 || ""}</li>
-        `;
-        document.getElementById("additionalInfoList").innerHTML = `
-          <li><strong>장애인 편의시설:</strong> ${store.facility || ""}</li>
-          <li><strong>반려동물 출입:</strong> ${store.pets || ""}</li>
-          <li><strong>주차:</strong> ${store.parking || ""}</li>
-        `;
-        document.getElementById("contactPhone").innerHTML = `<strong>전화번호:</strong> ${store.contactPhone || ""}`;
-        document.getElementById("contactHomepage").innerHTML = store.homepage
-          ? `<strong>홈페이지:</strong> <a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>`
-          : "";
-        document.getElementById("additionalDesc").textContent = store.additionalDesc || "";
-        document.getElementById("addressText").textContent = store.address || "";
-
-        // 이미지 설정
-        if (store.images && Array.isArray(store.images) && store.images.length > 0) {
-          images = store.images.map((img) =>
-            img.startsWith("http") ? img : `${location.origin}${img}`
-          );
-          currentIndex = 0;
-          sliderImage.src = images[currentIndex];
-        } else {
-          sliderImage.src = "https://via.placeholder.com/600x400?text=NO+IMAGE";
-        }
-
-        // 메뉴 출력
-        const menuList = document.getElementById("menuList");
-        menuList.innerHTML = "";
-        if (Array.isArray(menuData) && menuData.length > 0) {
-          const categorizedMenus = {};
-          menuData.forEach((item) => {
-            const category = item.category || "기타";
-            if (!categorizedMenus[category]) categorizedMenus[category] = [];
-            categorizedMenus[category].push(item);
-          });
-
-          Object.entries(categorizedMenus).forEach(([category, items]) => {
-            const catHeader = document.createElement("li");
-            catHeader.textContent = category;
-            catHeader.className = "font-bold text-blue-600 pt-4";
-            menuList.appendChild(catHeader);
-
-            items.forEach((item) => {
-              const li = document.createElement("li");
-              li.className = "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
-              li.dataset.name = item.menuName;
-              li.dataset.price = item.menuPrice;
-              li.innerHTML = `
-                <img src="${item.menuImageUrl || "https://via.placeholder.com/80?text=NOIMAGE"}" alt="${item.menuName}" class="w-16 h-16 object-cover rounded border">
-                <span class="font-semibold text-gray-800">${item.menuName}</span>
-                <span class="ml-auto text-gray-600">${Number(item.menuPrice).toLocaleString()}원</span>
-              `;
-              menuList.appendChild(li);
-            });
-          });
-
-          bindMenuItemEvents();
-        } else {
-          menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
-        }
-
-        // 카카오 지도
-        kakao.maps.load(() => {
-          const container = document.getElementById("map");
-          const map = new kakao.maps.Map(container, {
-            center: new kakao.maps.LatLng(37.5665, 126.978),
-            level: 3,
-          });
-          const geocoder = new kakao.maps.services.Geocoder();
-          geocoder.addressSearch(store.address, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-              const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-              new kakao.maps.Marker({ map: map, position: coords });
-              map.setCenter(coords);
-            }
-          });
-        });
+        renderStore(store, menuData);  // 이 함수 안에서 지도와 화면 다 보여줌
       })
       .catch((err) => {
         console.error("데이터 로딩 실패", err);
         alert("서버에서 데이터를 가져오는 데 실패했습니다.");
       });
 
-    // 장바구니
-    let cart = [];
-    function bindMenuItemEvents() {
-      document.querySelectorAll(".menu-item").forEach((item) => {
-        item.addEventListener("click", () => {
-          const name = item.dataset.name;
-          const price = parseInt(item.dataset.price, 10);
-          const found = cart.find((i) => i.name === name);
-          if (found) {
-            found.quantity++;
-          } else {
-            cart.push({ name, price, quantity: 1 });
-          }
-          updateCart();
-        });
+
+    // ✅ 지도 렌더링을 포함한 모든 store 출력 처리 함수
+    renderStore(store, menuData); // ← 이거 반드시 있어야 함!
+  })
+
+  // 이미지 설정
+  if (store.images && Array.isArray(store.images) && store.images.length > 0) {
+    images = store.images.map((img) =>
+      img.startsWith("http") ? img : `${location.origin}${img}`
+    );
+    currentIndex = 0;
+    sliderImage.src = images[currentIndex];
+  } else {
+    sliderImage.src = "https://via.placeholder.com/600x400?text=NO+IMAGE";
+  }
+
+  // 메뉴 출력
+  const menuList = document.getElementById("menuList");
+  menuList.innerHTML = "";
+  if (Array.isArray(menuData) && menuData.length > 0) {
+    const categorizedMenus = {};
+    menuData.forEach((item) => {
+      const category = item.category || "기타";
+      if (!categorizedMenus[category]) categorizedMenus[category] = [];
+      categorizedMenus[category].push(item);
+    });
+
+    Object.entries(categorizedMenus).forEach(([category, items]) => {
+      const catHeader = document.createElement("li");
+      catHeader.textContent = category;
+      catHeader.className = "font-bold text-blue-600 pt-4";
+      menuList.appendChild(catHeader);
+
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "relative group flex items-center gap-3 border-b pb-2 cursor-pointer menu-item";
+        li.dataset.name = item.menuName;
+        li.dataset.price = item.menuPrice;
+        li.innerHTML = `
+                <img src="${item.menuImageUrl || "https://via.placeholder.com/80?text=NOIMAGE"}" alt="${item.menuName}" class="w-16 h-16 object-cover rounded border">
+                <span class="font-semibold text-gray-800">${item.menuName}</span>
+                <span class="ml-auto text-gray-600">${Number(item.menuPrice).toLocaleString()}원</span>
+              `;
+        menuList.appendChild(li);
       });
-    }
+    });
 
-    function updateCart() {
-      const cartList = document.getElementById("cartList");
-      const totalPriceEl = document.getElementById("totalPrice");
-      cartList.innerHTML = "";
-      let total = 0;
+    bindMenuItemEvents();
+  } else {
+    menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
+  }
 
-      cart.forEach((item, idx) => {
-        total += item.price * item.quantity;
-        const div = document.createElement("div");
-        div.className = "flex items-center justify-between border-b pb-2";
-        div.innerHTML = `
+  function renderStore(store, menuData) {
+    // ✅ 화면 상단에 주소 표시
+    document.getElementById("addressText").textContent = store.address || "";
+
+    // 카카오 지도
+    kakao.maps.load(() => {
+      const container = document.getElementById("map");
+      const map = new kakao.maps.Map(container, {
+        center: new kakao.maps.LatLng(37.5665, 126.978), // 기본 좌표
+        level: 3,
+      });
+
+      const geocoder = new kakao.maps.services.Geocoder();
+      geocoder.addressSearch(store.address, (result, status) => {
+        if (status === kakao.maps.services.Status.OK) {
+          const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+          new kakao.maps.Marker({ map, position: coords });
+          map.setCenter(coords);
+        } else {
+          console.warn("주소를 좌표로 변환하지 못했습니다.");
+        }
+      });
+    });
+  }
+
+  // 장바구니
+  let cart = [];
+  function bindMenuItemEvents() {
+    document.querySelectorAll(".menu-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const name = item.dataset.name;
+        const price = parseInt(item.dataset.price, 10);
+        const found = cart.find((i) => i.name === name);
+        if (found) {
+          found.quantity++;
+        } else {
+          cart.push({ name, price, quantity: 1 });
+        }
+        updateCart();
+      });
+    });
+  }
+
+  function updateCart() {
+    const cartList = document.getElementById("cartList");
+    const totalPriceEl = document.getElementById("totalPrice");
+    cartList.innerHTML = "";
+    let total = 0;
+
+    cart.forEach((item, idx) => {
+      total += item.price * item.quantity;
+      const div = document.createElement("div");
+      div.className = "flex items-center justify-between border-b pb-2";
+      div.innerHTML = `
           <div>
             <span class="font-semibold">${item.name}</span>
             <span class="ml-2 text-gray-600">${item.price}원</span>
@@ -304,31 +297,32 @@
             <button class="delete border px-2 ml-2 text-red-500">삭제</button>
           </div>
         `;
-        div.querySelector(".increase").onclick = () => { item.quantity++; updateCart(); };
-        div.querySelector(".decrease").onclick = () => {
-          item.quantity--;
-          if (item.quantity <= 0) cart.splice(idx, 1);
-          updateCart();
-        };
-        div.querySelector(".delete").onclick = () => {
-          cart.splice(idx, 1);
-          updateCart();
-        };
-        cartList.appendChild(div);
-      });
-
-      totalPriceEl.textContent = total.toLocaleString();
-      const cartBox = document.getElementById("cartBox");
-      cartBox.classList.toggle("hidden", cart.length === 0);
-    }
-
-    document.getElementById("checkoutBtn").addEventListener("click", () => {
-      if (cart.length === 0) {
-        return alert("장바구니가 비어 있습니다.");
-      }
-      alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
+      div.querySelector(".increase").onclick = () => { item.quantity++; updateCart(); };
+      div.querySelector(".decrease").onclick = () => {
+        item.quantity--;
+        if (item.quantity <= 0) cart.splice(idx, 1);
+        updateCart();
+      };
+      div.querySelector(".delete").onclick = () => {
+        cart.splice(idx, 1);
+        updateCart();
+      };
+      cartList.appendChild(div);
     });
+
+    totalPriceEl.textContent = total.toLocaleString();
+    const cartBox = document.getElementById("cartBox");
+    cartBox.classList.toggle("hidden", cart.length === 0);
+  }
+
+  document.getElementById("checkoutBtn").addEventListener("click", () => {
+    if (cart.length === 0) {
+      return alert("장바구니가 비어 있습니다.");
+    }
+    alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
   });
- </script>
+});
+</script>
 </body>
+
 </html>
