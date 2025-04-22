@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <title>상세 페이지</title>
@@ -9,10 +10,10 @@
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
   <!-- 카카오 지도 API (실제 앱 키로 교체 필요) -->
   <script
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"
-    defer
-  ></script>
+    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+
 </head>
+
 <body class="bg-gray-100 min-h-screen flex flex-col">
   <div id="header-placeholder"></div>
 
@@ -24,16 +25,12 @@
         <!-- 이미지 슬라이더 -->
         <div class="relative">
           <img id="sliderImage" alt="가게 이미지" class="w-full h-64 object-cover rounded shadow mb-2" />
-          <button
-            id="prevBtn"
-            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
-          >
+          <button id="prevBtn"
+            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1">
             이전
           </button>
-          <button
-            id="nextBtn"
-            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1"
-          >
+          <button id="nextBtn"
+            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded px-3 py-1">
             다음
           </button>
         </div>
@@ -51,10 +48,8 @@
         </div>
 
         <!-- 메뉴 박스 -->
-        <div
-          id="menuBox"
-          class="bg-gray-50 border border-gray-300 rounded p-4 overflow-hidden transition-all duration-300 max-h-[13rem] hover:max-h-[2000px]"
-        >
+        <div id="menuBox"
+          class="bg-gray-50 border border-gray-300 rounded p-4 overflow-hidden transition-all duration-300 max-h-[13rem] hover:max-h-[2000px]">
           <h2 class="text-lg font-bold mb-4">메뉴</h2>
           <ul id="menuList" class="space-y-2"></ul>
         </div>
@@ -94,10 +89,7 @@
           <ul id="cartList" class="space-y-2"></ul>
           <div class="border-t mt-3 pt-3 text-right">
             <p class="font-semibold">총합: <span id="totalPrice">0</span>원</p>
-            <button
-              id="checkoutBtn"
-              class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
-            >
+            <button id="checkoutBtn" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">
               결제하기
             </button>
           </div>
@@ -122,183 +114,24 @@
         .then((html) => {
           document.getElementById("footer-placeholder").innerHTML = html;
         });
+      window.addEventListener("DOMContentLoaded", () => {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id") || 1;
 
-      // 공통 변수
-      let images = [];
-      let currentIndex = 0;
-      let cart = [];
-
-      const sliderImage = document.getElementById("sliderImage");
-      const prevBtn = document.getElementById("prevBtn");
-      const nextBtn = document.getElementById("nextBtn");
-      const openKakaoBtn = document.getElementById("openKakaoBtn");
-
-      // 슬라이더 버튼
-      prevBtn.addEventListener("click", () => {
-        currentIndex = (currentIndex - 1 + images.length) % images.length;
-        sliderImage.src = images[currentIndex];
-      });
-      nextBtn.addEventListener("click", () => {
-        currentIndex = (currentIndex + 1) % images.length;
-        sliderImage.src = images[currentIndex];
-      });
-
-      // 카카오맵 새 창
-      openKakaoBtn.addEventListener("click", () => {
-        const addr = document.getElementById("addressText").textContent || "";
-        window.open(`https://map.kakao.com/?q=${encodeURIComponent(addr)}`, "_blank");
-      });
-
-      // 데이터 로드
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("id") || 1;
-      const baseUrl = "https://www.hongbono1.com";
-
-      fetch(`${baseUrl}/store/${id}`)
-        .then((res) => res.json())
-        .then(({ store, menu }) => {
-          if (!store) {
-            alert("가게 정보를 불러오지 못했습니다.");
-            return;
-          }
-
-          // 1) 가게 정보 렌더링
-          document.getElementById("businessNameHeader").textContent =
-            store.businessName || "";
-          document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${
-            store.businessType || ""
-          }`;
-          document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${
-            store.deliveryOption || ""
-          }`;
-          document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${
-            store.businessHours || ""
-          }`;
-          document.getElementById("serviceDetails").textContent =
-            store.serviceDetails || "";
-          document.getElementById("additionalDesc").textContent =
-            store.additionalDesc || "";
-          document.getElementById("contactPhone").textContent = store.phone || "";
-          document.getElementById("contactHomepage").textContent =
-            store.homepage || "";
-          document.getElementById("addressText").textContent = store.address || "";
-
-          // 지도 렌더링
-          kakao.maps.load(() => {
-            const container = document.getElementById("map");
-            const map = new kakao.maps.Map(container, {
-              center: new kakao.maps.LatLng(37.5665, 126.978),
-              level: 3,
-            });
-            const geocoder = new kakao.maps.services.Geocoder();
-            geocoder.addressSearch(store.address, (result, status) => {
-              if (status === kakao.maps.services.Status.OK) {
-                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                new kakao.maps.Marker({ map, position: coords });
-                map.setCenter(coords);
-              }
-            });
+        fetch(`https://www.hongbono1.com/store/${id}`)
+          .then(res => res.json())
+          .then(data => {
+            const store = data.store;
+            const image = store.image1 || "https://via.placeholder.com/600x400?text=NO+IMAGE";
+            document.getElementById("sliderImage").src = image;
+          })
+          .catch(err => {
+            console.error("이미지 로딩 오류", err);
+            document.getElementById("sliderImage").src = "https://via.placeholder.com/600x400?text=NO+IMAGE";
           });
+      });
 
-          // 2) 이미지 세팅
-          images =
-            Array.isArray(store.images) && store.images.length
-              ? store.images.map((src) =>
-                  src.startsWith("http") ? src : `${baseUrl}${src}`
-                )
-              : ["https://via.placeholder.com/600x400?text=NO+IMAGE"];
-          currentIndex = 0;
-          sliderImage.src = images[currentIndex];
-
-          // 3) 메뉴 렌더링
-          const menuList = document.getElementById("menuList");
-          menuList.innerHTML = "";
-          if (!Array.isArray(menu) || !menu.length) {
-            menuList.innerHTML = "<li>메뉴가 없습니다.</li>";
-          } else {
-            const byCat = {};
-            menu.forEach((m) => {
-              const cat = m.category || "기타";
-              (byCat[cat] = byCat[cat] || []).push(m);
-            });
-            Object.entries(byCat).forEach(([cat, items]) => {
-              const h = document.createElement("li");
-              h.className = "font-bold text-blue-600 pt-4";
-              h.textContent = cat;
-              menuList.appendChild(h);
-              items.forEach((item) => {
-                const li = document.createElement("li");
-                li.className = "relative group flex items-center gap-3 border-b pb-2 cursor-pointer";
-                li.dataset.name = item.menuName;
-                li.dataset.price = item.menuPrice;
-                li.innerHTML = `
-                  <img src="${item.menuImageUrl ||
-                    "https://via.placeholder.com/80?text=NOIMAGE"}"
-                       alt="${item.menuName}"
-                       class="w-16 h-16 object-cover rounded border">
-                  <span class="font-semibold text-gray-800">${item.menuName}</span>
-                  <span class="ml-auto text-gray-600">${Number(item.menuPrice).toLocaleString()}원</span>
-                `;
-                li.addEventListener("click", () => {
-                  const found = cart.find((c) => c.name === item.menuName);
-                  if (found) found.quantity++;
-                  else cart.push({ name: item.menuName, price: +item.menuPrice, quantity: 1 });
-                  updateCart();
-                });
-                menuList.appendChild(li);
-              });
-            });
-          }
-
-          function updateCart() {
-            const cartBox = document.getElementById("cartBox");
-            const cartListEl = document.getElementById("cartList");
-            const totalEl = document.getElementById("totalPrice");
-            cartListEl.innerHTML = "";
-            let total = 0;
-            cart.forEach((c, i) => {
-              total += c.price * c.quantity;
-              const div = document.createElement("div");
-              div.className = "flex items-center justify-between border-b pb-2";
-              div.innerHTML = `
-                <div>
-                  <span class="font-semibold">${c.name}</span>
-                  <span class="ml-2 text-gray-600">${c.price.toLocaleString()}원</span>
-                </div>
-                <div class="flex items-center">
-                  <button data-idx="${i}" data-op="-" class="border px-2">-</button>
-                  <span class="mx-2">${c.quantity}</span>
-                  <button data-idx="${i}" data-op="+" class="border px-2">+</button>
-                  <button data-idx="${i}" data-op="del" class="border px-2 ml-2 text-red-500">삭제</button>
-                </div>
-              `;
-              cartListEl.appendChild(div);
-            });
-            cartListEl.querySelectorAll("button").forEach((btn) => {
-              btn.addEventListener("click", () => {
-                const i = +btn.dataset.idx, op = btn.dataset.op;
-                if (op === "+") cart[i].quantity++;
-                else if (op === "-") {
-                  cart[i].quantity--;
-                  if (cart[i].quantity < 1) cart.splice(i, 1);
-                } else cart.splice(i, 1);
-                updateCart();
-              });
-            });
-            totalEl.textContent = total.toLocaleString();
-            cartBox.classList.toggle("hidden", cart.length === 0);
-          }
-
-          document.getElementById("checkoutBtn").addEventListener("click", () => {
-            if (!cart.length) return alert("장바구니가 비어 있습니다.");
-            alert(`총 ${document.getElementById("totalPrice").textContent}원 결제 진행`);
-          });
-        })
-        .catch((err) => {
-          console.error("데이터 로딩 실패", err);
-          alert("서버에서 데이터를 가져오는 데 실패했습니다.");
-        });
-    });
   </script>
 </body>
+
 </html>
