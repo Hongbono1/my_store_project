@@ -1,4 +1,16 @@
 // server.js
+import fs from "fs";
+// 🔽 ① multer 설정 + uploads 폴더 자동 생성
+const uploadDir = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  ...
+});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+
 import express from "express";
 import pg from "pg";
 import multer from "multer";
@@ -24,15 +36,6 @@ const pool = new Pool({
 });
 
 /* ───────────────────────────────────
-   📂 2. Multer 업로드 설정
-───────────────────────────────────*/
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
-const upload = multer({ storage });
-
-/* ───────────────────────────────────
    🚀 3. Express 기본 설정
 ───────────────────────────────────*/
 const app = express();
@@ -44,7 +47,7 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
 app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 
@@ -230,21 +233,21 @@ app.post(
           const category =
             categories[Math.floor(i)] || "기타"; // 범위 초과 방지
 
-            await client.query(
-              `INSERT INTO store_menu
+          await client.query(
+            `INSERT INTO store_menu
                  (store_id, category, menu_name, menu_price, menu_image, menu_desc)
                VALUES ($1,      $2,       $3,        $4,         $5,         $6)`,
-              [
-                storeId,           // $1
-                category,          // $2
-                name,              // $3
-                price,             // $4
-                imgPath,           // $5
-                descriptions[i] || "" // $6
-              ]
-            );
-          } 
-  
+            [
+              storeId,           // $1
+              category,          // $2
+              name,              // $3
+              price,             // $4
+              imgPath,           // $5
+              descriptions[i] || "" // $6
+            ]
+          );
+        }
+
         await client.query("COMMIT");
         res.json({ message: "등록 성공", storeId });
       } catch (err) {
