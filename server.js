@@ -1,24 +1,4 @@
 // server.js
-import fs from "fs";
-// 🔽 ① multer 설정 + uploads 폴더 자동 생성
-const uploadDir = path.join(__dirname, "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);                   // 확장자 (ex: .jpg)
-    const base = path.basename(file.originalname, ext)              // 파일명(확장자 제거)
-      .replace(/\s+/g, "_")                              // 공백 → 언더바
-      .replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9-_]/g, "");  // 특수문자 제거
-    const safe = Date.now() + "-" + base + ext;                     // 최종 파일명
-    cb(null, safe);
-  }
-});
-
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
-
-
 import express from "express";
 import pg from "pg";
 import multer from "multer";
@@ -28,11 +8,32 @@ import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcrypt";
 import fetch from "node-fetch"; // ✅ 국세청 API 중계용 fetch
+import fs from "fs";             // ✅ 파일 시스템
 
 dotenv.config();
 
+// 🔥 __filename, __dirname 먼저 선언
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 🔥 그 다음에 업로드 폴더 설정
+const uploadDir = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+// 🔥 그 다음에 multer 설정
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext)
+      .replace(/\s+/g, "_")
+      .replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9-_]/g, "");
+    const safe = Date.now() + "-" + base + ext;
+    cb(null, safe);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
 
 /* ───────────────────────────────────
    📦 1. PostgreSQL 연결
