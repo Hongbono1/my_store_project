@@ -6,8 +6,16 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
-  ...
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);                   // 확장자 (ex: .jpg)
+    const base = path.basename(file.originalname, ext)              // 파일명(확장자 제거)
+      .replace(/\s+/g, "_")                              // 공백 → 언더바
+      .replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9-_]/g, "");  // 특수문자 제거
+    const safe = Date.now() + "-" + base + ext;                     // 최종 파일명
+    cb(null, safe);
+  }
 });
+
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 
