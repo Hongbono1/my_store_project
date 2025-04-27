@@ -99,73 +99,75 @@
     window.addEventListener("DOMContentLoaded", () => {
       const params = new URLSearchParams(window.location.search);
       const id = params.get("id") || 1;
-
+  
       fetch(`https://www.hongbono1.com/store/${id}`)
         .then(res => res.json())
         .then(data => {
           const store = data.store;
-
-          // ✅ 이미지 배열 준비
+  
+          // ✅ 이미지 슬라이더 준비
           const images = Array.isArray(store.images) && store.images.length > 0
             ? store.images
             : ["https://via.placeholder.com/600x400?text=NO+IMAGE"];
-
+  
           const sliderImage = document.getElementById("sliderImage");
           const prevBtn = document.getElementById("prevBtn");
           const nextBtn = document.getElementById("nextBtn");
-
+  
           let currentIndex = 0;
-
+  
           function showImage(index) {
             sliderImage.src = images[index];
           }
-
+  
           prevBtn.addEventListener("click", () => {
             currentIndex = (currentIndex - 1 + images.length) % images.length;
             showImage(currentIndex);
           });
-
+  
           nextBtn.addEventListener("click", () => {
             currentIndex = (currentIndex + 1) % images.length;
             showImage(currentIndex);
           });
-
-          showImage(currentIndex);
+  
+          showImage(currentIndex); // ✅ 초기 이미지 보여주기
+  
+          // ✅ 지도 로딩 (fetch 성공 후 store.address를 이용해서)
+          kakao.maps.load(() => {
+            const geocoder = new kakao.maps.services.Geocoder();
+  
+            const address = store.address;
+  
+            geocoder.addressSearch(address, (result, status) => {
+              if (status === kakao.maps.services.Status.OK) {
+                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+  
+                const mapContainer = document.getElementById('map');
+                const mapOption = {
+                  center: coords,
+                  level: 3,
+                };
+  
+                const map = new kakao.maps.Map(mapContainer, mapOption);
+  
+                const marker = new kakao.maps.Marker({
+                  map: map,
+                  position: coords
+                });
+  
+                const infowindow = new kakao.maps.InfoWindow({
+                  content: `<div style="padding:5px;">${store.businessName}</div>`
+                });
+                infowindow.open(map, marker);
+              }
+            });
+          });
+  
         })
         .catch(err => {
-          console.error("이미지 로딩 오류", err);
+          console.error("데이터 로딩 오류", err);
           document.getElementById("sliderImage").src = "https://via.placeholder.com/600x400?text=NO+IMAGE";
         });
-      });
-
-      // 카카오 지도 API가 준비되면
-      kakao.maps.load(() => {
-        const geocoder = new kakao.maps.services.Geocoder();
-
-        const address = store.address; // 서버로부터 받아온 주소
-
-        geocoder.addressSearch(address, (result, status) => {
-          if (status === kakao.maps.services.Status.OK) {
-            const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-
-            const mapContainer = document.getElementById('map');
-            const mapOption = {
-              center: coords,
-              level: 3,
-            };
-
-            const map = new kakao.maps.Map(mapContainer, mapOption);
-
-            const marker = new kakao.maps.Marker({
-              map: map,
-              position: coords
-            });
-
-            const infowindow = new kakao.maps.InfoWindow({
-              content: `<div style="padding:5px;">${store.businessName}</div>`
-            });
-            infowindow.open(map, marker);
-          }
-        });
-      });
+    });
   </script>
+  
