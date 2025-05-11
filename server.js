@@ -7,20 +7,17 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcrypt";
-import fetch from "node-fetch"; // ✅ 국세청 API 중계용 fetch
-import fs from "fs";             // ✅ 파일 시스템
+import fetch from "node-fetch";
+import fs from "fs";
 
 dotenv.config();
 
-// 🔥 __filename, __dirname 먼저 선언
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔥 그 다음에 업로드 폴더 설정
 const uploadDir = path.join(__dirname, "public", "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// 🔥 그 다음에 multer 설정
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
@@ -30,29 +27,20 @@ const storage = multer.diskStorage({
       .replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9-_]/g, "");
     const safe = Date.now() + "-" + base + ext;
     cb(null, safe);
-  }
+  },
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-
-/* ───────────────────────────────────
-   📦 1. PostgreSQL 연결
-───────────────────────────────────*/
 const { Pool } = pg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-/* ───────────────────────────────────
-   🚀 3. Express 기본 설정
-───────────────────────────────────*/
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(
-  cors({ origin: ["https://www.hongbono1.com", "http://localhost:3000"] })
-);
+app.use(cors({ origin: ["https://www.hongbono1.com", "http://localhost:3000"] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -60,16 +48,10 @@ app.use("/uploads", express.static(uploadDir));
 
 app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 
-/* ------------------------------------------------------------------
-   ✅ 4. 사업자등록번호 진위 확인 중계 API
--------------------------------------------------------------------*/
 app.post("/verify-biz", async (req, res) => {
   try {
-    let { b_no } = req.body;
-    console.log("요청된 사업자번호:", b_no);
-
+    const { b_no } = req.body;
     const businessNumbers = Array.isArray(b_no) ? b_no : [b_no];
-
     const ntsUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
     const response = await fetch(ntsUrl, {
       method: "POST",
@@ -79,19 +61,14 @@ app.post("/verify-biz", async (req, res) => {
       },
       body: JSON.stringify({ b_no: businessNumbers }),
     });
-
     const data = await response.json();
-    console.log("국세청 응답:", JSON.stringify(data, null, 2));
     res.json(data);
   } catch (err) {
-    console.error("❌ 사업자 인증 오류:", err.message, err.stack);
+    console.error("❌ 사업자 인증 오류:", err.message);
     res.status(500).json({ message: "서버 오류" });
   }
 });
 
-/* ------------------------------------------------------------------
-   🔄 5. 가게 정보 등록 API  (/store)
--------------------------------------------------------------------*/
 app.post(
   "/store",
   upload.fields([
@@ -101,7 +78,6 @@ app.post(
   ]),
   async (req, res) => {
     try {
-      /* 5‑1. 폼 데이터 파싱 */
       const bizNumber =
         (req.body.bizNumber1 || "") +
         (req.body.bizNumber2 || "") +
@@ -133,19 +109,13 @@ app.post(
         detailAddress,
       } = req.body;
 
-      console.log("✅ 등록 요청 본문:", req.body);
-      console.log("✅ 업로드된 파일 목록:", req.files);
-
       const fullStoreAddress = `${postalCode} ${roadAddress} ${detailAddress}`.trim();
-
-      /* 5‑2. 파일 업로드 경로 */
       const imageFiles = req.files["images[]"] || [];
       const imagePaths = imageFiles.map((f) => "/uploads/" + f.filename);
 
       const certFile = req.files["businessCertImage"]?.[0];
       const certPath = certFile ? "/uploads/" + certFile.filename : null;
 
-      /* 5‑3. 민감정보 단방향 암호화 */
       const salt = await bcrypt.genSalt(10);
       const hashedBizNumber = await bcrypt.hash(bizNumber, salt);
       const hashedOwnerPhone = await bcrypt.hash(ownerPhone || "", salt);
@@ -154,7 +124,6 @@ app.post(
       try {
         await client.query("BEGIN");
 
-        /* ① owner_info */
         const ownerResult = await client.query(
           `INSERT INTO owner_info
            (biz_number, name, birth_date, email, address, phone, cert_image)
@@ -171,7 +140,6 @@ app.post(
         );
         const ownerId = ownerResult.rows[0].id;
 
-        /* ② store_info */
         const storeResult = await client.query(
           `INSERT INTO store_info (
              owner_id,business_name,business_type,delivery_option,business_hours,
@@ -206,7 +174,6 @@ app.post(
         );
         const storeId = storeResult.rows[0].id;
 
-        /* ③ store_menu */
         const categories = Array.isArray(req.body.menuCategory)
           ? req.body.menuCategory
           : req.body.menuCategory
@@ -217,13 +184,11 @@ app.post(
           : req.body.menuName
             ? [req.body.menuName]
             : [];
-
         let menuPrices = Array.isArray(req.body.menuPrice)
           ? req.body.menuPrice
           : req.body.menuPrice
             ? [req.body.menuPrice]
             : [];
-
         const descriptions = Array.isArray(req.body.menuDesc)
           ? req.body.menuDesc
           : req.body.menuDesc
@@ -239,20 +204,19 @@ app.post(
           const imgPath =
             menuImages[i]?.filename ? "/uploads/" + menuImages[i].filename : null;
 
-          const category =
-            categories[Math.floor(i)] || "기타"; // 범위 초과 방지
+          const category = categories[i] || "기타";
 
           await client.query(
             `INSERT INTO store_menu
-                 (store_id, category, menu_name, menu_price, menu_image, menu_desc)
-               VALUES ($1,      $2,       $3,        $4,         $5,         $6)`,
+               (store_id, category, menu_name, menu_price, menu_image, menu_desc)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
             [
-              storeId,           // $1
-              category,          // $2
-              name,              // $3
-              price,             // $4
-              imgPath,           // $5
-              descriptions[i] || "" // $6
+              storeId,
+              category,
+              name,
+              price,
+              imgPath,
+              descriptions[i] || "",
             ]
           );
         }
@@ -261,21 +225,18 @@ app.post(
         res.json({ message: "등록 성공", storeId });
       } catch (err) {
         await client.query("ROLLBACK");
-        console.error("❌ 등록 트랜잭션 오류:", err.message, err.stack);
+        console.error("❌ 등록 트랜잭션 오류:", err.message);
         res.status(500).json({ message: "서버 오류" });
       } finally {
         client.release();
       }
     } catch (err) {
-      console.error("❌ 등록 처리 오류:", err.message, err.stack);
+      console.error("❌ 등록 처리 오류:", err.message);
       res.status(500).json({ message: "서버 오류" });
     }
   }
 );
 
-/* ------------------------------------------------------------------
-   📄 6. 상세 조회 API (/store/:id)
--------------------------------------------------------------------*/
 app.get("/store/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -317,12 +278,11 @@ app.get("/store/:id", async (req, res) => {
       })),
     });
   } catch (err) {
-    console.error("❌ 상세 조회 오류:", err.message, err.stack);
+    console.error("❌ 상세 조회 오류:", err.message);
     res.status(500).json({ message: "서버 오류" });
   }
 });
 
-/* ------------------------------------------------------------------*/
-app.listen(port, () =>
-  console.log(`🚀 서버 실행 중!  http://localhost:${port}`)
-);
+app.listen(3000, '0.0.0.0', () => {
+  console.log("✅ 서버 실행 중! http://0.0.0.0:3000 또는 도메인으로 접속 가능");
+});
