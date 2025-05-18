@@ -177,23 +177,23 @@ app.post(
         const categories = Array.isArray(req.body.menuCategory)
           ? req.body.menuCategory
           : req.body.menuCategory
-            ? [req.body.menuCategory]
-            : [];
+          ? [req.body.menuCategory]
+          : [];
         const menuNames = Array.isArray(req.body.menuName)
           ? req.body.menuName
           : req.body.menuName
-            ? [req.body.menuName]
-            : [];
+          ? [req.body.menuName]
+          : [];
         let menuPrices = Array.isArray(req.body.menuPrice)
           ? req.body.menuPrice
           : req.body.menuPrice
-            ? [req.body.menuPrice]
-            : [];
+          ? [req.body.menuPrice]
+          : [];
         const descriptions = Array.isArray(req.body.menuDesc)
           ? req.body.menuDesc
           : req.body.menuDesc
-            ? [req.body.menuDesc]
-            : [];
+          ? [req.body.menuDesc]
+          : [];
 
         const menuImages = req.files["menuImage[]"] || [];
 
@@ -283,6 +283,6 @@ app.get("/store/:id", async (req, res) => {
   }
 });
 
-app.listen(3000, '0.0.0.0', () => {
-  console.log("✅ 서버 실행 중! http://0.0.0.0:3000 또는 도메인으로 접속 가능");
+app.listen(3000, "0.0.0.0", () => {
+  console.log("🚀 서버 실행 중! http://localhost:3000");
 });
