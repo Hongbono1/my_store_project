@@ -48,6 +48,10 @@ app.use("/uploads", express.static(uploadDir));
 
 app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 
+app.get("/config/kakao", (req, res) => {
+  res.json({ key: process.env.KAKAO_MAP_KEY || "" });
+});
+
 app.post("/verify-biz", async (req, res) => {
   try {
     const { b_no } = req.body;
