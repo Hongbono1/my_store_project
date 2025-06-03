@@ -282,9 +282,9 @@ app.get("/store/:id", async (req, res) => {
       })),
     });
   } catch (err) {
-    console.error("❌ 상세 조회 오류:", err.message);
-    res.status(500).json({ message: "서버 오류" });
-  }
+  console.error("❌ 상세 조회 오류:", err); // 전체 출력
+  res.status(500).json({ message: "서버 오류" });
+}
 });
 
 app.listen(3000, "0.0.0.0", () => {
