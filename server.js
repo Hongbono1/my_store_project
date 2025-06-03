@@ -181,23 +181,23 @@ app.post(
         const categories = Array.isArray(req.body.menuCategory)
           ? req.body.menuCategory
           : req.body.menuCategory
-          ? [req.body.menuCategory]
-          : [];
+            ? [req.body.menuCategory]
+            : [];
         const menuNames = Array.isArray(req.body.menuName)
           ? req.body.menuName
           : req.body.menuName
-          ? [req.body.menuName]
-          : [];
+            ? [req.body.menuName]
+            : [];
         let menuPrices = Array.isArray(req.body.menuPrice)
           ? req.body.menuPrice
           : req.body.menuPrice
-          ? [req.body.menuPrice]
-          : [];
+            ? [req.body.menuPrice]
+            : [];
         const descriptions = Array.isArray(req.body.menuDesc)
           ? req.body.menuDesc
           : req.body.menuDesc
-          ? [req.body.menuDesc]
-          : [];
+            ? [req.body.menuDesc]
+            : [];
 
         const menuImages = req.files["menuImage[]"] || [];
 
@@ -282,9 +282,11 @@ app.get("/store/:id", async (req, res) => {
       })),
     });
   } catch (err) {
-  console.error("❌ 상세 조회 오류:", err); // 전체 출력
-  res.status(500).json({ message: "서버 오류" });
-}
+    console.error("❌ 상세 조회 오류:");
+    console.error(err);             // ← 객체 전체 출력
+    console.error(err.stack);       // ← 스택까지 출력
+    res.status(500).json({ message: "서버 오류" });
+  }
 });
 
 app.listen(3000, "0.0.0.0", () => {
