@@ -96,65 +96,123 @@
   <script>
     window.addEventListener("DOMContentLoaded", () => {
       let store; // ✅ 바깥에서 먼저 store 선언
-  
+
       const params = new URLSearchParams(window.location.search);
       const id = params.get("id") || 1;
-  
-      fetch(`https://www.hongbono1.com/store/${id}`)
+
+      fetch(`/store/${id}`)
         .then(res => res.json())
         .then(data => {
           store = data.store; // ✅ 여기서 할당
-  
+
           // ✅ 슬라이더 준비
           const images = Array.isArray(store.images) && store.images.length > 0
             ? store.images
             : ["https://via.placeholder.com/600x400?text=NO+IMAGE"];
-  
+
           const sliderImage = document.getElementById("sliderImage");
           const prevBtn = document.getElementById("prevBtn");
           const nextBtn = document.getElementById("nextBtn");
-  
+
           let currentIndex = 0;
-  
+
           function showImage(index) {
             sliderImage.src = images[index];
           }
-  
+
           prevBtn.addEventListener("click", () => {
             currentIndex = (currentIndex - 1 + images.length) % images.length;
             showImage(currentIndex);
           });
-  
+
           nextBtn.addEventListener("click", () => {
             currentIndex = (currentIndex + 1) % images.length;
             showImage(currentIndex);
           });
-  
+
           showImage(currentIndex);
-  
+
+
+          // 텍스트 필드들 출력
+          document.getElementById("businessNameHeader").textContent = store.businessName || "상호명 없음";
+          document.getElementById("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || ""}`;
+          document.getElementById("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || ""}`;
+          document.getElementById("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || ""}`;
+          document.getElementById("serviceDetails").textContent = store.serviceDetails || "";
+
+          // 이벤트 리스트
+          const eventsList = document.getElementById("eventsList");
+          (eventsList.innerHTML = "");
+          (store.events || []).forEach(event => {
+            const li = document.createElement("li");
+            li.textContent = event;
+            eventsList.appendChild(li);
+          });
+
+          // 추가 정보 리스트
+          const addList = document.getElementById("additionalInfoList");
+          (addList.innerHTML = "");
+          (store.additionalInfo || []).forEach(info => {
+            const li = document.createElement("li");
+            li.textContent = info;
+            addList.appendChild(li);
+          });
+
+          // 연락처
+          document.getElementById("contactPhone").textContent = store.contactPhone || "";
+          document.getElementById("contactHomepage").innerHTML = store.contactHomepage
+            ? `<a href="${store.contactHomepage}" class="text-blue-600 underline" target="_blank">${store.contactHomepage}</a>`
+            : "";
+
+          // 추가 설명
+          document.getElementById("additionalDesc").textContent = store.additionalDesc || "";
+
+          // 메뉴 출력
+          const menuList = document.getElementById("menuList");
+          (menuList.innerHTML = "");
+          (data.menu || []).forEach(item => {
+            const li = document.createElement("li");
+            li.className = "flex items-center gap-4 border p-2 rounded hover:shadow";
+
+            const img = document.createElement("img");
+            img.src = item.menuImageUrl || "https://via.placeholder.com/80";
+            img.alt = item.menu_name;
+            img.className = "w-20 h-20 object-cover rounded";
+
+            const text = document.createElement("div");
+            text.innerHTML = `
+              <p class="text-lg font-semibold">${item.menuName}</p>
+              <p class="text-gray-600">${Number(item.menuPrice).toLocaleString()}원</p>
+            `;
+
+            li.appendChild(img);
+            li.appendChild(text);
+            menuList.appendChild(li);
+          });
+
           // ✅ 지도도 fetch 완료 후 kakao.maps.load()로
           kakao.maps.load(() => {
             const geocoder = new kakao.maps.services.Geocoder();
-  
+
             const address = store.address; // 이제 안전하게 접근 가능
-  
+
             geocoder.addressSearch(address, (result, status) => {
               if (status === kakao.maps.services.Status.OK) {
                 const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-  
+
                 const mapContainer = document.getElementById('map');
                 const mapOption = {
                   center: coords,
                   level: 3,
                 };
-  
+
                 const map = new kakao.maps.Map(mapContainer, mapOption);
-  
+
                 const marker = new kakao.maps.Marker({
                   map: map,
                   position: coords
                 });
-  
+
                 const infowindow = new kakao.maps.InfoWindow({
                   content: `<div style="padding:5px;">${store.businessName}</div>`
                 });
@@ -162,7 +220,7 @@
               }
             });
           });
-  
+
         })
         .catch(err => {
           console.error("데이터 로딩 오류", err);
@@ -170,5 +228,3 @@
         });
     });
   </script>
-  
-  
