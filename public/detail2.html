@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>detail2 · 가게 상세</title>
+
+  <!-- Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-white py-8">
+
+  <!-- ─────────────── wrapper ─────────────── -->
+  <div class="max-w-screen-lg mx-auto flex flex-col sm:flex-row sm:space-x-6 space-y-6 sm:space-y-0">
+
+    <!-- ▣ CARD 1 ───────────────────────────── -->
+    <article class="flex-1 bg-white border border-gray-300 shadow-lg rounded-lg overflow-hidden flex flex-col">
+
+      <!-- 상호명 -->
+      <header class="py-4 text-center border-b border-gray-200">
+        <h2 id="storeName" class="text-green-600 text-2xl font-bold leading-tight"></h2>
+      </header>
+
+      <!-- 이미지 슬라이더 -->
+      <section id="imageSlider" class="relative w-full overflow-hidden">
+        <!-- 슬라이드 트랙 -->
+        <div id="slidesWrapper" class="flex transition-transform duration-500"></div>
+
+        <!-- 화살표 -->
+        <button id="prevBtn"
+                class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white px-3 py-1 rounded-full select-none">‹</button>
+        <button id="nextBtn"
+                class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white px-3 py-1 rounded-full select-none">›</button>
+
+        <!-- 인디케이터 -->
+        <div id="dots" class="absolute bottom-2 w-full flex justify-center space-x-2"></div>
+      </section>
+
+      <!-- (추가 설명 영역이 필요하다면 여기에) -->
+      <section class="p-6 flex-1"></section>
+
+      <footer class="py-4 bg-gray-50 border-t border-gray-200"></footer>
+    </article>
+
+    <!-- ▣ CARD 2 ───────────────────────────── -->
+    <article class="flex-1 bg-white border border-gray-300 shadow-lg rounded-lg overflow-hidden flex flex-col">
+      <!-- 필요 시 내용 채워 넣으세요 -->
+    </article>
+
+    <!-- ▣ CARD 3 ───────────────────────────── -->
+    <article class="flex-1 bg-white border border-gray-300 shadow-lg rounded-lg overflow-hidden flex flex-col">
+      <!-- 필요 시 내용 채워 넣으세요 -->
+    </article>
+
+  </div><!-- //wrapper -->
+
+  <!-- ─────────────── JS : 데이터 fetch + 슬라이더 ─────────────── -->
+  <script type="module">
+    const params  = new URLSearchParams(location.search);
+    const storeId = params.get("id") || "1";
+
+    /* ── 슬라이더 전역 ── */
+    let current = 0, total = 0, auto;
+    const slidesWrapper = document.getElementById("slidesWrapper");
+    const dotsWrap      = document.getElementById("dots");
+    const prevBtn       = document.getElementById("prevBtn");
+    const nextBtn       = document.getElementById("nextBtn");
+
+    try {
+      /* ① 가게 데이터 가져오기 */
+      const res  = await fetch(`/store/${storeId}`);
+      if (!res.ok) throw new Error("API 응답 오류");
+      const { storeInfo } = await res.json();
+
+      /* ② 상호명 표시 */
+      document.getElementById("storeName").textContent =
+        storeInfo.businessName ?? "";
+
+      /* ③ 이미지 3장 배열 수집 */
+      const images = [storeInfo.image1, storeInfo.image2, storeInfo.image3]
+                     .filter(Boolean);
+      total = images.length || 1;      // 최소 1
+
+      /* ④ DOM 동적 생성 */
+      images.forEach((src, idx) => {
+        // <img>
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = storeInfo.businessName || "store image";
+        img.className = "w-full flex-shrink-0 select-none";
+        slidesWrapper.appendChild(img);
+
+        // indicator
+        const dot = document.createElement("span");
+        dot.className = `h-2 w-2 rounded-full cursor-pointer ${
+          idx === 0 ? "bg-red-500" : "bg-gray-400"
+        }`;
+        dot.dataset.index = idx;
+        dotsWrap.appendChild(dot);
+      });
+
+      slidesWrapper.style.width = `${total * 100}%`;
+
+      /* ⑤ 이벤트 */
+      prevBtn.onclick = () => slideTo(current - 1);
+      nextBtn.onclick = () => slideTo(current + 1);
+      dotsWrap.onclick = (e) => {
+        if (e.target.dataset.index) slideTo(+e.target.dataset.index);
+      };
+
+      /* ⑥ 자동 재생 */
+      auto = setInterval(() => slideTo(current + 1), 3000);
+
+    } catch (err) {
+      console.error("데이터 로딩 실패:", err);
+    }
+
+    /* ── 슬라이드 이동 ── */
+    function slideTo(idx) {
+      if (!total) return;
+      current = (idx + total) % total;
+      slidesWrapper.style.transform = `translateX(-${current * 100}%)`;
+
+      // 점(active) 갱신
+      [...dotsWrap.children].forEach((d, i) => {
+        d.classList.toggle("bg-red-500", i === current);
+        d.classList.toggle("bg-gray-400", i !== current);
+      });
+
+      // 자동재생 재시작
+      clearInterval(auto);
+      auto = setInterval(() => slideTo(current + 1), 3000);
+    }
+  </script>
+</body>
+</html>
