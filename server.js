@@ -71,7 +71,7 @@ app.post("/verify-biz", async (req, res) => {
 
 // .env에 있는 KAKAO_API_KEY 값을 클라이언트에 전달
 app.get("/kakao-key", (req, res) => {
-  res.json({ key: process.env.KAKAO_API_KEY });
+  res.json({ key: process.env.KAKAO_MAP_KEY });
 });
 
 
