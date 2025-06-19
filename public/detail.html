@@ -129,19 +129,36 @@
 
         /* ────────────────────────── 2. Kakao SDK 동적 로드 ─────────────── */
         function loadKakaoSdk() {
+            console.log("📦 Kakao SDK 로딩 시작");
             return fetch("/kakao-key")
                 .then(r => r.json())
                 .then(({ key }) => new Promise((resolve, reject) => {
-                    if (!key) return reject("Kakao key not found");
+                    if (!key) {
+                        console.error("❌ Kakao key not found");
+                        return reject("Kakao key not found");
+                    }
 
                     const s = document.createElement("script");
                     s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
                     s.defer = true;
-                    s.onload = () => kakao.maps.load(resolve);
-                    s.onerror = () => reject("Kakao SDK load error");
+
+                    s.onload = () => {
+                        console.log("✅ Kakao SDK script 로드 완료");
+                        kakao.maps.load(() => {
+                            console.log("✅ kakao.maps.load 실행 완료");
+                            resolve();
+                        });
+                    };
+
+                    s.onerror = () => {
+                        console.error("❌ Kakao SDK script 로딩 실패");
+                        reject("Kakao SDK load error");
+                    };
+
                     document.head.appendChild(s);
                 }));
         }
+
 
         /* ────────────────────────── 3. 이미지 슬라이더 ───────────────── */
         const slider = {
