@@ -159,6 +159,39 @@
                 }));
         }
 
+        /* ✅ initMap 함수 추가 ------------------------------ */
+        async function initMap(storeAddress, storeName = "") {
+            try {
+                await loadKakaoSdk();
+
+                const geocoder = new kakao.maps.services.Geocoder();
+                geocoder.addressSearch(storeAddress, (result, status) => {
+                    if (status !== kakao.maps.services.Status.OK) {
+                        console.warn("❌ 주소 검색 실패:", status);
+                        return;
+                    }
+
+                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                    const map = new kakao.maps.Map(document.getElementById("map"), {
+                        center: coords,
+                        level: 3
+                    });
+
+                    new kakao.maps.Marker({ map, position: coords });
+
+                    new kakao.maps.InfoWindow({
+                        map,
+                        position: coords,
+                        content: `<div style="padding:5px">${storeName}</div>`
+                    });
+
+                    document.getElementById("addressText").textContent = storeAddress;
+                });
+            } catch (e) {
+                console.error("지도 초기화 오류:", e);
+            }
+        }
+
 
         /* ────────────────────────── 3. 이미지 슬라이더 ───────────────── */
         const slider = {
@@ -253,8 +286,7 @@
                     menuList.appendChild(li);
                 });
 
-                /* 5-5 Kakao 지도 표시 */
-                /* 5-5 Kakao 지도 표시 */
+                /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
                 const geocoder = new kakao.maps.services.Geocoder();
                 geocoder.addressSearch(store.address, (result, status) => {
                     console.log("📍주소:", store.address);       // 주소 확인
@@ -276,7 +308,8 @@
                     $("addressText").textContent = store.address;
                 });
 
-
+                /* ✅ initMap 별도 호출 추가 (함수 이동 요구 반영) */
+                initMap(store.address, store.businessName);
 
             } catch (err) {
                 console.error("로드 오류:", err);
