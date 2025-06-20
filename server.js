@@ -10,6 +10,7 @@ import bcrypt from "bcrypt";
 import fetch from "node-fetch";
 import fs from "fs";
 
+console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
