@@ -349,29 +349,52 @@
                     box.className = "flex flex-col md:flex-row items-center md:items-start bg-white p-4 rounded shadow";
 
                     box.innerHTML = `
-                        <!-- 이미지 -->
-                        <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-                             alt="${it.menuName}" class="w-24 h-24 object-cover rounded mb-2 md:mb-0 md:mr-4" />
-
-                        <!-- 텍스트 + 수량 조절 -->
-                        <div class="flex-1 w-full">
-                            <div class="text-center md:text-left">
-                                <div class="text-base font-semibold">${it.menuName}</div>
-                                <div class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</div>
+                      <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
+                           alt="${it.menuName}" class="w-24 h-24 object-cover rounded mb-2 md:mb-0 md:mr-4" />
+                      <div class="flex-1 w-full">
+                        <div class="flex md:items-center justify-between flex-col md:flex-row">
+                          <div class="text-base md:text-lg font-semibold">${it.menuName}</div>
+                          <div class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</div>
                         </div>
-
-                        <div class="flex justify-center md:justify-start items-center space-x-2 mt-2">
-                            <button class="px-2 py-1 bg-gray-200 rounded">-</button>
-                            <span class="w-6 text-center">1</span>
-                            <button class="px-2 py-1 bg-gray-200 rounded">+</button>
-                            <button class="px-3 py-1 bg-blue-600 text-white rounded">담기</button>
+                        <div class="flex justify-center md:justify-end items-center space-x-2 mt-2">
+                          <button class="decrease px-2 py-1 bg-gray-200 rounded">-</button>
+                          <span class="qty w-6 text-center">1</span>
+                          <button class="increase px-2 py-1 bg-gray-200 rounded">+</button>
+                          <button class="addBtn px-3 py-1 bg-blue-600 text-white rounded">담기</button>
                         </div>
-                     </div>
-                     `;
+                      </div>
+                    `;
 
-                    // 담기 버튼 기능 연결
-                    const addBtn = box.querySelector("button.bg-blue-600");
-                    if (addBtn) addBtn.onclick = () => addToCart(it);
+                    // 수량 증가/감소 기능
+                    const decreaseBtn = box.querySelector(".decrease");
+                    const increaseBtn = box.querySelector(".increase");
+                    const qtySpan = box.querySelector(".qty");
+                    let quantity = 1;
+
+                    decreaseBtn.onclick = () => {
+                        if (quantity > 1) {
+                            quantity--;
+                            qtySpan.textContent = quantity;
+                        }
+                    };
+
+                    increaseBtn.onclick = () => {
+                        quantity++;
+                        qtySpan.textContent = quantity;
+                    };
+
+                    // 담기 시 수량 포함해서 전송
+                    const addBtn = box.querySelector(".addBtn");
+                    if (addBtn) {
+                        addBtn.onclick = () => {
+                            const item = {
+                                ...it,
+                                quantity,
+                                totalPrice: quantity * Number(it.menuPrice)
+                            };
+                            addToCart(item);
+                        };
+                    }
 
                     $("menuList").appendChild(box);
                 });
