@@ -259,6 +259,11 @@ app.get("/store/:id", async (req, res) => {
     );
 
     const s = storeQ.rows[0];
+
+    // 🔹 배열로 묶어서 프런트로 전달
+    const eventsArr = [s.event1, s.event2].filter(Boolean);
+    const addInfoArr = [s.facility, s.pets, s.parking].filter(Boolean);
+
     res.json({
       store: {
         businessName: s.business_name,
@@ -266,24 +271,24 @@ app.get("/store/:id", async (req, res) => {
         deliveryOption: s.delivery_option,
         businessHours: s.business_hours,
         serviceDetails: s.service_details,
-        event1: s.event1,
-        event2: s.event2,
-        facility: s.facility,
-        pets: s.pets,
-        parking: s.parking,
+
+        /* 프런트가 바로 쓸 수 있는 배열 */
+        events: eventsArr,      // 예) ["신규 방문 이벤트", "여름 할인"]
+        additionalInfo: addInfoArr,     // 예) ["장애인편의 시설", "반려동물 출입", "주차정보"]
+
         contactPhone: s.phone_number,
         homepage: s.homepage,
         instagram: s.instagram,
         facebook: s.facebook,
         additionalDesc: s.additional_desc,
         address: s.address,
-        images: [s.image1, s.image2, s.image3].filter(Boolean),
+        images: [s.image1, s.image2, s.image3].filter(Boolean)
       },
-      menu: menuQ.rows.map((m) => ({
+      menu: menuQ.rows.map(m => ({
         menuName: m.menu_name,
         menuPrice: m.menu_price,
-        menuImageUrl: m.menu_image,
-      })),
+        menuImageUrl: m.menu_image
+      }))
     });
   } catch (err) {
     console.error("❌ 상세 조회 오류:");
