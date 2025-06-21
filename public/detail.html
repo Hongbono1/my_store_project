@@ -85,6 +85,8 @@
                     <h3 class="text-xl font-bold mb-2 border-b pb-1">연락처</h3>
                     <p id="contactPhone" class="text-gray-700"></p>
                     <p id="contactHomepage" class="text-gray-700"></p>
+                    <p id="contactInstagram" class="text-gray-700"></p>
+                    <p id="contactFacebook" class="text-gray-700"></p>
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded border">
@@ -282,6 +284,7 @@
                 if (!res.ok) throw new Error("Store API error");
                 const { store, menu = [] } = await res.json();
 
+
                 /* 5-3 슬라이더 · 기본 정보 */
                 slider.init(store.images || []);
                 $("businessNameHeader").textContent = store.businessName ?? "상호명 없음";
@@ -289,25 +292,40 @@
                 $("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption ?? ""}`;
                 $("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours ?? ""}`;
                 $("serviceDetails").textContent = store.serviceDetails ?? "";
+
+                /* 고객 이벤트 */
                 setList("eventsList", store.events);
-                setList("additionalInfoList", store.additionalInfo);
+
+                /* 커스터마이즈 된 추가 정보 렌더링 */
+                const infoList = $("additionalInfoList");
+                if (infoList) {
+                    infoList.innerHTML = `
+                      <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
+                      <li>반려동물 출입: ${store.pets ?? "정보 없음"}</li>
+                      <li>주차 정보:      ${store.parking ?? "정보 없음"}</li>
+                      `;
+                }
+
+                /* 연락처 · 홈페이지 · 추가 설명 */
                 if ($("contactPhone")) $("contactPhone").textContent = store.contactPhone ?? "";
-                $("contactHomepage").innerHTML = store.contactHomepage
+                if ($("contactHomepage")) $("contactHomepage").innerHTML = store.contactHomepage
                     ? `<a href="${store.contactHomepage}" class="text-blue-600 underline" target="_blank">${store.contactHomepage}</a>`
                     : "";
-                $("additionalDesc").textContent = store.additionalDesc ?? "";
+                if ($("additionalDesc")) $("additionalDesc").textContent = store.additionalDesc ?? "";
+
+
                 /* 5-4 메뉴 → 장바구니 */
                 const menuList = $("menuList"); menuList.innerHTML = "";
                 menu.forEach(it => {
                     const li = document.createElement("li");
                     li.className = "flex items-center gap-4 border p-2 rounded hover:shadow cursor-pointer";
                     li.innerHTML = `
-        <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-             alt="${it.menuName}" class="w-20 h-20 object-cover rounded">
-        <div>
-          <p class="text-lg font-semibold">${it.menuName}</p>
-          <p class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</p>
-        </div>`;
+                       <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
+                            alt="${it.menuName}" class="w-20 h-20 object-cover rounded">
+                       <div>
+                       <p class="text-lg font-semibold">${it.menuName}</p>
+                       <p class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</p>
+                       </div>`;
                     li.onclick = () => addToCart(it);
                     menuList.appendChild(li);
                 });
