@@ -24,16 +24,22 @@
 
             <!-- ▣ 1. 왼쪽 : 이미지 슬라이더 + 지도 -->
             <section class="flex-1 bg-white p-6 rounded shadow flex flex-col gap-6">
-                <!-- 이미지 슬라이더 -->
+                <!-- 🔹 이미지 슬라이더 + 썸네일 -->
                 <div class="relative">
                     <div id="sliderWrapper" class="w-full h-64 overflow-hidden relative rounded shadow">
                         <div id="sliderImages" class="flex transition-transform duration-500 ease-in-out h-full"></div>
                     </div>
+
+                    <!-- 방향 버튼 - 불투명·라운드 개선 -->
                     <button id="prevBtn"
-                        class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded px-3 py-1 z-10">‹</button>
+                        class="absolute left-2 top-1/2 -translate-y-1/2 bg-black text-white rounded-full px-3 py-1 opacity-70 hover:opacity-100 z-10">‹</button>
                     <button id="nextBtn"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded px-3 py-1 z-10">›</button>
+                        class="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded-full px-3 py-1 opacity-70 hover:opacity-100 z-10">›</button>
+
+                    <!-- 🔹 썸네일 컨테이너 -->
+                    <div id="thumbBox" class="flex gap-2 justify-center mt-3"></div>
                 </div>
+
 
                 <!-- 지도 -->
                 <div class="bg-gray-50 border rounded-lg p-4 flex-1">
@@ -192,32 +198,40 @@
             }
         }
 
-
-        /* ────────────────────────── 3. 이미지 슬라이더 ───────────────── */
-        const slider = {
+        const slider = {                // 🔹 썸네일 기능 포함
             imgs: [],
             idx: 0,
             init(arr) {
                 this.imgs = arr.length ? arr : ["https://via.placeholder.com/600x400?text=NO+IMAGE"];
-                const sliderImages = $("sliderImages");
-                sliderImages.innerHTML = this.imgs.map(url => `
-      <img src="${url}" class="w-full h-64 flex-shrink-0 object-cover" />
-    `).join("");
-                this.updateTransform();
-
+                $("sliderImages").innerHTML = this.imgs.map(u =>
+                    `<img src="${u}" class="w-full h-64 flex-shrink-0 object-cover" />`).join("");
+                this.renderThumbs();        // 🔹 썸네일 생성
+                this.update();              // 초기 하이라이트
                 $("prevBtn").onclick = () => this.move(-1);
                 $("nextBtn").onclick = () => this.move(1);
             },
+            renderThumbs() {
+                const box = $("thumbBox"); box.innerHTML = "";
+                this.imgs.forEach((src, i) => {
+                    const t = document.createElement("img");
+                    t.src = src;
+                    t.className = "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
+                    t.onclick = () => { this.idx = i; this.update(); };
+                    box.appendChild(t);
+                });
+            },
             move(step) {
                 this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
-                this.updateTransform();
+                this.update();
             },
-            updateTransform() {
-                const offset = -this.idx * 100;
-                $("sliderImages").style.transform = `translateX(${offset}%)`;
+            update() {
+                $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
+                [...$("thumbBox").children].forEach((el, i) => {
+                    el.classList.toggle("ring-2", i === this.idx);
+                    el.classList.toggle("ring-blue-500", i === this.idx);
+                });
             }
         };
-
 
         /* ────────────────────────── 4. 장바구니 ──────────────────────── */
         const cart = [];
