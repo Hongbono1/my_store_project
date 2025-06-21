@@ -97,10 +97,14 @@
 
             <!-- ▣ 3. 오른쪽 : 메뉴 + 장바구니(상시 표시) -->
             <section class="w-full lg:w-1/3 flex flex-col gap-4">
-                <!-- 메뉴 -->
+                <!-- 메뉴 (10개 제한 + 스크롤 + 반응형) -->
                 <div id="menuBox" class="flex-1 bg-white border rounded p-4 shadow overflow-auto">
                     <h2 class="text-xl font-bold mb-4">메뉴</h2>
-                    <ul id="menuList" class="space-y-2"></ul>
+
+                    <!-- 메뉴 리스트 -->
+                    <div id="menuList" class="max-h-[600px] overflow-y-auto divide-y">
+                        <!-- JS로 동적으로 채워짐 -->
+                    </div>
                 </div>
 
                 <!-- 장바구니 -->
@@ -341,18 +345,37 @@
                 /* 5-4 메뉴 → 장바구니 */
                 const menuList = $("menuList"); menuList.innerHTML = "";
                 menu.forEach(it => {
-                    const li = document.createElement("li");
-                    li.className = "flex items-center gap-4 border p-2 rounded hover:shadow cursor-pointer";
-                    li.innerHTML = `
-                       <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-                            alt="${it.menuName}" class="w-20 h-20 object-cover rounded">
-                       <div>
-                       <p class="text-lg font-semibold">${it.menuName}</p>
-                       <p class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</p>
-                       </div>`;
-                    li.onclick = () => addToCart(it);
-                    menuList.appendChild(li);
+                    const box = document.createElement("div");
+                    box.className = "flex flex-col md:flex-row items-center md:items-start bg-white p-4 rounded shadow";
+
+                    box.innerHTML = `
+                        <!-- 이미지 -->
+                        <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
+                             alt="${it.menuName}" class="w-24 h-24 object-cover rounded mb-2 md:mb-0 md:mr-4" />
+
+                        <!-- 텍스트 + 수량 조절 -->
+                        <div class="flex-1 w-full">
+                            <div class="text-center md:text-left">
+                                <div class="text-base font-semibold">${it.menuName}</div>
+                                <div class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</div>
+                        </div>
+
+                        <div class="flex justify-center md:justify-start items-center space-x-2 mt-2">
+                            <button class="px-2 py-1 bg-gray-200 rounded">-</button>
+                            <span class="w-6 text-center">1</span>
+                            <button class="px-2 py-1 bg-gray-200 rounded">+</button>
+                            <button class="px-3 py-1 bg-blue-600 text-white rounded">담기</button>
+                        </div>
+                     </div>
+                     `;
+
+                    // 담기 버튼 기능 연결
+                    const addBtn = box.querySelector("button.bg-blue-600");
+                    if (addBtn) addBtn.onclick = () => addToCart(it);
+
+                    $("menuList").appendChild(box);
                 });
+
 
                 /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
                 const geocoder = new kakao.maps.services.Geocoder();
