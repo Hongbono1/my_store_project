@@ -358,96 +358,109 @@
                 /* 5-4 메뉴 → 장바구니 */
                 const menuList = $("menuList");
                 menuList.innerHTML = "";
-                menuList.className = "grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto"; // 세로 목록 + 스크롤
+                menuList.className = "max-h-[600px] overflow-y-auto divide-y";  // 세로 스크롤용
 
                 menu.forEach(it => {
                     const box = document.createElement("div");
-
-                    // ✅ 1. 이미지 크기 고정 / ✅ 2. flex-1 제거 / ✅ 3. max-w 추가
-                    box.className = "max-w-[320px] bg-white border-2 border-gray-300 p-4 rounded-lg shadow-lg text-center transform transition hover:scale-105 flex flex-col justify-between cursor-pointer mx-auto";
+                    box.className = "flex items-center p-4 space-x-4";
 
                     box.innerHTML = `
                       <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-                           alt="${it.menuName}"
-                           class="w-20 h-20 object-cover rounded-md mx-auto mb-2" />
+                           class="w-20 h-20 object-cover rounded-md" />
 
-                      <div class="text-base font-semibold truncate">${it.menuName}</div>
-                      <div class="text-gray-600 mb-2">${Number(it.menuPrice).toLocaleString()}원</div>
-
-                      <div class="flex items-center justify-center space-x-2">
-                        <button class="decrease px-2 py-1 bg-gray-200 rounded">-</button>
-                        <span class="quantity">1</span>
-                        <button class="increase px-2 py-1 bg-gray-200 rounded">+</button>
-                        <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+                      <div class="flex-1">
+                        <div class="text-base font-semibold">${it.menuName}</div>
+                        <div class="text-gray-600 mb-1">${Number(it.menuPrice).toLocaleString()}원</div>
+                        <div class="flex items-center space-x-2">
+                          <button class="minus px-2 py-1 bg-gray-200 rounded">-</button>
+                          <span class="quantity w-6 text-center">1</span>
+                          <button class="plus px-2 py-1 bg-gray-200 rounded">+</button>
+                          <button class="addBtn px-3 py-1 bg-blue-600 text-white rounded text-sm">담기</button>
+                        </div>
                       </div>
                     `;
 
-                    // 수량 조절 기능
-                    let quantity = 1;
-                    const qtySpan = box.querySelector(".quantity");
-                    box.querySelector(".decrease").onclick = () => {
-                        if (quantity > 1) qtySpan.textContent = --quantity;
+                    box.querySelector(".addBtn").onclick = () => addToCart(it);
+                    box.querySelector(".plus").onclick = () => {
+                        const qtyEl = box.querySelector(".quantity");
+                        qtyEl.textContent = Number(qtyEl.textContent) + 1;
                     };
-                    box.querySelector(".increase").onclick = () => {
-                        qtySpan.textContent = ++quantity;
-                    };
-
-                    // 담기
-                    box.querySelector(".addBtn").onclick = () => {
-                        addToCart({ ...it, quantity });
+                    box.querySelector(".minus").onclick = () => {
+                        const qtyEl = box.querySelector(".quantity");
+                        const current = Number(qtyEl.textContent);
+                        if (current > 1) qtyEl.textContent = current - 1;
                     };
 
                     menuList.appendChild(box);
                 });
 
 
-                /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
-                const geocoder = new kakao.maps.services.Geocoder();
-                geocoder.addressSearch(store.address, (result, status) => {
-                    console.log("📍주소:", store.address);       // 주소 확인
-                    console.log("🗺️지오코딩 결과:", result);     // 좌표 결과 배열
-                    console.log("📡상태 코드:", status);         // 응답 상태 코드
+                // 수량 조절 기능
+                let quantity = 1;
+                const qtySpan = box.querySelector(".quantity");
+                box.querySelector(".decrease").onclick = () => {
+                    if (quantity > 1) qtySpan.textContent = --quantity;
+                };
+                box.querySelector(".increase").onclick = () => {
+                    qtySpan.textContent = ++quantity;
+                };
 
-                    if (status !== kakao.maps.services.Status.OK) {
-                        console.warn("❌ 지오코딩 실패: 상태 =", status);
-                        return;
-                    }
+                // 담기
+                box.querySelector(".addBtn").onclick = () => {
+                    addToCart({ ...it, quantity });
+                };
 
-                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                    new kakao.maps.Marker({ map, position: coords });
-                    new kakao.maps.InfoWindow({
-                        map, position: coords,
-                        content: `<div style="padding:5px">${store.businessName}</div>`
-                    });
-                    $("addressText").textContent = store.address;
-                });
+                menuList.appendChild(box);
+            });
 
-                // ✅ 주소 정제
-                function cleanAddress(fullAddress) {
-                    let cleaned = fullAddress.replace(/^\d{5}\s*/, "");   // 앞자리 우편번호 제거
-                    cleaned = cleaned.replace(/\s+\d+$/, "");             // 끝자리 상세주소 제거
-                    return cleaned.trim();
+
+            /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
+            const geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(store.address, (result, status) => {
+                console.log("📍주소:", store.address);       // 주소 확인
+                console.log("🗺️지오코딩 결과:", result);     // 좌표 결과 배열
+                console.log("📡상태 코드:", status);         // 응답 상태 코드
+
+                if (status !== kakao.maps.services.Status.OK) {
+                    console.warn("❌ 지오코딩 실패: 상태 =", status);
+                    return;
                 }
 
-                const mapAddress = cleanAddress(store.address);
-                initMap(mapAddress, store.businessName);
+                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+                new kakao.maps.Marker({ map, position: coords });
+                new kakao.maps.InfoWindow({
+                    map, position: coords,
+                    content: `<div style="padding:5px">${store.businessName}</div>`
+                });
+                $("addressText").textContent = store.address;
+            });
 
-                /* ✅ initMap 별도 호출 추가 (함수 이동 요구 반영) */
-                initMap(store.address, store.businessName);
+            // ✅ 주소 정제
+            function cleanAddress(fullAddress) {
+                let cleaned = fullAddress.replace(/^\d{5}\s*/, "");   // 앞자리 우편번호 제거
+                cleaned = cleaned.replace(/\s+\d+$/, "");             // 끝자리 상세주소 제거
+                return cleaned.trim();
+            }
 
-            } catch (err) {
-                console.error("로드 오류:", err);
-                // 에러 발생 시 슬라이더에 기본 이미지 삽입
-                const sliderImages = $("sliderImages");
-                if (sliderImages) {
-                    sliderImages.innerHTML = `
+            const mapAddress = cleanAddress(store.address);
+            initMap(mapAddress, store.businessName);
+
+            /* ✅ initMap 별도 호출 추가 (함수 이동 요구 반영) */
+            initMap(store.address, store.businessName);
+
+        } catch (err) {
+            console.error("로드 오류:", err);
+            // 에러 발생 시 슬라이더에 기본 이미지 삽입
+            const sliderImages = $("sliderImages");
+            if (sliderImages) {
+                sliderImages.innerHTML = `
                       <img src="/images/no-image.png"
                            class="w-full h-64 flex-shrink-0 object-cover" />
                  `;
-                }
             }
-        })();
+        }
+        }) ();
     </script>
 
 </body>
