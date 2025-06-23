@@ -253,15 +253,31 @@
         function renderCart() {
             const ul = $("cartList"); ul.innerHTML = "";
             let sum = 0;
-            cart.forEach(({ menuName, menuPrice }) => {
-                sum += Number(menuPrice);
+
+            cart.forEach((item, index) => {
+                sum += item.menuPrice * item.quantity;
                 const li = document.createElement("li");
-                li.className = "flex justify-between text-sm";
-                li.innerHTML = `<span>${menuName}</span><span>${Number(menuPrice).toLocaleString()}원</span>`;
+                li.className = "flex justify-between items-center text-sm";
+
+                li.innerHTML = `
+                  <span>${item.menuName} × ${item.quantity}</span>
+                  <span>${(item.menuPrice * item.quantity).toLocaleString()}원</span>
+                  <button class="removeBtn text-red-500 ml-2" data-index="${index}">삭제</button>
+                `;
                 ul.appendChild(li);
             });
+
+            ul.querySelectorAll(".removeBtn").forEach(btn => {
+                btn.onclick = () => {
+                    const idx = btn.dataset.index;
+                    cart.splice(idx, 1);
+                    renderCart();
+                };
+            });
+
             $("totalPrice").textContent = sum.toLocaleString();
         }
+
 
         /* 리스트 출력 헬퍼 */
         const setList = (wrapId, arr = []) => {
@@ -344,26 +360,36 @@
                 menuList.className = "max-h-[600px] overflow-y-auto divide-y";  // ✅ 세로 스크롤 + 구분선
 
                 menu.forEach(it => {
+                    let quantity = 1;
                     const box = document.createElement("div");
-                    box.className = "flex items-center p-4 space-x-4";  // ✅ 가로 정렬 구조 유지
-
+                    box.className = "...";
                     box.innerHTML = `
-                        <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-                             alt="${it.menuName}" class="w-20 h-20 object-cover rounded-md" />
-
-                        <div class="flex-1">
-                            <div class="text-base font-semibold">${it.menuName}</div>
-                            <div class="text-gray-600">${Number(it.menuPrice).toLocaleString()}원</div>
-                        </div>
-
+                      <img src="${it.menuImageUrl || '/images/no-thumb.png'}" />
+                      <div>
+                        <div>${it.menuName}</div>
+                        <div>${Number(it.menuPrice).toLocaleString()}원</div>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <button class="minus px-2 py-1 bg-gray-200 rounded">-</button>
+                        <span class="quantity w-6 text-center">${quantity}</span>
+                        <button class="plus px-2 py-1 bg-gray-200 rounded">+</button>
                         <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-                    `;
+                      </div>
+                     `;
 
-                    box.querySelector(".addBtn").onclick = () => addToCart(it);
+                    const qtySpan = box.querySelector(".quantity");
+                    box.querySelector(".minus").onclick = () => {
+                        if (quantity > 1) qtySpan.textContent = --quantity;
+                    };
+                    box.querySelector(".plus").onclick = () => {
+                        qtySpan.textContent = ++quantity;
+                    };
+
+                    box.querySelector(".addBtn").onclick = () => {
+                        addToCart({ ...it, quantity });
+                    };
                     menuList.appendChild(box);
                 });
-
-
 
                 /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
                 const geocoder = new kakao.maps.services.Geocoder();
