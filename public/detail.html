@@ -372,27 +372,43 @@
 
                 /* 5-4 메뉴 → 장바구니 */
                 const menuList = $("menuList");
+                menuList.innerHTML = "";
+                menuList.className = "flex flex-col gap-4";
+
+                // ① 카테고리별로 그룹화
+                const menuByCategory = {};
                 menu.forEach(it => {
-                    const box = document.createElement("div");
-                    box.className = "flex items-center p-4 space-x-4 border-b";
+                    const category = it.category || "기타";
+                    if (!menuByCategory[category]) {
+                        menuByCategory[category] = [];
+                    }
+                    menuByCategory[category].push(it);
+                });
 
-                    box.innerHTML = `
-                      <img src="${it.menuImageUrl || '/images/no-thumb.png'}" class="w-20 h-20 object-cover rounded-md" />
-                      <div class="flex-1 min-w-0">
-                        <div class="text-sm text-blue-600 font-bold mb-1">${it.category || "기타"}</div>
-                        <div class="text-base font-semibold">${it.menuName}</div>
-                        <div class="text-base text-gray-600">${Number(it.menuPrice).toLocaleString()}원</div>
-                      </div>
-                      <div class="flex items-center space-x-2">
-                        <button class="decrease">-</button>
-                        <span class="quantity">1</span>
-                        <button class="increase">+</button>
-                        <button class="addBtn">담기</button>
-                      </div>
-                    `;
+                // ② 카테고리별로 출력
+                Object.entries(menuByCategory).forEach(([category, items]) => {
+                    // 카테고리 제목
+                    const title = document.createElement("h3");
+                    title.textContent = "🍱 " + category;
+                    title.className = "text-xl font-bold mt-6 mb-2";
+                    menuList.appendChild(title);
 
-                    // 수량, 담기 로직 ...
-                    menuList.appendChild(box);
+                    // 해당 카테고리 메뉴들
+                    items.forEach(it => {
+                        const box = document.createElement("div");
+                        box.className = "flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm border";
+
+                        box.innerHTML = `
+                          <img src="${it.menuImageUrl || '/images/no-thumb.png'}" class="w-24 h-24 object-cover rounded-md" />
+                          <div class="flex-1">
+                            <div class="text-base font-bold mb-1">${it.menuName}</div>
+                            <div class="text-sm text-gray-500 mb-1">${it.menuDesc || ''}</div>
+                            <div class="text-lg font-semibold">${Number(it.menuPrice).toLocaleString()}원</div>
+                          </div>
+                        `;
+
+                        menuList.appendChild(box);
+                    });
                 });
 
                 /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
