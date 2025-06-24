@@ -99,7 +99,7 @@
             <section class="w-full lg:w-1/3 flex flex-col gap-4">
                 <div id="menuBox" class="bg-white border rounded p-4 shadow overflow-y-auto"
                     style="max-height: 1000px;">
-                    <h2 class="text-xxl font-bold mb-4">메뉴</h2>
+                    <h2 class="text-lg font-bold mb-4">메뉴</h2>
                     <div id="menuList" class="flex flex-col gap-4"></div>
                 </div>
 
@@ -255,10 +255,25 @@
         };
 
         /* ────────────────────────── 4. 장바구니 ──────────────────────── */
+        /* ─────────────────── 1) 전역 카트 배열 ─────────────────── */
         const cart = [];
-        function addToCart(item) { cart.push(item); renderCart(); }
+
+        /* ─────────────────── 2) 같은 메뉴 합산 로직 ─────────────────── */
+        function addToCart(item) {
+            const found = cart.find(c => c.menuName === item.menuName);
+            if (found) {
+                found.quantity += item.quantity;          // 이미 있으면 수량 증가
+            } else {
+                cart.push({ ...item });                   // 없으면 새 항목
+            }
+            renderCart();
+        }
+
+        /* ─────────────────── 3) 장바구니 렌더 ─────────────────── */
         function renderCart() {
-            const ul = $("cartList"); ul.innerHTML = "";
+            const ul = $("cartList");
+            ul.innerHTML = "";
+
             let sum = 0;
 
             cart.forEach((item, index) => {
@@ -272,16 +287,16 @@
 
                 li.innerHTML = `
                   <span>${item.menuName} × ${qty}</span>
-                  <span>${total.toLocaleString()}원</span>
-                  <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">
+                  <span class="font-bold">${total.toLocaleString()}원</span>  <!-- 가격 굵게 -->
+                  <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2"
+                          data-index="${index}">
                     삭제
                   </button>
-                 </div>
                 `;
                 ul.appendChild(li);
             });
 
-            // 삭제 기능
+            /* 항목 삭제 */
             ul.querySelectorAll(".removeBtn").forEach(btn => {
                 btn.onclick = () => {
                     const idx = btn.dataset.index;
@@ -292,9 +307,6 @@
 
             $("totalPrice").textContent = sum.toLocaleString();
         }
-
-
-
 
         /* 리스트 출력 헬퍼 */
         const setList = (wrapId, arr = []) => {
@@ -399,7 +411,7 @@
                         const box = document.createElement("div");
                         // ① 카드 바깥 박스
                         box.className =
-                             "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
+                            "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
 
                         // ② 카드 내부 HTML
                         box.innerHTML = `
@@ -408,10 +420,10 @@
 
                           <div class="flex-1 flex flex-col justify-center">
                             <div class="text-xl font-bold mb-0.5">${it.menuName}</div>
-                            <div class="text-lg font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
+                            <div class="text-lg font-bold text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
                           </div>
 
-                          <div class="flex flex-col items-center gap-1 shrink-0">
+                          <div class="flex flex-col items-center justify-center gap-1 shrink-0">
                             <div class="flex items-center gap-1">
                               <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
                               <span  class="quantity w-6 text-center">1</span>
