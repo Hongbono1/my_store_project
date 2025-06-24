@@ -253,9 +253,14 @@ app.get("/store/:id", async (req, res) => {
       return res.status(404).json({ message: "가게 정보를 찾을 수 없습니다." });
 
     const menuQ = await pool.query(
-      `SELECT menu_name, menu_price, menu_image
-         FROM store_menu WHERE store_id=$1`,
-      [id]
+      `SELECT
+           COALESCE(NULLIF(trim(category), ''), '기타') AS category,
+           menu_name,
+           menu_price,
+           menu_image
+        FROM store_menu
+       WHERE store_id = $1`,
+       [id]
     );
 
     const s = storeQ.rows[0];
@@ -285,9 +290,10 @@ app.get("/store/:id", async (req, res) => {
         images: [s.image1, s.image2, s.image3].filter(Boolean)
       },
       menu: menuQ.rows.map(m => ({
-        menuName: m.menu_name,
-        menuPrice: m.menu_price,
-        menuImageUrl: m.menu_image
+        category:    m.category,
+        menuName:    m.menu_name,
+        menuPrice:   m.menu_price,
+        menuImageUrl:m.menu_image
       }))
     });
   } catch (err) {
