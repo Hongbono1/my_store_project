@@ -233,11 +233,21 @@
 
                     // 인포윈도우
                     if (storeName) {
-                        const iwContent = `<div style="padding:5px 10px;font-size:13px;">${storeName}</div>`;
-                        const infowindow = new kakao.maps.InfoWindow({
-                            content: iwContent
+                        const ovContent = `
+                          <div style="
+                                padding:4px 8px;
+                                background:#fff;
+                                border:1px solid #666;
+                                border-radius:4px;
+                                font-size:13px;
+                                white-space:nowrap;">${storeName}
+                           </div>`;
+                        const overlay = new kakao.maps.CustomOverlay({
+                            position: marker.getPosition(),
+                            content: ovContent,
+                            yAnchor: 1     // 말풍선 아랫변이 마커 꼭짓점에 닿도록
                         });
-                        infowindow.open(map, marker);
+                        overlay.setMap(map);
                     }
                 });
 
@@ -247,24 +257,40 @@
         }
 
 
-        const slider = {                // 🔹 썸네일 기능 포함
-            imgs: [],
-            idx: 0,
+        const slider = {
+            imgs: [],        // 원본 이미지 URL 배열
+            idx: 0,          // 현재 인덱스
 
+            /* ---------------- init ---------------- */
             init(arr) {
-                this.imgs = arr.length
-                    ? arr
-                    : ["/images/no-image.png"];
+                this.imgs = arr.length ? arr : ["/images/no-image.png"];
+
+                // 메인 슬라이더 이미지 HTML 생성 (+인덱스 보관 & 클릭 활성화)
                 $("sliderImages").innerHTML = this.imgs
-                    .map(u => `<img src="${u}"
-                 class="w-full h-full object-cover flex-shrink-0" />`)
-                    .join("");
-                this.renderThumbs();
-                this.update();
+                    .map((u, i) => `
+        <img src="${u}"
+             data-index="${i}"                     <!-- ★ 인덱스 보관 -->
+             class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />
+      `).join("");
+
+                /* 메인 이미지 클릭 시 모달 열기 */
+                $("sliderImages").onclick = (e) => {
+                    if (e.target.tagName === "IMG") {
+                        this.idx = Number(e.target.dataset.index);
+                        this.update();
+                        openModal(this.imgs[this.idx]);
+                    }
+                };
+
+                this.renderThumbs();   // 썸네일 출력
+                this.update();         // 첫 화면 렌더
+
+                // 좌우 버튼
                 $("prevBtn").onclick = () => this.move(-1);
                 $("nextBtn").onclick = () => this.move(1);
             },
 
+            /* -------------- 썸네일 출력 -------------- */
             renderThumbs() {
                 const box = $("thumbBox");
                 box.innerHTML = "";
@@ -272,37 +298,61 @@
                 this.imgs.forEach((src, i) => {
                     const t = document.createElement("img");
                     t.src = src;
-                    t.className = "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
+                    t.dataset.index = i;
+                    t.className =
+                        "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
                     t.onclick = () => {
                         this.idx = i;
                         this.update();
-                        openModal(src);  // ✅ 모달 열기!
+                        openModal(src);       // 썸네일부터 모달 열기
                     };
                     box.appendChild(t);
                 });
-
-                function closeModal() {
-                    document.getElementById("imageModal").classList.add("hidden");
-                }
-
-                window.addEventListener("keydown", (e) => {
-                    if (e.key === "Escape") closeModal();
-                });
             },
 
+            /* -------------- 이동 -------------- */
             move(step) {
                 this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
                 this.update();
             },
 
+            /* -------------- 화면 업데이트 -------------- */
             update() {
+                // 메인 슬라이더 위치 이동
                 $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
+
+                // 썸네일 강조
                 [...$("thumbBox").children].forEach((el, i) => {
                     el.classList.toggle("ring-2", i === this.idx);
                     el.classList.toggle("ring-blue-500", i === this.idx);
                 });
             }
         };
+
+        /* -------- 모달 키보드 / 배경 클릭 핸들러 (한 번만 실행) -------- */
+        (function enableModalKeys() {
+            const modal = $("imageModal");
+
+            // 바깥 클릭 시 닫기
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            // ← / → / ESC
+            window.addEventListener("keydown", (e) => {
+                if (modal.classList.contains("hidden")) return; // 모달 열렸을 때만
+                if (e.key === "ArrowLeft") {
+                    slider.move(-1);
+                    $("modalImage").src = slider.imgs[slider.idx];
+                }
+                if (e.key === "ArrowRight") {
+                    slider.move(1);
+                    $("modalImage").src = slider.imgs[slider.idx];
+                }
+                if (e.key === "Escape") closeModal();
+            });
+        })();
+
 
         // ✅ 전역 함수 정의는 여기!
         function openModal(src) {
@@ -523,12 +573,15 @@
 
 
                 /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
+                function cleanAddress(addr) {
+                    // “시/군/구 + 읍/면/동” 3토큰까지만 남김
+                    return addr.split(" ").slice(0, 3).join(" ");
+                }
+
                 const cleaned = cleanAddress(store.address);
-                initMap(cleaned, store.businessName);
-                console.log("📍주소:", store.address);       // 주소 확인
-
-                $("addressText").textContent = `📍 대략적인 위치: ${cleaned}`;
-
+                initMap(cleaned, store.businessName);           // ✅ 지도도 축약 주소로
+                document.getElementById("addressText").textContent =
+                    `📍 대략적인 위치: ${cleaned}`;                // ✅ 축약 주소 표기
                 // 🔹 지도 위 텍스트에 주소 표시
                 if ($("addressText")) {
                     $("addressText").textContent = cleaned;
