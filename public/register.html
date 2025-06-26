@@ -189,39 +189,51 @@
               class="flex-1 border rounded px-3 py-2">
           </div>
 
-          <!-- 🟦 ② 새로 추가 : 업종 구분 -->
-          <div class="flex flex-col md:flex-row md:items-start gap-2 mb-3">
-            <label class="w-32 font-medium shrink-0 pt-2">업종 구분</label>
+          <!-- 🟦 업종 구분 -->
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3 relative">
+            <label class="w-32 font-medium shrink-0" for="businessCategoryDisplay">업종 구분</label>
 
-            <!-- 버튼그룹 -->
-            <div id="typeButtons" class="flex flex-wrap gap-2">
-              <!-- 한식 -->
-              <button type="button" data-value="한식" class="typeBtn px-4 py-2 bg-gray-200 rounded">한식</button>
-              <button type="button" data-value="양식" class="typeBtn px-4 py-2 bg-gray-200 rounded">양식</button>
-              <button type="button" data-value="중식" class="typeBtn px-4 py-2 bg-gray-200 rounded">중식</button>
-              <button type="button" data-value="일식" class="typeBtn px-4 py-2 bg-gray-200 rounded">일식</button>
-              <button type="button" data-value="패스트푸드" class="typeBtn px-4 py-2 bg-gray-200 rounded">패스트푸드</button>
-              <button type="button" data-value="치킨" class="typeBtn px-4 py-2 bg-gray-200 rounded">치킨</button>
-              <button type="button" data-value="카페" class="typeBtn px-4 py-2 bg-gray-200 rounded">카페</button>
-              <button type="button" data-value="스트리트푸드" class="typeBtn px-4 py-2 bg-gray-200 rounded">스트리트푸드</button>
-              <button type="button" data-value="분식" class="typeBtn px-4 py-2 bg-gray-200 rounded">분식</button>
-              <button type="button" data-value="기타" class="typeBtn px-4 py-2 bg-gray-200 rounded">기타</button>
-            </div>
+            <!-- 선택 결과가 표시될 네모칸 -->
+            <input id="businessCategoryDisplay" readonly placeholder="선택"
+              class="flex-1 border rounded px-3 py-2 bg-gray-100 cursor-pointer">
+
+            <!-- 토글 버튼 -->
+            <button type="button" id="categoryToggle" class="shrink-0 bg-gray-300 px-3 py-2 rounded">▼</button>
+
+            <!-- 드롭다운 목록 -->
+            <ul id="categoryList"
+              class="absolute left-36 top-full mt-1 w-60 bg-white border rounded shadow hidden z-10">
+              <li data-value="한식" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">한식</li>
+              <li data-value="양식" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">양식</li>
+              <li data-value="중식" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">중식</li>
+              <li data-value="일식" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">일식</li>
+              <li data-value="패스트푸드" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">패스트푸드</li>
+              <li data-value="치킨" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">치킨</li>
+              <li data-value="카페" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">카페</li>
+              <li data-value="스트리트푸드" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">스트리트푸드</li>
+              <li data-value="분식" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">분식</li>
+              <li data-value="기타" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">기타</li>
+            </ul>
+
+            <!-- 실제 서버로 전송될 값 -->
+            <input type="hidden" id="businessCategory" name="businessCategory">
+          </div>
 
 
-            <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-              <label class="w-32 font-medium shrink-0" for="deliveryOption">배송/테이크아웃</label>
-              <select id="deliveryOption" name="deliveryOption" class="flex-1 border rounded px-3 py-2">
-                <option value="가능">가능</option>
-                <option value="불가능">불가능</option>
-              </select>
-            </div>
 
-            <div class="flex flex-col md:flex-row md:items-center gap-2">
-              <label class="w-32 font-medium shrink-0" for="businessHours">영업시간</label>
-              <input id="businessHours" name="businessHours" placeholder="09:00 ~ 22:00"
-                class="flex-1 border rounded px-3 py-2">
-            </div>
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+            <label class="w-32 font-medium shrink-0" for="deliveryOption">배송/테이크아웃</label>
+            <select id="deliveryOption" name="deliveryOption" class="flex-1 border rounded px-3 py-2">
+              <option value="가능">가능</option>
+              <option value="불가능">불가능</option>
+            </select>
+          </div>
+
+          <div class="flex flex-col md:flex-row md:items-center gap-2">
+            <label class="w-32 font-medium shrink-0" for="businessHours">영업시간</label>
+            <input id="businessHours" name="businessHours" placeholder="09:00 ~ 22:00"
+              class="flex-1 border rounded px-3 py-2">
+          </div>
         </section>
 
         <!-- ───────────────── 5. 서비스 내용 ───────────────── -->
@@ -498,6 +510,36 @@
       document.getElementById('detailAddress').value = '';
       updateMap(''); // 지도 초기화
     }
+
+
+    /* 업종 구분 드롭다운 --------------------------- */
+    (() => {
+      const toggleBtn = document.getElementById('categoryToggle');
+      const list = document.getElementById('categoryList');
+      const display = document.getElementById('businessCategoryDisplay');
+      const hiddenInp = document.getElementById('businessCategory');
+
+      // ▼ 버튼 토글
+      toggleBtn.addEventListener('click', () => list.classList.toggle('hidden'));
+      display.addEventListener('click', () => list.classList.toggle('hidden'));
+
+      // 항목 클릭
+      list.querySelectorAll('li').forEach(li => {
+        li.addEventListener('click', () => {
+          display.value = li.textContent;
+          hiddenInp.value = li.dataset.value;
+          list.classList.add('hidden');
+        });
+      });
+
+      // 바깥 클릭 시 목록 닫기
+      document.addEventListener('click', (e) => {
+        if (!list.contains(e.target) && e.target !== toggleBtn && e.target !== display) {
+          list.classList.add('hidden');
+        }
+      });
+    })();
+
 
     /* ----------------------------------------------------
        가격 입력 세 자리 콤마
