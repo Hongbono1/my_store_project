@@ -96,9 +96,9 @@
                 </div>
 
                 <!-- 지도 -->
-                <div class="bg-white p-4 rounded shadow w-full max-w-full">
+                <div class="bg-white p-6 rounded shadow flex flex-col gap-6 min-h-[400px]">
                     <h2 class="text-lg font-semibold mb-2">가게 위치</h2>
-                    <div id="map" class="w-full h-64 rounded border"></div> <!-- 핵심: h-64 -->
+                    <div id="map" class="w-full h-64 rounded border"></div>
                 </div>
 
                 <!-- 광고 박스 2개 : 세로 배치 -->
@@ -338,65 +338,68 @@
                 box.innerHTML = "";
 
                 this.imgs.forEach((src, i) => {
+                    // src 값이 HTML 코드일 경우 무시하거나 필터링
+                    if (!src.startsWith("http") && !src.startsWith("/")) return;
+
                     const t = document.createElement("img");
-                    t.src = src;
-                    t.className =
-                        "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
-                    t.onclick = () => {
+                    t.setAttribute("src", src);
+                    t.setAttribute("alt", `이미지 ${i + 1}`);
+                    t.className = "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
+                    t.addEventListener("click", () => {
                         this.idx = i;
                         this.update();
-                        openModal(src);          // 전역 openModal 사용
-                    };
+                        openModal(src);
+                    });
                     box.appendChild(t);
                 });
             },
 
-            /* -------------- 이동 -------------- */
-            move(step) {
-                this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
-                this.update();
-            },
+                /* -------------- 이동 -------------- */
+                move(step) {
+                    this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
+                    this.update();
+                },
 
-            /* -------------- 화면 업데이트 -------------- */
-            update() {
-                // 메인 슬라이더 위치 이동
-                $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
+                /* -------------- 화면 업데이트 -------------- */
+                update() {
+                    // 메인 슬라이더 위치 이동
+                    $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
 
-                // 썸네일 강조
-                [...$("thumbBox").children].forEach((el, i) => {
-                    el.classList.toggle("ring-2", i === this.idx);
-                    el.classList.toggle("ring-blue-500", i === this.idx);
-                });
-            }
-        };
+                    // 썸네일 강조
+                    [...$("thumbBox").children].forEach((el, i) => {
+                        el.classList.toggle("ring-2", i === this.idx);
+                        el.classList.toggle("ring-blue-500", i === this.idx);
+                    });
+                }
+            };
 
         /* -------- 모달 키보드 / 배경 클릭 핸들러 (한 번만 실행) -------- */
         (function enableModalKeys() {
-            const modal = $("imageModal");
+                const modal = $("imageModal");
 
-            // 바깥 클릭 시 닫기
-            modal.addEventListener("click", (e) => {
-                if (e.target === modal) closeModal();
-            });
+                // 바깥 클릭 시 닫기
+                modal.addEventListener("click", (e) => {
+                    if (e.target === modal) closeModal();
+                });
 
-            // ← / → / ESC
-            window.addEventListener("keydown", (e) => {
-                if (modal.classList.contains("hidden")) return; // 모달 열렸을 때만
-                if (e.key === "ArrowLeft") {
-                    slider.move(-1);
-                    $("modalImage").src = slider.imgs[slider.idx];
-                }
-                if (e.key === "ArrowRight") {
-                    slider.move(1);
-                    $("modalImage").src = slider.imgs[slider.idx];
-                }
-                if (e.key === "Escape") closeModal();
-            });
+                // ← / → / ESC
+                window.addEventListener("keydown", (e) => {
+                    if (modal.classList.contains("hidden")) return; // 모달 열렸을 때만
+                    if (e.key === "ArrowLeft") {
+                        slider.move(-1);
+                        $("modalImage").src = slider.imgs[slider.idx];
+                    }
+                    if (e.key === "ArrowRight") {
+                        slider.move(1);
+                        $("modalImage").src = slider.imgs[slider.idx];
+                    }
+                    if (e.key === "Escape") closeModal();
+                });
 
-            document.getElementById('closeModal').addEventListener('click', () => {
-                document.getElementById('imageModal').classList.add('hidden');
-            });
-        })();
+                document.getElementById('closeModal').addEventListener('click', () => {
+                    document.getElementById('imageModal').classList.add('hidden');
+                });
+            })();
 
 
         // ✅ 전역 함수 정의는 여기!
