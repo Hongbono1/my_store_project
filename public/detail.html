@@ -484,8 +484,6 @@
         };
 
         /* ────────────────────────── 5. 메인 실행 (async IIFE) ─────────── */
-        (async () => {
-            try {
                 /* 5-1 Kakao SDK 먼저 준비 */
                 await loadKakaoSdk();
 
@@ -646,32 +644,52 @@
 
 
                 /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
-                const cleaned = cleanAddress(store.address);
-                if ($("addressText")) {
-                    $("addressText").textContent = `📍 ${cleaned}`;
-                }
-                /* ───── 주소 정제 함수 ───── */
-                function cleanAddress(fullAddress) {
-                    // 우편번호 제거 + 맨 끝 숫자 제거
-                    return fullAddress
-                        .replace(/^\d{5}\s*/, "")   // 우편번호 제거
-                        .replace(/\s+\d+(-\d+)?$/, "")  // 끝에 숫자 또는 00-00 제거
-                        .trim();
-                }
+                (() => {
+                    try {
+                        /* 5-5 Kakao 지도 표시 */
+                        const cleaned = cleanAddress(store.address);
 
-            } catch (err) {
-                console.error("로드 오류:", err);
-                // 에러 발생 시 슬라이더에 기본 이미지 삽입
-                const sliderImages = $("sliderImages");
-                if (sliderImages) {
-                    sliderImages.innerHTML = `
-                      <img src="/images/no-image.png"
-                           class="w-full h-64 flex-shrink-0 object-cover" />
-                 `;
-                }
-            }
-        })();
+                        // 주소 텍스트 출력
+                        if ($("addressText")) {
+                            $("addressText").textContent = `📍 ${cleaned}`;
+                        }
+
+                        // 지도 표시
+                        window.kakaoReady = () => {
+                            kakao.maps.load(() => {
+                                initMap(cleaned, store.businessName);
+                            });
+                        };
+
+                        if (window.kakao && window.kakao.maps) {
+                            kakao.maps.load(() => {
+                                initMap(cleaned, store.businessName);
+                            });
+                        } else if (window.kakaoReady) {
+                            window.kakaoReady();
+                        }
+
+                        // 주소 정제 함수
+                        function cleanAddress(fullAddress) {
+                            return fullAddress
+                                .replace(/^\d{5}\s*/, "")   // 우편번호 제거
+                                .replace(/\s+\d+(-\d+)?$/, "")  // 번지 제거
+                                .trim();
+                        }
+
+                    } catch (err) {
+                        console.error("로드 오류:", err);
+                        const sliderImages = $("sliderImages");
+                        if (sliderImages) {
+                            sliderImages.innerHTML = `
+        <img src="/images/no-image.png"
+             class="w-full h-64 flex-shrink-0 object-cover" />
+      `;
+                        }
+                    }
+                })();
     </script>
+
 
 </body>
 
