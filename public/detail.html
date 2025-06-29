@@ -600,68 +600,57 @@
         });
 
         // 출력
+        // 메뉴 그룹화 · 렌더링 부분
         Object.entries(menuByCategory).forEach(([category, items]) => {
             // 🔹 그룹 묶음 컨테이너
             const group = document.createElement("div");
 
-            // 🔹 카테고리 제목 (큼직하게)
+            // 🔹 카테고리 제목
             const title = document.createElement("h3");
             title.textContent = "🍱 " + category;
-            title.className = "text-2xl font-semibold mt-6 mb-2 text-gray-800";
+            title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
             group.appendChild(title);
 
+            // ▶ items 순회
             items.forEach(it => {
                 const box = document.createElement("div");
                 box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-
                 box.innerHTML = `
-                  <img src="${it.menuImageUrl || '/images/no-thumb.png'}"
-                       class="w-32 h-32 object-cover rounded-md" />
+      <img src="${it.menuImageUrl || '/images/no-thumb.png'}" class="w-32 h-32 object-cover rounded-md" />
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="text-2xl font-bold mb-1">${it.menuName}</div>
+        <div class="text-lg font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
+      </div>
+      <div class="flex flex-col items-center justify-center gap-1 shrink-0">
+        <div class="flex items-center gap-1">
+          <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+          <span class="quantity w-6 text-center">1</span>
+          <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+        </div>
+        <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+      </div>
+    `;
 
-                  <div class="flex-1 flex flex-col justify-center">
-                    <!-- 메뉴명: lg → text-lg -->
-                    <div class="text-lg font-semibold mb-1">${it.menuName}</div>
-                    <!-- 가격: base → text-base -->
-                    <div class="text-base font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
-                  </div>
+                // 수량 조절 이벤트
+                let qty = 1;
+                const qtySpan = box.querySelector(".quantity");
+                box.querySelector(".decrease").onclick = () => {
+                    if (qty > 1) qtySpan.textContent = --qty;
+                };
+                box.querySelector(".increase").onclick = () => {
+                    qtySpan.textContent = ++qty;
+                };
+                box.querySelector(".addBtn").onclick = () => {
+                    addToCart({ ...it, quantity: qty });
+                };
 
-                  <div class="flex flex-col items-center justify-center gap-1 shrink-0">
-                    <div class="flex items-center gap-1">
-                      <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                      <span class="quantity w-6 text-center">1</span>
-                      <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                    </div>
-                    <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-                   </div>
-                `;
-
+                // 그룹에 카드 추가
                 group.appendChild(box);
             });
 
+            // 최종적으로 menuList에 그룹 추가
             menuList.appendChild(group);
-
-
-            console.log("✅ 출력된 카테고리:", category, "→", items.length, "개");
-
-            // 수량 조절
-            let qty = 1;
-            const qtySpan = box.querySelector(".quantity");
-            box.querySelector(".decrease").onclick = () => {
-                if (qty > 1) qtySpan.textContent = --qty;
-            };
-            box.querySelector(".increase").onclick = () => {
-                qtySpan.textContent = ++qty;
-            };
-            box.querySelector(".addBtn").onclick = () => {
-                addToCart({ ...it, quantity: qty });
-            };
-
-            group.appendChild(box);
         });
-
-        menuList.appendChild(group); // ✅ 그룹을 통째로 추가
-        });
-
 
         /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
         (() => {
