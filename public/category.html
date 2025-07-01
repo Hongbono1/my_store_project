@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>광고 홈페이지 - 응급실</title>
+  <title>광고 홈페이지 - 식사</title>
   <!-- Tailwind CSS -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <style>
@@ -34,8 +34,8 @@
     <section>
       <!-- 응급실 배경/타이틀 (왼쪽 정렬) -->
       <div class="bg-gradient-to-r from-gray-800 to-blue-500 text-white p-6 rounded-lg shadow mb-6">
-        <h1 class="text-4xl sm:text-5xl font-bold mb-2">응급실</h1>
-        <p class="text-lg sm:text-xl">우리동네 응급실 정보를 소개합니다</p>
+        <h1 class="text-4xl sm:text-5xl font-bold mb-2">식사</h1>
+        <p class="text-lg sm:text-xl">우리동네 식당 정보를 소개합니다</p>
       </div>
 
       <!-- 북마크 영역 (왼쪽 정렬) -->
@@ -67,9 +67,11 @@
         <div class="bg-white shadow border border-gray-300 rounded-lg p-4">
           <h2 class="text-2xl font-extrabold text-yellow-500 mb-4 text-center">우리동네 인기명소</h2>
           <!-- 배경 이미지 + 강화된 오버레이 및 텍스트 스타일 -->
-          <div id="mvpBox" class="relative bg-cover bg-center h-64 rounded-lg shadow-2xl cursor-pointer border-4 border-yellow-500"
+          <div id="mvpBox"
+            class="relative bg-cover bg-center h-64 rounded-lg shadow-2xl cursor-pointer border-4 border-yellow-500"
             style="background-image: url('https://source.unsplash.com/random/1200x400/?luxury,architecture');">
-            <div class="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black opacity-60 rounded-lg"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black opacity-60 rounded-lg">
+            </div>
             <div class="absolute inset-0 flex items-center justify-center">
               <h2 id="mvpName" class="text-5xl font-extrabold text-white drop-shadow-2xl tracking-wider">VIP 병원</h2>
             </div>
@@ -78,7 +80,7 @@
 
         <!-- (B) 검색어 박스: 높이 조정 (인라인 스타일 사용) -->
         <div class="bg-white shadow border border-gray-300 rounded-lg p-6" style="min-height: 310px;">
-          <h2 class="text-3xl font-bold mb-6 text-center">검색어</h2>
+          <h2 class="text-2xl font-bold mb-6 text-center">검색어</h2>
           <!-- 검색어 목록 -->
           <ol id="rankingList" class="pl-0 text-gray-700 space-y-3 text-2xl leading-snug">
             <!-- JS로 1~5위 순위 동적 생성 -->
@@ -109,312 +111,125 @@
     <p>푸터 영역 - Footer Placeholder</p>
   </footer>
 
-  <!-- JavaScript 코드 (인라인) -->
   <script>
-    // 모달 열기 함수
-    function openModalWithData(data) {
-      if (window.populateModal) {
-        window.populateModal(data);
-        document.getElementById("modalOverlay").classList.remove("hidden");
-        document.getElementById("commonModal").classList.remove("hidden");
-      } else {
-        console.error("populateModal 함수가 로드되지 않았습니다.");
-      }
+    /* ───────────── 1. 설정 ───────────── */
+    const pageSize = 12;                 // 한 페이지 12개
+    let current = 1;                  // 현재 페이지
+    let adsData = [];                 // 서버에서 받은 전체 광고
+
+    /* ───────────── 2. 서버에서 데이터 수신 ───────────── */
+    async function fetchMealStores() {
+      // ※ API 경로를 실제 서버 주소로 바꿔 주세요
+      const res = await fetch('/stores?category=식사');
+      if (!res.ok) throw new Error('식사 카테고리 데이터를 불러오지 못했습니다');
+      return await res.json();           // [{ businessName, phone, thumbnailUrl, ... }, … ]
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      // MVP 예시 데이터
-      const mvpData = {
-        title: "VIP 병원",
-        phone: "010-1234-5678",
-        image: "https://source.unsplash.com/random/1200x400/?luxury,modern",
-        address: "서울특별시 강남구 역삼동 123-45",
-        category: "VIP",
-        delivery: "정보 없음",
-        hours: "정보 없음",
-        serviceItems: "정보 없음",
-        events: ["특가 이벤트", ""],
-        facilities: "휠체어 접근 가능",
-        pets: "정보 없음",
-        parking: "무료 주차",
-        sliderImages: ["https://source.unsplash.com/random/1200x400/?luxury,modern"]
+    /* ───────────── 3. 카드 생성 : 이미지 + 상호 + 전화 ───────────── */
+    function createAdCard(ad) {
+      const card = document.createElement('div');
+      card.className =
+        'ad-card bg-white shadow-lg rounded-lg p-4 flex flex-col border border-gray-300 hover:shadow-xl cursor-pointer transition';
+
+      /* ➊ 모달용 데이터 속성(data-*) 저장 */
+      card.dataset.title = ad.businessName;
+      card.dataset.phone = ad.phone;
+      card.dataset.img = ad.thumbnailUrl;
+      card.dataset.address = ad.address || '주소 정보 없음';
+
+      /* ➋ 카드 UI */
+      card.innerHTML = `
+    <img src="${ad.thumbnailUrl}" alt="${ad.businessName}"
+         class="h-40 w-full object-cover rounded mb-3" />
+    <h3 class="text-xl font-bold text-center mb-1 truncate">${ad.businessName}</h3>
+    <p  class="text-center text-gray-600">${ad.phone}</p>
+  `;
+      return card;
+    }
+
+    /* ───────────── 4. 페이지별 렌더링 ───────────── */
+    function renderPage(page) {
+      const container = document.getElementById('emergencyAdsContainer');
+      container.innerHTML = '';
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      adsData.slice(start, end).forEach(ad => container.appendChild(createAdCard(ad)));
+    }
+
+    /* ───────────── 5. 페이지네이션 ───────────── */
+    function renderPagination() {
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+      const total = Math.ceil(adsData.length / pageSize);
+
+      const makeBtn = (text, disabled, handler, extra = '') => {
+        const b = document.createElement('button');
+        b.textContent = text;
+        b.disabled = disabled;
+        b.className =
+          `px-3 py-1 rounded ${extra} ${disabled ? 'bg-gray-200 opacity-40' : 'bg-gray-100 hover:bg-gray-200'}`;
+        b.onclick = handler;
+        return b;
       };
 
-      // MVP 영역 설정
-      const mvpNameElem = document.getElementById("mvpName");
-      if (mvpNameElem) {
-        mvpNameElem.textContent = mvpData.title;
-      }
-      const mvpBox = document.getElementById("mvpBox");
-      if (mvpBox) {
-        mvpBox.addEventListener("click", () => {
-          openModalWithData(mvpData);
-        });
-      }
+      pagination.appendChild(
+        makeBtn('이전', current === 1, () => { current--; renderPage(current); renderPagination(); })
+      );
 
-      // 광고 데이터 (응급실)
-      const generalAdsData = [{
-          title: "대학병원",
-          category: "응급실",
-          phone: "010-1234-5678",
-          img: "https://via.placeholder.com/300x200/111111",
-          events: "신규 할인",
-          facilities: "휠체어 접근 가능",
-          parking: "무료 주차"
-        },
-        {
-          title: "영한병원",
-          category: "응급실",
-          phone: "010-1111-2222",
-          img: "https://via.placeholder.com/300x200/aaaaaa",
-          events: "이벤트 중",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "서울대병원",
-          category: "응급실",
-          phone: "010-2222-3333",
-          img: "https://via.placeholder.com/300x200/bbbbbb",
-          events: "시즌 할인",
-          facilities: "휠체어 리프트 있음",
-          parking: "무료 주차"
-        },
-        {
-          title: "지역병원",
-          category: "응급실",
-          phone: "010-3333-4444",
-          img: "https://via.placeholder.com/300x200/cccccc",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "한국병원",
-          category: "응급실",
-          phone: "010-4444-5555",
-          img: "https://via.placeholder.com/300x200/dddddd",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "제병원원",
-          category: "응급실",
-          phone: "010-5555-6666",
-          img: "https://via.placeholder.com/300x200/eeeeee",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "한세병원",
-          category: "응급실",
-          phone: "010-6666-7777",
-          img: "https://via.placeholder.com/300x200/ffffff",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "병원병원",
-          category: "응급실",
-          phone: "010-7777-8888",
-          img: "https://via.placeholder.com/300x200/999999",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "대학병원 복제",
-          category: "응급실",
-          phone: "010-1234-5678",
-          img: "https://via.placeholder.com/300x200/111111",
-          events: "신규 할인",
-          facilities: "휠체어 접근 가능",
-          parking: "무료 주차"
-        },
-        {
-          title: "영한병원 복제",
-          category: "응급실",
-          phone: "010-1111-2222",
-          img: "https://via.placeholder.com/300x200/aaaaaa",
-          events: "이벤트 중",
-          facilities: "없음",
-          parking: "유료 주차"
-        },
-        {
-          title: "서울대병원 복제",
-          category: "응급실",
-          phone: "010-2222-3333",
-          img: "https://via.placeholder.com/300x200/bbbbbb",
-          events: "시즌 할인",
-          facilities: "휠체어 리프트 있음",
-          parking: "무료 주차"
-        },
-        {
-          title: "지역병원 복제",
-          category: "응급실",
-          phone: "010-3333-4444",
-          img: "https://via.placeholder.com/300x200/cccccc",
-          events: "특가 행사",
-          facilities: "없음",
-          parking: "유료 주차"
-        }
-      ];
-
-      const pageSize = 12;
-      let currentPage = 1;
-      let filteredAds = generalAdsData.filter(ad => ad.category === "응급실");
-      let totalPages = Math.ceil(filteredAds.length / pageSize);
-
-      function createAdCard(ad) {
-        const adBox = document.createElement("div");
-        adBox.className =
-          "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-        adBox.dataset.title = ad.title;
-        adBox.dataset.phone = ad.phone;
-        adBox.dataset.img = ad.img;
-        adBox.dataset.events = ad.events;
-        adBox.dataset.facilities = ad.facilities;
-        adBox.dataset.parking = ad.parking;
-        adBox.dataset.category = ad.category;
-        adBox.innerHTML = `
-            <img src="${ad.img}" alt="${ad.title}" class="h-40 w-full object-cover rounded mb-4" />
-            <h2 class="text-2xl font-bold text-center mb-2">${ad.title}</h2>
-            <p class="text-lg text-gray-500 text-center">${ad.phone}</p>
-            <button class="open-modal mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600">
-              상세보기
-            </button>
-          `;
-        return adBox;
+      for (let i = 1; i <= total; i++) {
+        pagination.appendChild(
+          makeBtn(i, false, () => { current = i; renderPage(current); renderPagination(); },
+            i === current ? 'bg-blue-500 text-white font-bold' : '')
+        );
       }
 
-      function renderAdsPage(page) {
-        const container = document.getElementById("emergencyAdsContainer");
-        container.innerHTML = "";
-        const start = (page - 1) * pageSize;
-        const end = start + pageSize;
-        filteredAds.slice(start, end).forEach(ad => {
-          container.appendChild(createAdCard(ad));
-        });
+      pagination.appendChild(
+        makeBtn('다음', current === total, () => { current++; renderPage(current); renderPagination(); })
+      );
+    }
+
+    /* ───────────── 6. 모달 열기 헬퍼 ───────────── */
+    function openModalWithCard(card) {
+      if (!window.populateModal) return console.warn('populateModal 함수 없음');
+      const data = {
+        title: card.dataset.title,
+        phone: card.dataset.phone,
+        image: card.dataset.img,
+        address: card.dataset.address,
+        category: '식사',
+        delivery: '정보 없음',
+        hours: '정보 없음',
+        serviceItems: '정보 없음',
+        events: [],
+        facilities: '',
+        pets: '정보 없음',
+        parking: '',
+        sliderImages: [card.dataset.img]
+      };
+      window.populateModal(data);                     // 모달 콘텐츠 채우기
+      document.getElementById('modal').classList.remove('hidden');  // 모달 열기
+    }
+
+    /* ───────────── 7. 초기화 ───────────── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        adsData = await fetchMealStores();            // ① 데이터 수신
+        renderPage(current);                          // ② 첫 페이지 출력
+        renderPagination();                           // ③ 페이지네이션 출력
+      } catch (err) {
+        console.error(err);
+        document.getElementById('emergencyAdsContainer').innerHTML =
+          '<p class="w-full text-center text-red-600">데이터를 불러오지 못했습니다.</p>';
       }
 
-      function renderPaginationControls() {
-        const pagination = document.getElementById("pagination");
-        pagination.innerHTML = "";
-
-        // 이전 버튼
-        const prevBtn = document.createElement("button");
-        prevBtn.textContent = "이전";
-        prevBtn.className = "bg-gray-300 text-gray-800 py-1 px-3 rounded hover:bg-gray-400";
-        prevBtn.disabled = currentPage === 1;
-        prevBtn.addEventListener("click", () => {
-          if (currentPage > 1) {
-            currentPage--;
-            renderAdsPage(currentPage);
-            renderPaginationControls();
-          }
-        });
-        pagination.appendChild(prevBtn);
-
-        // 페이지 번호 버튼
-        for (let i = 1; i <= totalPages; i++) {
-          const pageBtn = document.createElement("button");
-          pageBtn.textContent = i;
-          pageBtn.className = "bg-gray-200 text-gray-800 py-1 px-3 rounded hover:bg-gray-300";
-          if (i === currentPage) {
-            pageBtn.classList.add("font-bold", "bg-blue-500", "text-white");
-          }
-          pageBtn.addEventListener("click", () => {
-            currentPage = i;
-            renderAdsPage(currentPage);
-            renderPaginationControls();
-          });
-          pagination.appendChild(pageBtn);
-        }
-
-        // 다음 버튼
-        const nextBtn = document.createElement("button");
-        nextBtn.textContent = "다음";
-        nextBtn.className = "bg-gray-300 text-gray-800 py-1 px-3 rounded hover:bg-gray-400";
-        nextBtn.disabled = currentPage === totalPages;
-        nextBtn.addEventListener("click", () => {
-          if (currentPage < totalPages) {
-            currentPage++;
-            renderAdsPage(currentPage);
-            renderPaginationControls();
-          }
-        });
-        pagination.appendChild(nextBtn);
-      }
-
-      // "상세보기" 버튼 클릭 시 모달 열기
-      document.addEventListener("click", (e) => {
-        if (e.target.matches(".open-modal")) {
-          e.preventDefault();
-          const adCard = e.target.closest(".ad-card");
-          if (!adCard) return;
-          const data = {
-            title: adCard.dataset.title,
-            phone: adCard.dataset.phone,
-            image: adCard.dataset.img,
-            address: "주소 미정",
-            category: adCard.dataset.category,
-            delivery: "정보 없음",
-            hours: "정보 없음",
-            serviceItems: "정보 없음",
-            events: [adCard.dataset.events],
-            facilities: adCard.dataset.facilities,
-            pets: "정보 없음",
-            parking: adCard.dataset.parking,
-            sliderImages: [adCard.dataset.img]
-          };
-          openModalWithData(data);
-        }
+      /* 카드 클릭 시 모달 */
+      document.getElementById('emergencyAdsContainer').addEventListener('click', e => {
+        const card = e.target.closest('.ad-card');
+        if (card) openModalWithCard(card);
       });
-
-      // 검색어 출력
-      const rankingList = document.getElementById("rankingList");
-      if (rankingList) {
-        const searchRanking = [{
-            name: "응급실 운영 시간",
-            link: "search.php?keyword=응급실+운영+시간"
-          },
-          {
-            name: "병원 예약",
-            link: "search.php?keyword=병원+예약"
-          },
-          {
-            name: "응급실 위치",
-            link: "search.php?keyword=응급실+위치"
-          },
-          {
-            name: "응급실 대기시간",
-            link: "search.php?keyword=응급실+대기시간"
-          },
-          {
-            name: "응급실 후기",
-            link: "search.php?keyword=응급실+후기"
-          }
-        ];
-        rankingList.innerHTML = "";
-        searchRanking.forEach((item, index) => {
-          const li = document.createElement("li");
-          li.innerHTML = `
-            <a href="${item.link}" 
-               class="block w-full text-black hover:underline truncate text-left" 
-               title="${item.name}">
-               ${index + 1}. ${item.name}
-            </a>`;
-          rankingList.appendChild(li);
-        });
-      }
-
-      renderAdsPage(currentPage);
-      renderPaginationControls();
     });
   </script>
+
 </body>
 
 </html>
