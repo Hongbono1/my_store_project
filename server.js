@@ -43,15 +43,24 @@ const pool = new Pool({
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-
+// ── 생략 ──
 app.use(cors({ origin: ["https://www.hongbono1.com", "http://localhost:3000"] }));
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(uploadDir));
+app.use(express.static(path.join(__dirname, "public")));  // ① public 폴더 서빙
+
+// ── 추가된 부분: HTML 응답에 charset 강제 지정 ──
+app.use((req, res, next) => {
+  if (req.path.endsWith(".html")) {
+    res.setHeader("Content-Type", "text/html; charset=UTF-8");
+  }
+  next();
+});
+// ── 추가 끝 ──
+
+app.use("/uploads", express.static(uploadDir));  // ② 업로드 폴더 서빙
 
 app.get("/", (_, res) => res.send("서버 실행 중입니다."));
 
+// ── 사업자 인증 라우트 ──
 app.post("/verify-biz", async (req, res) => {
   try {
     const { b_no } = req.body;
@@ -71,7 +80,7 @@ app.post("/verify-biz", async (req, res) => {
     console.error("❌ 사업자 인증 오류:", err.message);
     res.status(500).json({ message: "서버 오류" });
   }
-});
+}); // ← 여기 app.post의 끝, 반드시 `});` 로 닫아야 합니다
 
 // .env에 있는 KAKAO_API_KEY 값을 클라이언트에 전달
 app.get("/kakao-key", (req, res) => {
@@ -197,23 +206,23 @@ app.post(
       const categories = Array.isArray(req.body.menuCategory)
         ? req.body.menuCategory
         : req.body.menuCategory
-        ? [req.body.menuCategory]
-        : [];
+          ? [req.body.menuCategory]
+          : [];
       const menuNames = Array.isArray(req.body.menuName)
         ? req.body.menuName
         : req.body.menuName
-        ? [req.body.menuName]
-        : [];
+          ? [req.body.menuName]
+          : [];
       let menuPrices = Array.isArray(req.body.menuPrice)
         ? req.body.menuPrice
         : req.body.menuPrice
-        ? [req.body.menuPrice]
-        : [];
+          ? [req.body.menuPrice]
+          : [];
       const descriptions = Array.isArray(req.body.menuDesc)
         ? req.body.menuDesc
         : req.body.menuDesc
-        ? [req.body.menuDesc]
-        : [];
+          ? [req.body.menuDesc]
+          : [];
 
       const menuImages = req.files["menuImage[]"] || [];
 
