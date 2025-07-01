@@ -1,8 +1,10 @@
 // server.js
+import dotenv from "dotenv";
+dotenv.config();   
+
 import express from "express";
 import pg from "pg";
 import multer from "multer";
-import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,7 +13,6 @@ import fetch from "node-fetch";
 import fs from "fs";
 
 console.log("✅ DATABASE_URL:", process.env.DATABASE_URL);
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,6 +99,8 @@ app.post(
         ownerAddress,
         ownerPhone,
         businessName,
+        businessCategory,     
+        businessSubcategory,
         businessType,
         deliveryOption,
         businessHours,
@@ -150,7 +153,7 @@ app.post(
 
         const storeResult = await client.query(
           `INSERT INTO store_info (
-             owner_id,business_name,business_type,delivery_option,business_hours,
+             owner_id,business_name,business_category,business_subcategory,business_type,delivery_option,business_hours,
              service_details,event1,event2,facility,pets,parking,
              phone_number,homepage,instagram,facebook,
              additional_desc,address,image1,image2,image3)
@@ -160,6 +163,8 @@ app.post(
           [
             ownerId,
             businessName,
+            businessCategory,
+            business_subcategory,
             businessType,
             deliveryOption,
             businessHours,
