@@ -1,6 +1,6 @@
 // server.js
 import dotenv from "dotenv";
-dotenv.config();   
+dotenv.config();
 
 import express from "express";
 import pg from "pg";
@@ -99,7 +99,7 @@ app.post(
         ownerAddress,
         ownerPhone,
         businessName,
-        businessCategory,     
+        businessCategory,
         businessSubcategory,
         businessType,
         deliveryOption,
@@ -153,18 +153,38 @@ app.post(
 
         const storeResult = await client.query(
           `INSERT INTO store_info (
-             owner_id,business_name,business_category,business_subcategory,business_type,delivery_option,business_hours,
-             service_details,event1,event2,facility,pets,parking,
-             phone_number,homepage,instagram,facebook,
-             additional_desc,address,image1,image2,image3)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-                   $12,$13,$14,$15,$16,$17,$18,$19,$20)
-           RETURNING id`,
+            owner_id,
+            business_name,
+            business_category,
+            business_subcategory,
+            business_type,
+            delivery_option,
+            business_hours,
+            service_details,
+            event1,
+            event2,
+            facility,
+            pets,
+            parking,
+            phone_number,
+            homepage,
+            instagram,
+            facebook,
+            additional_desc,
+            address,
+            image1,
+            image2,
+            image3
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+          )
+          RETURNING id`,
           [
             ownerId,
             businessName,
             businessCategory,
-            business_subcategory,
+            businessSubcategory,
             businessType,
             deliveryOption,
             businessHours,
@@ -182,9 +202,10 @@ app.post(
             fullStoreAddress,
             imagePaths[0] || null,
             imagePaths[1] || null,
-            imagePaths[2] || null,
+            imagePaths[2] || null
           ]
         );
+
         const storeId = storeResult.rows[0].id;
 
         const categories = Array.isArray(req.body.menuCategory)
@@ -265,7 +286,7 @@ app.get("/store/:id", async (req, res) => {
            menu_image
         FROM store_menu
        WHERE store_id = $1`,
-       [id]
+      [id]
     );
 
     const s = storeQ.rows[0];
@@ -295,10 +316,10 @@ app.get("/store/:id", async (req, res) => {
         images: [s.image1, s.image2, s.image3].filter(Boolean)
       },
       menu: menuQ.rows.map(m => ({
-        category:    m.category,
-        menuName:    m.menu_name,
-        menuPrice:   m.menu_price,
-        menuImageUrl:m.menu_image
+        category: m.category,
+        menuName: m.menu_name,
+        menuPrice: m.menu_price,
+        menuImageUrl: m.menu_image
       }))
     });
   } catch (err) {
