@@ -1,4 +1,5 @@
-// server.js
+// server.js ----------------------------
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -42,8 +43,8 @@ const pool = new Pool({
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use(cors({ origin: ["https://www.hongbono1.com", "http://localhost:3000"] }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -77,7 +78,6 @@ app.get("/kakao-key", (req, res) => {
   res.json({ key: process.env.KAKAO_MAP_KEY });
 });
 
-
 app.post(
   "/store",
   upload.fields([
@@ -86,187 +86,170 @@ app.post(
     { name: "businessCertImage" },
   ]),
   async (req, res) => {
+    const bizNumber =
+      (req.body.bizNumber1 || "") +
+      (req.body.bizNumber2 || "") +
+      (req.body.bizNumber3 || "");
+
+    const {
+      ownerName,
+      birthDate,
+      ownerEmail,
+      ownerAddress,
+      ownerPhone,
+      businessName,
+      businessCategory,
+      businessSubcategory,
+      businessType,
+      deliveryOption,
+      businessHours,
+      serviceDetails,
+      event1,
+      event2,
+      facility,
+      pets,
+      parking,
+      phoneNumber,
+      homepage,
+      instagram,
+      facebook,
+      additionalDesc,
+      postalCode,
+      roadAddress,
+      detailAddress,
+    } = req.body;
+
+    const fullStoreAddress = `${postalCode} ${roadAddress} ${detailAddress}`.trim();
+    const imageFiles = req.files["images[]"] || [];
+    const imagePaths = imageFiles.map((f) => "/uploads/" + f.filename);
+
+    const certFile = req.files["businessCertImage"]?.[0];
+    const certPath = certFile ? "/uploads/" + certFile.filename : null;
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedBizNumber = await bcrypt.hash(bizNumber, salt);
+    const hashedOwnerPhone = await bcrypt.hash(ownerPhone || "", salt);
+
+    const client = await pool.connect();
+
     try {
-      const bizNumber =
-        (req.body.bizNumber1 || "") +
-        (req.body.bizNumber2 || "") +
-        (req.body.bizNumber3 || "");
+      await client.query("BEGIN");
+      console.log("✅ 요청 데이터:", req.body);
 
-      const {
-        ownerName,
-        birthDate,
-        ownerEmail,
-        ownerAddress,
-        ownerPhone,
-        businessName,
-        businessCategory,
-        businessSubcategory,
-        businessType,
-        deliveryOption,
-        businessHours,
-        serviceDetails,
-        event1,
-        event2,
-        facility,
-        pets,
-        parking,
-        phoneNumber,
-        homepage,
-        instagram,
-        facebook,
-        additionalDesc,
-        postalCode,
-        roadAddress,
-        detailAddress,
-      } = req.body;
+      // 1️⃣ owner_info 저장
+      const ownerResult = await client.query(
+        `INSERT INTO owner_info
+         (biz_number, name, birth_date, email, address, phone, cert_image)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [
+          hashedBizNumber,
+          ownerName,
+          birthDate,
+          ownerEmail,
+          ownerAddress,
+          hashedOwnerPhone,
+          certPath,
+        ]
+      );
+      const ownerId = ownerResult.rows[0].id;
 
-      const fullStoreAddress = `${postalCode} ${roadAddress} ${detailAddress}`.trim();
-      const imageFiles = req.files["images[]"] || [];
-      const imagePaths = imageFiles.map((f) => "/uploads/" + f.filename);
+      // 2️⃣ store_info 저장
+      const storeResult = await client.query(
+        `INSERT INTO store_info (
+          owner_id, business_name, business_category, business_subcategory,
+          business_type, delivery_option, business_hours,
+          service_details, event1, event2, facility, pets, parking,
+          phone_number, homepage, instagram, facebook,
+          additional_desc, address, image1, image2, image3
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7,
+          $8, $9, $10, $11, $12, $13,
+          $14, $15, $16, $17, $18, $19, $20, $21, $22
+        ) RETURNING id`,
+        [
+          ownerId,
+          businessName,
+          businessCategory,
+          businessSubcategory,
+          businessType,
+          deliveryOption,
+          businessHours,
+          serviceDetails,
+          event1,
+          event2,
+          facility,
+          pets,
+          parking,
+          phoneNumber,
+          homepage,
+          instagram,
+          facebook,
+          additionalDesc,
+          fullStoreAddress,
+          imagePaths[0] || null,
+          imagePaths[1] || null,
+          imagePaths[2] || null,
+        ]
+      );
+      const storeId = storeResult.rows[0].id;
 
-      const certFile = req.files["businessCertImage"]?.[0];
-      const certPath = certFile ? "/uploads/" + certFile.filename : null;
+      // 3️⃣ 메뉴 loop 저장
+      const categories = Array.isArray(req.body.menuCategory)
+        ? req.body.menuCategory
+        : req.body.menuCategory
+        ? [req.body.menuCategory]
+        : [];
+      const menuNames = Array.isArray(req.body.menuName)
+        ? req.body.menuName
+        : req.body.menuName
+        ? [req.body.menuName]
+        : [];
+      let menuPrices = Array.isArray(req.body.menuPrice)
+        ? req.body.menuPrice
+        : req.body.menuPrice
+        ? [req.body.menuPrice]
+        : [];
+      const descriptions = Array.isArray(req.body.menuDesc)
+        ? req.body.menuDesc
+        : req.body.menuDesc
+        ? [req.body.menuDesc]
+        : [];
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedBizNumber = await bcrypt.hash(bizNumber, salt);
-      const hashedOwnerPhone = await bcrypt.hash(ownerPhone || "", salt);
+      const menuImages = req.files["menuImage[]"] || [];
 
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
+      for (let i = 0; i < menuNames.length; i++) {
+        const name = menuNames[i] || "";
+        const rawPrice = (menuPrices[i] || "0").toString();
+        const price = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
+        const imgPath =
+          menuImages[i]?.filename ? "/uploads/" + menuImages[i].filename : null;
 
-        const ownerResult = await client.query(
-          `INSERT INTO owner_info
-           (biz_number, name, birth_date, email, address, phone, cert_image)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        const category = categories[i] || "기타";
+
+        await client.query(
+          `INSERT INTO store_menu
+             (store_id, category, menu_name, menu_price, menu_image, menu_desc)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [
-            hashedBizNumber,
-            ownerName,
-            birthDate,
-            ownerEmail,
-            ownerAddress,
-            hashedOwnerPhone,
-            certPath,
+            storeId,
+            category,
+            name,
+            price,
+            imgPath,
+            descriptions[i] || "",
           ]
         );
-        const ownerId = ownerResult.rows[0].id;
-
-        const storeResult = await client.query(
-          `INSERT INTO store_info (
-            owner_id,
-            business_name,
-            business_category,
-            business_subcategory,
-            business_type,
-            delivery_option,
-            business_hours,
-            service_details,
-            event1,
-            event2,
-            facility,
-            pets,
-            parking,
-            phone_number,
-            homepage,
-            instagram,
-            facebook,
-            additional_desc,
-            address,
-            image1,
-            image2,
-            image3
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
-          )
-          RETURNING id`,
-          [
-            ownerId,
-            businessName,
-            businessCategory,
-            businessSubcategory,
-            businessType,
-            deliveryOption,
-            businessHours,
-            serviceDetails,
-            event1,
-            event2,
-            facility,
-            pets,
-            parking,
-            phoneNumber,
-            homepage,
-            instagram,
-            facebook,
-            additionalDesc,
-            fullStoreAddress,
-            imagePaths[0] || null,
-            imagePaths[1] || null,
-            imagePaths[2] || null
-          ]
-        );
-
-        const storeId = storeResult.rows[0].id;
-
-        const categories = Array.isArray(req.body.menuCategory)
-          ? req.body.menuCategory
-          : req.body.menuCategory
-            ? [req.body.menuCategory]
-            : [];
-        const menuNames = Array.isArray(req.body.menuName)
-          ? req.body.menuName
-          : req.body.menuName
-            ? [req.body.menuName]
-            : [];
-        let menuPrices = Array.isArray(req.body.menuPrice)
-          ? req.body.menuPrice
-          : req.body.menuPrice
-            ? [req.body.menuPrice]
-            : [];
-        const descriptions = Array.isArray(req.body.menuDesc)
-          ? req.body.menuDesc
-          : req.body.menuDesc
-            ? [req.body.menuDesc]
-            : [];
-
-        const menuImages = req.files["menuImage[]"] || [];
-
-        for (let i = 0; i < menuNames.length; i++) {
-          const name = menuNames[i] || "";
-          const rawPrice = (menuPrices[i] || "0").toString();
-          const price = parseInt(rawPrice.replace(/[^\d]/g, ""), 10) || 0;
-          const imgPath =
-            menuImages[i]?.filename ? "/uploads/" + menuImages[i].filename : null;
-
-          const category = categories[i] || "기타";
-
-          await client.query(
-            `INSERT INTO store_menu
-               (store_id, category, menu_name, menu_price, menu_image, menu_desc)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-              storeId,
-              category,
-              name,
-              price,
-              imgPath,
-              descriptions[i] || "",
-            ]
-          );
-        }
-
-        await client.query("COMMIT");
-        res.json({ message: "등록 성공", storeId });
-      } catch (err) {
-        await client.query("ROLLBACK");
-        console.error("❌ 등록 트랜잭션 오류:", err.message);
-        res.status(500).json({ message: "서버 오류" });
-      } finally {
-        client.release();
       }
+
+      await client.query("COMMIT");
+      res.json({ message: "등록 성공", storeId });
+
     } catch (err) {
-      console.error("❌ 등록 처리 오류:", err.message);
-      res.status(500).json({ message: "서버 오류" });
+      await client.query("ROLLBACK");
+      console.error("❌ 등록 트랜잭션 오류:", err);
+      res.status(500).json({ message: "서버 오류", error: err.message });
+    } finally {
+      client.release();
     }
   }
 );
@@ -290,8 +273,6 @@ app.get("/store/:id", async (req, res) => {
     );
 
     const s = storeQ.rows[0];
-
-    // 🔹 배열로 묶어서 프런트로 전달
     const eventsArr = [s.event1, s.event2].filter(Boolean);
     const addInfoArr = [s.facility, s.pets, s.parking].filter(Boolean);
 
@@ -302,18 +283,15 @@ app.get("/store/:id", async (req, res) => {
         deliveryOption: s.delivery_option,
         businessHours: s.business_hours,
         serviceDetails: s.service_details,
-
-        /* 프런트가 바로 쓸 수 있는 배열 */
-        events: eventsArr,      // 예) ["신규 방문 이벤트", "여름 할인"]
-        additionalInfo: addInfoArr,     // 예) ["장애인편의 시설", "반려동물 출입", "주차정보"]
-
         contactPhone: s.phone_number,
         homepage: s.homepage,
         instagram: s.instagram,
         facebook: s.facebook,
         additionalDesc: s.additional_desc,
         address: s.address,
-        images: [s.image1, s.image2, s.image3].filter(Boolean)
+        images: [s.image1, s.image2, s.image3].filter(Boolean),
+        events: eventsArr,
+        additionalInfo: addInfoArr,
       },
       menu: menuQ.rows.map(m => ({
         category: m.category,
@@ -323,17 +301,11 @@ app.get("/store/:id", async (req, res) => {
       }))
     });
   } catch (err) {
-    console.error("❌ 상세 조회 오류:");
-    console.error(err);             // ← 객체 전체 출력
-    console.error(err.stack);       // ← 스택까지 출력
+    console.error("❌ 상세 조회 오류:", err);
     res.status(500).json({ message: "서버 오류" });
   }
 });
 
-app.get("/kakao-key", (req, res) => {
-  res.json({ key: process.env.KAKAO_API_KEY });
-});
-
-app.listen(3000, "0.0.0.0", () => {
-  console.log("🚀 서버 실행 중! http://localhost:3000");
+app.listen(port, () => {
+  console.log(`🚀 서버 실행 중! http://localhost:${port}`);
 });
