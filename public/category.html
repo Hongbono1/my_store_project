@@ -94,153 +94,156 @@
   <div id="footer-placeholder"></div>
 
   <!-- ───── 스크립트 ───── -->
-<script>
-  /* ── 1. 헤더 · 푸터 연결 ───────────────────────────── */
-  fetch('/components/header.html')
-    .then(r => r.text())
-    .then(html => { document.getElementById('header-placeholder').innerHTML = html; });
+  <script>
+    /* 1) 헤더·푸터 fetch (그대로) */
+    fetch('/components/header.html')
+      .then(r => r.text())
+      .then(html => { document.getElementById('header-placeholder').innerHTML = html; });
 
-  fetch('/components/footer.html')
-    .then(r => r.text())
-    .then(html => { document.getElementById('footer-placeholder').innerHTML = html; });
+    fetch('/components/footer.html')
+      .then(r => r.text())
+      .then(html => { document.getElementById('footer-placeholder').innerHTML = html; });
 
-  /* ── 2. 카테고리 버튼 공통 스타일 ─────────────────── */
-  document.querySelectorAll('.category-btn').forEach(btn => {
-    btn.classList.add(
-      'px-4', 'py-2',
-      'rounded-full', 'border', 'border-gray-300',
-      'bg-white', 'text-gray-800',
-      'hover:bg-blue-500', 'hover:text-white',
-      'transition'
-    );
-  });
-
-  /* ── 3. 전역 설정 ─────────────────────────────────── */
-  const pageSize   = 12;
-  let   current    = 1;
-  let   adsData    = [];
-
-  /* 쿼리스트링에서 카테고리 id 추출 */
-  const rawId      = new URLSearchParams(location.search).get('id');
-  const categoryId = isNaN(Number(rawId))
-    ? decodeURIComponent(rawId || '')
-    : document.querySelector('section h1').textContent;
-
-  const API_BASE_URL = 'https://www.hongbono1.com';
-
-  /* ── 4. 데이터 요청 ───────────────────────────────── */
-  async function fetchCategoryStores() {
-    const res = await fetch(`${API_BASE_URL}/category/${encodeURIComponent(categoryId)}/stores`);
-    if (!res.ok) throw new Error('카테고리 데이터를 불러오지 못했습니다');
-
-    const list = await res.json();
-    return list.map(store => {
-      const fileName  = (store.image1 || '').replace(/^\/uploads\//, '');
-      const thumbnail = fileName ? `/uploads/${fileName}` : '/images/no-image.png';
-
-      return {
-        id:     store.id,
-        name:   store.businessName,
-        cat:    store.businessCategory || store.business_category || '',
-        phone:  store.phone || '전화번호 없음',
-        thumb:  thumbnail,
-        addr:   store.address || ''
-      };
+    /* 2) 카테고리 버튼 스타일 (그대로) */
+    document.querySelectorAll('.category-btn').forEach(btn => {
+      btn.classList.add(
+        'px-4', 'py-2', 'rounded-full', 'border', 'border-gray-300',
+        'bg-white', 'text-gray-800', 'hover:bg-blue-500', 'hover:text-white', 'transition'
+      );
     });
-  }
 
-  /* ── 5. 카드 생성 ─────────────────────────────────── */
-  function createAdCard(ad) {
-    const wrap = document.createElement('div');
-    wrap.className = 'ad-card group w-full flex flex-col gap-3 cursor-pointer';
-    wrap.dataset.id = ad.id;
+    /* ★ 3) [추가] 숫자→이름 매핑 테이블 ------------------- */
+    const CATEGORY_MAP = {
+      14: '식사',
+      15: '분식',
+      16: '카페'
+      // 필요하면 계속 추가
+    };
 
-    /* 이미지 박스 */
-    const imgBox = document.createElement('div');
-    imgBox.className = `
+    /* 4) 전역 변수 --------------------------------------- */
+    const pageSize = 12;
+    let current = 1;
+    let adsData = [];
+
+    /* ★ 5) id 파싱 → 문자열 카테고리명으로 통일 ---------- */
+    const rawId = new URLSearchParams(location.search).get('id');   // "14" 또는 "식사"
+    const categoryId = CATEGORY_MAP[rawId] || decodeURIComponent(rawId || '');
+
+    const API_BASE_URL = 'https://www.hongbono1.com';
+
+    /* 6) 데이터 요청 ------------------------------------- */
+    async function fetchCategoryStores() {
+      /* ← 여기서 categoryId 는 항상 “식사/분식/카페 …” */
+      const res = await fetch(`${API_BASE_URL}/category/${encodeURIComponent(categoryId)}/stores`);
+      if (!res.ok) throw new Error('카테고리 데이터를 불러오지 못했습니다');
+
+      const list = await res.json();
+      return list.map(store => {
+        const fileName = (store.image1 || '').replace(/^\/uploads\//, '');
+        const thumb = fileName ? `/uploads/${fileName}` : '/images/no-image.png';
+        return {
+          id: store.id,
+          name: store.businessName,
+          cat: store.businessCategory || '',
+          phone: store.phone || '전화번호 없음',
+          thumb,
+          addr: store.address || ''
+        };
+      });
+    }
+
+    /* ── 5. 카드 생성 ─────────────────────────────────── */
+    function createAdCard(ad) {
+      const wrap = document.createElement('div');
+      wrap.className = 'ad-card group w-full flex flex-col gap-3 cursor-pointer';
+      wrap.dataset.id = ad.id;
+
+      /* 이미지 박스 */
+      const imgBox = document.createElement('div');
+      imgBox.className = `
       relative rounded-xl overflow-hidden w-full h-60
       transform transition duration-300
       group-hover:scale-105 group-hover:-translate-y-2 group-hover:shadow-lg
     `.trim();
 
-    const img = document.createElement('img');
-    img.src       = ad.thumb;
-    img.alt       = ad.name;
-    img.className = 'w-full h-full object-cover';
-    imgBox.appendChild(img);
+      const img = document.createElement('img');
+      img.src = ad.thumb;
+      img.alt = ad.name;
+      img.className = 'w-full h-full object-cover';
+      imgBox.appendChild(img);
 
-    /* 텍스트 블록 */
-    const txt = document.createElement('div');
-    txt.className = 'flex flex-col items-center gap-1 mt-2 text-center';
+      /* 텍스트 블록 */
+      const txt = document.createElement('div');
+      txt.className = 'flex flex-col items-center gap-1 mt-2 text-center';
 
-    const cat = document.createElement('p');
-    cat.className = 'text-sm font-semibold text-blue-600';
-    cat.textContent = ad.cat;
+      const cat = document.createElement('p');
+      cat.className = 'text-sm font-semibold text-blue-600';
+      cat.textContent = ad.cat;
 
-    const name = document.createElement('p');
-    name.className = 'text-xl font-bold text-gray-900';
-    name.textContent = ad.name;
+      const name = document.createElement('p');
+      name.className = 'text-xl font-bold text-gray-900';
+      name.textContent = ad.name;
 
-    const phone = document.createElement('p');
-    phone.className = 'text-lg text-gray-600';
-    phone.textContent = ad.phone.replace(/[^0-9]/g, '').replace(/(\d{3})(\d{3,4})(\d{4})/, '$1 $2 $3');
+      const phone = document.createElement('p');
+      phone.className = 'text-lg text-gray-600';
+      phone.textContent = ad.phone.replace(/[^0-9]/g, '').replace(/(\d{3})(\d{3,4})(\d{4})/, '$1 $2 $3');
 
-    txt.append(cat, name, phone);
-    wrap.append(imgBox, txt);
+      txt.append(cat, name, phone);
+      wrap.append(imgBox, txt);
 
-    return wrap;
-  }
-
-  /* ── 6. 페이지 · 페이지네이션 렌더 ────────────────── */
-  function renderPage(page) {
-    const box = document.getElementById('categoryAdsContainer');
-    box.innerHTML = '';
-    const start = (page - 1) * pageSize;
-    adsData.slice(start, start + pageSize).forEach(ad => box.appendChild(createAdCard(ad)));
-  }
-
-  function renderPagination() {
-    const pag   = document.getElementById('pagination');
-    pag.innerHTML = '';
-    const total = Math.ceil(adsData.length / pageSize);
-
-    const btn = (txt, dis, fn, extra = '') => {
-      const b = document.createElement('button');
-      b.textContent = txt;
-      b.disabled    = dis;
-      b.className   = `px-3 py-1 rounded ${extra} ${dis ? 'bg-gray-200 opacity-40' : 'bg-gray-100 hover:bg-gray-200'}`;
-      b.onclick     = fn;
-      return b;
-    };
-
-    pag.append(btn('이전', current === 1, () => { current--; renderPage(current); renderPagination(); }));
-
-    for (let i = 1; i <= total; i++) {
-      pag.append(btn(i, false, () => { current = i; renderPage(i); renderPagination(); },
-        i === current ? 'bg-blue-500 text-white font-bold' : ''));
+      return wrap;
     }
 
-    pag.append(btn('다음', current === total, () => { current++; renderPage(current); renderPagination(); }));
-  }
-
-  /* ── 7. 초기화 ─────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      adsData = await fetchCategoryStores();
-      renderPage(current);
-      renderPagination();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('categoryAdsContainer').innerHTML =
-        '<p class="w-full text-center text-red-600">데이터를 불러오지 못했습니다.</p>';
+    /* ── 6. 페이지 · 페이지네이션 렌더 ────────────────── */
+    function renderPage(page) {
+      const box = document.getElementById('categoryAdsContainer');
+      box.innerHTML = '';
+      const start = (page - 1) * pageSize;
+      adsData.slice(start, start + pageSize).forEach(ad => box.appendChild(createAdCard(ad)));
     }
 
-    /* 카드 클릭 → 디테일 페이지 이동 */
-    document.getElementById('categoryAdsContainer').addEventListener('click', e => {
-      const card = e.target.closest('.ad-card');
-      if (card?.dataset.id) {
-        window.location.href = `/detail.html?id=${card.dataset.id}`;
+    function renderPagination() {
+      const pag = document.getElementById('pagination');
+      pag.innerHTML = '';
+      const total = Math.ceil(adsData.length / pageSize);
+
+      const btn = (txt, dis, fn, extra = '') => {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.disabled = dis;
+        b.className = `px-3 py-1 rounded ${extra} ${dis ? 'bg-gray-200 opacity-40' : 'bg-gray-100 hover:bg-gray-200'}`;
+        b.onclick = fn;
+        return b;
+      };
+
+      pag.append(btn('이전', current === 1, () => { current--; renderPage(current); renderPagination(); }));
+
+      for (let i = 1; i <= total; i++) {
+        pag.append(btn(i, false, () => { current = i; renderPage(i); renderPagination(); },
+          i === current ? 'bg-blue-500 text-white font-bold' : ''));
       }
+
+      pag.append(btn('다음', current === total, () => { current++; renderPage(current); renderPagination(); }));
+    }
+
+    /* ── 7. 초기화 ─────────────────────────────────────── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        adsData = await fetchCategoryStores();
+        renderPage(current);
+        renderPagination();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('categoryAdsContainer').innerHTML =
+          '<p class="w-full text-center text-red-600">데이터를 불러오지 못했습니다.</p>';
+      }
+
+      /* 카드 클릭 → 디테일 페이지 이동 */
+      document.getElementById('categoryAdsContainer').addEventListener('click', e => {
+        const card = e.target.closest('.ad-card');
+        if (card?.dataset.id) {
+          window.location.href = `/detail.html?id=${card.dataset.id}`;
+        }
+      });
     });
-  });
-</script>
+  </script>
