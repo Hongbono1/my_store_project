@@ -6,6 +6,7 @@ import cors from "cors";
 import path from "path";
 import storeRouter from "./routes/store.js";
 import miscRouter  from "./routes/misc.js";
+import categoryRouter from "./routes/category.js";
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,7 @@ app.use((req, res, next) => {
 
 /* ── 라우터 ─────────────────────────── */
 app.use("/store", storeRouter);
+app.use("/category", categoryRouter);
 app.use("/",      miscRouter);   // /verify-biz, /kakao-key
 
 /* ── 헬스 체크 ──────────────────────── */
