@@ -24,8 +24,16 @@
   </header>
 
   <!-- 모달 (정적 자리 표시자) -->
-  <div id="modal" class="hidden">
-    <!-- 실제 모달 콘텐츠를 여기에 추가 -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full relative">
+      <button id="closeModal" class="absolute top-2 right-2 text-2xl font-bold">&times;</button>
+      <h3 id="modalTitle" class="text-2xl font-bold mb-4"></h3>
+      <img id="modalImage" class="w-full h-48 object-cover rounded mb-4" />
+      <p id="modalPhone" class="mb-2 text-lg"></p>
+      <p id="modalAddress" class="mb-2 text-lg"></p>
+    </div>
+  </div>
+  <!-- 실제 모달 콘텐츠를 여기에 추가 -->
   </div>
 
   <!-- 메인 컨테이너 (하단 여백 mb-8 추가) -->
@@ -127,19 +135,24 @@
 
     /* ───────────── 3. 카드 생성 : 이미지 + 상호 + 전화 ───────────── */
     function createAdCard(ad) {
+      console.log('thumbnailUrl:', ad.thumbnailUrl);   // 👉 실제 값 확인용
+
+      // ✅ 썸네일이 없으면 기본 이미지로 대체
+      const imgSrc = ad.thumbnailUrl
+        ? `/uploads/${ad.thumbnailUrl}`   // DB가 파일명만 준다면
+        : '/images/no-image.png';         // 프로젝트에 준비된 기본 이미지
+
       const card = document.createElement('div');
       card.className =
         'ad-card bg-white shadow-lg rounded-lg p-4 flex flex-col border border-gray-300 hover:shadow-xl cursor-pointer transition';
 
-      /* ➊ 모달용 데이터 속성(data-*) 저장 */
       card.dataset.title = ad.businessName;
       card.dataset.phone = ad.phone;
-      card.dataset.img = ad.thumbnailUrl;
+      card.dataset.img = imgSrc;                   // ✅ 안전한 경로로 대체
       card.dataset.address = ad.address || '주소 정보 없음';
 
-      /* ➋ 카드 UI */
       card.innerHTML = `
-    <img src="${ad.thumbnailUrl}" alt="${ad.businessName}"
+    <img src="${imgSrc}" alt="${ad.businessName}"
          class="h-40 w-full object-cover rounded mb-3" />
     <h3 class="text-xl font-bold text-center mb-1 truncate">${ad.businessName}</h3>
     <p  class="text-center text-gray-600">${ad.phone}</p>
@@ -209,6 +222,19 @@
       window.populateModal(data);                     // 모달 콘텐츠 채우기
       document.getElementById('modal').classList.remove('hidden');  // 모달 열기
     }
+
+    window.populateModal = data => {
+      document.getElementById('modalTitle').textContent = data.title;
+      document.getElementById('modalImage').src = data.image || '/images/no-image.png';
+      document.getElementById('modalPhone').textContent = `전화번호: ${data.phone}`;
+      document.getElementById('modalAddress').textContent = `주소: ${data.address}`;
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('closeModal')
+        .addEventListener('click', () =>
+          document.getElementById('modal').classList.add('hidden'));
+    });
 
     /* ───────────── 7. 초기화 ───────────── */
     document.addEventListener('DOMContentLoaded', async () => {
