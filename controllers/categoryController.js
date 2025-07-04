@@ -23,7 +23,7 @@ export async function getStoresByCategory(req, res) {
         business_name      AS "businessName",
         business_category  AS "businessCategory",
         phone_number       AS "phone",
-        image1,
+         image1            AS "thumbnailUrl"
         address
       FROM store_info
       WHERE business_category = $1
