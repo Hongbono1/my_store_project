@@ -25,40 +25,61 @@ export async function getStores(req, res) {
 export async function getStoreDetail(req, res) {
   const { id } = req.params;
   try {
-    const storeQ = await pool.query(`SELECT * FROM store_info WHERE id=$1`, [id]);
-    if (!storeQ.rowCount)
-      return res.status(404).json({ message: "가게 정보를 찾을 수 없습니다." });
+    // ① 필요한 컬럼만 골라오면서 business_category 도 함께 조회
+    const storeQ = await pool.query(`
+      SELECT
+        id,
+        business_name,
+        business_type,
+        business_category,   -- <-- 이 컬럼
+        delivery_option,
+        business_hours,
+        service_details,
+        additional_desc,
+        facility,
+        pets,
+        parking,
+        phone_number,
+        homepage,
+        instagram,
+        facebook,
+        address,
+        image1,
+        image2,
+        image3,
+        event1,
+        event2
+      FROM store_info
+      WHERE id = $1
+    `, [id]);
 
-    const menuQ = await pool.query(
-      `SELECT COALESCE(NULLIF(trim(category),''),'기타') AS category,
-              menu_name  AS "menuName",
-              menu_price AS "menuPrice",
-              menu_image AS "menuImageUrl"
-         FROM store_menu
-        WHERE store_id = $1`,
-      [id],
-    );
+    if (!storeQ.rowCount) {
+      return res.status(404).json({ message: "가게 정보를 찾을 수 없습니다." });
+    }
 
     const s = storeQ.rows[0];
-    const eventsArr = [s.event1, s.event2].filter(Boolean);
-    const addInfoArr = [s.facility, s.pets, s.parking].filter(Boolean);
 
+    const eventsArr = [s.event1, s.event2].filter(Boolean);
+    const additionalInfo = [s.facility, s.pets, s.parking].filter(Boolean);
+
+    // ② 응답에서 businessCategory 필드로 매핑
     res.json({
       store: {
-        businessName:  s.business_name,
-        businessType:  s.business_type,
-        deliveryOption:s.delivery_option,
+        businessName: s.business_name,
+        businessType: s.business_type,
+        businessCategory: s.business_category,    // <-- 여기!
+        deliveryOption: s.delivery_option,
         businessHours: s.business_hours,
-        serviceDetails:s.service_details,
-        contactPhone:  s.phone_number,
-        homepage:      s.homepage,
-        instagram:     s.instagram,
-        facebook:      s.facebook,
-        additionalDesc:s.additional_desc,
-        address:       s.address,
-        images:        [s.image1, s.image2, s.image3].filter(Boolean),
-        events:        eventsArr,
-        additionalInfo:addInfoArr,
+        serviceDetails: s.service_details,
+        additionalDesc: s.additional_desc,
+        contactPhone: s.phone_number,
+        homepage: s.homepage,
+        instagram: s.instagram,
+        facebook: s.facebook,
+        address: s.address,
+        images: [s.image1, s.image2, s.image3].filter(Boolean),
+        events: eventsArr,
+        additionalInfo: additionalInfo,
       },
       menu: menuQ.rows,
     });
@@ -84,12 +105,12 @@ export async function createStore(req, res) {
   const fullStoreAddress = `${postalCode} ${roadAddress} ${detailAddress}`.trim();
 
   const imagePaths = (req.files["images[]"] || []).map(f => "/uploads/" + f.filename);
-  const certPath   = req.files["businessCertImage"]?.[0]
-                   ? "/uploads/" + req.files["businessCertImage"][0].filename
-                   : null;
+  const certPath = req.files["businessCertImage"]?.[0]
+    ? "/uploads/" + req.files["businessCertImage"][0].filename
+    : null;
 
   const salt = await bcrypt.genSalt(10);
-  const hashedBiz   = await bcrypt.hash(bizNumber,   salt);
+  const hashedBiz = await bcrypt.hash(bizNumber, salt);
   const hashedPhone = await bcrypt.hash(ownerPhone || "", salt);
 
   const client = await pool.connect();
@@ -130,11 +151,11 @@ export async function createStore(req, res) {
     const storeId = storeRows[0].id;
 
     /* 3) 메뉴 */
-    const categories   = [].concat(req.body.menuCategory || []);
-    const menuNames    = [].concat(req.body.menuName    || []);
-    const menuPrices   = [].concat(req.body.menuPrice   || []);
-    const descriptions = [].concat(req.body.menuDesc    || []);
-    const menuImages   = req.files["menuImage[]"] || [];
+    const categories = [].concat(req.body.menuCategory || []);
+    const menuNames = [].concat(req.body.menuName || []);
+    const menuPrices = [].concat(req.body.menuPrice || []);
+    const descriptions = [].concat(req.body.menuDesc || []);
+    const menuImages = req.files["menuImage[]"] || [];
 
     for (let i = 0; i < menuNames.length; i++) {
       const price = parseInt((menuPrices[i] || "0").replace(/[^\d]/g, ""), 10);
