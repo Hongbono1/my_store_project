@@ -263,36 +263,64 @@
     }
 
     /* ✅ 7. 북마크 렌더 함수 */
+    /* ✅ 7. 북마크 렌더 함수 */
     function renderBookmarks() {
       const container = document.getElementById('bookmarkContainer');
       container.innerHTML = '';
 
       const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
-
-      if (bookmarks.length === 0) {
+      if (!bookmarks.length) {
         container.innerHTML = '<p class="text-gray-400">북마크가 없습니다</p>';
         return;
       }
 
       bookmarks.forEach(b => {
-        const badge = document.createElement('div');
-        badge.className = `
-      flex items-center justify-center
-    px-6 py-2           /* ← 가로 6, 세로 2 */
-    rounded-full        /* ← 양쪽 둥글게(필-형) */
-    border border-blue-500
-    bg-white text-blue-600
-    text-xl font-bold    /* ← 글자 크기 xl */
-    cursor-pointer
-    hover:scale-105 transition
-      `.trim();
-        badge.textContent = b.name.length > 4 ? b.name.slice(0, 4) + '…' : b.name;
+        // 1) 래퍼
+        const wrap = document.createElement('div');
+        wrap.className = 'relative inline-flex items-center';
 
+        // 2) 뱃지
+        const badge = document.createElement('div');
+        badge.className = [
+          'flex', 'items-center', 'justify-center',
+          'px-6', 'py-2',
+          'rounded-full',
+          'border', 'border-blue-500',
+          'bg-white', 'text-blue-600',
+          'text-xl', 'font-bold',
+          'cursor-pointer',
+          'hover:scale-105', 'transition'
+        ].join(' ');
+        badge.textContent = b.name.length > 4
+          ? b.name.slice(0, 4) + '…'
+          : b.name;
         badge.onclick = () => {
           location.href = `/detail.html?id=${encodeURIComponent(b.id)}`;
         };
+        wrap.appendChild(badge);
 
-        container.appendChild(badge);
+        // 3) 삭제 버튼
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.innerText = '🗑️';
+        delBtn.title = '북마크 삭제';
+        delBtn.className = [
+          'absolute', '-top-2', '-right-2',
+          'text-red-500', 'bg-white',
+          'rounded-full', 'p-1',
+          'hover:bg-red-50', 'transition'
+        ].join(' ');
+        delBtn.onclick = e => {
+          e.stopPropagation();
+          let list = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+          list = list.filter(x => x.id !== b.id);
+          localStorage.setItem('bookmarks', JSON.stringify(list));
+          renderBookmarks();
+          window.dispatchEvent(new Event('bookmarkChanged'));
+        };
+        wrap.appendChild(delBtn);
+
+        container.appendChild(wrap);
       });
     }
 
