@@ -25,33 +25,34 @@ export async function getStores(req, res) {
 export async function getStoreDetail(req, res) {
   const { id } = req.params;
   try {
-    // ① 필요한 컬럼만 골라오면서 business_category 도 함께 조회
-    const storeQ = await pool.query(`
-      SELECT
-        id,
-        business_name,
-        business_type,
-        business_category,   -- <-- 이 컬럼
-        delivery_option,
-        business_hours,
-        service_details,
-        additional_desc,
-        facility,
-        pets,
-        parking,
-        phone_number,
-        homepage,
-        instagram,
-        facebook,
-        address,
-        image1,
-        image2,
-        image3,
-        event1,
-        event2
-      FROM store_info
-      WHERE id = $1
-    `, [id]);
+    // 1) 매장 정보
+    const storeQ = await pool.query(
+      `SELECT
+         id,
+         business_name,
+         business_type,
+         business_category,
+         delivery_option,
+         business_hours,
+         service_details,
+         additional_desc,
+         facility,
+         pets,
+         parking,
+         phone_number,
+         homepage,
+         instagram,
+         facebook,
+         address,
+         image1,
+         image2,
+         image3,
+         event1,
+         event2
+       FROM store_info
+       WHERE id = $1`,
+      [id]
+    );
 
     if (!storeQ.rowCount) {
       return res.status(404).json({ message: "가게 정보를 찾을 수 없습니다." });
@@ -59,15 +60,28 @@ export async function getStoreDetail(req, res) {
 
     const s = storeQ.rows[0];
 
-    const eventsArr = [s.event1, s.event2].filter(Boolean);
-    const additionalInfo = [s.facility, s.pets, s.parking].filter(Boolean);
+    // 2) 메뉴 정보 쿼리 추가!
+    const menuQ = await pool.query(
+      `SELECT
+         COALESCE(NULLIF(trim(category),''),'기타') AS category,
+         menu_name  AS "menuName",
+         menu_price AS "menuPrice",
+         menu_image AS "menuImageUrl"
+       FROM store_menu
+       WHERE store_id = $1`,
+      [id]
+    );
 
-    // ② 응답에서 businessCategory 필드로 매핑
+    // 3) 배열 가공
+    const eventsArr = [s.event1, s.event2].filter(Boolean);
+    const additionalArr = [s.facility, s.pets, s.parking].filter(Boolean);
+
+    // 4) JSON 응답
     res.json({
       store: {
         businessName: s.business_name,
         businessType: s.business_type,
-        businessCategory: s.business_category,    // <-- 여기!
+        businessCategory: s.business_category,
         deliveryOption: s.delivery_option,
         businessHours: s.business_hours,
         serviceDetails: s.service_details,
@@ -79,15 +93,16 @@ export async function getStoreDetail(req, res) {
         address: s.address,
         images: [s.image1, s.image2, s.image3].filter(Boolean),
         events: eventsArr,
-        additionalInfo: additionalInfo,
+        additionalInfo: additionalArr,
       },
-      menu: menuQ.rows,
+      menu: menuQ.rows,    // 이제 정의된 menuQ 사용
     });
   } catch (err) {
     console.error("❌ getStoreDetail", err);
     res.status(500).json({ message: "DB error" });
   }
 }
+
 
 /* POST /store  (등록) */
 export async function createStore(req, res) {
