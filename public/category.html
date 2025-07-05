@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>광고 홈페이지 - 식사</title>
+  <title>광고 홈페이지 - 식 사</title>
 
   <!-- Tailwind v2 CDN -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
@@ -30,7 +30,7 @@
     <!-- ▣ 타이틀 + 북마크 -->
     <section>
       <div class="p-6 mb-6 text-center">
-        <h1 class="text-4xl sm:text-5xl font-bold mb-2 text-gray-900">식사</h1>
+        <h1 class="text-4xl sm:text-5xl font-bold mb-2 text-gray-900">식 사</h1>
         <p class="text-lg sm:text-xl text-gray-600">우리동네 식당 정보를 소개합니다</p>
       </div>
 
@@ -255,16 +255,43 @@
       pag.append(btn('다음', current === total, () => { current++; renderPage(current); renderPagination(); }));
     }
 
-    /* 6. 카드 클릭 → 디테일 페이지로 이동 */
+    /* ✅ 6. 카드 클릭 → 디테일 페이지로 이동 */
     function openDetailPage(card) {
-      // 카드에 담아둔 id 사용
       const id = card.dataset.id;
       if (!id) return console.warn('id 누락');
-      // 원하는 경로에 맞게 수정 가능
       location.href = `/detail.html?id=${encodeURIComponent(id)}`;
     }
 
-    /* 7. 초기화 */
+    /* ✅ 7. 북마크 렌더 함수 */
+    function renderBookmarks() {
+      const container = document.getElementById('bookmarkContainer');
+      container.innerHTML = '';
+
+      const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+
+      if (bookmarks.length === 0) {
+        container.innerHTML = '<p class="text-gray-400">북마크가 없습니다</p>';
+        return;
+      }
+
+      bookmarks.forEach(b => {
+        const badge = document.createElement('div');
+        badge.className = `
+      flex items-center justify-center w-20 h-20 rounded-full
+      bg-blue-100 text-gray-800 text-sm font-semibold cursor-pointer
+      hover:scale-105 transition
+      `.trim();
+        badge.textContent = b.name.length > 4 ? b.name.slice(0, 4) + '…' : b.name;
+
+        badge.onclick = () => {
+          location.href = `/detail.html?id=${encodeURIComponent(b.id)}`;
+        };
+
+        container.appendChild(badge);
+      });
+    }
+
+    /* ✅ 8. 초기화 */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         adsData = await fetchMealStores();
@@ -276,12 +303,19 @@
           '<p class="w-full text-center text-red-600">데이터를 불러오지 못했습니다.</p>';
       }
 
-      // ← 여기만 함수 이름 교체!
       document.getElementById('emergencyAdsContainer')
         .addEventListener('click', e => {
           const card = e.target.closest('.ad-card');
           if (card) openDetailPage(card);
         });
+
+      renderBookmarks();
+    });
+
+    /* ✅ 북마크 변경 실시간 반영 */
+    window.addEventListener('bookmarkChanged', renderBookmarks);
+    window.addEventListener('storage', e => {
+      if (e.key === 'bookmarks') renderBookmarks();
     });
   </script>
 </body>
