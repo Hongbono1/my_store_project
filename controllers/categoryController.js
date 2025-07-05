@@ -1,10 +1,9 @@
 // controllers/categoryController.js
 import { pool } from "../db/pool.js";
 
-/** 1) 카테고리 목록 (간단 Mock) */
 export async function getCategories(req, res) {
   try {
-    // 필요하면 DB에서 SELECT DISTINCT business_category …
+    // 예시: DB에서 SELECT 또는 상수
     res.json(["식사", "분식", "카페"]);
   } catch (err) {
     console.error(err);
@@ -12,24 +11,42 @@ export async function getCategories(req, res) {
   }
 }
 
-/** 2) 특정 카테고리 이름으로 가게 목록 반환 */
 export async function getStoresByCategory(req, res) {
-  const { categoryName } = req.params;                // ex: '식사'
+  const { id } = req.params;
 
   try {
-    const query = `
-      SELECT
-        id,
-        business_name      AS "businessName",
-        business_category  AS "businessCategory",
-        phone_number       AS "phone",
-         image1            AS "thumbnailUrl",
-        address
-      FROM store_info
-      WHERE business_category = $1
-    `;
-    const { rows } = await pool.query(query, [categoryName]);
+    let query = "";
+    let values = [];
+
+    if (isNaN(id)) {
+      // ✅ 숫자가 아니면 카테고리 이름으로
+      query = `
+        SELECT
+          id,
+          business_name AS "businessName",
+          phone_number AS "phone",
+          image1
+        FROM store_info
+        WHERE business_category = $1
+      `;
+      values = [id];
+    } else {
+      // ✅ 숫자면 id로 단일 가게
+      query = `
+        SELECT
+          id,
+          business_name AS "businessName",
+          phone_number AS "phone",
+          image1
+        FROM store_info
+        WHERE id = $1
+      `;
+      values = [Number(id)];
+    }
+
+    const { rows } = await pool.query(query, values);
     res.json(rows);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "서버 오류" });
