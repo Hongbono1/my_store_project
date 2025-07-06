@@ -15,12 +15,9 @@ export async function getStoresByCategory(req, res) {
   const { id } = req.params;
 
   try {
-    let query = "";
-    let values = [];
-
     if (isNaN(id)) {
-      // ✅ 숫자가 아니면 카테고리 이름으로
-      query = `
+      // 카테고리 이름 (문자)
+      const { rows } = await pool.query(`
         SELECT
           id,
           business_name AS "businessName",
@@ -28,26 +25,30 @@ export async function getStoresByCategory(req, res) {
           image1
         FROM store_info
         WHERE business_category = $1
-      `;
-      values = [id];
+      `, [id]);
+
+      res.json(rows);
+
     } else {
-      // ✅ 숫자면 id로 단일 가게
-      const storeQ = await pool.query(`
+      // 숫자: 단일 가게 상세
+      const { rows } = await pool.query(`
         SELECT
           id,
-          business_name       AS "businessName",
-          phone_number        AS "phone",
-          image1              AS "image1",
-          image2              AS "image2",
-          image3              AS "image3"
+          business_name AS "businessName",
+          phone_number AS "phone",
+          image1,
+          image2,
+          image3
         FROM store_info
-         WHERE id = $1
-        `, [id]);
-      values = [Number(id)];
-    }
+        WHERE id = $1
+      `, [Number(id)]);
 
-    const { rows } = await pool.query(query, values);
-    res.json(rows);
+      if (rows.length === 0) {
+        res.status(404).json({ error: "가게를 찾을 수 없음" });
+      } else {
+        res.json(rows[0]);  // 단일 가게니까 rows[0]!
+      }
+    }
 
   } catch (err) {
     console.error(err);
