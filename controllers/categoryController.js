@@ -32,15 +32,17 @@ export async function getStoresByCategory(req, res) {
       values = [id];
     } else {
       // ✅ 숫자면 id로 단일 가게
-      query = `
+      const storeQ = await pool.query(`
         SELECT
           id,
-          business_name AS "businessName",
-          phone_number AS "phone",
-          image1
+          business_name       AS "businessName",
+          phone_number        AS "phone",
+          image1              AS "image1",
+          image2              AS "image2",
+          image3              AS "image3"
         FROM store_info
-        WHERE id = $1
-      `;
+         WHERE id = $1
+        `, [id]);
       values = [Number(id)];
     }
 
