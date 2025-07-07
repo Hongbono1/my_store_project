@@ -166,37 +166,64 @@
 
     /* 3. 카드 생성 */
     function createAdCard(ad) {
-      /* 래퍼 */
+      // 카드 래퍼
       const wrap = document.createElement('div');
       wrap.className = 'ad-card group w-full flex flex-col gap-3 cursor-pointer';
 
-      wrap.dataset.title = ad.businessName;
-      wrap.dataset.phone = ad.phone;
-      wrap.dataset.img = ad.thumbnailUrl;
-      wrap.dataset.address = ad.address;
-      wrap.dataset.category = ad.businessCategory;
       wrap.dataset.id = ad.id;
 
-      /* 이미지 */
+      // 이미지 박스
       const imgBox = document.createElement('div');
       imgBox.className = `
-        relative rounded-xl overflow-hidden w-full h-60
-        transform transition duration-300
-        group-hover:scale-105 group-hover:-translate-y-2 group-hover:shadow-lg
-      `.trim();
+    relative rounded-xl overflow-hidden w-full h-60
+    transform transition duration-300
+    group-hover:scale-105 group-hover:-translate-y-2 group-hover:shadow-lg
+  `.trim();
       const img = document.createElement('img');
       img.src = ad.thumbnailUrl;
       img.alt = ad.businessName;
       img.className = 'w-full h-full object-cover transition duration-300';
       imgBox.appendChild(img);
 
-      /* 텍스트 */
-      // [수정 후] ☑️ 전화번호 제거 버전
+      // ✅ 북마크 버튼 추가
+      const bookmarkBtn = document.createElement('button');
+      bookmarkBtn.textContent = '★';
+      bookmarkBtn.className = `
+    absolute top-2 right-2 bg-white text-blue-500 border border-blue-500
+    rounded-full px-2 py-1 font-bold
+    hover:bg-blue-500 hover:text-white transition
+  `.trim();
+
+      // ✅ 저장 로직
+      bookmarkBtn.onclick = (e) => {
+        e.stopPropagation(); // 카드 클릭과 충돌 방지
+
+        const bookmark = {
+          id: ad.id,                    // ★ 반드시 id 포함
+          name: ad.businessName
+        };
+
+        let list = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+        const exists = list.find(x => x.id === bookmark.id);
+        if (!exists) {
+          list.push(bookmark);
+          localStorage.setItem('bookmarks', JSON.stringify(list));
+          window.dispatchEvent(new Event('bookmarkChanged'));
+          alert(`${bookmark.name}이(가) 북마크에 추가됨!`);
+        } else {
+          alert(`${bookmark.name}은(는) 이미 북마크에 있음`);
+        }
+      };
+
+      imgBox.style.position = 'relative'; // 포지션 지정
+      imgBox.appendChild(bookmarkBtn);    // 버튼 삽입
+
+      // 텍스트 박스
       const txt = document.createElement('div');
       txt.className = `
-        flex flex-col items-center gap-1 mt-2 text-center
-        transition group-hover:-translate-y-2
-      `.trim();
+    flex flex-col items-center gap-1 mt-2 text-center
+    transition group-hover:-translate-y-2
+  `.trim();
 
       const cat = document.createElement('p');
       cat.className = 'text-sm font-semibold text-blue-600';
@@ -204,14 +231,14 @@
 
       const name = document.createElement('p');
       name.className = `
-        text-xl font-bold text-gray-900
-        group-hover:text-blue-600 transition
-      `.trim();
+    text-xl font-bold text-gray-900
+    group-hover:text-blue-600 transition
+  `.trim();
       name.textContent = ad.businessName;
 
-      txt.append(cat, name); // ✅ phone 제거!
-      wrap.append(imgBox, txt);
+      txt.append(cat, name);
 
+      wrap.append(imgBox, txt);
       return wrap;
     }
 
