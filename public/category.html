@@ -140,12 +140,12 @@
       const res = await fetch(
         `${API_BASE_URL}/store?category=${encodeURIComponent(category)}`
       );
-        console.log('✅ res.ok:', res.ok);
+      console.log('✅ res.ok:', res.ok);
       if (!res.ok) throw new Error('카테고리 데이터를 불러오지 못했습니다');
       const data = await res.json();
 
       return data.map(store => {
-         console.log('✅ store.id:', store.id, 'store:', store);
+        console.log('✅ store.id:', store.id, 'store:', store);
 
         const rawPath = store.thumb || '';
         const fileName = rawPath.startsWith('/uploads/')
@@ -155,7 +155,7 @@
           ? `/uploads/${fileName}`
           : '/no-image.png';
 
-          console.log('store.id:', store.id, 'store:', store);
+        console.log('store.id:', store.id, 'store:', store);
 
         return {
           id: store.id,
@@ -296,41 +296,41 @@
     }
 
     /* ✅ 7. 북마크 렌더 함수 */
-    /* ✅ 7. 북마크 렌더 함수 */
     function renderBookmarks() {
       const container = document.getElementById('bookmarkContainer');
       container.innerHTML = '';
 
-      const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
-      if (!bookmarks.length) {
+      // 1) raw 데이터 읽어서
+      let raw = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+
+      // 2) 숫자만 저장된 예전 형식이면 → {id, name} 객체로 변환
+      if (raw.length && typeof raw[0] !== 'object') {
+        raw = raw.map(id => ({ id, name: `가게 #${id}` }));
+        localStorage.setItem('bookmarks', JSON.stringify(raw));
+      }
+
+      // 3) 이제 실제 렌더
+      if (!raw.length) {
         container.innerHTML = '<p class="text-gray-400">북마크가 없습니다</p>';
         return;
       }
 
-      bookmarks.forEach(b => {
-        // 1) 래퍼
+      raw.forEach(b => {
         const wrap = document.createElement('div');
         wrap.className = 'relative inline-flex items-center';
 
-        // 2) 뱃지
         const badge = document.createElement('div');
         badge.className = [
           'flex', 'items-center', 'justify-center',
-          'px-6', 'py-2',
-          'rounded-full',
-          'border', 'border-blue-500',
-          'bg-white', 'text-blue-600',
-          'text-xl', 'font-bold',
-          'cursor-pointer',
-          'hover:scale-105', 'transition'
+          'px-6', 'py-2', 'rounded-full', 'border', 'border-blue-500',
+          'bg-white', 'text-blue-600', 'text-xl', 'font-bold',
+          'cursor-pointer', 'hover:scale-105', 'transition'
         ].join(' ');
-        badge.textContent = b.name.length > 4
-          ? b.name.slice(0, 4) + '…'
-          : b.name;
+        badge.textContent = b.name;
         badge.onclick = () => {
+          // b.id가 확실히 있으니 undefined 안 뜸
           location.href = `/detail.html?id=${encodeURIComponent(b.id)}`;
         };
-        wrap.appendChild(badge);
 
         // 3) 삭제 버튼
         const delBtn = document.createElement('button');
@@ -351,15 +351,14 @@
           renderBookmarks();
           window.dispatchEvent(new Event('bookmarkChanged'));
         };
-        wrap.appendChild(delBtn);
-
+        wrap.append(badge, delBtn);
         container.appendChild(wrap);
       });
     }
 
     /* ✅ 8. 초기화 */
     document.addEventListener('DOMContentLoaded', async () => {
-      console.log('✅ DOMContentLoaded 시작'); 
+      console.log('✅ DOMContentLoaded 시작');
       try {
         adsData = await fetchMealStores();
         renderPage(current);
