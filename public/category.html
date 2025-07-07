@@ -129,22 +129,21 @@
     let adsData = [];
 
     /* 쿼리스트링에서 category 추출 */
-    const category = new URLSearchParams(location.search).get('id') || '';
+    const category = new URLSearchParams(location.search).get('category') || '';
+
     document.getElementById('categoryTitle').textContent =
       category ? `${category} 카테고리` : '전체 카테고리';
 
-    /* 2. 서버에서 데이터 수신 */
     const API_BASE_URL = 'https://www.hongbono1.com';
 
     async function fetchMealStores() {
       const res = await fetch(
-        `${API_BASE_URL}/category/${encodeURIComponent(category)}/stores`
+        `${API_BASE_URL}/store?category=${encodeURIComponent(category)}`
       );
       if (!res.ok) throw new Error('카테고리 데이터를 불러오지 못했습니다');
       const data = await res.json();
 
       return data.map(store => {
-        // 썸네일 계산 로직은 그대로…
         const rawPath = store.thumb || '';
         const fileName = rawPath.startsWith('/uploads/')
           ? rawPath.slice('/uploads/'.length)
@@ -152,17 +151,18 @@
         const thumbnail = fileName
           ? `/uploads/${fileName}`
           : '/no-image.png';
-        // ↙ map 콜백의 중괄호 { 에 대응하는 } 여기
+
         return {
-          id: store.id,   // ←★ 반드시 포함
+          id: store.id,
           businessName: store.businessName,
           businessCategory: store.businessCategory || store.business_category || '',
           phone: store.phone || '전화번호 없음',
           thumbnailUrl: thumbnail,
           address: store.address || ''
         };
-      }); // ← map 닫기
-    }   // ← fetchMealStores 함수 닫기
+      });
+    } // ✅ 함수 닫기
+
 
     /* 3. 카드 생성 */
     function createAdCard(ad) {
@@ -178,7 +178,7 @@
       wrap.dataset.id = ad.id;
 
       /* 이미지 */
-      const imgBox = document.createElement('div'); 
+      const imgBox = document.createElement('div');
       imgBox.className = `
         relative rounded-xl overflow-hidden w-full h-60
         transform transition duration-300
