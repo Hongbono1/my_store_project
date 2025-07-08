@@ -13,7 +13,7 @@ export async function getCategories(req, res) {
 
 // ✅ 카테고리별 가게 목록 (수정 완료!)
 export async function getStoresByCategory(req, res) {
-  const { category = "", subcategory = "" } = req.query;
+  const { category = "" } = req.query;
 
   try {
     const { rows } = await pool.query(
@@ -28,9 +28,8 @@ export async function getStoresByCategory(req, res) {
           power_ad AS "powerAd"
         FROM store_info
         WHERE ($1 = '' OR business_type = $1)
-          AND ($2 = '' OR business_subcategory = $2)
       `,
-      [category, subcategory]
+      [category]
     );
 
     res.json(rows);
@@ -39,3 +38,4 @@ export async function getStoresByCategory(req, res) {
     res.status(500).json({ error: "서버 오류" });
   }
 }
+
