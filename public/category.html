@@ -261,14 +261,22 @@
   <!-- 푸터 (JSP 인클루드로 불러옴) -->
   <jsp:include page="components/footer.html" />
 
-  <!-- 모달 관련 기존 코드 삭제 및 새로운 모달 HTML/JS 동적 로드 -->
-  <script>
-    
 
-  <!-- 광고 및 모달 렌더링 관련 스크립트 -->
-    /* ───────────────────────────────
-        1) 서버에서 요약 데이터 가져오기
-       ─────────────────────────────── */
+  <!-- 광고 렌더링 관련 스크립트 -->
+  <script>
+    // 0) containerMap은 반드시 최상단에 선언
+    const containerMap = {
+      밥: "밥Section",
+      "찌개/탕/국": "찌개/탕/국Section",
+      "고기/구이": "고기/구이Section",
+      생선: "생선Section",
+      "족발/보쌈": "족발/보쌈Section",
+      국밥: "국밥Section",
+      반찬: "반찬Section",
+      여러가지: "여러가지etcSection"
+    };
+
+    // 1) 서버에서 요약 데이터 가져오기
     async function fetchStores() {
       const params = new URLSearchParams(window.location.search);
       const category = params.get("category") || "";
@@ -277,112 +285,77 @@
       return await res.json();
     }
 
-    /* ───────────────────────────────
-        2) 카드 생성 함수
-       ─────────────────────────────── */
+    // 2) 카드 내부 HTML 생성
     function makeCardHTML(ad, isPower) {
-      // 카드 공통 dataset (모달용)
       return `
-        ${isPower ? '<div class="absolute top-2 right-2 …">파워광고</div>' : ''}
-        <img src="${ad.thumbnailUrl}" alt="${ad.businessName}" … />
-        <h2 class="text-2xl font-bold …">${ad.businessName}</h2>
-        <h3 class="text-xl font-semibold …">${ad.category}</h3>
-        <p class="text-lg text-gray-500 …">${ad.phone}</p>
-        <!-- 여기 ↓ 상세페이지로 이동하도록 수정 -->
-        <a href="/detail.html?id=${ad.id}
-                   &category=${encodeURIComponent(ad.category)}
-                   &subcategory=${encodeURIComponent(ad.businessSubcategory)}"
-           class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 block">
-           상세보기
-         </a>
-        `;
+        ${isPower ? '<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-xs rounded">파워광고</div>' : ''}
+        <img src="${ad.thumbnailUrl}" alt="${ad.businessName}" class="h-40 w-full object-cover rounded mb-4" />
+        <h2 class="text-2xl font-bold text-center mb-2">${ad.businessName}</h2>
+        <h3 class="text-xl font-semibold text-center text-gray-700">${ad.category}</h3>
+        <p class="text-lg text-gray-500 text-center">${ad.phone || "전화번호 없음"}</p>
+        <a href="/detail.html?id=${ad.id}"
+          class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 block">
+          상세보기
+        </a>
+    `;
     }
 
+    // 3) 파워 광고 카드 생성
     function createPowerAdCard(ad) {
-      const box = document.createElement('div');
+      const box = document.createElement("div");
       box.className =
-        'ad-card relative bg-yellow-50 border-4 border-yellow-400 shadow-lg rounded-lg p-6 flex flex-col transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl';
-      box.dataset.title = ad.businessName;
-      box.dataset.phone = ad.phone || '';
-      box.dataset.img = ad.thumbnailUrl;
-      box.dataset.events = ad.events || '';
-      box.dataset.facilities = ad.facilities || '';
-      box.dataset.parking = ad.parking || '';
-      box.dataset.category = ad.category;
+        "ad-card relative bg-yellow-50 border-4 border-yellow-400 shadow-lg rounded-lg p-6 flex flex-col transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
       box.innerHTML = makeCardHTML(ad, true);
       return box;
     }
 
+    // 4) 일반 광고 카드 생성
     function createAdCard(ad) {
-      const box = document.createElement('div');
+      const box = document.createElement("div");
       box.className =
-        'ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl';
-      box.dataset.title = ad.businessName;
-      box.dataset.phone = ad.phone || '';
-      box.dataset.img = ad.thumbnailUrl;
-      box.dataset.events = ad.events || '';
-      box.dataset.facilities = ad.facilities || '';
-      box.dataset.parking = ad.parking || '';
-      box.dataset.category = ad.category;
+        "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
       box.innerHTML = makeCardHTML(ad, false);
       return box;
     }
 
-    /* ───────────────────────────────
-        3) 섹션 렌더링 + 모달 버튼 핸들러
-       ─────────────────────────────── */
+    // 5) 섹션에 카드 붙이기
     function renderSection(items, makeCard, containerId, limit) {
       const container = document.getElementById(containerId);
-      container.innerHTML = '';
+      container.innerHTML = "";
       items.slice(0, limit).forEach(ad => container.appendChild(makeCard(ad)));
     }
 
-    /* ───────────────────────────────
-        4) 초기화
-       ─────────────────────────────── */
-    document.addEventListener('DOMContentLoaded', async () => {
+    // 6) 초기화
+    document.addEventListener("DOMContentLoaded", async () => {
       try {
         const stores = await fetchStores();
 
-        /* 4-1. 파워 광고(4개) */
+        // 6-1. 파워 광고 (DB에서 powerAd:true인 것만)
         const powerAds = stores.filter(ad => ad.powerAd);
-        renderSection(powerAds, createPowerAdCard, 'powerAdsContainer', 4);
+        renderSection(powerAds, createPowerAdCard, "powerAdsContainer", 4);
 
-        /* 4-2. 카테고리별 CSR 광고(각 8개) */
-
+        // 6-2. 카테고리별 광고 (업종=한식 + 소분류 카테고리)
         Object.entries(containerMap).forEach(([cat, id]) => {
           const items = stores.filter(ad =>
-            ad.businessType === '한식' &&      // 업종 조건
-            ad.category === cat                // 카테고리(소분류) 조건
+            ad.businessType === "한식" &&
+            ad.category === cat
           );
           renderSection(items, createAdCard, id, 8);
         });
-
       } catch (err) {
-        console.error(err);
+        console.error("광고 데이터 로드 실패:", err);
       }
 
-      /* ========== (기존 코드 그대로 유지) ========== */
-      const containerMap = {
-        밥: "밥Section",
-        "찌개/탕/국": "찌개/탕/국Section",
-        "고기/구이": "고기/구이Section",
-        생선: "생선Section",
-        "족발/보쌈": "족발/보쌈Section",
-        국밥: "국밥Section",
-        반찬: "반찬Section",
-        여러가지: "여러가지etcSection"
-      };
-
+      // 7) 카테고리 버튼 스크롤
       document.querySelectorAll(".category-btn").forEach(button => {
         button.addEventListener("click", () => {
-          const cat = button.dataset.category;
-          const secId = containerMap[cat];
+          const secId = containerMap[button.dataset.category];
           const sec = document.getElementById(secId);
           if (sec) sec.scrollIntoView({ behavior: "smooth" });
         });
       });
 
+      // 8) 홈 버튼 스크롤
       document.querySelectorAll(".home-link").forEach(link => {
         link.addEventListener("click", e => {
           e.preventDefault();
@@ -391,6 +364,7 @@
       });
     });
   </script>
+
 
 </body>
 
