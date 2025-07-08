@@ -18,17 +18,15 @@ export async function getStoresByCategory(req, res) {
   try {
     const { rows } = await pool.query(
       `
-       SELECT
-        id,
-        business_name    AS "businessName",
-        business_type    AS "businessType",     -- 대분류
-        business_subcategory AS "subcategory",  -- 소분류
-        phone_number     AS "phone",
-        image1           AS "thumbnailUrl",     -- 프론트에서 기대하는 이름
-        power_ad         AS "powerAd"           -- 파워광고 여부
-      FROM store_info
-      WHERE ($1 = '' OR business_type = $1)      -- 필요하다면 대분류 필터
-        AND ($2 = '' OR business_subcategory = $2) -- 소분류 필터(프론트에서 subcategory 파라미터 넘길 때)
+        SELECT
+          id,
+          business_name AS "businessName",
+          business_type AS "businessType",
+          business_subcategory AS "category",
+          phone_number AS "phone",
+          image1 AS "thumbnailUrl",
+          power_ad AS "powerAd"
+        FROM store_info
       `,
       [category]
     );
