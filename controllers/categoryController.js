@@ -1,5 +1,16 @@
-// controllers/categoryController.js
+import { pool } from "../db/pool.js";
 
+// 카테고리 리스트
+export async function getCategories(req, res) {
+  try {
+    res.json(["식사", "분식", "카페"]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "서버 오류" });
+  }
+}
+
+// 카테고리별 가게 목록
 export async function getStoresByCategory(req, res) {
   const category = req.params.category || req.query.category || "";
   console.log("🛠️ getStoresByCategory called with category:", category);
@@ -19,7 +30,7 @@ export async function getStoresByCategory(req, res) {
     return res.json(rows);
 
   } catch (err) {
-    // 에러 메시지를 바로 응답에 포함하도록 변경
+    // 에러 메시지와 스택 일부를 응답에 포함
     console.error("🔴 getStoresByCategory error:", err);
     return res
       .status(500)
