@@ -30,10 +30,13 @@ export async function getStoresByCategory(req, res) {
     return res.json(rows);
 
   } catch (err) {
-    // 에러 메시지와 스택 일부를 응답에 포함
+    // 에러 메시지와 스택 일부를 응답에 포함합니다
     console.error("🔴 getStoresByCategory error:", err);
     return res
       .status(500)
-      .json({ error: err.message, stack: err.stack.split("\n").slice(0,3) });
+      .json({
+        error: err.message,
+        stack: err.stack.split("\n").slice(0,3)
+      });
   }
 }
