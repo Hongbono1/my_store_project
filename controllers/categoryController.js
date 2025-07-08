@@ -1,3 +1,4 @@
+// controllers/categoryController.js
 import { pool } from "../db/pool.js";
 
 // 카테고리 리스트
@@ -12,6 +13,7 @@ export async function getCategories(req, res) {
 
 // 카테고리별 가게 목록
 export async function getStoresByCategory(req, res) {
+  // 라우트 파라미터 또는 쿼리 스트링에서 category를 가져옵니다.
   const category = req.params.category || req.query.category || "";
   console.log("🛠️ getStoresByCategory called with category:", category);
 
@@ -19,9 +21,12 @@ export async function getStoresByCategory(req, res) {
     const sql = `
       SELECT
         id,
-        business_name  AS "businessName",
-        phone_number   AS "phone",
-        image1         AS "thumbnailUrl"
+        business_name        AS "businessName",    -- 가게 이름
+        business_category    AS "businessType",    -- 대분류 (예: 한식)
+        business_subcategory AS "category",        -- 소분류 (예: 밥, 찌개/탕)
+        phone_number         AS "phone",           -- 전화번호
+        image1               AS "thumbnailUrl",    -- 썸네일 이미지 URL
+        power_ad             AS "powerAd"          -- 파워광고 여부 (boolean)
       FROM store_info
       WHERE ($1 = '' OR business_category = $1)
     `;
@@ -30,14 +35,12 @@ export async function getStoresByCategory(req, res) {
     return res.json(rows);
 
   } catch (err) {
-    // 에러 메시지와 스택 일부를 응답에 포함합니다
-
     console.error("🔴 getStoresByCategory error:", err);
     return res
       .status(500)
       .json({
         error: err.message,
-        stack: err.stack.split("\n").slice(0,3)
+        stack: err.stack.split("\n").slice(0, 3)
       });
   }
 }
