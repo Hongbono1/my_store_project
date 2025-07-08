@@ -302,9 +302,11 @@
         1) 서버에서 요약 데이터 가져오기
        ─────────────────────────────── */
     async function fetchStores() {
-      const res = await fetch('/stores');   // ✦ 목록 전용 API
-      if (!res.ok) throw new Error('데이터 조회 실패');
-      return await res.json();              // [{ id, businessName, thumbnailUrl, category, phone, powerAd, events, facilities, parking }, …]
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id") || "";
+      const res = await fetch(`/category/${id}/stores`);  // ✅ id 연결!
+      if (!res.ok) throw new Error("데이터 조회 실패");
+      return await res.json();
     }
 
     /* ───────────────────────────────
@@ -407,7 +409,7 @@
         renderSection(powerAds, createPowerAdCard, 'powerAdsContainer', 4);
 
         /* 4-2. 카테고리별 CSR 광고(각 8개) */
-        
+
         Object.entries(containerMap).forEach(([cat, id]) => {
           const items = stores.filter(ad => ad.category === cat);
           renderSection(items, createAdCard, id, 8);
@@ -420,7 +422,7 @@
       }
 
       /* ========== (기존 코드 그대로 유지) ========== */
-      const categorySectionMap = {
+      const containerMap = {
         밥: "밥Section",
         "찌개/탕/국": "찌개/탕/국Section",
         "고기/구이": "고기/구이Section",
@@ -434,7 +436,7 @@
       document.querySelectorAll(".category-btn").forEach(button => {
         button.addEventListener("click", () => {
           const cat = button.dataset.category;
-          const secId = categorySectionMap[cat];
+          const secId = containerMap[cat];
           const sec = document.getElementById(secId);
           if (sec) sec.scrollIntoView({ behavior: "smooth" });
         });
