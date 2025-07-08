@@ -31,6 +31,7 @@ export async function getStoresByCategory(req, res) {
 
   } catch (err) {
     // 에러 메시지와 스택 일부를 응답에 포함합니다
+
     console.error("🔴 getStoresByCategory error:", err);
     return res
       .status(500)
