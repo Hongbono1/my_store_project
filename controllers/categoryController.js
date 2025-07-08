@@ -11,9 +11,10 @@ export async function getCategories(req, res) {
   }
 }
 
-// ✅ 카테고리별 가게 목록
+// 카테고리별 가게 목록
 export async function getStoresByCategory(req, res) {
-  const { category = "" } = req.query;
+  // 라우트 파라미터를 우선으로, 없으면 쿼리 스트링 사용
+  const category = req.params.category || req.query.category || "";
   console.log("🛠️ getStoresByCategory called with category:", category);
 
   try {
@@ -21,12 +22,12 @@ export async function getStoresByCategory(req, res) {
       `
       SELECT
         id,
-        business_name       AS "businessName",
-        business_category   AS "businessType",    -- 대분류
-        business_subcategory AS "category",       -- 소분류
-        phone_number        AS "phone",
-        image1              AS "thumbnailUrl",
-        power_ad            AS "powerAd"
+        business_name        AS "businessName",
+        business_category    AS "businessType",
+        business_subcategory AS "category",
+        phone_number         AS "phone",
+        image1               AS "thumbnailUrl",
+        power_ad             AS "powerAd"
       FROM store_info
       WHERE ($1 = '' OR business_category = $1)
       `,
