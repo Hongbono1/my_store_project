@@ -19,15 +19,14 @@ export async function getStoresByCategory(req, res) {
     const { rows } = await pool.query(
       `
         SELECT
-          id,
-          business_name AS "businessName",
-          business_type AS "businessType",
-          business_subcategory AS "category",
-          phone_number AS "phone",
-          image1 AS "thumbnailUrl",
-          power_ad AS "powerAd"
-        FROM store_info
-        WHERE ($1 = '' OR business_type = $1)
+  id,
+  business_name AS "businessName",
+  business_type AS "businessType",         -- ✅ 필수
+  business_subcategory AS "category",      -- ✅ category = 소분류
+  phone_number AS "phone",
+  image1 AS "thumbnailUrl",                -- ✅ JS가 기대하는 이름
+  power_ad AS "powerAd"                    -- ✅ true/false
+FROM store_info
       `,
       [category]
     );
