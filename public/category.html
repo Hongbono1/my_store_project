@@ -303,8 +303,8 @@
        ─────────────────────────────── */
     async function fetchStores() {
       const params = new URLSearchParams(window.location.search);
-      const id = params.get("id") || "";
-      const res = await fetch(`/category/${id}/stores`);  // ✅ id 연결!
+      const category = params.get("category") || "";
+      const res = await fetch(`/store?category=${encodeURIComponent(category)}`);
       if (!res.ok) throw new Error("데이터 조회 실패");
       return await res.json();
     }
@@ -315,13 +315,19 @@
     function makeCardHTML(ad, isPower) {
       // 카드 공통 dataset (모달용)
       return `
-      ${isPower ? '<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-xs rounded">파워광고</div>' : ''}
-      <img src="${ad.thumbnailUrl}" alt="${ad.businessName}" class="h-40 w-full object-cover rounded mb-4" />
-      <h2 class="text-2xl font-bold text-center mb-2">${ad.businessName}</h2>
-      <h3 class="text-xl font-semibold text-center text-gray-700">${ad.category}</h3>
-      <p class="text-lg text-gray-500 text-center">${ad.phone}</p>
-      <a href="#" class="open-modal mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600">바로가기</a>
-    `;
+        ${isPower ? '<div class="absolute top-2 right-2 …">파워광고</div>' : ''}
+        <img src="${ad.thumbnailUrl}" alt="${ad.businessName}" … />
+        <h2 class="text-2xl font-bold …">${ad.businessName}</h2>
+        <h3 class="text-xl font-semibold …">${ad.category}</h3>
+        <p class="text-lg text-gray-500 …">${ad.phone}</p>
+        <!-- 여기 ↓ 상세페이지로 이동하도록 수정 -->
+        <a href="/detail.html?id=${ad.id}
+                   &category=${encodeURIComponent(ad.category)}
+                   &subcategory=${encodeURIComponent(ad.businessSubcategory)}"
+           class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 block">
+           상세보기
+         </a>
+        `;
     }
 
     function createPowerAdCard(ad) {
@@ -411,7 +417,10 @@
         /* 4-2. 카테고리별 CSR 광고(각 8개) */
 
         Object.entries(containerMap).forEach(([cat, id]) => {
-          const items = stores.filter(ad => ad.category === cat);
+          const items = stores.filter(ad =>
+            ad.businessType === '한식' &&      // 업종 조건
+            ad.category === cat                // 카테고리(소분류) 조건
+          );
           renderSection(items, createAdCard, id, 8);
         });
 
