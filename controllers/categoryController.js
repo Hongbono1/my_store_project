@@ -15,6 +15,8 @@ export async function getCategories(req, res) {
 export async function getStoresByCategory(req, res) {
   const { category = "" } = req.query;
 
+  console.log("🛠️ getStoresByCategory called with category:", category);
+
   try {
     const { rows } = await pool.query(
       `
