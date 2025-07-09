@@ -23,7 +23,7 @@ export async function getStoresByCategory(req, res) {
         id,
         business_name        AS "businessName",    -- 가게 이름
         business_category    AS "businessType",    -- 대분류 (예: 한식)
-        business_subcategory AS "category",        -- 소분류 (예: 밥, 찌개/탕)
+        subcategory          AS "category", 
         phone_number         AS "phone",           -- 전화번호
         image1               AS "thumbnailUrl",    -- 썸네일 이미지 URL
         power_ad             AS "powerAd"          -- 파워광고 여부 (boolean)
