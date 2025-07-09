@@ -3,6 +3,6 @@ import express from "express";
 import { getStoreById } from "../controllers/storeController.js";
 
 const router = express.Router();
-router.get("/:id", getStoreById);   // GET /store/14
+router.get("/store/:id", getStoreById);  
 export default router;
 
