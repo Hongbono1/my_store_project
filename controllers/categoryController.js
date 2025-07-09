@@ -19,15 +19,15 @@ export async function getStoresByCategory(req, res) {
 
   try {
     const sql = `
-      SELECT
-        id,
-        business_name        AS "businessName",
-        phone_number         AS "phone",
-        image1               AS "thumbnailUrl",  -- ✅ alias 추가
-        business_category    AS "category",
-        business_subcategory AS "subcategory"
-      FROM store_info
-      WHERE business_category = $1
+     SELECT
+       id,
+       business_name        AS "businessName",
+       phone_number         AS "phone",
+       image1               AS "thumbnailUrl",
+       business_subcategory AS "category", -- ★ 여기!
+       business_category    AS "mainCategory"    -- (원하면 보존용)
+     FROM store_info
+     WHERE business_category = $1
     `;
     const { rows } = await pool.query(sql, [category]);
     console.log("🛠️ getStoresByCategory result:", rows.length, "rows");
