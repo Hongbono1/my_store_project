@@ -1,13 +1,12 @@
 // controllers/storeController.js
 import { pool } from "../db/pool.js";
 
-// 단일 가게 조회 + 메뉴까지 같이 내려주기
+// 단일 가게 상세 조회
 export async function getStoreById(req, res) {
   const { id } = req.params;
 
   try {
-    // 가게 정보
-    const storeSql = `
+    const sql = `
       SELECT
         id,
         business_name        AS "businessName",
@@ -22,37 +21,39 @@ export async function getStoreById(req, res) {
         event2,
         facility,
         pets,
-        parking
+        parking,
+        service_details      AS "serviceDetails",
+        homepage,
+        instagram,
+        facebook,
+        description
       FROM store_info
       WHERE id = $1
     `;
-    const { rows } = await pool.query(storeSql, [id]);
-    if (!rows.length) return res.status(404).json({ error: "Store not found" });
+
+    const { rows } = await pool.query(sql, [id]);
+    if (!rows.length) {
+      return res.status(404).json({ error: "Store not found" });
+    }
 
     const store = rows[0];
+
+    // ✅ images 배열로 묶기
     store.images = [store.image1, store.image2, store.image3].filter(Boolean);
     if (!store.images.length) {
       store.images = ["/images/no-image.png"];
     }
+
+    // ✅ 썸네일 fallback
     store.thumbnailUrl = store.image1 || "/images/no-image.png";
 
-    // ✅ 메뉴 정보 추가
-    const menuSql = `
-      SELECT
-        menu_name   AS "menuName",
-        menu_price  AS "menuPrice",
-        category    AS "category",
-        menu_image  AS "menuImageUrl"
-      FROM store_menu
-      WHERE store_id = $1
-    `;
-    const menuResult = await pool.query(menuSql, [id]);
+    // ✅ 이벤트 배열로 묶기
+    store.events = [store.event1, store.event2].filter(Boolean);
 
-    // ✅ store + menu 함께 내려주기
-    return res.json({
-      store,
-      menu: menuResult.rows
-    });
+    // 👉 필요 시 description 출력용으로도 사용 가능
+    store.additionalDescription = store.description || "";
+
+    return res.json({ store });
 
   } catch (err) {
     console.error("🔴 getStoreById error:", err);
