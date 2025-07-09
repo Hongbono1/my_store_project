@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import path from "path";
-//import storeRouter from "./routes/store.js";
+import storeRouter from "./routes/store.js";
 import miscRouter  from "./routes/misc.js";
 import categoryRouter from "./routes/category.js";
 
@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 /* ── 라우터 ─────────────────────────── */
-//app.use("/store", storeRouter);
+app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
 app.use("/",      miscRouter);   // /verify-biz, /kakao-key
 
