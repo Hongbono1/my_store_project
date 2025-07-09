@@ -1,17 +1,10 @@
-// controllers/storeController.js
 import { pool } from "../db/pool.js";
 
-/**
- * 단일 가게 상세 조회 + 메뉴 목록
- * GET /store/:id
- */
 export async function getStoreById(req, res) {
-  const { id } = req.params;           // 예: 14
+  const { id } = req.params;
 
   try {
-    /* ───────────────────────────────────────────────
-     * 1) 가게 기본 정보
-     * ───────────────────────────────────────────── */
+    // 1) 가게 정보
     const storeSql = `
       SELECT
         id,
@@ -41,7 +34,6 @@ export async function getStoreById(req, res) {
 
     const store = rows[0];
 
-    /* 1-a) 전처리: 이미지 · 이벤트 등 배열로 변환 */
     store.images       = [store.image1, store.image2, store.image3].filter(Boolean);
     if (!store.images.length) store.images = ["/images/no-image.png"];
 
@@ -49,15 +41,13 @@ export async function getStoreById(req, res) {
     store.events       = [store.event1, store.event2].filter(Boolean);
     store.additionalDescription = store.description || "";
 
-    /* ───────────────────────────────────────────────
-     * 2) 메뉴 정보
-     * ───────────────────────────────────────────── */
+    // 2) 메뉴 정보 - menu_image 꼭 포함!
     const menuSql = `
       SELECT
         id,
         category,
         menu_name  AS "menuName",
-        menu_price AS "menuPrice"
+        menu_price AS "menuPrice",
         menu_image AS "menu_image"
       FROM store_menu
       WHERE store_id = $1
@@ -65,9 +55,7 @@ export async function getStoreById(req, res) {
     `;
     const { rows: menus } = await pool.query(menuSql, [id]);
 
-    /* ───────────────────────────────────────────────
-     * 3) 응답
-     * ───────────────────────────────────────────── */
+    // 3) 응답
     return res.json({ store, menus });
   } catch (err) {
     console.error("🔴 getStoreById error:", err);
