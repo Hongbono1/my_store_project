@@ -21,14 +21,13 @@ export async function getStoresByCategory(req, res) {
     const sql = `
       SELECT
         id,
-        business_name        AS "businessName",    -- 가게 이름
-        business_category    AS "businessType",    -- 대분류 (예: 한식)
-        subcategory          AS "category", 
-        phone_number         AS "phone",           -- 전화번호
-        image1               AS "thumbnailUrl",    -- 썸네일 이미지 URL
-        power_ad             AS "powerAd"          -- 파워광고 여부 (boolean)
+        business_name AS "businessName",
+        phone_number AS "phone",
+        image1,
+        business_category AS "category",
+        business_subcategory AS "subcategory"
       FROM store_info
-      WHERE ($1 = '' OR business_category = $1)
+      WHERE business_category = $1
     `;
     const { rows } = await pool.query(sql, [category]);
     console.log("🛠️ getStoresByCategory result:", rows.length, "rows");
