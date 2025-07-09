@@ -21,10 +21,10 @@ export async function getStoresByCategory(req, res) {
     const sql = `
       SELECT
         id,
-        business_name AS "businessName",
-        phone_number AS "phone",
-        image1,
-        business_category AS "category",
+        business_name        AS "businessName",
+        phone_number         AS "phone",
+        image1               AS "thumbnailUrl",  -- ✅ alias 추가
+        business_category    AS "category",
         business_subcategory AS "subcategory"
       FROM store_info
       WHERE business_category = $1
