@@ -1,12 +1,15 @@
 import express from "express";
-import { getCategories, getStoresByCategory } from "../controllers/categoryController.js";
+import {
+  getCategories,
+  getStoresByCategory
+} from "../controllers/categoryController.js";
 
 const router = express.Router();
 
-// 1) 전체 카테고리 목록 조회 → GET /category
+// 카테고리 전체
 router.get("/", getCategories);
 
-// 2) 특정 카테고리 내 스토어 조회 → GET /category/:category/stores
+// 특정 카테고리 내 가게 목록
 router.get("/:category/stores", getStoresByCategory);
 
 export default router;
