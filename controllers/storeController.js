@@ -67,40 +67,46 @@ export async function getStoreById(req, res) {
  * ▣ 여러 가게 리스트 조회 (업종, 카테고리)
  * GET /store?category=밥&type=한식
  */
+/**
+ * ▣ 여러 가게 리스트 조회 (카테고리·서브카테고리)
+ *    예) /store?category=한식&subcategory=밥
+ */
 export async function getStores(req, res) {
   const { category, subcategory } = req.query;
 
   let sql = `
     SELECT
       id,
-      business_name AS "businessName",
-      business_category AS "category",
+      business_name        AS "businessName",
+      business_category    AS "category",
       business_subcategory AS "subcategory",
-      phone_number AS "phone",
-      image1 AS "thumb",
+      phone_number         AS "phone",
+      image1               AS "thumb",
       address
     FROM store_info
-    WHERE 1=1
+    WHERE 1 = 1
   `;
-  const params = [];
-  let paramIdx = 1;
+
+  const params   = [];
+  let   paramIdx = 1;          // ✅ 한 변수만 사용!
 
   if (category) {
-    sql += ` AND business_category = $${idx++}`;
+    sql += ` AND business_category = $${paramIdx++}`;
     params.push(category.trim());
   }
 
-  if (subcategory) {                              // ✅ 추가
-    sql += ` AND business_subcategory = $${idx++}`;
+  if (subcategory) {
+    sql += ` AND business_subcategory = $${paramIdx++}`;
     params.push(subcategory.trim());
   }
 
+  sql += " ORDER BY id DESC";
 
   try {
     const { rows } = await pool.query(sql, params);
     res.json(rows);
   } catch (err) {
-    console.error("getStores error:", err);
+    console.error("❌ getStores error:", err);
     res.status(500).json({ error: err.message });
   }
 }
