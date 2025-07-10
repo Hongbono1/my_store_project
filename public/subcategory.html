@@ -1,0 +1,389 @@
+!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>광고 홈페이지 - 밥</title>
+
+  <!-- Tailwind v2 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+
+  <style>
+    /* ol 기본 번호 제거 (JS에서 직접 “1. 내용” 붙임) */
+    #rankingList {
+      list-style: none;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <!-- ───── 헤더 ───── -->
+  <div id="header-placeholder"></div>
+
+  <!-- 모달 자리표시 -->
+  <div id="modal" class="hidden"></div>
+
+  <!-- ───── 메인 ───── -->
+  <main class="w-full max-w-screen-xl mx-auto px-4 sm:px-8 mt-8 mb-8 flex flex-col gap-8">
+
+    <!-- ▣ 타이틀 -->
+    <div class="p-6 mb-0 text-center">
+      <h1 id="categoryTitle" class="text-4xl sm:text-5xl font-bold mb-2 text-gray-900">
+        밥
+      </h1>
+      <p class="text-lg sm:text-xl text-gray-600">우리동네 식당 정보를 소개합니다</p>
+    </div>
+
+    <!-- ▣ 북마크 (가로 전체) -->
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-300">
+      <div class="bg-blue-100 p-6 rounded-lg">
+        <h2 class="text-2xl font-bold mb-6">북마크</h2>
+        <div id="bookmarkContainer" class="flex flex-wrap gap-3 justify-start"></div>
+      </div>
+    </div>
+
+    <!-- ▣ 메인 + 사이드 -->
+    <div class="flex flex-col lg:flex-row gap-8">
+      <!-- 메인 -->
+      <section class="flex-1 border-2 border-gray-300 rounded-lg p-6">
+        <div id="storeList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <!-- JS로 카드 채워짐 -->
+        </div>
+        <div id="pagination" class="mt-6 flex justify-center gap-4"></div>
+      </section>
+
+      <!-- 사이드 -->
+      <aside class="w-full lg:w-1/4 xl:w-1/5 flex flex-col gap-6 self-start">
+
+        <!-- ▣ 우리동네 인기명소 -->
+        <div class="bg-white shadow border border-gray-300 rounded-lg p-4">
+          <h2 class="text-2xl font-extrabold text-yellow-500 mb-4 text-center">우리동네 인기명소</h2>
+          <div id="mvpBox"
+            class="relative bg-cover bg-center h-64 rounded-lg shadow-2xl cursor-pointer border-4 border-yellow-500"
+            style="background-image:url('https://source.unsplash.com/random/1200x400/?luxury,architecture');">
+            <div class="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black opacity-60 rounded-lg">
+            </div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <h2 id="mvpName" class="text-5xl font-extrabold text-white drop-shadow-2xl tracking-wider">VIP 식당</h2>
+            </div>
+          </div>
+        </div>
+
+        <!-- ▣ 검색어 -->
+        <div class="bg-white shadow border border-gray-300 rounded-lg p-6" style="min-height:310px;">
+          <h2 class="text-2xl font-bold mb-6 text-center">검색어</h2>
+          <ol id="rankingList" class="pl-0 text-gray-700 space-y-3 text-2xl leading-snug"></ol>
+        </div>
+
+        <!-- ▣ 독립 광고 -->
+        <div class="space-y-6">
+          <a href="https://example.com/ad1" target="_blank">
+            <img src="https://source.unsplash.com/random/400x200/?advertisement" alt="광고"
+              class="w-full h-64 object-cover rounded shadow" />
+          </a>
+          <a href="https://example.com/ad2" target="_blank">
+            <img src="https://source.unsplash.com/random/400x200/?advertisement" alt="광고"
+              class="w-full h-64 object-cover rounded shadow" />
+          </a>
+        </div>
+
+      </aside>
+    </div>
+
+  </main>
+
+  <!-- ───── 푸터 ───── -->
+  <div id="footer-placeholder"></div>
+
+  <!-- ───── 스크립트 ───── -->
+  <script>
+    // 헤더 fetch로 연결
+    fetch('/components/header.html')
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById('header-placeholder').innerHTML = data;
+      });
+
+    // 푸터 fetch로 연결
+    fetch('/components/footer.html')
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById('footer-placeholder').innerHTML = data;
+      });
+
+    /* 0. 카테고리 버튼 공통 클래스 */
+    document.querySelectorAll('.category-btn').forEach(btn => {
+      btn.classList.add(
+        'px-4', 'py-2',
+        'rounded-full', 'border', 'border-gray-300',
+        'bg-white', 'text-gray-800',
+        'hover:bg-blue-500', 'hover:text-white',
+        'transition'
+      );
+    });
+
+    /* 1. 설정 */
+    const pageSize = 12;
+    let current = 1;
+    let adsData = [];
+
+    /* 쿼리스트링에서 category 추출 */
+    const category = new URLSearchParams(location.search).get('category') || '';
+
+    document.getElementById('categoryTitle').textContent =
+      category ? `${category} 카테고리` : '전체 카테고리';
+
+    const API_BASE_URL = 'https://www.hongbono1.com';
+
+    async function fetchMealStores() {
+      const res = await fetch(
+        `${API_BASE_URL}/store?category=${encodeURIComponent(category)}`
+      );
+      console.log('✅ res.ok:', res.ok);
+      if (!res.ok) throw new Error('카테고리 데이터를 불러오지 못했습니다');
+      const data = await res.json();
+
+      return data.map(store => {
+        console.log('✅ store.id:', store.id, 'store:', store);
+
+        const rawPath = store.thumb || '';
+        const fileName = rawPath.startsWith('/uploads/')
+          ? rawPath.slice('/uploads/'.length)
+          : rawPath;
+        const thumbnail = fileName
+          ? `/uploads/${fileName}`
+          : '/no-image.png';
+
+        console.log('store.id:', store.id, 'store:', store);
+
+        return {
+          id: store.id,
+          businessName: store.businessName,
+          businessCategory: store.businessCategory || store.business_category || '',
+          phone: store.phone || '전화번호 없음',
+          thumbnailUrl: thumbnail,
+          address: store.address || ''
+        };
+      });
+    } // ✅ 함수 닫기
+
+
+    /* 3. 카드 생성 */
+    function createAdCard(ad) {
+      // 카드 래퍼
+      const wrap = document.createElement('div');
+      wrap.className = 'ad-card group w-full flex flex-col gap-3 cursor-pointer';
+
+      wrap.dataset.id = ad.id;
+
+      // 이미지 박스
+      const imgBox = document.createElement('div');
+      imgBox.className = `
+    relative rounded-xl overflow-hidden w-full h-60
+    transform transition duration-300
+    group-hover:scale-105 group-hover:-translate-y-2 group-hover:shadow-lg
+  `.trim();
+      const img = document.createElement('img');
+      img.src = ad.thumbnailUrl;
+      img.alt = ad.businessName;
+      img.className = 'w-full h-full object-cover transition duration-300';
+      imgBox.appendChild(img);
+
+      // ✅ 북마크 버튼 추가
+      const bookmarkBtn = document.createElement('button');
+      bookmarkBtn.textContent = '★';
+      bookmarkBtn.className = `
+    absolute top-2 right-2 bg-white text-blue-500 border border-blue-500
+    rounded-full px-2 py-1 font-bold
+    hover:bg-blue-500 hover:text-white transition
+  `.trim();
+
+      // ✅ 저장 로직
+      bookmarkBtn.onclick = (e) => {
+        e.stopPropagation(); // 카드 클릭과 충돌 방지
+
+        const bookmark = {
+          id: String(ad.id),                    // ★ 반드시 id 포함
+          name: ad.businessName
+        };
+
+        let list = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+        const exists = list.find(x => String(x.id) === bookmark.id);
+        if (!exists) {
+          list.push(bookmark);
+          localStorage.setItem('bookmarks', JSON.stringify(list));
+          window.dispatchEvent(new Event('bookmarkChanged'));
+          alert(`${bookmark.name}이(가) 북마크에 추가됨!`);
+        } else {
+          alert(`${bookmark.name}은(는) 이미 북마크에 있음`);
+        }
+      };
+
+      imgBox.style.position = 'relative'; // 포지션 지정
+      imgBox.appendChild(bookmarkBtn);    // 버튼 삽입
+
+      // 텍스트 박스
+      const txt = document.createElement('div');
+      txt.className = `
+    flex flex-col items-center gap-1 mt-2 text-center
+    transition group-hover:-translate-y-2
+  `.trim();
+
+      const cat = document.createElement('p');
+      cat.className = 'text-sm font-semibold text-blue-600';
+      cat.textContent = ad.businessCategory;
+
+      const name = document.createElement('p');
+      name.className = `
+    text-xl font-bold text-gray-900
+    group-hover:text-blue-600 transition
+  `.trim();
+      name.textContent = ad.businessName;
+
+      txt.append(cat, name);
+
+      wrap.append(imgBox, txt);
+      return wrap;
+    }
+
+    /* 4. 페이지 렌더 */
+    function renderPage(page) {
+      const box = document.getElementById('storeList');
+      box.innerHTML = '';
+      const start = (page - 1) * pageSize;
+      adsData.slice(start, start + pageSize)
+        .forEach(ad => box.appendChild(createAdCard(ad)));
+    }
+
+    /* 5. 페이지네이션 */
+    function renderPagination() {
+      const pag = document.getElementById('pagination');
+      pag.innerHTML = '';
+      const total = Math.ceil(adsData.length / pageSize);
+
+      const makeBtn = (txt, disabled, fn, extra = '') => {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.disabled = disabled;
+        b.className = `
+          px-3 py-1 rounded ${extra} ${disabled ? 'bg-gray-200 opacity-40' : 'bg-gray-100 hover:bg-gray-200'}
+        `.trim();
+
+        b.onclick = fn;
+        return b;
+      };
+
+      pag.append(makeBtn('이전', current === 1, () => { current--; renderPage(current); renderPagination(); }));
+      for (let i = 1; i <= total; i++) {
+        pag.append(
+          makeBtn(
+            i,
+            false,
+            () => { current = i; renderPage(i); renderPagination(); },
+            i === current ? 'bg-blue-500 text-white font-bold' : ''
+          )
+        );
+      }
+      pag.append(makeBtn('다음', current === total, () => { current++; renderPage(current); renderPagination(); }));
+    }
+
+    /* ✅ 6. 카드 클릭 → 디테일 페이지로 이동 */
+    function openDetailPage(card) {
+      const id = card.dataset.id;
+      if (!id) return console.warn('id 누락');
+      location.href = `/detail.html?id=${encodeURIComponent(id)}`;
+    }
+
+    /* ✅ 7. 북마크 렌더 함수 */
+    function renderBookmarks() {
+      const container = document.getElementById('bookmarkContainer');
+      container.innerHTML = '';
+
+      // 1) raw 데이터 읽어서
+      let raw = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+
+      // 2) 숫자만 저장된 예전 형식이면 → {id, name} 객체로 변환
+      if (raw.length && typeof raw[0] !== 'object') {
+        raw = raw.map(id => ({ id, name: `가게 #${id}` }));
+        localStorage.setItem('bookmarks', JSON.stringify(raw));
+      }
+
+      // 3) 이제 실제 렌더
+      if (!raw.length) {
+        container.innerHTML = '<p class="text-gray-400">북마크가 없습니다</p>';
+        return;
+      }
+
+      raw.forEach(b => {
+        const wrap = document.createElement('div');
+        wrap.className = 'relative inline-flex items-center';
+
+        const badge = document.createElement('div');
+        badge.className = [
+          'flex', 'items-center', 'justify-center',
+          'px-6', 'py-2', 'rounded-full', 'border', 'border-blue-500',
+          'bg-white', 'text-blue-600', 'text-xl', 'font-bold',
+          'cursor-pointer', 'hover:scale-105', 'transition'
+        ].join(' ');
+        badge.textContent = b.name;
+        badge.onclick = () => {
+          // b.id가 확실히 있으니 undefined 안 뜸
+          location.href = `/detail.html?id=${encodeURIComponent(b.id)}`;
+        };
+
+        // 3) 삭제 버튼
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.innerText = '🗑️';
+        delBtn.title = '북마크 삭제';
+        delBtn.className = [
+          'absolute', '-top-2', '-right-2',
+          'text-red-500', 'bg-white',
+          'rounded-full', 'p-1',
+          'hover:bg-red-50', 'transition'
+        ].join(' ');
+        delBtn.onclick = e => {
+          e.stopPropagation();
+          let list = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+          list = list.filter(x => x.id !== b.id);
+          localStorage.setItem('bookmarks', JSON.stringify(list));
+          renderBookmarks();
+          window.dispatchEvent(new Event('bookmarkChanged'));
+        };
+        wrap.append(badge, delBtn);
+        container.appendChild(wrap);
+      });
+    }
+
+    /* ✅ 8. 초기화 */
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('✅ DOMContentLoaded 시작');
+      try {
+        adsData = await fetchMealStores();
+        renderPage(current);
+        renderPagination();
+
+        document.getElementById('storeList')
+          .addEventListener('click', e => {
+            const card = e.target.closest('.ad-card');
+            if (card) openDetailPage(card);
+          });
+
+        renderBookmarks();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('storeList').innerHTML =
+          '<p class="w-full text-center text-red-600">데이터를 불러오지 못했습니다.</p>';
+      }
+
+      /* ✅ 북마크 변경 실시간 반영 */
+      window.addEventListener('bookmarkChanged', renderBookmarks);
+      window.addEventListener('storage', e => {
+        if (e.key === 'bookmarks') renderBookmarks();
+      });
+    }); // ← 여기가 DOMContentLoaded 콜백 닫는 부분입니다
+  </script>
+</body>
+
+</html
