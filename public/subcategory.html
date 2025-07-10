@@ -181,24 +181,33 @@
 
     /* 3. 카드 생성 (트윈테일 스타일) */
     function createAdCard(ad) {
-      // 카드 래퍼
+      // 카드 틀
       const wrap = document.createElement('div');
-      wrap.className = 'ad-card bg-white border border-[#748CAB] rounded-2xl shadow-md flex flex-col gap-3 cursor-pointer transition hover:scale-105 hover:shadow-2xl';
+      wrap.className = `
+    ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col
+    border-2 border-gray-300 transform transition duration-300
+    hover:-translate-y-2 hover:shadow-2xl
+  `.trim();
       wrap.dataset.id = ad.id;
 
       // 이미지 박스
       const imgBox = document.createElement('div');
-      imgBox.className = 'relative rounded-xl overflow-hidden w-full h-52 transition group-hover:scale-105 group-hover:shadow-xl';
+      imgBox.className = 'relative w-full h-40 mb-4 rounded overflow-hidden';
+
       const img = document.createElement('img');
       img.src = ad.thumbnailUrl;
       img.alt = ad.businessName;
-      img.className = 'w-full h-full object-cover rounded-xl mb-2 transition';
+      img.className = 'w-full h-full object-cover rounded transition';
       imgBox.appendChild(img);
 
-      // 북마크 버튼
+      // 북마크 버튼 (유지)
       const bookmarkBtn = document.createElement('button');
       bookmarkBtn.textContent = '★';
-      bookmarkBtn.className = 'absolute top-2 right-2 bg-white text-[#748CAB] border border-[#748CAB] rounded-full px-2 py-1 font-bold hover:bg-[#7F9BBF] hover:text-white transition';
+      bookmarkBtn.className = `
+    absolute top-2 right-2 bg-white text-[#748CAB] border border-[#748CAB]
+    rounded-full px-2 py-1 font-bold hover:bg-[#7F9BBF]
+    hover:text-white transition
+  `.trim();
       bookmarkBtn.onclick = (e) => {
         e.stopPropagation();
         const bookmark = { id: String(ad.id), name: ad.businessName };
@@ -213,22 +222,34 @@
           alert(`${bookmark.name}은(는) 이미 북마크에 있음`);
         }
       };
-      imgBox.style.position = 'relative';
       imgBox.appendChild(bookmarkBtn);
 
       // 텍스트 박스
       const txt = document.createElement('div');
-      txt.className = 'flex flex-col items-center gap-1 mt-2 text-center transition group-hover:-translate-y-2';
+      txt.className = 'flex flex-col items-center gap-1 text-center';
 
       const cat = document.createElement('p');
       cat.className = 'text-sm font-bold text-[#748CAB]';
       cat.textContent = ad.businessCategory;
 
-      const name = document.createElement('p');
-      name.className = 'text-xl font-bold text-[#2C3E50] mt-1 mb-0 group-hover:text-[#4665a3] transition';
+      const name = document.createElement('h2');
+      name.className = 'text-2xl font-bold text-center mb-2';
       name.textContent = ad.businessName;
 
-      txt.append(cat, name);
+      const phone = document.createElement('p');
+      phone.className = 'text-lg text-gray-500 text-center';
+      phone.textContent = ad.phone || '전화번호 없음';
+
+      // 상세보기 버튼 (카테고리 광고박스와 동일)
+      const btn = document.createElement('a');
+      btn.href = `/detail.html?id=${encodeURIComponent(ad.id)}`;
+      btn.className = `
+    mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center
+    shadow-lg hover:bg-blue-600 block
+  `.trim();
+      btn.textContent = '상세보기';
+
+      txt.append(cat, name, phone, btn);
 
       wrap.append(imgBox, txt);
       return wrap;
@@ -335,16 +356,15 @@
     }
 
     /* 8. 초기화 */
-    /* 8. 초기화 */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         // 1) API에서 데이터를 가져와
         const rows = await fetchMealStores();
 
         // 2) 받은 rows를 바로 화면에 그린다
-        drawCards(rows);
-        adsData = rows;          // 페이지네이션용
-        renderPagination();
+        adsData = rows;          // 전역 데이터 저장
+        renderPage(1);           // 첫 페이지 카드 그리기
+        renderPagination();      // 페이지 버튼 만들기
 
         // 3) 카드 클릭 이벤트 (디테일 페이지 이동)
         document.getElementById('storeList')
