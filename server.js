@@ -7,6 +7,7 @@ import path from "path";
 import storeRouter from "./routes/store.js";
 import miscRouter  from "./routes/misc.js";
 import categoryRouter from "./routes/category.js";
+import subcategoryRouter from "./routes/subcategory.js";
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
 app.use("/", miscRouter);
+app.use("/subcategory", subcategoryRouter);
 
 /* ── 헬스 체크 ──────────────────────── */
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
