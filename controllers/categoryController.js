@@ -4,7 +4,6 @@ import { pool } from "../db/pool.js";
 /* ───────────────────────────────────────────────
  * 1) 전체 카테고리 목록 조회
  *    GET /category
- *    – store_info.business_category 컬럼에서 DISTINCT
  * ───────────────────────────────────────────── */
 export async function getCategories(req, res) {
   try {
@@ -15,8 +14,7 @@ export async function getCategories(req, res) {
       ORDER  BY category
     `;
     const { rows } = await pool.query(sql);
-    // ["한식", "중식", ...]
-    res.json(rows.map(r => r.category));
+    res.json(rows.map(r => r.category));           // ["한식", "중식", ...]
   } catch (err) {
     console.error("getCategories ▶", err);
     res.status(500).json({ error: "카테고리 조회 오류" });
@@ -25,11 +23,11 @@ export async function getCategories(req, res) {
 
 /* ───────────────────────────────────────────────
  * 2) 특정 카테고리의 서브카테고리 목록 조회
- *    GET /category/:cat/sub
- *    – store_menu.category 값을 기준으로 추출
+ *    GET /category/:category/sub
  * ───────────────────────────────────────────── */
 export async function getSubcategories(req, res) {
-  const { cat } = req.params;  // ex: '한식'
+  const { category } = req.params;                // ex: '한식'
+
   try {
     const sql = `
       SELECT DISTINCT m.category AS sub
@@ -38,9 +36,8 @@ export async function getSubcategories(req, res) {
       WHERE  s.business_category = $1
       ORDER  BY sub
     `;
-    const { rows } = await pool.query(sql, [cat]);
-    // ["밥", "국", "면", ...]
-    res.json(rows.map(r => r.sub));
+    const { rows } = await pool.query(sql, [category]);
+    res.json(rows.map(r => r.sub));               // ["밥", "국", "면", ...]
   } catch (err) {
     console.error("getSubcategories ▶", err);
     res.status(500).json({ error: "서브카테고리 조회 오류" });
@@ -49,20 +46,18 @@ export async function getSubcategories(req, res) {
 
 /* ───────────────────────────────────────────────
  * 3) 카테고리별 가게 목록 조회 (옵션: 서브카테고리 필터)
- *    GET /category/:cat/stores
- *    예) /category/한식/stores?subcategory=밥
+ *    GET /category/:category/stores?subcategory=밥
  * ───────────────────────────────────────────── */
 export async function getStoresByCategory(req, res) {
-  const { cat } = req.params;    // ex: '한식'
-  const { subcategory } = req.query;     // ex: '밥' 또는 undefined
+  const { category } = req.params;                // ex: '한식'
+  const { subcategory } = req.query;              // ex: '밥' 또는 undefined
 
-  // ── 디버그 로그 시작
+  // ── 디버그 로그
   console.log("▶ getStoresByCategory called");
-  console.log("   params.cat       =", cat);
-  console.log("   query.subcategory=", subcategory);
-  // ────────────────────
+  console.log("   params.category =", category);
+  console.log("   query.subcategory =", subcategory);
 
-  const params = [cat];                   // $1 = category
+  const params = [category];                      // $1 = category
   let sql = `
     SELECT
       s.id,
@@ -74,31 +69,27 @@ export async function getStoresByCategory(req, res) {
     WHERE s.business_category = $1
   `;
 
-  // 옵션: subcategory 파라미터가 있으면 store_menu.category 기준으로 필터
   if (subcategory) {
     sql += `
       AND EXISTS (
         SELECT 1
         FROM   store_menu m
         WHERE  m.store_id = s.id
-          AND  m.category   = $2
+          AND  m.category  = $2
       )
     `;
-    params.push(subcategory);             // $2 = subcategory
+    params.push(subcategory);                    // $2 = subcategory
   }
 
   sql += " ORDER BY s.id DESC";
 
-  // ── 디버그: 최종 SQL와 바인딩 값
   console.log("   SQL:", sql.trim());
   console.log("   params array:", params);
-  // ─────────────────────────────────
-
 
   try {
     const { rows } = await pool.query(sql, params);
     console.log("▶ getStoresByCategory result rows:", rows);
-    res.json(rows);                       // 빈 배열이면 프런트에서 “결과 없음” 처리
+    res.json(rows);                              // 빈 배열이면 프런트에서 “결과 없음” 처리
   } catch (err) {
     console.error("getStoresByCategory ▶", err);
     res.status(500).json({ error: "가게 목록 조회 오류" });
