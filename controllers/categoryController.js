@@ -52,10 +52,11 @@ export async function getStoresByCategory(req, res) {
   const { category } = req.params;                // ex: '한식'
   const { subcategory } = req.query;              // ex: '밥' 또는 undefined
 
-  // ── 디버그 로그
-  console.log("▶ getStoresByCategory called");
+  /* ── 디버그 로그 ────────────────────────────── */
+  console.log("▶ getStoresByCategory");
   console.log("   params.category =", category);
   console.log("   query.subcategory =", subcategory);
+  /* ------------------------------------------- */
 
   const params = [category];                      // $1 = category
   let sql = `
@@ -64,32 +65,30 @@ export async function getStoresByCategory(req, res) {
       s.business_name      AS "businessName",
       s.phone_number       AS "phone",
       COALESCE(s.image1,'') AS "thumb",
-      s.business_category  AS "category"
+      s.business_category  AS "category",
+      m.category           AS "subcategory"      -- ★ 추가
     FROM store_info s
+    LEFT JOIN store_menu m ON m.store_id = s.id  -- ★ 추가
     WHERE s.business_category = $1
   `;
 
   if (subcategory) {
-    sql += `
-      AND EXISTS (
-        SELECT 1
-        FROM   store_menu m
-        WHERE  m.store_id = s.id
-          AND  m.category  = $2
-      )
-    `;
+    sql += ` AND m.category = $2`;
     params.push(subcategory);                    // $2 = subcategory
   }
 
-  sql += " ORDER BY s.id DESC";
+  sql += `
+    GROUP BY s.id, m.category
+    ORDER  BY s.id DESC
+  `;
 
   console.log("   SQL:", sql.trim());
-  console.log("   params array:", params);
+  console.log("   params:", params);
 
   try {
     const { rows } = await pool.query(sql, params);
-    console.log("▶ getStoresByCategory result rows:", rows);
-    res.json(rows);                              // 빈 배열이면 프런트에서 “결과 없음” 처리
+    console.log("▶ result rows:", rows.length);
+    res.json(rows);                              // 빈 배열이면 프런트가 ‘결과 없음’ 처리
   } catch (err) {
     console.error("getStoresByCategory ▶", err);
     res.status(500).json({ error: "가게 목록 조회 오류" });
