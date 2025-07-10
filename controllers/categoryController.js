@@ -18,31 +18,39 @@ export async function getCategories(req, res) {
    ✅ 2) 특정 카테고리별 가게 목록
    ──────────────────────────────── */
 export async function getStoresByCategory(req, res) {
-  const category = req.params.category || req.query.category || "";
-  console.log("🛠️ getStoresByCategory called with category:", category);
+  const { cat } = req.params;          // 예: '한식'
+  const { subcategory } = req.query;   // 예: '밥'
+
+  let sql = `
+    SELECT s.id,
+           s.business_name AS "businessName",
+           s.phone_number  AS "phone",
+           COALESCE(s.image1,'') AS "thumb",
+           s.business_category AS "category"
+    FROM   store_info s
+    WHERE  s.business_category = $1`;
+
+  const params = [cat];
+
+  if (subcategory) {
+    sql += `
+      AND EXISTS (
+        SELECT 1
+        FROM   store_menu m
+        WHERE  m.store_id = s.id
+          AND  m.category = $2
+      )`;
+    params.push(subcategory);
+  }
+
+  sql += " ORDER BY s.id DESC";
 
   try {
-    const sql = `
-      SELECT
-        id,
-        business_name        AS "businessName",
-        phone_number         AS "phone",
-        image1               AS "thumbnailUrl",
-        business_subcategory AS "category",      -- ✅ 소분류 (필터용)
-        business_category    AS "mainCategory"   -- ✅ 대분류 (보존용)
-      FROM store_info
-      WHERE business_category = $1
-    `;
-
-    const { rows } = await pool.query(sql, [category]);
-    console.log("🛠️ getStoresByCategory result:", rows.length, "rows");
-    return res.json(rows);
-
+    const { rows } = await pool.query(sql, params);
+    res.json(rows);
   } catch (err) {
-    console.error("🔴 getStoresByCategory error:", err);
-    return res.status(500).json({
-      error: err.message,
-      stack: err.stack.split("\n").slice(0, 3)
-    });
+    console.error("getStoresByCategory ▶", err);
+    res.status(500).json({ error: "가게 목록 조회 오류" });
   }
 }
+
