@@ -1,11 +1,9 @@
-// routes/subcategory.js
-
 import express from "express";
-import { getStoresBySubcategory } from "../controllers/subcategoryController.js";
+import { getStoreById, getStores } from "../controllers/storeController.js";
 
 const router = express.Router();
 
-// 예: GET /subcategory/밥/stores
-router.get("/:id/stores", getStoresBySubcategory);
+router.get("/", getStores);          // GET /store?category=밥&type=한식
+router.get("/:id", getStoreById);    // GET /store/14
 
 export default router;
