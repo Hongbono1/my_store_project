@@ -1,8 +1,9 @@
-// routes/store.js
 import express from "express";
-import { getStoreById } from "../controllers/storeController.js";
+import { getStoreById, getStores } from "../controllers/storeController.js";
 
 const router = express.Router();
-router.get("/store/:id", getStoreById);  
-export default router;
 
+router.get("/", getStores);             // GET /store?category=밥&type=한식&subcategory=비빔밥
+router.get("/:id", getStoreById);       // GET /store/14
+
+export default router;
