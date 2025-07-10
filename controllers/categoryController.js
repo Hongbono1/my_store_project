@@ -36,8 +36,8 @@ export async function getSubcategories(req, res) {
 
 /* 3) 가게 목록 (옵션: 소제목 필터) */
 export async function getStoresByCategory(req, res) {
-  const { category } = req.params;          // 업종 구분 (한식)
-  const { subcategory } = req.query;        // 소제목 (밥) 또는 없음
+  const { category } = req.params;      // ex) '한식'
+  const { subcategory } = req.query;    // ex) '밥'
 
   const params = [category];
   let sql = `
@@ -45,7 +45,7 @@ export async function getStoresByCategory(req, res) {
       id,
       business_name         AS "businessName",
       phone_number          AS "phone",
-      COALESCE(image1,'')   AS "thumb",
+      COALESCE(image1, '')  AS "thumb",
       business_category     AS "category",
       business_subcategory  AS "subcategory"
     FROM store_info
@@ -61,9 +61,10 @@ export async function getStoresByCategory(req, res) {
 
   try {
     const { rows } = await pool.query(sql, params);
-    res.json(rows);                          // 필요 필드는 모두 포함
-  } catch (e) {
-    console.error(e);
+    res.json(rows);
+  } catch (err) {
+    console.error("getStoresByCategory ▶", err);
     res.status(500).json({ error: "가게 목록 조회 오류" });
   }
 }
+
