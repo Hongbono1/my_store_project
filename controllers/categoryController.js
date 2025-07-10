@@ -1,96 +1,69 @@
 // controllers/categoryController.js
 import { pool } from "../db/pool.js";
 
-/* ───────────────────────────────────────────────
- * 1) 전체 카테고리 목록 조회
- *    GET /category
- * ───────────────────────────────────────────── */
+/* 1) 카테고리(업종 구분) 목록 */
 export async function getCategories(req, res) {
   try {
-    const sql = `
+    const { rows } = await pool.query(`
       SELECT DISTINCT business_category AS category
-      FROM   store_info
-      WHERE  business_category IS NOT NULL
-      ORDER  BY category
-    `;
-    const { rows } = await pool.query(sql);
-    res.json(rows.map(r => r.category));           // ["한식", "중식", ...]
-  } catch (err) {
-    console.error("getCategories ▶", err);
+      FROM store_info
+      WHERE business_category IS NOT NULL
+      ORDER BY category
+    `);
+    res.json(rows.map(r => r.category));
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: "카테고리 조회 오류" });
   }
 }
 
-/* ───────────────────────────────────────────────
- * 2) 특정 카테고리의 서브카테고리 목록 조회
- *    GET /category/:category/sub
- * ───────────────────────────────────────────── */
+/* 2) 소제목 목록(8 개) */
 export async function getSubcategories(req, res) {
-  const { category } = req.params;                // ex: '한식'
-
+  const { category } = req.params;          // ex) '한식'
   try {
-    const sql = `
-      SELECT DISTINCT m.category AS sub
-      FROM   store_menu m
-      JOIN   store_info s ON m.store_id = s.id
-      WHERE  s.business_category = $1
-      ORDER  BY sub
-    `;
-    const { rows } = await pool.query(sql, [category]);
-    res.json(rows.map(r => r.sub));               // ["밥", "국", "면", ...]
-  } catch (err) {
-    console.error("getSubcategories ▶", err);
-    res.status(500).json({ error: "서브카테고리 조회 오류" });
+    const { rows } = await pool.query(`
+      SELECT DISTINCT business_subcategory AS sub
+      FROM store_info
+      WHERE business_category = $1
+      ORDER BY sub
+    `, [category]);
+    res.json(rows.map(r => r.sub));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "소제목 조회 오류" });
   }
 }
 
-/* ───────────────────────────────────────────────
- * 3) 카테고리별 가게 목록 조회 (옵션: 서브카테고리 필터)
- *    GET /category/:category/stores?subcategory=밥
- * ───────────────────────────────────────────── */
+/* 3) 가게 목록 (옵션: 소제목 필터) */
 export async function getStoresByCategory(req, res) {
-  const { category } = req.params;                // ex: '한식'
-  const { subcategory } = req.query;              // ex: '밥' 또는 undefined
+  const { category } = req.params;          // 업종 구분 (한식)
+  const { subcategory } = req.query;        // 소제목 (밥) 또는 없음
 
-  /* ── 디버그 로그 ────────────────────────────── */
-  console.log("▶ getStoresByCategory");
-  console.log("   params.category =", category);
-  console.log("   query.subcategory =", subcategory);
-  /* ------------------------------------------- */
-
-  const params = [category];                      // $1 = category
+  const params = [category];
   let sql = `
     SELECT
-      s.id,
-      s.business_name      AS "businessName",
-      s.phone_number       AS "phone",
-      COALESCE(s.image1,'') AS "thumb",
-      s.business_category  AS "category",
-      m.category           AS "subcategory"      -- ★ 추가
-    FROM store_info s
-    LEFT JOIN store_menu m ON m.store_id = s.id  -- ★ 추가
-    WHERE s.business_category = $1
+      id,
+      business_name         AS "businessName",
+      phone_number          AS "phone",
+      COALESCE(image1,'')   AS "thumb",
+      business_category     AS "category",
+      business_subcategory  AS "subcategory"
+    FROM store_info
+    WHERE business_category = $1
   `;
 
   if (subcategory) {
-    sql += ` AND m.category = $2`;
-    params.push(subcategory);                    // $2 = subcategory
+    sql += ` AND business_subcategory = $2`;
+    params.push(subcategory);
   }
 
-  sql += `
-    GROUP BY s.id, m.category
-    ORDER  BY s.id DESC
-  `;
-
-  console.log("   SQL:", sql.trim());
-  console.log("   params:", params);
+  sql += " ORDER BY id DESC";
 
   try {
     const { rows } = await pool.query(sql, params);
-    console.log("▶ result rows:", rows.length);
-    res.json(rows);                              // 빈 배열이면 프런트가 ‘결과 없음’ 처리
-  } catch (err) {
-    console.error("getStoresByCategory ▶", err);
+    res.json(rows);                          // 필요 필드는 모두 포함
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: "가게 목록 조회 오류" });
   }
 }
