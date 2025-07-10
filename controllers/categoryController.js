@@ -53,8 +53,14 @@ export async function getSubcategories(req, res) {
  *    예) /category/한식/stores?subcategory=밥
  * ───────────────────────────────────────────── */
 export async function getStoresByCategory(req, res) {
-  const { cat }          = req.params;    // ex: '한식'
-  const { subcategory }  = req.query;     // ex: '밥' or undefined
+  const { cat } = req.params;    // ex: '한식'
+  const { subcategory } = req.query;     // ex: '밥' 또는 undefined
+
+  // ── 디버그 로그 시작
+  console.log("▶ getStoresByCategory called");
+  console.log("   params.cat       =", cat);
+  console.log("   query.subcategory=", subcategory);
+  // ────────────────────
 
   const params = [cat];                   // $1 = category
   let sql = `
@@ -83,8 +89,15 @@ export async function getStoresByCategory(req, res) {
 
   sql += " ORDER BY s.id DESC";
 
+  // ── 디버그: 최종 SQL와 바인딩 값
+  console.log("   SQL:", sql.trim());
+  console.log("   params array:", params);
+  // ─────────────────────────────────
+
+
   try {
     const { rows } = await pool.query(sql, params);
+    console.log("▶ getStoresByCategory result rows:", rows);
     res.json(rows);                       // 빈 배열이면 프런트에서 “결과 없음” 처리
   } catch (err) {
     console.error("getStoresByCategory ▶", err);
