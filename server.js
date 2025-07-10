@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 app.use(express.static(path.join(process.cwd(), "public")));
 
-/* HTML에 charset=UTF-8 강제 */
+/* HTML charset=UTF-8 강제 */
 app.use((req, res, next) => {
   if (req.path.endsWith(".html")) res.setHeader("Content-Type", "text/html; charset=UTF-8");
   next();
@@ -29,7 +29,7 @@ app.use((req, res, next) => {
 /* ── 라우터 ─────────────────────────── */
 app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
-app.use("/",      miscRouter);   // /verify-biz, /kakao-key
+app.use("/", miscRouter);
 
 /* ── 헬스 체크 ──────────────────────── */
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));

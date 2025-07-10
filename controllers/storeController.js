@@ -36,10 +36,10 @@ export async function getStoreById(req, res) {
     if (!rows.length) return res.status(404).json({ error: "Store not found" });
 
     const store = rows[0];
-    store.images       = [store.image1, store.image2, store.image3].filter(Boolean);
+    store.images = [store.image1, store.image2, store.image3].filter(Boolean);
     if (!store.images.length) store.images = ["/images/no-image.png"];
     store.thumbnailUrl = store.image1 || "/images/no-image.png";
-    store.events       = [store.event1, store.event2].filter(Boolean);
+    store.events = [store.event1, store.event2].filter(Boolean);
     store.additionalDescription = store.description || "";
 
     // 메뉴 정보
@@ -64,13 +64,12 @@ export async function getStoreById(req, res) {
 }
 
 /**
- * ▣ 여러 가게 리스트 조회 (카테고리/서브카테고리/업종)
+ * ▣ 여러 가게 리스트 조회 (업종, 카테고리)
  * GET /store?category=밥&type=한식
  */
 export async function getStores(req, res) {
-  const { category, subcategory, type } = req.query; // 예: type=한식, category=밥, subcategory=비빔밥
+  const { category, type } = req.query; // ❌ subcategory 제거
 
-  // 기본 SELECT문
   let sql = `
     SELECT
       id,
@@ -86,9 +85,8 @@ export async function getStores(req, res) {
   const params = [];
   let paramIdx = 1;
 
-  if (type)        { sql += ` AND business_type = $${paramIdx++}`;        params.push(type); }
-  if (category)    { sql += ` AND business_category = $${paramIdx++}`;    params.push(category); }
-  if (subcategory) { sql += ` AND business_subcategory = $${paramIdx++}`; params.push(subcategory); }
+  if (type) { sql += ` AND business_type = $${paramIdx++}`; params.push(type); }
+  if (category) { sql += ` AND business_category = $${paramIdx++}`; params.push(category); }
 
   sql += " ORDER BY id DESC";
 
