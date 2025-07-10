@@ -33,23 +33,29 @@ export async function getStoreById(req, res) {
       WHERE id = $1
     `;
     const { rows } = await pool.query(storeSql, [id]);
-    if (!rows.length) return res.status(404).json({ error: "Store not found" });
+    if (!rows.length) {
+      return res.status(404).json({ error: "Store not found" });
+    }
 
     const store = rows[0];
+
+    // 이미지 배열 처리
     store.images = [store.image1, store.image2, store.image3].filter(Boolean);
     if (!store.images.length) store.images = ["/images/no-image.png"];
     store.thumbnailUrl = store.image1 || "/images/no-image.png";
+
+    // 이벤트 배열 처리
     store.events = [store.event1, store.event2].filter(Boolean);
     store.additionalDescription = store.description || "";
 
-    // 메뉴 정보
+    // 메뉴 가져오기
     const menuSql = `
       SELECT
         id,
         category,
         menu_name  AS "menuName",
         menu_price AS "menuPrice",
-        menu_image AS "menu_image"
+        menu_image AS "menuImage"
       FROM store_menu
       WHERE store_id = $1
       ORDER BY id
@@ -57,18 +63,19 @@ export async function getStoreById(req, res) {
     const { rows: menus } = await pool.query(menuSql, [id]);
 
     return res.json({ store, menus });
+
   } catch (err) {
-    console.error("🔴 getStoreById error:", err);
+    console.error("❌ getStoreById error:", err);
     res.status(500).json({ error: err.message });
   }
 }
 
 /**
- * ▣ 여러 가게 리스트 조회 (업종, 카테고리)
- * GET /store?category=밥&type=한식
+ * ▣ 여러 가게 리스트 조회 (카테고리/서브카테고리)
+ * GET /store?category=한식&subcategory=밥
  */
 export async function getStores(req, res) {
-  const { category, type } = req.query; // ❌ subcategory 제거
+  const { category, subcategory } = req.query;
 
   let sql = `
     SELECT
@@ -82,11 +89,19 @@ export async function getStores(req, res) {
     FROM store_info
     WHERE 1=1
   `;
+
   const params = [];
   let paramIdx = 1;
 
-  if (type) { sql += ` AND business_type = $${paramIdx++}`; params.push(type); }
-  if (category) { sql += ` AND business_category = $${paramIdx++}`; params.push(category); }
+  if (category) {
+    sql += ` AND business_category = $${paramIdx++}`;
+    params.push(category.trim());
+  }
+
+  if (subcategory) {
+    sql += ` AND business_subcategory = $${paramIdx++}`;
+    params.push(subcategory.trim());
+  }
 
   sql += " ORDER BY id DESC";
 
@@ -94,7 +109,7 @@ export async function getStores(req, res) {
     const { rows } = await pool.query(sql, params);
     res.json(rows);
   } catch (err) {
-    console.error("getStores error:", err);
+    console.error("❌ getStores error:", err);
     res.status(500).json({ error: err.message });
   }
 }
