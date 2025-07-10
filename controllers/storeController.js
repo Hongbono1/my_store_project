@@ -68,7 +68,7 @@ export async function getStoreById(req, res) {
  * GET /store?category=밥&type=한식
  */
 export async function getStores(req, res) {
-  const { category } = req.query;
+  const { category, subcategory } = req.query;
 
   let sql = `
     SELECT
@@ -85,9 +85,16 @@ export async function getStores(req, res) {
   const params = [];
   let paramIdx = 1;
 
-  if (category) { sql += ` AND business_category = $${paramIdx++}`; params.push(category); }
+  if (category) {
+    sql += ` AND business_category = $${idx++}`;
+    params.push(category.trim());
+  }
 
-  sql += " ORDER BY id DESC";
+  if (subcategory) {                              // ✅ 추가
+    sql += ` AND business_subcategory = $${idx++}`;
+    params.push(subcategory.trim());
+  }
+
 
   try {
     const { rows } = await pool.query(sql, params);
