@@ -30,8 +30,9 @@ app.use((req, res, next) => {
 /* ── 라우터 ─────────────────────────── */
 app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
-app.use("/", miscRouter);
 app.use("/subcategory", subcategoryRouter);
+app.use("/", miscRouter);
+
 
 /* ── 헬스 체크 ──────────────────────── */
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
