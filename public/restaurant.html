@@ -245,34 +245,26 @@
     }
 
     /* ───────── 카테고리별 데이터 로드 ───────── */
-    async function fetchRestaurantStores() {
-      const res = await fetch('/restaurant/stores');
-      if (!res.ok) throw new Error('데이터 조회 실패');
-      return await res.json();
+    /* ✅ ✅ ▣ 이게 핵심! 카테고리별 데이터 로드 함수 */
+    async function loadCategoryAds(category, containerId, emptyId) {
+      try {
+        const r = await fetch('/restaurant/' + encodeURIComponent(category) + '/stores');
+        const data = await r.json();
+        const box = document.getElementById(containerId);
+        const empty = document.getElementById(emptyId);
+        box.innerHTML = '';
+        if (!data.length) { empty.classList.remove('hidden'); return; }
+        empty.classList.add('hidden');
+        data.slice(0, 8).forEach(item =>
+          box.appendChild(createAdCard({
+            title: item.businessName,
+            category: item.category,
+            phone: item.phone,
+            img: item.thumb
+          }))
+        );
+      } catch (e) { console.error(e); }
     }
-
-    function createCard({ id, businessName, phone, thumb }) {
-      const box = document.createElement("div");
-      box.className = "bg-white border shadow-lg rounded-lg p-6 flex flex-col transform transition duration-300 hover:-translate-y-1 hover:shadow-2xl";
-      box.innerHTML = `
-      <img src="${thumb || '/assets/images/no-thumb.png'}" alt="${businessName}" class="h-40 w-full object-cover rounded mb-4" />
-      <h3 class="text-xl font-bold text-center mb-2">${businessName}</h3>
-      <p class="text-gray-600 text-center">${phone || ""}</p>
-    `;
-      box.addEventListener('click', () => {
-        location.href = '/detail.html?id=' + id;
-      });
-      return box;
-    }
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      const stores = await fetchRestaurantStores();
-      const container = document.getElementById("storeList");
-      container.innerHTML = "";
-      stores.forEach(item => {
-        container.appendChild(createCard(item));
-      });
-    });
 
     /* ───────── 초기화 ───────── */
     document.addEventListener('DOMContentLoaded', async () => {
