@@ -8,6 +8,7 @@ import storeRouter from "./routes/store.js";
 import miscRouter  from "./routes/misc.js";
 import categoryRouter from "./routes/category.js";
 import subcategoryRouter from "./routes/subcategory.js";
+import restaurantRouter from "./routes/restaurant.js";
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,7 @@ app.use((req, res, next) => {
 });
 
 /* ── 라우터 ─────────────────────────── */
+app.use("/restaurant", restaurantRouter);
 app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
