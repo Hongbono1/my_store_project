@@ -176,7 +176,7 @@
           </div>
 
           <!-- 🟦 업종 구분 -->
-          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3 relative">
+          <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3 relative hidden">
             <label class="w-32 font-medium shrink-0" for="businessType">업종구분</label>
 
             <!-- 선택 결과가 표시될 네모칸 -->
@@ -544,51 +544,63 @@
             display.value = li.textContent;
             hiddenInp.value = li.dataset.value;
             list.classList.add('hidden');
+
+            // ✅ 추가: 한식이면 한식 카테고리 보이기
+            if (inputId === 'businessCategory') {
+              const subcatRow = document.getElementById('subcategoryDisplay').closest('div.relative');
+              if (li.dataset.value === '한식') {
+                subcatRow.classList.remove('hidden');
+              } else {
+                subcatRow.classList.add('hidden');
+                // 선택 값도 초기화
+                document.getElementById('subcategoryDisplay').value = '';
+                document.getElementById('businessSubcategory').value = '';
+              }
+            }
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!list.contains(e.target) && e.target !== toggleBtn && e.target !== display) {
+              list.classList.add('hidden');
+            }
           });
         });
+      })();
 
-        document.addEventListener('click', (e) => {
-          if (!list.contains(e.target) && e.target !== toggleBtn && e.target !== display) {
-            list.classList.add('hidden');
-          }
-        });
-      });
-    })();
+      /* ----------------------------------------------------
+         가격 입력 세 자리 콤마
+      ---------------------------------------------------- */
+      function formatCurrency(inp) {
+        let v = inp.value.replace(/[^0-9.]/g, '');
+        const p = v.split('.');
+        if (p.length > 2) v = p[0] + '.' + p.slice(1).join('');
+        let int = p[0] || '';
+        let dec = p[1] || '';
+        if (!int && !dec) { inp.value = ''; return; }
+        if (dec.length > 2) dec = dec.slice(0, 2);
+        int = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        inp.value = dec ? `${int}.${dec}` : int;
+      }
 
-    /* ----------------------------------------------------
-       가격 입력 세 자리 콤마
-    ---------------------------------------------------- */
-    function formatCurrency(inp) {
-      let v = inp.value.replace(/[^0-9.]/g, '');
-      const p = v.split('.');
-      if (p.length > 2) v = p[0] + '.' + p.slice(1).join('');
-      let int = p[0] || '';
-      let dec = p[1] || '';
-      if (!int && !dec) { inp.value = ''; return; }
-      if (dec.length > 2) dec = dec.slice(0, 2);
-      int = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      inp.value = dec ? `${int}.${dec}` : int;
-    }
+      /* ----------------------------------------------------
+         메뉴 · 카테고리 관리
+      ---------------------------------------------------- */
+      let totalMenuCount = 0;
+      const MAX_MENUS = 50;
 
-    /* ----------------------------------------------------
-       메뉴 · 카테고리 관리
-    ---------------------------------------------------- */
-    let totalMenuCount = 0;
-    const MAX_MENUS = 50;
+      /* 카테고리(구분) 추가 */
+      function addCategory() {
+        const catName = document.getElementById('categoryInput').value.trim();
+        if (!catName) { alert('카테고리명을 입력하세요.'); return; }
 
-    /* 카테고리(구분) 추가 */
-    function addCategory() {
-      const catName = document.getElementById('categoryInput').value.trim();
-      if (!catName) { alert('카테고리명을 입력하세요.'); return; }
+        const menuContainer = document.getElementById('menuContainer');
+        const catId = `cat-${Date.now()}`;
 
-      const menuContainer = document.getElementById('menuContainer');
-      const catId = `cat-${Date.now()}`;
+        const catBlock = document.createElement('div');
+        catBlock.className = 'border border-gray-300 p-4 rounded bg-gray-50';
+        catBlock.dataset.category = catName;
 
-      const catBlock = document.createElement('div');
-      catBlock.className = 'border border-gray-300 p-4 rounded bg-gray-50';
-      catBlock.dataset.category = catName;
-
-      catBlock.innerHTML = `
+        catBlock.innerHTML = `
         <div class="flex justify-between items-center mb-3">
           <h4 class="text-lg font-bold">${catName}</h4>
           <button type="button"
@@ -605,28 +617,28 @@
           + 메뉴 추가
         </button>
       `;
-      menuContainer.appendChild(catBlock);
-      document.getElementById('categoryInput').value = '';
+        menuContainer.appendChild(catBlock);
+        document.getElementById('categoryInput').value = '';
 
-      /* 기본 메뉴 1개 자동 추가 */
-      addMenu(catId, catName);
-    }
-
-    /* 품목(메뉴) 추가 : 파일선택 → 메뉴명 → 가격 */
-    function addMenu(catContainerId, catName) {
-      if (totalMenuCount >= MAX_MENUS) {
-        alert('메뉴는 최대 50개까지만 추가할 수 있습니다.');
-        return;
+        /* 기본 메뉴 1개 자동 추가 */
+        addMenu(catId, catName);
       }
-      totalMenuCount++;
 
-      const cont = document.getElementById(catContainerId);
-      const row = document.createElement('div');
+      /* 품목(메뉴) 추가 : 파일선택 → 메뉴명 → 가격 */
+      function addMenu(catContainerId, catName) {
+        if (totalMenuCount >= MAX_MENUS) {
+          alert('메뉴는 최대 50개까지만 추가할 수 있습니다.');
+          return;
+        }
+        totalMenuCount++;
 
-      // ★ flex-col 로 세로 스택, gap-2 로 줄 사이 간격, mb-4 로 블록간 간격 지정
-      row.className = 'flex flex-col gap-2 mb-4';
+        const cont = document.getElementById(catContainerId);
+        const row = document.createElement('div');
 
-      row.innerHTML = `
+        // ★ flex-col 로 세로 스택, gap-2 로 줄 사이 간격, mb-4 로 블록간 간격 지정
+        row.className = 'flex flex-col gap-2 mb-4';
+
+        row.innerHTML = `
     <!-- ① 카테고리 히든 필드 -->
     <input type="hidden" name="menuCategory[]" value="${catName}">
 
@@ -650,202 +662,202 @@
     </div>
   `;
 
-      cont.appendChild(row);
+        cont.appendChild(row);
 
-      // ✅ 입력 시 배경색 변경 로직 추가
-      const nameInput = row.querySelector("input[name='menuName[]']");
-      const priceInput = row.querySelector("input[name='menuPrice[]']");
+        // ✅ 입력 시 배경색 변경 로직 추가
+        const nameInput = row.querySelector("input[name='menuName[]']");
+        const priceInput = row.querySelector("input[name='menuPrice[]']");
 
-      function updateBackground() {
-        if (nameInput.value.trim() && priceInput.value.trim()) {
-          row.classList.remove('bg-white');
-          row.classList.add('bg-blue-100');
-        } else {
-          row.classList.remove('bg-blue-100');
-          row.classList.add('bg-white');
+        function updateBackground() {
+          if (nameInput.value.trim() && priceInput.value.trim()) {
+            row.classList.remove('bg-white');
+            row.classList.add('bg-blue-100');
+          } else {
+            row.classList.remove('bg-blue-100');
+            row.classList.add('bg-white');
+          }
         }
+
+        nameInput.addEventListener('input', updateBackground);
+        priceInput.addEventListener('input', updateBackground);
+
+        // 초기 상태도 체크
+        updateBackground();
+
       }
 
-      nameInput.addEventListener('input', updateBackground);
-      priceInput.addEventListener('input', updateBackground);
-
-      // 초기 상태도 체크
-      updateBackground();
-
-    }
-
-    function removeMenu(btn) {
-      btn.parentElement.remove();
-      totalMenuCount--;
-    }
-    function removeCategory(btn) {
-      const block = btn.closest('div.border');
-      const menus = block.querySelectorAll('input[name="menuName[]"]').length;
-      totalMenuCount -= menus;
-      block.remove();
-    }
-
-    /* ----------------------------------------------------
-       입력란 ? 토글
-    ---------------------------------------------------- */
-    /* === 도움(?) 버튼 / 툴팁 === */
-    function toggleTip(e) {
-      const tip = document.getElementById('tipBox');
-      tip.style.left = e.clientX + 10 + 'px';  // clientX/Y: 뷰포트(윈도우) 기준
-      tip.style.top = e.clientY + 10 + 'px';
-      tip.classList.toggle('hidden');
-    }
-
-    document.addEventListener('click', (e) => {
-      const tip = document.getElementById('tipBox');
-      const btn = document.getElementById('helpBtn');
-      if (!tip.contains(e.target) && !btn.contains(e.target)) {
-        tip.classList.add('hidden');
+      function removeMenu(btn) {
+        btn.parentElement.remove();
+        totalMenuCount--;
       }
-    });
-
-    /* ----------------------------------------------------
-       사업자 등록번호 인증 ( /verify-biz )
-    ---------------------------------------------------- */
-    async function verifyBizNumber() {
-      const n1 = document.getElementById('bizNumber1').value.trim();
-      const n2 = document.getElementById('bizNumber2').value.trim();
-      const n3 = document.getElementById('bizNumber3').value.trim();
-      const biz = n1 + n2 + n3;
-
-      const resEl = document.getElementById('bizVerifyResult');
-      const nameInp = document.getElementById('businessName');
-
-      if (!/^\d{10}$/.test(biz)) {
-        resEl.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
-        resEl.className = 'text-sm text-red-600 text-center';
-        return;
+      function removeCategory(btn) {
+        const block = btn.closest('div.border');
+        const menus = block.querySelectorAll('input[name="menuName[]"]').length;
+        totalMenuCount -= menus;
+        block.remove();
       }
 
-      try {
-        const r = await fetch('/verify-biz', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ b_no: [biz] })
-        });
-        const d = await r.json();
-        const i = d?.data?.[0];
+      /* ----------------------------------------------------
+         입력란 ? 토글
+      ---------------------------------------------------- */
+      /* === 도움(?) 버튼 / 툴팁 === */
+      function toggleTip(e) {
+        const tip = document.getElementById('tipBox');
+        tip.style.left = e.clientX + 10 + 'px';  // clientX/Y: 뷰포트(윈도우) 기준
+        tip.style.top = e.clientY + 10 + 'px';
+        tip.classList.toggle('hidden');
+      }
 
-        if (i && i.b_stt_cd === '01') {
-          resEl.textContent = `✅ 인증 완료: ${i.b_no}`;
-          resEl.className = 'text-sm text-green-600 text-center';
-          nameInp.value = i.b_nm || '';
-          if (!i.b_nm) nameInp.placeholder = '자동입력 실패 - 상호명을 입력하세요';
-        } else {
-          resEl.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
+      document.addEventListener('click', (e) => {
+        const tip = document.getElementById('tipBox');
+        const btn = document.getElementById('helpBtn');
+        if (!tip.contains(e.target) && !btn.contains(e.target)) {
+          tip.classList.add('hidden');
+        }
+      });
+
+      /* ----------------------------------------------------
+         사업자 등록번호 인증 ( /verify-biz )
+      ---------------------------------------------------- */
+      async function verifyBizNumber() {
+        const n1 = document.getElementById('bizNumber1').value.trim();
+        const n2 = document.getElementById('bizNumber2').value.trim();
+        const n3 = document.getElementById('bizNumber3').value.trim();
+        const biz = n1 + n2 + n3;
+
+        const resEl = document.getElementById('bizVerifyResult');
+        const nameInp = document.getElementById('businessName');
+
+        if (!/^\d{10}$/.test(biz)) {
+          resEl.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
           resEl.className = 'text-sm text-red-600 text-center';
-        }
-      } catch (err) {
-        console.error(err);
-        resEl.textContent = '서버 오류로 인증에 실패했습니다.';
-        resEl.className = 'text-sm text-red-600 text-center';
-      }
-    }
-
-    /* ----------------------------------------------------
-       휴대전화 인증 (테스트)
-    ---------------------------------------------------- */
-    document.getElementById('verifyPhoneButton').addEventListener('click', () => {
-      const phone = document.getElementById('ownerPhone').value.trim();
-      const resEl = document.getElementById('phoneVerifyResult');
-      if (!phone) {
-        resEl.textContent = '핸드폰 번호를 입력해주세요.';
-        resEl.className = 'text-sm text-red-600 ';
-        return;
-      }
-      resEl.textContent = '인증번호가 발송되었습니다. (테스트 코드: 123456)';
-      resEl.className = 'text-sm text-green-600 text-center';
-    });
-    document.getElementById('phoneAuth').addEventListener('blur', function () {
-      const code = this.value.trim();
-      const resEl = document.getElementById('phoneVerifyResult');
-      if (code === '123456') {
-        resEl.textContent = '휴대전화 인증 성공.';
-        resEl.className = 'text-sm text-green-600 text-center';
-      } else {
-        resEl.textContent = '인증번호가 일치하지 않습니다.';
-        resEl.className = 'text-sm text-red-600 text-center';
-      }
-    });
-
-    /* ----------------------------------------------------
-       헤더 / 푸터 포함
-    ---------------------------------------------------- */
-    fetch('/components/header.html')
-      .then(r => r.text())
-      .then(d => (document.getElementById('header-placeholder').innerHTML = d));
-    fetch('/components/footer.html')
-      .then(r => r.text())
-      .then(d => (document.getElementById('footer-placeholder').innerHTML = d));
-
-    /* ----------------------------------------------------
-       폼 제출 (등록)
-    ---------------------------------------------------- */
-    const form = document.getElementById('businessForm');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        const businessType = form.querySelector('[name="businessType"]').value.trim();
-        if (!businessType) {
-          alert("업종(구분)을 입력해주세요.");
           return;
         }
-        const fd = new FormData(form);
 
-        /* 사업자번호 병합 */
-        const biz =
-          document.getElementById('bizNumber1').value.trim() +
-          document.getElementById('bizNumber2').value.trim() +
-          document.getElementById('bizNumber3').value.trim();
-        fd.append('bizNumber', biz);
+        try {
+          const r = await fetch('/verify-biz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ b_no: [biz] })
+          });
+          const d = await r.json();
+          const i = d?.data?.[0];
 
-        /* 가격 콤마 제거 */
-        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
-        fd.delete('menuPrice[]');
-        priceInputs.forEach(i => fd.append('menuPrice[]', i.value.replace(/,/g, '')));
-
-        /* 이메일 확정 */
-        fd.delete('ownerEmail');
-        fd.append('ownerEmail', document.getElementById('ownerEmail').value);
-
-        const res = await fetch('/store', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error('서버 응답 에러');
-        const result = await res.json();
-        alert('등록이 완료되었습니다!');
-        window.location.href = `detail.html?id=${result.storeId}`;
-      } catch (err) {
-        console.error(err);
-        alert('데이터 전송 중 에러가 발생했습니다!');
+          if (i && i.b_stt_cd === '01') {
+            resEl.textContent = `✅ 인증 완료: ${i.b_no}`;
+            resEl.className = 'text-sm text-green-600 text-center';
+            nameInp.value = i.b_nm || '';
+            if (!i.b_nm) nameInp.placeholder = '자동입력 실패 - 상호명을 입력하세요';
+          } else {
+            resEl.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
+            resEl.className = 'text-sm text-red-600 text-center';
+          }
+        } catch (err) {
+          console.error(err);
+          resEl.textContent = '서버 오류로 인증에 실패했습니다.';
+          resEl.className = 'text-sm text-red-600 text-center';
+        }
       }
-    });
 
-    /* ----------------------------------------------------
-       수정 로직
-    ---------------------------------------------------- */
-    async function updateData() {
-      const storeId = document.getElementById('storeId').value;
-      if (!storeId) {
-        alert('수정할 데이터가 없습니다. 먼저 등록을 진행하세요.');
-        return;
-      }
-      try {
-        const fd = new FormData(form);
-        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
-        fd.delete('menuPrice[]');
-        priceInputs.forEach(i => fd.append('menuPrice[]', i.value.replace(/,/g, '')));
+      /* ----------------------------------------------------
+         휴대전화 인증 (테스트)
+      ---------------------------------------------------- */
+      document.getElementById('verifyPhoneButton').addEventListener('click', () => {
+        const phone = document.getElementById('ownerPhone').value.trim();
+        const resEl = document.getElementById('phoneVerifyResult');
+        if (!phone) {
+          resEl.textContent = '핸드폰 번호를 입력해주세요.';
+          resEl.className = 'text-sm text-red-600 ';
+          return;
+        }
+        resEl.textContent = '인증번호가 발송되었습니다. (테스트 코드: 123456)';
+        resEl.className = 'text-sm text-green-600 text-center';
+      });
+      document.getElementById('phoneAuth').addEventListener('blur', function () {
+        const code = this.value.trim();
+        const resEl = document.getElementById('phoneVerifyResult');
+        if (code === '123456') {
+          resEl.textContent = '휴대전화 인증 성공.';
+          resEl.className = 'text-sm text-green-600 text-center';
+        } else {
+          resEl.textContent = '인증번호가 일치하지 않습니다.';
+          resEl.className = 'text-sm text-red-600 text-center';
+        }
+      });
 
-        const res = await fetch(`/store/${storeId}`, { method: 'PUT', body: fd });
-        if (!res.ok) throw new Error('서버 응답 에러 (수정)');
-        alert('수정이 완료되었습니다!');
-        window.location.href = `detail.html?id=${storeId}`;
-      } catch (err) {
-        console.error(err);
-        alert('데이터 수정 중 에러가 발생했습니다!');
+      /* ----------------------------------------------------
+         헤더 / 푸터 포함
+      ---------------------------------------------------- */
+      fetch('/components/header.html')
+        .then(r => r.text())
+        .then(d => (document.getElementById('header-placeholder').innerHTML = d));
+      fetch('/components/footer.html')
+        .then(r => r.text())
+        .then(d => (document.getElementById('footer-placeholder').innerHTML = d));
+
+      /* ----------------------------------------------------
+         폼 제출 (등록)
+      ---------------------------------------------------- */
+      const form = document.getElementById('businessForm');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const businessType = form.querySelector('[name="businessType"]').value.trim();
+          if (!businessType) {
+            alert("업종(구분)을 입력해주세요.");
+            return;
+          }
+          const fd = new FormData(form);
+
+          /* 사업자번호 병합 */
+          const biz =
+            document.getElementById('bizNumber1').value.trim() +
+            document.getElementById('bizNumber2').value.trim() +
+            document.getElementById('bizNumber3').value.trim();
+          fd.append('bizNumber', biz);
+
+          /* 가격 콤마 제거 */
+          const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
+          fd.delete('menuPrice[]');
+          priceInputs.forEach(i => fd.append('menuPrice[]', i.value.replace(/,/g, '')));
+
+          /* 이메일 확정 */
+          fd.delete('ownerEmail');
+          fd.append('ownerEmail', document.getElementById('ownerEmail').value);
+
+          const res = await fetch('/store', { method: 'POST', body: fd });
+          if (!res.ok) throw new Error('서버 응답 에러');
+          const result = await res.json();
+          alert('등록이 완료되었습니다!');
+          window.location.href = `detail.html?id=${result.storeId}`;
+        } catch (err) {
+          console.error(err);
+          alert('데이터 전송 중 에러가 발생했습니다!');
+        }
+      });
+
+      /* ----------------------------------------------------
+         수정 로직
+      ---------------------------------------------------- */
+      async function updateData() {
+        const storeId = document.getElementById('storeId').value;
+        if (!storeId) {
+          alert('수정할 데이터가 없습니다. 먼저 등록을 진행하세요.');
+          return;
+        }
+        try {
+          const fd = new FormData(form);
+          const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
+          fd.delete('menuPrice[]');
+          priceInputs.forEach(i => fd.append('menuPrice[]', i.value.replace(/,/g, '')));
+
+          const res = await fetch(`/store/${storeId}`, { method: 'PUT', body: fd });
+          if (!res.ok) throw new Error('서버 응답 에러 (수정)');
+          alert('수정이 완료되었습니다!');
+          window.location.href = `detail.html?id=${storeId}`;
+        } catch (err) {
+          console.error(err);
+          alert('데이터 수정 중 에러가 발생했습니다!');
+        }
       }
-    }
   </script>
