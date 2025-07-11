@@ -1,9 +1,7 @@
-// routes/restaurant.js
 import express from "express";
-import { getStoresByCategory } from "../controllers/restaurantController.js";
-
+import { getStoresByRestaurant } from "../controllers/restaurantController.js";
 const router = express.Router();
 
-router.get("/:category/stores", getStoresByCategory);
+router.get("/stores", getStoresByRestaurant);
 
 export default router;
