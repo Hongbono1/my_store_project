@@ -12,5 +12,6 @@ router.get("/", (req, res) => {
 
 // ✅ 카테고리별 가게 목록
 router.get("/:category/stores", getStoresByCategory);
+router.get("/ads", getPowerAds);   // ★ 추가
 
 export default router;
