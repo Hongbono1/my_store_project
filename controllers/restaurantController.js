@@ -5,6 +5,7 @@ import { pool } from "../db/pool.js";
  * GET /restaurant/ads
  */
 export async function getPowerAds(req, res) {
+  console.log("▶ getPowerAds 호출됨");
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -36,20 +37,27 @@ export async function getStoresByCategory(req, res) {
       `
       SELECT
         id,
-        business_name      AS "title",
-        business_category  AS "category",
-        phone_number       AS "phone",
-        '/uploads/' || image1 AS "img"
+        business_name      AS title,
+        business_category  AS category,
+        phone_number       AS phone,
+        -- image1에 'uploads/파일.jpg' 형식으로만 저장되어 있다고 가정
+        -- 만약 image1에 앞에 슬래시가 붙어 있으면 제거
+        CASE 
+          WHEN image1 LIKE '/%' 
+            THEN image1 
+          ELSE '/uploads/' || image1 
+        END AS img
       FROM store_info
       WHERE business_category = $1
-      ORDER BY created_at DESC
-      LIMIT  100
+      ORDER BY view_count DESC
+      LIMIT 20
       `,
       [category]
     );
+
     res.json(rows);
-  } catch (err) {
-    console.error("카테고리별 가게 조회 오류:", err);
-    res.status(500).json({ error: "카테고리별 가게 조회 오류" });
+  } catch (e) {
+    console.error("가게 목록 조회 중 에러:", e);
+    res.status(500).json({ error: "가게 목록 조회 실패" });
   }
 }
