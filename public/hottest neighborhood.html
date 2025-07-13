@@ -67,64 +67,76 @@
 
 
   <script>
-  // 1) 카드 생성 함수 (전역에 한 번만 선언)
-      function createAdCard(ad) {
-    const adBox = document.createElement("div");
+    // 추천 가게 데이터 (static)
+    const recommendedStoreAds = [
+      { id: 101, businessName: "미스터피자", phone: "010-1111-2222", thumb: "https://via.placeholder.com/300x200" },
+      { id: 102, businessName: "도미노피자", phone: "010-2222-3333", thumb: "https://via.placeholder.com/300x200" },
+      { id: 103, businessName: "버거킹", phone: "010-3333-4444", thumb: "https://via.placeholder.com/300x200" },
+      { id: 104, businessName: "롯데리아", phone: "010-4444-5555", thumb: "https://via.placeholder.com/300x200" },
+      { id: 105, businessName: "탐앤탐스", phone: "010-5555-6666", thumb: "https://via.placeholder.com/300x200" },
+      { id: 106, businessName: "엔제리너스", phone: "010-6666-7777", thumb: "https://via.placeholder.com/300x200" },
+      { id: 107, businessName: "파리바게뜨", phone: "010-7777-8888", thumb: "https://via.placeholder.com/300x200" },
+      { id: 108, businessName: "뚜레쥬르", phone: "010-8888-9999", thumb: "https://via.placeholder.com/300x200" }
+    ];
+
+    // 카드 생성 함수
+    function createAdCard(ad) {
+      const adBox = document.createElement("div");
+      adBox.dataset.id = ad.id;
       adBox.className =
-      "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-      // data-* 속성은 모달용(필요 없다면 제거)
-      adBox.dataset.title = ad.businessName;
-      adBox.dataset.phone = ad.phone;
-      adBox.dataset.img   = ad.thumb;
+        "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 " +
+        "transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
 
       adBox.innerHTML = `
       <img src="${ad.thumb}" alt="${ad.businessName}"
-        class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
-      <h3 class="font-semibold text-lg mb-1 cursor-pointer">
-        ${ad.businessName}
-      </h3>
+           class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
+      <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
       <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
         바로가기
       </button>
-      `;
+    `;
 
-    // 이미지·제목 클릭 → 상세페이지
-    [adBox.querySelector("img"), adBox.querySelector("h3")].forEach(el =>
-      el.addEventListener("click", () => {
-        window.location.href = `/detail.html?id=${ad.id}`;
-      })
+      // 이미지 · 제목 · 버튼 클릭 시 상세페이지 이동
+      [adBox.querySelector("img"),
+      adBox.querySelector("h3"),
+      adBox.querySelector(".go-detail")].forEach(el =>
+        el.addEventListener("click", () => {
+          window.location.href = `/detail.html?id=${ad.id}`;
+        })
       );
-      // 버튼 클릭 → 상세페이지
-      adBox.querySelector(".go-detail")
-      .addEventListener("click", () => {
-        window.location.href = `/detail.html?id=${ad.id}`;
-      });
 
       return adBox;
-  }
+    }
 
-      // 2) API 호출 함수
-      async function loadHotNeighborhood() {
-    const res = await fetch("/hot/api");
+    // 핫 섹션 데이터 fetch
+    async function loadHotNeighborhood() {
+      const res = await fetch("/hot/api");
       if (!res.ok) throw new Error("핫 데이터 로드 실패");
-      return await res.json();  // [{id, businessName, phone, thumb}, …]
-  }
+      return await res.json();  // [{ id, businessName, phone, thumb }, …]
+    }
 
-  // 3) 페이지 로드 후 한 번만 실행
-  document.addEventListener("DOMContentLoaded", async () => {
-    // (a) 레이아웃 그대로 유지
-    const container = document.getElementById("hotNeighborhoodBoxes");
+    // 컨테이너에 카드 렌더링
+    function renderAdBoxes(containerId, ads) {
+      const container = document.getElementById(containerId);
       container.innerHTML = "";
-
-      // (b) 동적 데이터 받아서 카드 뿌리기
-      const ads = await loadHotNeighborhood();
-    ads.forEach(ad => {
+      ads.forEach(ad => {
         container.appendChild(createAdCard(ad));
-    });
+      });
+    }
 
-    // (c) 슬라이더, 추천가게, 모달 연결 등
-    //    … 기존에 쓰시던 renderAds(), slider init, modal binding 코드 …
-  });
+    // 페이지 로드 후 한 번만 실행
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1) 핫 섹션
+      const hotAds = await loadHotNeighborhood();
+      renderAdBoxes("hotNeighborhoodBoxes", hotAds);
+
+      // 2) 추천 섹션
+      renderAdBoxes("recommendedStoreContainer", recommendedStoreAds);
+
+      // 3) 슬라이더 초기화 & 모달 바인딩
+      initSlider();   // 기존 슬라이더 세팅 함수
+      bindModal();    // 기존 모달 바인딩 함수
+    });
 
   </script>
 </body>
