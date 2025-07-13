@@ -66,53 +66,56 @@
   <script src="modal/modal.js"></script>
 
   <script>
-    /* ────────── 내부 카드 ────────── */
+    /* ───────────────── ① 카드 하나 ───────────────── */
     function makeCard(ad) {
-      const el = document.createElement("div");
-      el.className =
-        "flex-1 bg-white shadow rounded-lg p-4 flex flex-col border border-gray-300";
-      el.innerHTML = ad       // 데이터 카드
-        ? `
-        <img src="${ad.thumb}" alt="${ad.businessName}"
-             class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
-        <h3 class="font-semibold text-center">${ad.businessName}</h3>
-        <p class="text-sm text-center text-gray-500 mb-3">${ad.phone ?? ""}</p>
-        <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
-          바로가기
-        </button>`
-        : `
-        <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
-        <h3 class="font-semibold text-center text-gray-400">정보 없음</h3>`;
+      const card = document.createElement("div");
+      card.className =
+        "flex-1 bg-white border border-gray-300 rounded-lg p-4 flex flex-col " +
+        "shadow transition hover:shadow-lg";
 
       if (ad) {
-        el.querySelectorAll("img,button,h3").forEach(node =>
-          node.addEventListener("click", () =>
-            window.location.href = `/detail.html?id=${ad.id}`));
+        card.innerHTML = `
+      <img src="${ad.thumb}" alt="${ad.businessName}"
+           class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
+      <h3 class="font-semibold text-center">${ad.businessName}</h3>
+      <p class="text-sm text-center text-gray-500 mb-3">${ad.phone ?? ""}</p>
+      <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
+        바로가기
+      </button>`;
+        card.querySelectorAll("img,h3,button").forEach(el =>
+          el.addEventListener("click",
+            () => window.location.href = `/detail.html?id=${ad.id}`));
+      } else {
+        // 플레이스홀더
+        card.innerHTML = `
+      <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
+      <h3 class="font-semibold text-center text-gray-400">준비 중</h3>`;
       }
-      return el;
+      return card;
     }
 
-    /* ────────── 2칸짜리 큰 박스 ────────── */
-    function renderTwoColBoxes(containerId, ads, totalSlots = 8) {
-      const wrap = document.getElementById(containerId);
-      wrap.innerHTML = "";
+    /* ───────────────── ② 2칸짜리 큰 박스 ───────────────── */
+    function makeBigBox(card1, card2) {
+      const box = document.createElement("div");
+      box.className =
+        "border-2 border-gray-300 bg-white rounded-lg p-4 " +
+        "flex flex-col md:flex-row gap-4";
+      box.append(card1, card2);
+      return box;
+    }
 
+    /* ───────────────── ③ 컨테이너 렌더링 ───────────────── */
+    function renderBoxes(containerId, ads, totalSlots = 8) {
+      const root = document.getElementById(containerId);
+      root.innerHTML = "";
       for (let i = 0; i < totalSlots; i += 2) {
-        // 큰 박스 테두리
-        const bigBox = document.createElement("div");
-        bigBox.className =
-          "border-2 border-gray-300 bg-white rounded-lg p-4 flex flex-col gap-4 " +
-          "md:flex-row";                     /* 데스크탑·태블릿에서는 가로 2열 */
-
-        // 카드 2개(있으면 데이터, 없으면 플레이스홀더)
-        bigBox.appendChild(i < ads.length ? makeCard(ads[i]) : makeCard(null));
-        bigBox.appendChild(i + 1 < ads.length ? makeCard(ads[i + 1]) : makeCard(null));
-
-        wrap.appendChild(bigBox);
+        const cardA = i < ads.length ? makeCard(ads[i]) : makeCard(null);
+        const cardB = i + 1 < ads.length ? makeCard(ads[i + 1]) : makeCard(null);
+        root.appendChild(makeBigBox(cardA, cardB));
       }
     }
 
-    /* ────────── 안전 fetch → 실패 시 [] ────────── */
+    /* ───────────────── ④ 안전 fetch → 실패 시 [] ───────────────── */
     const safeFetch = async url => {
       try {
         const r = await fetch(url);
@@ -121,20 +124,21 @@
       return [];
     };
 
-    /* ────────── 페이지 로드 ────────── */
+    /* ───────────────── ⑤ 페이지 로드 ───────────────── */
     document.addEventListener("DOMContentLoaded", async () => {
-      /* 1) 가장 핫한 우리동네 (동적) */
+      // 1) 가장 핫한 우리동네 (동적)
       const hotAds = await safeFetch("/hot/api");
-      renderTwoColBoxes("hotNeighborhoodBoxes", hotAds);      // 8슬롯 고정
+      renderBoxes("hotNeighborhoodBoxes", hotAds);
 
-      /* 2) 추천 가게 (동적) */
+      // 2) 추천 가게 (동적)
       const recAds = await safeFetch("/recommend/api");
-      renderTwoColBoxes("recommendedStoreContainer", recAds); // 8슬롯 고정
+      renderBoxes("recommendedStoreContainer", recAds);
 
-      /* 3) 슬라이더 · 모달 */
+      // 3) 슬라이더 & 모달
       initSlider();
       bindModal();
     });
   </script>
+
 </body>
 </html>
