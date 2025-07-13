@@ -67,29 +67,71 @@
 
 
   <script>
-
     // 1) 빈 카드(placeholder) 생성 함수
     function createEmptyCard() {
       const box = document.createElement("div");
       box.className =
         "ad-card bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col " +
-        "items-center justify-center text-gray-400 opacity-50 h-64"; // height 고정
+        "items-center justify-center text-gray-400 opacity-50 h-64";
       box.innerHTML = `
-    <div class="mb-4 h-40 w-full bg-gray-100 rounded animate-pulse"></div>
-    <h3 class="font-semibold text-lg mb-1">정보 없음</h3>
-    <button disabled
-      class="mt-auto bg-gray-300 text-white py-2 px-4 rounded cursor-not-allowed">
-      대기 중
-    </button>
-  `;
+      <div class="mb-4 h-40 w-full bg-gray-100 rounded animate-pulse"></div>
+      <h3 class="font-semibold text-lg mb-1">정보 없음</h3>
+      <button disabled
+        class="mt-auto bg-gray-300 text-white py-2 px-4 rounded cursor-not-allowed">
+        대기 중
+      </button>
+    `;
       return box;
     }
 
-    // 2) renderAdBoxes 수정: 고정 슬롯(예:8개)으로 채우기
+    // 2) 카드 생성 함수 (데이터 있을 때)
+    function createAdCard(ad) {
+      const adBox = document.createElement("div");
+      adBox.dataset.id = ad.id;
+      adBox.className =
+        "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 " +
+        "transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
+      adBox.innerHTML = `
+      <img src="${ad.thumb}" alt="${ad.businessName}"
+           class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
+      <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
+      <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+        바로가기
+      </button>
+    `;
+      [adBox.querySelector("img"),
+      adBox.querySelector("h3"),
+      adBox.querySelector(".go-detail")].forEach(el =>
+        el.addEventListener("click", () => {
+          window.location.href = `/detail.html?id=${ad.id}`;
+        })
+      );
+      return adBox;
+    }
+
+    // 3) 추천 가게 데이터 (static)
+    const recommendedStoreAds = [
+      { id: 101, businessName: "미스터피자", phone: "010-1111-2222", thumb: "https://via.placeholder.com/300x200" },
+      { id: 102, businessName: "도미노피자", phone: "010-2222-3333", thumb: "https://via.placeholder.com/300x200" },
+      { id: 103, businessName: "버거킹", phone: "010-3333-4444", thumb: "https://via.placeholder.com/300x200" },
+      { id: 104, businessName: "롯데리아", phone: "010-4444-5555", thumb: "https://via.placeholder.com/300x200" },
+      { id: 105, businessName: "탐앤탐스", phone: "010-5555-6666", thumb: "https://via.placeholder.com/300x200" },
+      { id: 106, businessName: "엔제리너스", phone: "010-6666-7777", thumb: "https://via.placeholder.com/300x200" },
+      { id: 107, businessName: "파리바게뜨", phone: "010-7777-8888", thumb: "https://via.placeholder.com/300x200" },
+      { id: 108, businessName: "뚜레쥬르", phone: "010-8888-9999", thumb: "https://via.placeholder.com/300x200" }
+    ];
+
+    // 4) 핫 섹션 데이터 fetch
+    async function loadHotNeighborhood() {
+      const res = await fetch("/hot/api");
+      if (!res.ok) throw new Error("핫 데이터 로드 실패");
+      return res.json(); // [{ id, businessName, phone, thumb }, …]
+    }
+
+    // 5) renderAdBoxes: totalSlots 개수만큼 채움
     function renderAdBoxes(containerId, ads, totalSlots = 8) {
       const container = document.getElementById(containerId);
       container.innerHTML = "";
-
       for (let i = 0; i < totalSlots; i++) {
         if (i < ads.length) {
           container.appendChild(createAdCard(ads[i]));
@@ -98,42 +140,14 @@
         }
       }
     }
-    // 추천 가게 데이터 (static)
-    const recommendedStoreAds = [
-      { id: 101, businessName: "미스터피자", phone: "010-1111-2222", thumb: "https://via.placeholder.com/300x200" },
-      /* … 나머지 … */
-    ];
 
-    // 카드 생성 함수
-    function createAdCard(ad) {
-      const adBox = document.createElement("div");
-      adBox.dataset.id = ad.id;
-      adBox.className = "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-      adBox.innerHTML = `
-      <img src="${ad.thumb}" alt="${ad.businessName}" class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
-      <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
-      <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">바로가기</button>
-    `;
-      [adBox.querySelector("img"), adBox.querySelector("h3"), adBox.querySelector(".go-detail")].forEach(el =>
-        el.addEventListener("click", () => window.location.href = `/detail.html?id=${ad.id}`)
-      );
-      return adBox;
-    }
-
-    // 핫 섹션 데이터 fetch
-    async function loadHotNeighborhood() {
-      const res = await fetch("/hot/api");
-      if (!res.ok) throw new Error("핫 데이터 로드 실패");
-      return res.json();
-    }
-
-    // 페이지 로드 후 동작
+    // 6) 페이지 로드 후 한 번만 실행
     document.addEventListener("DOMContentLoaded", async () => {
-      // 1) 핫 섹션
+      // 1) “가장 핫한 우리동네” 섹션
       const hotAds = await loadHotNeighborhood();
       renderAdBoxes("hotNeighborhoodBoxes", hotAds);
 
-      // 2) 추천 섹션
+      // 2) “추천 가게” 섹션
       renderAdBoxes("recommendedStoreContainer", recommendedStoreAds);
 
       // 3) 슬라이더 초기화 & 모달 바인딩
@@ -141,6 +155,7 @@
       bindModal();
     });
   </script>
+
 
 </body>
 
