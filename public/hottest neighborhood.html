@@ -182,32 +182,48 @@
     function createAdCard(ad) {
       const adBox = document.createElement("div");
       adBox.className =
-        "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
+        "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl flex-1";
       adBox.innerHTML = `
-          <img src="${ad.img}" alt="${ad.title}" class="h-40 w-full object-cover rounded mb-4">
-          <h2 class="text-2xl font-bold text-center mb-2">${ad.title}</h2>
-          <h3 class="text-xl font-semibold text-center text-gray-700">${ad.category}</h3>
-          <p class="text-lg text-gray-500 text-center">${ad.phone}</p>
-          <a href="${ad.link}" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">바로가기</a>
-      `;
+    <img src="${ad.img || '/assets/images/no-thumb.png'}" alt="${ad.title || '정보 없음'}" class="h-40 w-full object-cover rounded mb-4">
+    <h2 class="text-2xl font-bold text-center mb-2">${ad.title || '정보 없음'}</h2>
+    <h3 class="text-xl font-semibold text-center text-gray-700">${ad.category || ''}</h3>
+    <p class="text-lg text-gray-500 text-center">${ad.phone || ''}</p>
+    <a href="${ad.link || '#'}" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">바로가기</a>
+  `;
       return adBox;
     }
 
-    // 광고 박스를 생성하여 각 박스 내부에 광고 카드 2개씩 배치하는 함수
-    function renderAdBoxes(containerId, ads, itemsPerBox = 2) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = ""; // 기존 내용 제거
+    // 플레이스홀더(정보 없음) 카드 생성 함수
+    function createEmptyAdCard() {
+      const adBox = document.createElement("div");
+      adBox.className =
+        "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 opacity-50 flex-1";
+      adBox.innerHTML = `
+    <div class="h-40 w-full bg-gray-100 rounded mb-4 animate-pulse"></div>
+    <h2 class="text-2xl font-bold text-center mb-2 text-gray-400">정보 없음</h2>
+    <h3 class="text-xl font-semibold text-center text-gray-300">카테고리</h3>
+    <p class="text-lg text-gray-300 text-center">-</p>
+    <a class="mt-4 bg-gray-300 text-white py-2 px-4 rounded text-center shadow-lg cursor-not-allowed">대기 중</a>
+  `;
+      return adBox;
+    }
 
-      for (let i = 0; i < ads.length; i += itemsPerBox) {
-        // 큰 네모 박스 (광고 박스)
+    // 트윈테일 박스 렌더링 함수
+    function renderAdBoxes(containerId, ads, itemsPerBox = 2, totalCards = 8) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      // 부족한 만큼 빈카드 추가
+      const data = ads.slice(0, totalCards);
+      while (data.length < totalCards) data.push(null);
+
+      // 2개씩 그룹화
+      for (let i = 0; i < totalCards; i += itemsPerBox) {
         const box = document.createElement("div");
         box.className = "bg-gray-50 border-2 border-gray-300 rounded-lg p-4 flex flex-col md:flex-row gap-4";
-
-        // 그룹 내 광고 카드 2개씩 추가
-        for (let j = i; j < i + itemsPerBox && j < ads.length; j++) {
-          const adCard = createAdCard(ads[j]);
-          adCard.classList.add("flex-1");
-          box.appendChild(adCard);
+        for (let j = 0; j < itemsPerBox; j++) {
+          const cardData = data[i + j];
+          box.appendChild(cardData ? createAdCard(cardData) : createEmptyAdCard());
         }
         container.appendChild(box);
       }
