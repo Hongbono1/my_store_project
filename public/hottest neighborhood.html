@@ -25,14 +25,23 @@
       </div>
     </section>
 
+
     <!-- 슬라이드 영역 (광고박스 캐러셀) -->
     <section
       class="relative w-full max-w-screen-lg mx-auto overflow-hidden border border-gray-300 rounded-lg mt-8 px-4 mb-9">
-      <div id="sliderContainer" class="flex transition-transform duration-500 h-48 items-center"></div>
-      <button id="prevBtn"
-        class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white p-3 rounded-full hover:bg-gray-900 transition z-10">&lt;</button>
-      <button id="nextBtn"
-        class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white p-3 rounded-full hover:bg-gray-900 transition z-10">&gt;</button>
+
+      <!-- 광고카드들을 가로로 나열할 공간 -->
+      <div id="sliderContainer" class="flex transition-transform duration-500 h-48 items-center">
+        <!-- 광고카드(여러개) JS로 동적으로 생성 -->
+
+        <div class="flex-shrink-0 w-64 mx-2 cursor-pointer group">
+          <div
+            class="bg-white border-2 border-gray-200 rounded-lg shadow p-3 flex flex-col items-center transition hover:shadow-lg">
+            <img src="이미지URL" alt="상호명" class="w-full h-36 object-cover rounded-md mb-2">
+            <h3 class="text-lg font-bold text-center group-hover:text-blue-500 truncate">상호명</h3>
+          </div>
+        </div>
+      </div>
 
       <!-- 이전/다음 버튼 -->
       <button id="prevBtn"
@@ -40,6 +49,7 @@
       <button id="nextBtn"
         class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white p-3 rounded-full hover:bg-gray-900 transition z-10">&gt;</button>
     </section>
+
 
     <!-- ⭐ 추천 가게 섹션 (순수 이미지, 만화) -->
     <section class="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-300">
@@ -224,20 +234,23 @@
     });
 
     // 광고슬라이드용 카드(한 개)
-    function createSlideAdCard(ad) {
+    // ★ 기존의 createSlideAdCard, renderSliderAds 함수 완전히 삭제하고, 아래로 교체!
+
+    // (1) 광고박스 레이아웃: 이미지+상호명, 클릭시 상세 이동
+    function createSimpleSlideAdCard(ad) {
       const div = document.createElement("div");
-      div.className = "flex-shrink-0 w-80 mx-3 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-4 flex flex-col items-center";
+      div.className = "flex-shrink-0 w-64 mx-2 cursor-pointer group";
       div.innerHTML = `
-      <img src="${ad?.img || ad?.thumb || '/assets/images/no-thumb.png'}" alt="${ad?.title || ad?.businessName || '정보 없음'}" class="h-28 w-full object-cover rounded mb-3">
-      <h3 class="font-bold text-lg mb-1">${ad?.title || ad?.businessName || '정보 없음'}</h3>
-      <p class="text-sm text-gray-500">${ad?.category || ''}</p>
-      <p class="text-sm text-gray-400 mb-2">${ad?.phone || ''}</p>
-      <a href="${ad?.link || `/detail.html?id=${ad?.id || ''}`}" class="mt-auto bg-blue-500 text-white py-1.5 px-4 rounded shadow-lg hover:bg-blue-600 text-center">바로가기</a>
-    `;
+    <div class="bg-white border-2 border-gray-200 rounded-lg shadow p-3 flex flex-col items-center transition hover:shadow-lg">
+      <img src="${ad.img || ad.thumb || '/assets/images/no-thumb.png'}" alt="${ad.businessName || '정보 없음'}" class="w-full h-36 object-cover rounded-md mb-2">
+      <h3 class="text-lg font-bold text-center group-hover:text-blue-500 truncate">${ad.businessName || '정보 없음'}</h3>
+    </div>
+  `;
+      div.onclick = () => location.href = `/detail.html?id=${ad.id || ''}`;
       return div;
     }
 
-    // 슬라이드 광고 fetch + 렌더 + 캐러셀
+    // (2) 슬라이드 fetch + 렌더 + 캐러셀 기능
     async function renderSliderAds() {
       const sliderContainer = document.getElementById("sliderContainer");
       let ads = [];
@@ -245,31 +258,27 @@
         const res = await fetch("/slide/api");
         if (res.ok) ads = await res.json();
       } catch (e) { ads = []; }
-      if (!ads.length) ads = Array(5).fill(null); // 정보없음으로 채움
+      if (!ads.length) ads = Array(5).fill(null);
 
-      // 카드들 렌더
       sliderContainer.innerHTML = "";
       ads.forEach(ad => sliderContainer.appendChild(
-        ad ? createSlideAdCard(ad) : createSlideAdCard({})
+        ad ? createSimpleSlideAdCard(ad) : createSimpleSlideAdCard({})
       ));
 
-      // 슬라이드 동작 (기본 좌우)
       let idx = 0, total = ads.length;
       function update() {
-        sliderContainer.style.transform = `translateX(-${idx * 21.5}rem)`; // 21.5rem = w-80(20rem)+mx-3
+        sliderContainer.style.transform = `translateX(-${idx * 17}rem)`;
         sliderContainer.style.transition = "transform 0.6s";
       }
-      document.getElementById("prevBtn").onclick = () => {
-        idx = (idx - 1 + total) % total; update();
-      };
-      document.getElementById("nextBtn").onclick = () => {
-        idx = (idx + 1) % total; update();
-      };
+      document.getElementById("prevBtn").onclick = () => { idx = (idx - 1 + total) % total; update(); };
+      document.getElementById("nextBtn").onclick = () => { idx = (idx + 1) % total; update(); };
       update();
     }
+
+    // (3) 페이지 로딩 시 슬라이드 광고 자동 세팅
+    document.addEventListener("DOMContentLoaded", renderSliderAds);
 
   </script>
 
 </body>
-
 </html>
