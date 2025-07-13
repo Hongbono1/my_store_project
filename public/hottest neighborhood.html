@@ -65,86 +65,76 @@
   <!-- 모달 JS (정적 포함) -->
   <script src="modal/modal.js"></script>
 
-
   <script>
-
-    /* ───── 카드 & 플레이스홀더 ───── */
-    function createAdCard(ad) {
+    /* ────────── 내부 카드 ────────── */
+    function makeCard(ad) {
       const el = document.createElement("div");
       el.className =
-        "flex-1 bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 " +
-        "transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-      el.innerHTML = `
-      <img src="${ad.thumb}" alt="${ad.businessName}"
-        class="h-40 w-full object-cover rounded mb-4 cursor-pointer">
-        <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
-        <p class="text-sm text-gray-500 mb-2">${ad.phone ?? ""}</p>
-        <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+        "flex-1 bg-white shadow rounded-lg p-4 flex flex-col border border-gray-300";
+      el.innerHTML = ad       // 데이터 카드
+        ? `
+        <img src="${ad.thumb}" alt="${ad.businessName}"
+             class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
+        <h3 class="font-semibold text-center">${ad.businessName}</h3>
+        <p class="text-sm text-center text-gray-500 mb-3">${ad.phone ?? ""}</p>
+        <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
           바로가기
-        </button>`;
-      el.querySelectorAll("img,h3,.go-detail").forEach(btn =>
-        btn.addEventListener("click", () =>
-          window.location.href = `/detail.html?id=${ad.id}`));
+        </button>`
+        : `
+        <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
+        <h3 class="font-semibold text-center text-gray-400">정보 없음</h3>`;
+
+      if (ad) {
+        el.querySelectorAll("img,button,h3").forEach(node =>
+          node.addEventListener("click", () =>
+            window.location.href = `/detail.html?id=${ad.id}`));
+      }
       return el;
     }
 
-    function createEmptyCard() {
-      const el = document.createElement("div");
-      el.className =
-        "flex-1 bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col " +
-        "items-center justify-center text-gray-400 opacity-50 h-64";
-      el.innerHTML = `
-        <div class="mb-4 h-40 w-full bg-gray-100 rounded animate-pulse"></div>
-        <h3 class="font-semibold text-lg">정보 없음</h3>`;
-      return el;
-    }
-
-    /* ───── 두 칸씩 묶는 박스 렌더러 ───── */
-    function renderGroupedBoxes(containerId, ads, totalSlots = 8, perBox = 2) {
+    /* ────────── 2칸짜리 큰 박스 ────────── */
+    function renderTwoColBoxes(containerId, ads, totalSlots = 8) {
       const wrap = document.getElementById(containerId);
       wrap.innerHTML = "";
-      for (let i = 0; i < totalSlots; i += perBox) {
-        const box = document.createElement("div");
-        box.className =
-          "bg-gray-50 border-2 border-gray-300 rounded-lg p-4 flex flex-col md:flex-row gap-4";
-        for (let j = 0; j < perBox; j++) {
-          const idx = i + j;
-          box.appendChild(idx < ads.length ? createAdCard(ads[idx]) : createEmptyCard());
-        }
-        wrap.appendChild(box);
+
+      for (let i = 0; i < totalSlots; i += 2) {
+        // 큰 박스 테두리
+        const bigBox = document.createElement("div");
+        bigBox.className =
+          "border-2 border-gray-300 bg-white rounded-lg p-4 flex flex-col gap-4 " +
+          "md:flex-row";                     /* 데스크탑·태블릿에서는 가로 2열 */
+
+        // 카드 2개(있으면 데이터, 없으면 플레이스홀더)
+        bigBox.appendChild(i < ads.length ? makeCard(ads[i]) : makeCard(null));
+        bigBox.appendChild(i + 1 < ads.length ? makeCard(ads[i + 1]) : makeCard(null));
+
+        wrap.appendChild(bigBox);
       }
     }
 
-    /* ───── 공통 fetch 헬퍼 ───── */
-    async function safeFetchJson(url) {
+    /* ────────── 안전 fetch → 실패 시 [] ────────── */
+    const safeFetch = async url => {
       try {
-        const res = await fetch(url);
-        if (res.ok) return await res.json();
-      } catch (err) {
-        console.error(url, err);
-      }
-      return [];               // 실패 시 빈 배열
-    }
+        const r = await fetch(url);
+        if (r.ok) return r.json();
+      } catch (e) { console.error(url, e); }
+      return [];
+    };
 
-    /* ───── 페이지 로드 ───── */
+    /* ────────── 페이지 로드 ────────── */
     document.addEventListener("DOMContentLoaded", async () => {
-      // 1) 가장 핫한 우리동네
-      const hotAds = await safeFetchJson("/hot/api");       // ↙︎ 컨트롤러에서 JSON 반환
-      renderGroupedBoxes("hotNeighborhoodBoxes", hotAds);
+      /* 1) 가장 핫한 우리동네 (동적) */
+      const hotAds = await safeFetch("/hot/api");
+      renderTwoColBoxes("hotNeighborhoodBoxes", hotAds);      // 8슬롯 고정
 
-      // 2) 추천 가게 (동적)
-      const recommendAds = await safeFetchJson("/recommend/api");
-      renderGroupedBoxes("recommendedStoreContainer", recommendAds);
+      /* 2) 추천 가게 (동적) */
+      const recAds = await safeFetch("/recommend/api");
+      renderTwoColBoxes("recommendedStoreContainer", recAds); // 8슬롯 고정
 
-      // 3) 슬라이더 & 모달
+      /* 3) 슬라이더 · 모달 */
       initSlider();
       bindModal();
     });
-
-
   </script>
-
-
 </body>
-
 </html>
