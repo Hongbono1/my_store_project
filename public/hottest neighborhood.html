@@ -67,84 +67,81 @@
 
 
   <script>
-    /* ------------------- 카드·슬롯 생성 ------------------- */
-    // 데이터 카드
+
+    /* ───── 카드 & 플레이스홀더 ───── */
     function createAdCard(ad) {
-      const box = document.createElement("div");
-      box.className =
-        "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 " +
+      const el = document.createElement("div");
+      el.className =
+        "flex-1 bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 " +
         "transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-      box.innerHTML = `
-    <img src="${ad.thumb}" alt="${ad.businessName}"
-         class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
-    <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
-    <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
-      바로가기
-    </button>
-  `;
-      [box.querySelector("img"), box.querySelector("h3"), box.querySelector(".go-detail")]
-        .forEach(el => el.addEventListener("click",
-          () => window.location.href = `/detail.html?id=${ad.id}`));
-      return box;
+      el.innerHTML = `
+      <img src="${ad.thumb}" alt="${ad.businessName}"
+        class="h-40 w-full object-cover rounded mb-4 cursor-pointer">
+        <h3 class="font-semibold text-lg mb-1 cursor-pointer">${ad.businessName}</h3>
+        <p class="text-sm text-gray-500 mb-2">${ad.phone ?? ""}</p>
+        <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+          바로가기
+        </button>`;
+      el.querySelectorAll("img,h3,.go-detail").forEach(btn =>
+        btn.addEventListener("click", () =>
+          window.location.href = `/detail.html?id=${ad.id}`));
+      return el;
     }
 
-    // 빈 슬롯 카드
     function createEmptyCard() {
-      const box = document.createElement("div");
-      box.className =
-        "bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col " +
+      const el = document.createElement("div");
+      el.className =
+        "flex-1 bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col " +
         "items-center justify-center text-gray-400 opacity-50 h-64";
-      box.innerHTML = `
-    <div class="mb-4 h-40 w-full bg-gray-100 rounded animate-pulse"></div>
-    <h3 class="font-semibold text-lg mb-1">정보 없음</h3>
-    <button disabled
-      class="mt-auto bg-gray-300 text-white py-2 px-4 rounded cursor-not-allowed">
-      대기 중
-    </button>`;
-      return box;
+      el.innerHTML = `
+        <div class="mb-4 h-40 w-full bg-gray-100 rounded animate-pulse"></div>
+        <h3 class="font-semibold text-lg">정보 없음</h3>`;
+      return el;
     }
 
-    /* ------------------- 공통 렌더링 ------------------- */
-    function renderAdBoxes(containerId, ads, totalSlots = 8) {
-      const c = document.getElementById(containerId);
-      c.innerHTML = "";
-      for (let i = 0; i < totalSlots; i++) {
-        if (i < ads.length) c.appendChild(createAdCard(ads[i]));
-        else c.appendChild(createEmptyCard());
+    /* ───── 두 칸씩 묶는 박스 렌더러 ───── */
+    function renderGroupedBoxes(containerId, ads, totalSlots = 8, perBox = 2) {
+      const wrap = document.getElementById(containerId);
+      wrap.innerHTML = "";
+      for (let i = 0; i < totalSlots; i += perBox) {
+        const box = document.createElement("div");
+        box.className =
+          "bg-gray-50 border-2 border-gray-300 rounded-lg p-4 flex flex-col md:flex-row gap-4";
+        for (let j = 0; j < perBox; j++) {
+          const idx = i + j;
+          box.appendChild(idx < ads.length ? createAdCard(ads[idx]) : createEmptyCard());
+        }
+        wrap.appendChild(box);
       }
     }
 
-    /* ------------------- 정적 추천 가게 ------------------- */
-    const recommendedStoreAds = [
-      { id: 101, businessName: "미스터피자", phone: "010-1111-2222", thumb: "https://via.placeholder.com/300x200" },
-      { id: 102, businessName: "도미노피자", phone: "010-2222-3333", thumb: "https://via.placeholder.com/300x200" },
-      { id: 103, businessName: "버거킹", phone: "010-3333-4444", thumb: "https://via.placeholder.com/300x200" },
-      { id: 104, businessName: "롯데리아", phone: "010-4444-5555", thumb: "https://via.placeholder.com/300x200" },
-      { id: 105, businessName: "탐앤탐스", phone: "010-5555-6666", thumb: "https://via.placeholder.com/300x200" },
-      { id: 106, businessName: "엔제리너스", phone: "010-6666-7777", thumb: "https://via.placeholder.com/300x200" },
-      { id: 107, businessName: "파리바게뜨", phone: "010-7777-8888", thumb: "https://via.placeholder.com/300x200" },
-      { id: 108, businessName: "뚜레쥬르", phone: "010-8888-9999", thumb: "https://via.placeholder.com/300x200" }
-    ];
-
-    /* ------------------- 페이지 로드 ------------------- */
-    document.addEventListener("DOMContentLoaded", async () => {
-      /* 1) 핫 섹션 ─ 에러가 나도 빈 배열로 넘어감 */
-      let hotAds = [];
+    /* ───── 공통 fetch 헬퍼 ───── */
+    async function safeFetchJson(url) {
       try {
-        const res = await fetch("/hot/api");
-        if (res.ok) hotAds = await res.json();
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
       } catch (err) {
-        console.error("🔥 hot api error:", err);
+        console.error(url, err);
       }
-      renderAdBoxes("hotNeighborhoodBoxes", hotAds);
+      return [];               // 실패 시 빈 배열
+    }
 
-      /* 2) 추천 섹션 (정적) */
-      renderAdBoxes("recommendedStoreContainer", recommendedStoreAds);
+    /* ───── 페이지 로드 ───── */
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1) 가장 핫한 우리동네
+      const hotAds = await safeFetchJson("/hot/api");       // ↙︎ 컨트롤러에서 JSON 반환
+      renderGroupedBoxes("hotNeighborhoodBoxes", hotAds);
 
-      /* 3) 슬라이더·모달 */
+      // 2) 추천 가게 (동적)
+      const recommendAds = await safeFetchJson("/recommend/api");
+      renderGroupedBoxes("recommendedStoreContainer", recommendAds);
+
+      // 3) 슬라이더 & 모달
       initSlider();
       bindModal();
     });
+
+
   </script>
 
 
