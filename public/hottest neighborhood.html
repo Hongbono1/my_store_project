@@ -25,13 +25,14 @@
       </div>
     </section>
 
-    <!-- 슬라이드 영역 (변경 없음) -->
+    <!-- 슬라이드 영역 (광고박스 캐러셀) -->
     <section
       class="relative w-full max-w-screen-lg mx-auto overflow-hidden border border-gray-300 rounded-lg mt-8 px-4 mb-9">
-      <!-- 슬라이드 전체 컨테이너 -->
-      <div id="sliderContainer" class="flex transition-transform duration-500 h-48 items-center">
-        <!-- 슬라이드 내부 아이템이 동적으로 추가됩니다 -->
-      </div>
+      <div id="sliderContainer" class="flex transition-transform duration-500 h-48 items-center"></div>
+      <button id="prevBtn"
+        class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white p-3 rounded-full hover:bg-gray-900 transition z-10">&lt;</button>
+      <button id="nextBtn"
+        class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white p-3 rounded-full hover:bg-gray-900 transition z-10">&gt;</button>
 
       <!-- 이전/다음 버튼 -->
       <button id="prevBtn"
@@ -208,7 +209,7 @@
       return [];
     }
 
-    // 메인 로딩
+    // 메인 로딩 (트윈테일/추천가게)
     document.addEventListener("DOMContentLoaded", async () => {
       // 🔥 우리가게 추천(트윈테일)
       const hotAds = await safeFetch("/hot/api");
@@ -218,8 +219,55 @@
       const recoAds = await safeFetch("/recommend/api");
       renderAds("recommendedStoreContainer", recoAds);
 
-      // (기존 슬라이더/모달 코드 이 아래에 추가)
+      // ⭐ 슬라이드 광고 (아래에서 별도 등록)
+      renderSliderAds(); // 이 한줄로!
     });
+
+    // 광고슬라이드용 카드(한 개)
+    function createSlideAdCard(ad) {
+      const div = document.createElement("div");
+      div.className = "flex-shrink-0 w-80 mx-3 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-4 flex flex-col items-center";
+      div.innerHTML = `
+      <img src="${ad?.img || ad?.thumb || '/assets/images/no-thumb.png'}" alt="${ad?.title || ad?.businessName || '정보 없음'}" class="h-28 w-full object-cover rounded mb-3">
+      <h3 class="font-bold text-lg mb-1">${ad?.title || ad?.businessName || '정보 없음'}</h3>
+      <p class="text-sm text-gray-500">${ad?.category || ''}</p>
+      <p class="text-sm text-gray-400 mb-2">${ad?.phone || ''}</p>
+      <a href="${ad?.link || `/detail.html?id=${ad?.id || ''}`}" class="mt-auto bg-blue-500 text-white py-1.5 px-4 rounded shadow-lg hover:bg-blue-600 text-center">바로가기</a>
+    `;
+      return div;
+    }
+
+    // 슬라이드 광고 fetch + 렌더 + 캐러셀
+    async function renderSliderAds() {
+      const sliderContainer = document.getElementById("sliderContainer");
+      let ads = [];
+      try {
+        const res = await fetch("/slide/api");
+        if (res.ok) ads = await res.json();
+      } catch (e) { ads = []; }
+      if (!ads.length) ads = Array(5).fill(null); // 정보없음으로 채움
+
+      // 카드들 렌더
+      sliderContainer.innerHTML = "";
+      ads.forEach(ad => sliderContainer.appendChild(
+        ad ? createSlideAdCard(ad) : createSlideAdCard({})
+      ));
+
+      // 슬라이드 동작 (기본 좌우)
+      let idx = 0, total = ads.length;
+      function update() {
+        sliderContainer.style.transform = `translateX(-${idx * 21.5}rem)`; // 21.5rem = w-80(20rem)+mx-3
+        sliderContainer.style.transition = "transform 0.6s";
+      }
+      document.getElementById("prevBtn").onclick = () => {
+        idx = (idx - 1 + total) % total; update();
+      };
+      document.getElementById("nextBtn").onclick = () => {
+        idx = (idx + 1) % total; update();
+      };
+      update();
+    }
+
   </script>
 
 </body>
