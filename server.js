@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import hotRouter from "./routes/hot.js";
 import cors from "cors";
 import path from "path";
 import storeRouter from "./routes/store.js";
@@ -29,6 +30,7 @@ app.use((req, res, next) => {
 });
 
 /* ── 라우터 ─────────────────────────── */
+app.use("/hot", hotRouter);
 app.use("/restaurant", restaurantRouter);
 app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
