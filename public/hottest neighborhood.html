@@ -20,10 +20,11 @@
     <!-- 가장 핫한 우리동네 섹션 -->
     <section class="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-300 mb-12">
       <h2 class="text-3xl font-bold mb-6 text-center text-gray-800">가장 핫한 우리동네</h2>
-      <div id="hotNeighborhoodBoxes" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+      <!-- 트윈테일 구조로 광고 박스 -->
+      <div id="hotNeighborhoodBoxes" class="flex flex-col gap-6"></div>
     </section>
 
-    <!-- 슬라이드 영역 -->
+    <!-- 슬라이드 영역 (그대로) -->
     <section
       class="relative w-full max-w-screen-lg mx-auto overflow-hidden border border-gray-300 rounded-lg mt-8 px-4 mb-9">
       <div id="sliderContainer" class="flex transition-transform duration-500 h-48 items-center"></div>
@@ -41,7 +42,7 @@
     <section class="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-300">
       <h2 class="text-3xl font-bold mb-6 text-center text-gray-800">추천 가게</h2>
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
-        <!-- 좌측 이미지 박스: 만화 이미지 -->
+        <!-- 좌측 만화 이미지 -->
         <div class="lg:col-span-1 flex flex-col gap-6 h-full">
           <div class="flex-1 overflow-hidden border-2 border-gray-300 rounded-lg shadow-lg">
             <img src="https://via.placeholder.com/300x400?text=만화1" alt="만화 이미지 상단"
@@ -52,9 +53,8 @@
               class="w-full h-full object-cover" />
           </div>
         </div>
-        <!-- 오른쪽 광고 리스트 -->
-        <div id="recommendedStoreContainer" class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        </div>
+        <!-- 우측 광고 트윈테일 -->
+        <div id="recommendedStoreContainer" class="lg:col-span-4 flex flex-col gap-6"></div>
       </div>
     </section>
   </div>
@@ -66,26 +66,25 @@
   <script src="modal/modal.js"></script>
 
   <script>
-    /* ─────────────────── 카드 하나 ─────────────────── */
+    /* ────────── 광고 카드 ────────── */
     function makeCard(ad) {
       const c = document.createElement("div");
       c.className =
-        "bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col " +
-        "items-center text-center shadow transition hover:shadow-lg";
+        "bg-white border-2 border-gray-300 rounded-lg p-6 flex flex-col items-center text-center shadow transition hover:shadow-lg flex-1";
       if (ad) {
         c.innerHTML = `
-      <img src="${ad.thumb}" alt="${ad.businessName}"
+      <img src="${ad.thumb || ad.img || ''}" alt="${ad.businessName || ad.title || ''}"
            class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
-      <h3 class="font-semibold mb-1">${ad.businessName}</h3>
-      <p class="text-sm text-gray-500 mb-4">${ad.phone ?? ""}</p>
+      <h3 class="font-semibold mb-1">${ad.businessName || ad.title || '제목없음'}</h3>
+      <p class="text-sm text-gray-500 mb-4">${ad.phone ?? ad?.phone ?? ""}</p>
       <button class="mt-auto bg-blue-500 text-white py-1.5 w-full rounded hover:bg-blue-600">
         바로가기
       </button>`;
         c.querySelectorAll("img,button,h3").forEach(el =>
           el.addEventListener("click",
-            () => window.location.href = `/detail.html?id=${ad.id}`));
+            () => window.location.href = `/detail.html?id=${ad.id ?? ''}`));
       } else {
-        /* 플레이스홀더 */
+        // 빈 자리 플레이스홀더
         c.innerHTML = `
       <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
       <h3 class="font-semibold text-gray-400 mb-1">정보 없음</h3>`;
@@ -93,35 +92,46 @@
       return c;
     }
 
-    /* ─────────────────── 컨테이너 렌더링 ─────────────────── */
-    function renderCards(rootId, ads, totalSlots = 8) {
+    /* ────────── 트윈테일(2개씩 묶는) 렌더링 ────────── */
+    function renderTwinTailBoxes(rootId, ads, itemsPerBox = 2, totalBoxes = 4) {
       const root = document.getElementById(rootId);
-      /* 4열 그리드 고정 (모바일 1열 → 태블릿 2열 → 데스크톱 4열) */
-      root.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6";
       root.innerHTML = "";
-      for (let i = 0; i < totalSlots; i++) {
-        root.appendChild(i < ads.length ? makeCard(ads[i]) : makeCard(null));
+
+      // 총 필요한 카드 수 (부족하면 placeholder)
+      const needCards = itemsPerBox * totalBoxes;
+      // 실제 카드 배열에 부족한만큼 null로 채움
+      const cards = [...ads];
+      while (cards.length < needCards) cards.push(null);
+
+      // 2개씩 그룹핑 → 큰 박스(div)로 감싼다
+      for (let i = 0; i < needCards; i += itemsPerBox) {
+        const box = document.createElement("div");
+        box.className = "bg-gray-50 border-2 border-gray-300 rounded-lg p-4 flex flex-col md:flex-row gap-4";
+        for (let j = i; j < i + itemsPerBox; j++) {
+          box.appendChild(makeCard(cards[j]));
+        }
+        root.appendChild(box);
       }
     }
 
-    /* ─────────────────── 안전 fetch ─────────────────── */
+    /* ────────── 안전 fetch ────────── */
     const safeFetch = async url => {
       try { const r = await fetch(url); if (r.ok) return r.json(); }
       catch (e) { console.error(url, e); }
       return [];
     };
 
-    /* ─────────────────── 페이지 로드 ─────────────────── */
+    /* ────────── 페이지 로드 ────────── */
     document.addEventListener("DOMContentLoaded", async () => {
-      /* 1) 가장 핫한 우리동네 */
-      renderCards("hotNeighborhoodBoxes", await safeFetch("/hot/api"));
+      // 1) 가장 핫한 우리동네 트윈테일
+      renderTwinTailBoxes("hotNeighborhoodBoxes", await safeFetch("/hot/api"));
 
-      /* 2) 추천 가게 */
-      renderCards("recommendedStoreContainer", await safeFetch("/recommend/api"));
+      // 2) 추천 가게 트윈테일 (이미지 제외 오른쪽에만)
+      renderTwinTailBoxes("recommendedStoreContainer", await safeFetch("/recommend/api"));
 
-      /* 3) 슬라이더 & 모달 */
-      initSlider();
-      bindModal();
+      // 3) 슬라이더 & 모달
+      initSlider?.();
+      bindModal?.();
     });
   </script>
 </body>
