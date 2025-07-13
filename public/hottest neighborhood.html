@@ -66,77 +66,68 @@
   <script src="modal/modal.js"></script>
 
   <script>
-    /* ==========  카드  ========== */
-    function makeCard(ad) {
-      const div = document.createElement("div");
-      div.className =
-        "flex-1 bg-white border border-gray-300 rounded-lg p-4 flex flex-col shadow";
+    /* ─── 카드 하나 ─── */
+    function mkCard(ad) {
+      const d = document.createElement("div");
+      d.className = "flex-1 bg-white border border-gray-300 rounded-lg p-4 flex flex-col shadow";
+      d.innerHTML = ad ? `
+    <img src="${ad.thumb}" alt="${ad.businessName}"
+         class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
+    <h3 class="font-semibold text-center">${ad.businessName}</h3>
+    <p class="text-sm text-center text-gray-500 mb-3">${ad.phone ?? ""}</p>
+    <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
+      바로가기
+    </button>`: `
+    <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
+    <h3 class="font-semibold text-center text-gray-400">준비 중</h3>`;
       if (ad) {
-        div.innerHTML = `
-      <img src="${ad.thumb}" alt="${ad.businessName}"
-           class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
-      <h3 class="font-semibold text-center">${ad.businessName}</h3>
-      <p class="text-sm text-center text-gray-500 mb-3">${ad.phone ?? ""}</p>
-      <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
-        바로가기
-      </button>`;
-        div.querySelectorAll("img,h3,button")
-          .forEach(n => n.addEventListener("click",
-            () => location.href = `/detail.html?id=${ad.id}`));
-      } else {
-        div.innerHTML = `
-      <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
-      <h3 class="font-semibold text-center text-gray-400">준비 중</h3>`;
+        d.querySelectorAll("img,h3,button").forEach(el =>
+          el.addEventListener("click", () => location.href = `/detail.html?id=${ad.id}`));
       }
-      return div;
+      return d;
     }
 
-    /* ==========  박스(카드 2개 묶음)  ========== */
-    function bigBox(cardA, cardB) {
+    /* ─── 카드 2개를 묶는 큰 박스 ─── */
+    function mkBox(c1, c2) {
       const box = document.createElement("div");
-      box.className =
-        "border-2 border-gray-300 bg-white rounded-lg p-4 flex flex-col md:flex-row gap-4";
-      box.append(cardA, cardB);
-      return box;
+      box.className = "border-2 border-gray-300 bg-white rounded-lg p-4 flex flex-col md:flex-row gap-4";
+      box.append(c1, c2); return box;
     }
 
-    /* ==========  2열 × 2행 렌더링  ========== */
-    function renderBoxes(rootId, ads, slots = 4) {
+    /* ─── 공통 렌더 함수 (2열×2행=4박스) ─── */
+    function render4Boxes(rootId, ads) {
       const root = document.getElementById(rootId);
-      /** ➊ 컨테이너 자체를 2열 그리드로 강제 */
-      root.className =
-        "grid grid-cols-1 md:grid-cols-2 gap-6";   // ← 핵심: 2열 고정
+      // hot·recommend 구분 없이 2열 grid 적용 (부모의 col-span 유지)
+      root.classList.add("grid", "grid-cols-1", "md:grid-cols-2", "gap-6");
       root.innerHTML = "";
-
-      for (let i = 0; i < slots; i++) {
+      for (let i = 0; i < 4; i++) {
         const idx = i * 2;
-        const card1 = idx < ads.length ? makeCard(ads[idx]) : makeCard(null);
-        const card2 = idx + 1 < ads.length ? makeCard(ads[idx + 1]) : makeCard(null);
-        root.appendChild(bigBox(card1, card2));
+        root.append(
+          mkBox(
+            idx < ads.length ? mkCard(ads[idx]) : mkCard(null),
+            idx + 1 < ads.length ? mkCard(ads[idx + 1]) : mkCard(null)
+          )
+        );
       }
     }
 
-    /* ==========  안전 fetch  ========== */
-    const safeJson = async url => {
-      try { const r = await fetch(url); if (r.ok) return r.json(); } catch (e) { console.error(url, e) }
-      return [];
-    };
+    /* ─── 안전 fetch ─── */
+    const safe = async u => { try { const r = await fetch(u); if (r.ok) return r.json() } catch (e) { console.error(u, e) } return [] };
 
-    /* ==========  페이지 로드  ========== */
+    /* ─── 페이지 로드 ─── */
     document.addEventListener("DOMContentLoaded", async () => {
       /* 1) 가장 핫한 우리동네 */
-      const hot = await safeJson("/hot/api");
-      renderBoxes("hotNeighborhoodBoxes", hot);      // always 4 big-boxes
+      render4Boxes("hotNeighborhoodBoxes", await safe("/hot/api"));
 
-      /* 2) 추천 가게 */
-      const rec = await safeJson("/recommend/api");
-      renderBoxes("recommendedStoreContainer", rec); // 동일한 4 big-boxes
+      /* 2) 추천 가게 (동적) */
+      render4Boxes("recommendedStoreContainer", await safe("/recommend/api"));
 
-      /* 3) 슬라이더 & 모달 */
+      /* 3) 슬라이더·모달 */
       initSlider();
       bindModal();
     });
   </script>
+
 </body>
 
 </html>
