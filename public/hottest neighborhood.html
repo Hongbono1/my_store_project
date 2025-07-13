@@ -66,15 +66,13 @@
   <script src="modal/modal.js"></script>
 
   <script>
-    /* ───────────────── ① 카드 하나 ───────────────── */
+    /* ==========  카드  ========== */
     function makeCard(ad) {
-      const card = document.createElement("div");
-      card.className =
-        "flex-1 bg-white border border-gray-300 rounded-lg p-4 flex flex-col " +
-        "shadow transition hover:shadow-lg";
-
+      const div = document.createElement("div");
+      div.className =
+        "flex-1 bg-white border border-gray-300 rounded-lg p-4 flex flex-col shadow";
       if (ad) {
-        card.innerHTML = `
+        div.innerHTML = `
       <img src="${ad.thumb}" alt="${ad.businessName}"
            class="h-28 w-full object-cover rounded mb-3 cursor-pointer">
       <h3 class="font-semibold text-center">${ad.businessName}</h3>
@@ -82,63 +80,63 @@
       <button class="mt-auto bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600">
         바로가기
       </button>`;
-        card.querySelectorAll("img,h3,button").forEach(el =>
-          el.addEventListener("click",
-            () => window.location.href = `/detail.html?id=${ad.id}`));
+        div.querySelectorAll("img,h3,button")
+          .forEach(n => n.addEventListener("click",
+            () => location.href = `/detail.html?id=${ad.id}`));
       } else {
-        // 플레이스홀더
-        card.innerHTML = `
+        div.innerHTML = `
       <div class="h-28 w-full bg-gray-100 rounded mb-3 animate-pulse"></div>
       <h3 class="font-semibold text-center text-gray-400">준비 중</h3>`;
       }
-      return card;
+      return div;
     }
 
-    /* ───────────────── ② 2칸짜리 큰 박스 ───────────────── */
-    function makeBigBox(card1, card2) {
+    /* ==========  박스(카드 2개 묶음)  ========== */
+    function bigBox(cardA, cardB) {
       const box = document.createElement("div");
       box.className =
-        "border-2 border-gray-300 bg-white rounded-lg p-4 " +
-        "flex flex-col md:flex-row gap-4";
-      box.append(card1, card2);
+        "border-2 border-gray-300 bg-white rounded-lg p-4 flex flex-col md:flex-row gap-4";
+      box.append(cardA, cardB);
       return box;
     }
 
-    /* ───────────────── ③ 컨테이너 렌더링 ───────────────── */
-    function renderBoxes(containerId, ads, totalSlots = 8) {
-      const root = document.getElementById(containerId);
+    /* ==========  2열 × 2행 렌더링  ========== */
+    function renderBoxes(rootId, ads, slots = 4) {
+      const root = document.getElementById(rootId);
+      /** ➊ 컨테이너 자체를 2열 그리드로 강제 */
+      root.className =
+        "grid grid-cols-1 md:grid-cols-2 gap-6";   // ← 핵심: 2열 고정
       root.innerHTML = "";
-      for (let i = 0; i < totalSlots; i += 2) {
-        const cardA = i < ads.length ? makeCard(ads[i]) : makeCard(null);
-        const cardB = i + 1 < ads.length ? makeCard(ads[i + 1]) : makeCard(null);
-        root.appendChild(makeBigBox(cardA, cardB));
+
+      for (let i = 0; i < slots; i++) {
+        const idx = i * 2;
+        const card1 = idx < ads.length ? makeCard(ads[idx]) : makeCard(null);
+        const card2 = idx + 1 < ads.length ? makeCard(ads[idx + 1]) : makeCard(null);
+        root.appendChild(bigBox(card1, card2));
       }
     }
 
-    /* ───────────────── ④ 안전 fetch → 실패 시 [] ───────────────── */
-    const safeFetch = async url => {
-      try {
-        const r = await fetch(url);
-        if (r.ok) return r.json();
-      } catch (e) { console.error(url, e); }
+    /* ==========  안전 fetch  ========== */
+    const safeJson = async url => {
+      try { const r = await fetch(url); if (r.ok) return r.json(); } catch (e) { console.error(url, e) }
       return [];
     };
 
-    /* ───────────────── ⑤ 페이지 로드 ───────────────── */
+    /* ==========  페이지 로드  ========== */
     document.addEventListener("DOMContentLoaded", async () => {
-      // 1) 가장 핫한 우리동네 (동적)
-      const hotAds = await safeFetch("/hot/api");
-      renderBoxes("hotNeighborhoodBoxes", hotAds);
+      /* 1) 가장 핫한 우리동네 */
+      const hot = await safeJson("/hot/api");
+      renderBoxes("hotNeighborhoodBoxes", hot);      // always 4 big-boxes
 
-      // 2) 추천 가게 (동적)
-      const recAds = await safeFetch("/recommend/api");
-      renderBoxes("recommendedStoreContainer", recAds);
+      /* 2) 추천 가게 */
+      const rec = await safeJson("/recommend/api");
+      renderBoxes("recommendedStoreContainer", rec); // 동일한 4 big-boxes
 
-      // 3) 슬라이더 & 모달
+      /* 3) 슬라이더 & 모달 */
       initSlider();
       bindModal();
     });
   </script>
-
 </body>
+
 </html>
