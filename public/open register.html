@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오픈예정 등록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+  <!-- 타이틀 + 등록 버튼 (flex) -->
+  <div class="max-w-3xl mx-auto px-4 mt-10">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
+      <button id="toggleFormBtn"
+        class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+        등록
+      </button>
+    </div>
+
+    <!-- 등록 폼 (처음에는 숨김) -->
+    <section id="openFormSection" class="hidden mb-8">
+      <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
+        <div>
+          <label class="block font-medium mb-1">가게명 <span class="text-red-500">*</span></label>
+          <input name="name" type="text" class="w-full border rounded px-3 py-2" required>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">카테고리</label>
+          <input name="category" type="text" class="w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-medium mb-1">설명</label>
+          <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">주소</label>
+          <input name="addr" type="text" class="w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-medium mb-1">대표 이미지</label>
+          <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+        </div>
+        <button type="submit" class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
+      </form>
+    </section>
+  </div>
+
+  <!-- 등록된 카드 리스트 출력 -->
+  <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
+
+  <script>
+    // (1) 등록 폼 show/hide
+    document.getElementById('toggleFormBtn').onclick = function () {
+      document.getElementById('openFormSection').classList.toggle('hidden');
+    };
+
+    // (2) 등록 카드 데이터 (메모리 임시)
+    const cards = [];
+
+    // (3) 폼 제출 이벤트
+    document.getElementById('openForm').onsubmit = async function (e) {
+      e.preventDefault();
+      const fd = new FormData(this);
+
+      // 이미지 미리보기 처리
+      let imgURL = '';
+      const file = fd.get('img');
+      if (file && file.size) {
+        imgURL = await new Promise(res => {
+          const reader = new FileReader();
+          reader.onload = e => res(e.target.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // 카드 데이터 생성
+      const card = {
+        name: fd.get('name') || '',
+        category: fd.get('category') || '',
+        desc: fd.get('desc') || '',
+        addr: fd.get('addr') || '',
+        img: imgURL
+      };
+      cards.unshift(card); // 최신순
+      this.reset();
+      renderCards();
+      document.getElementById('openFormSection').classList.add('hidden'); // 등록 후 폼 닫기
+    };
+
+    // (4) 카드리스트 출력 함수
+    function renderCards() {
+      const list = document.getElementById('cardList');
+      if (!cards.length) {
+        list.innerHTML = `<div class="text-gray-400 py-12 text-center">등록된 오픈예정 가게가 없습니다.</div>`;
+        return;
+      }
+      list.innerHTML = cards.map(card => `
+        <div class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
+          <div>
+            <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
+              class="w-full h-44 object-cover rounded mb-4 border" alt="대표 이미지">
+          </div>
+          <h3 class="text-xl font-bold mb-2">${card.name}</h3>
+          <div class="text-sm text-blue-700 font-semibold mb-1">${card.category}</div>
+          <div class="text-gray-700 text-sm mb-2">${card.desc}</div>
+          <div class="text-gray-500 text-xs flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a2 2 0 002.828 0l4.243-4.243a8 8 0 10-11.314-11.314 8 8 0 0011.314 11.314z" />
+            </svg> 
+            ${card.addr}
+          </div>
+        </div>
+      `).join('');
+    }
+    renderCards(); // 최초 호출
+  </script>
+</body>
+</html>
