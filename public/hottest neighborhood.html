@@ -20,7 +20,7 @@
     <!-- 가장 핫한 우리동네 섹션 -->
     <section class="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-300 mb-12">
       <h2 class="text-3xl font-bold mb-6 text-center text-gray-800">가장 핫한 우리동네</h2>
-      <div id="hotNeighborhoodBoxes" class="grid grid-cols-1 sm:grid-cols-2 gap-6"></div>
+      <div id="hotNeighborhoodBoxes" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
     </section>
 
     <!-- 슬라이드 영역 -->
@@ -65,231 +65,67 @@
   <!-- 모달 JS (정적 포함) -->
   <script src="modal/modal.js"></script>
 
-  <!-- 광고 및 모달 로직 -->
+
   <script>
-    // 1) 광고 데이터 (예시)
-    const hotNeighborhoodAds = [
-      { title: "우리동네 카페", category: "카페", phone: "010-1111-2222", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 식당", category: "식당", phone: "010-2222-3333", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 치킨", category: "치킨", phone: "010-3333-4444", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 베이커리", category: "베이커리", phone: "010-4444-5555", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 패스트푸드", category: "패스트푸드", phone: "010-5555-6666", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 커피", category: "카페", phone: "010-6666-7777", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 레스토랑", category: "식당", phone: "010-7777-8888", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "우리동네 바", category: "바", phone: "010-8888-9999", img: "https://via.placeholder.com/300x200", link: "#" }
-    ];
-
-    const recommendedStoreAds = [
-      { title: "미스터피자", category: "피자", phone: "010-1111-2222", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "도미노피자", category: "피자", phone: "010-2222-3333", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "버거킹", category: "패스트푸드", phone: "010-3333-4444", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "롯데리아", category: "패스트푸드", phone: "010-4444-5555", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "탐앤탐스", category: "카페", phone: "010-5555-6666", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "엔제리너스", category: "카페", phone: "010-6666-7777", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "파리바게뜨", category: "베이커리", phone: "010-7777-8888", img: "https://via.placeholder.com/300x200", link: "#" },
-      { title: "뚜레쥬르", category: "베이커리", phone: "010-8888-9999", img: "https://via.placeholder.com/300x200", link: "#" }
-    ];
-
-    // 2) 광고 카드 생성 함수
-    function createAdCard(ad) {
-      const adBox = document.createElement("div");
+  // 1) 카드 생성 함수 (전역에 한 번만 선언)
+      function createAdCard(ad) {
+    const adBox = document.createElement("div");
       adBox.className =
-        "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
-      adBox.dataset.title = ad.title;
+      "ad-card bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transform transition duration-300 hover:-translate-y-2 hover:shadow-2xl";
+      // data-* 속성은 모달용(필요 없다면 제거)
+      adBox.dataset.title = ad.businessName;
       adBox.dataset.phone = ad.phone;
-      adBox.dataset.img = ad.img;
-      adBox.dataset.events = ad.events || "";
-      adBox.dataset.facilities = ad.facilities || "";
-      adBox.dataset.parking = ad.parking || "";
-      adBox.dataset.category = ad.category;
+      adBox.dataset.img   = ad.thumb;
 
       adBox.innerHTML = `
-        <img src="${ad.img}" alt="${ad.title}" class="h-40 w-full object-cover rounded mb-4">
-        <!-- category, phone 출력 제거 -->
-        <a href="${ad.link}" class="open-modal mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">바로가기</a>
-      `;    
+      <img src="${ad.thumb}" alt="${ad.businessName}"
+        class="h-40 w-full object-cover rounded mb-4 cursor-pointer" />
+      <h3 class="font-semibold text-lg mb-1 cursor-pointer">
+        ${ad.businessName}
+      </h3>
+      <button class="go-detail mt-auto bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+        바로가기
+      </button>
+      `;
+
+    // 이미지·제목 클릭 → 상세페이지
+    [adBox.querySelector("img"), adBox.querySelector("h3")].forEach(el =>
+      el.addEventListener("click", () => {
+        window.location.href = `/detail.html?id=${ad.id}`;
+      })
+      );
+      // 버튼 클릭 → 상세페이지
+      adBox.querySelector(".go-detail")
+      .addEventListener("click", () => {
+        window.location.href = `/detail.html?id=${ad.id}`;
+      });
+
       return adBox;
-    }
+  }
 
-    // 3) 광고 박스 생성 함수
-    function renderAdBoxes(containerId, ads, itemsPerBox = 2) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = "";
-      for (let i = 0; i < ads.length; i += itemsPerBox) {
-        const box = document.createElement("div");
-        box.className = "bg-gray-50 border-2 border-gray-300 rounded-lg p-4 flex flex-col md:flex-row gap-4";
-        for (let j = i; j < i + itemsPerBox && j < ads.length; j++) {
-          const adCard = createAdCard(ads[j]);
-          adCard.classList.add("flex-1");
-          box.appendChild(adCard);
-        }
-        container.appendChild(box);
-      }
-    }
+      // 2) API 호출 함수
+      async function loadHotNeighborhood() {
+    const res = await fetch("/hot/api");
+      if (!res.ok) throw new Error("핫 데이터 로드 실패");
+      return await res.json();  // [{id, businessName, phone, thumb}, …]
+  }
 
-    // 4) 광고 렌더링 함수 (추천 가게 섹션)
-    function renderAds(containerId, ads) {
-      const container = document.getElementById(containerId);
+  // 3) 페이지 로드 후 한 번만 실행
+  document.addEventListener("DOMContentLoaded", async () => {
+    // (a) 레이아웃 그대로 유지
+    const container = document.getElementById("hotNeighborhoodBoxes");
       container.innerHTML = "";
-      ads.forEach((ad) => {
+
+      // (b) 동적 데이터 받아서 카드 뿌리기
+      const ads = await loadHotNeighborhood();
+    ads.forEach(ad => {
         container.appendChild(createAdCard(ad));
-      });
-    }
-
-    // 5) 모달 열기 함수
-    function openModalWithData(data) {
-      console.log("openModalWithData 함수 호출됨", data);
-      if (window.populateModal) {
-        window.populateModal(data);
-        const overlay = document.getElementById("modalOverlay");
-        const modal = document.getElementById("commonModal");
-        if (overlay && modal) {
-          overlay.classList.remove("hidden");
-          modal.classList.remove("hidden");
-          console.log("모달 표시됨");
-        } else {
-          console.error("모달 요소를 찾을 수 없습니다.");
-        }
-      } else {
-        console.error("populateModal 함수가 로드되지 않았습니다.");
-      }
-    }
-
-    // 6) "가장 핫한 우리동네" 광고 카드의 제목 클릭 시 모달 열기
-    function openHotModal(adData) {
-      console.log("openHotModal 호출됨", adData);
-      // 데이터 전달 후 모달 오픈
-      openModalWithData(adData);
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      // "가장 핫한 우리동네" 8개 광고 렌더링
-      renderAdBoxes("hotNeighborhoodBoxes", hotNeighborhoodAds);
-
-      // 추천 가게 8개 광고 렌더링
-      renderAds("recommendedStoreContainer", recommendedStoreAds);
-
-      // 슬라이드 셋업 (병원 페이지와 동일 방식)
-      const sliderContainer = document.getElementById("sliderContainer");
-      const prevBtn = document.getElementById("prevBtn");
-      const nextBtn = document.getElementById("nextBtn");
-      const slideData = [
-        "https://via.placeholder.com/300x200/ffcccc?text=1",
-        "https://via.placeholder.com/300x200/ffdddd?text=2",
-        "https://via.placeholder.com/300x200/ffeeee?text=3",
-        "https://via.placeholder.com/300x200/ffeecc?text=4",
-        "https://via.placeholder.com/300x200/ffccdd?text=5",
-        "https://via.placeholder.com/300x200/ffddee?text=6",
-        "https://via.placeholder.com/300x200/ffeedc?text=7"
-      ];
-      const shuffledSlides = slideData.sort(() => 0.5 - Math.random()).slice(0, 5);
-      const slidesCount = shuffledSlides.length;
-      const loopSlides = [
-        shuffledSlides[slidesCount - 2],
-        shuffledSlides[slidesCount - 1],
-        ...shuffledSlides,
-        shuffledSlides[0],
-        shuffledSlides[1]
-      ];
-      sliderContainer.innerHTML = "";
-      loopSlides.forEach((imgSrc, i) => {
-        const slide = document.createElement("div");
-        slide.className = "flex-shrink-0 w-1/3 px-2 opacity-0";
-        slide.innerHTML = `
-            <div class="border border-gray-400 bg-white h-44 rounded-lg flex items-center justify-center">
-              <img src="${imgSrc}" alt="광고 이미지" class="object-cover h-full w-full rounded-lg">
-            </div>
-          `;
-        sliderContainer.appendChild(slide);
-      });
-      const slideEls = sliderContainer.querySelectorAll("div.flex-shrink-0");
-      slideEls.forEach((elem, idx) => {
-        setTimeout(() => {
-          elem.style.transition = "opacity 0.7s ease";
-          elem.style.opacity = "1";
-        }, 120 * idx);
-      });
-      let currentIndex = 2;
-      let slideWidth = sliderContainer.offsetWidth / 3;
-      sliderContainer.style.transform = `translateX(-${slideWidth * currentIndex}px)`;
-
-      function moveToIndex(index) {
-        sliderContainer.style.transition = "transform 0.7s ease-in-out";
-        currentIndex = index;
-        sliderContainer.style.transform = `translateX(-${slideWidth * currentIndex}px)`;
-      }
-
-      function nextSlide() {
-        moveToIndex(currentIndex + 1);
-        if (currentIndex === loopSlides.length - 2) {
-          setTimeout(() => {
-            sliderContainer.style.transition = "none";
-            currentIndex = 2;
-            sliderContainer.style.transform = `translateX(-${slideWidth * currentIndex}px)`;
-          }, 700);
-        }
-      }
-
-      function prevSlide() {
-        moveToIndex(currentIndex - 1);
-        if (currentIndex <= 1) {
-          setTimeout(() => {
-            sliderContainer.style.transition = "none";
-            currentIndex = slidesCount + 1;
-            sliderContainer.style.transform = `translateX(-${slideWidth * currentIndex}px)`;
-          }, 700);
-        }
-      }
-
-      prevBtn.addEventListener("click", prevSlide);
-      nextBtn.addEventListener("click", nextSlide);
-      let autoSlide = setInterval(nextSlide, 7000);
-      sliderContainer.addEventListener("mouseenter", () => clearInterval(autoSlide));
-      sliderContainer.addEventListener("mouseleave", () => autoSlide = setInterval(nextSlide, 7000));
-      window.addEventListener("resize", () => {
-        sliderContainer.style.transition = "none";
-        slideWidth = sliderContainer.offsetWidth / 3;
-        sliderContainer.style.transform = `translateX(-${slideWidth * currentIndex}px)`;
-      });
-
-      // 광고 카드 클릭 이벤트: open-modal 클래스 (모달 연결)
-      document.querySelectorAll(".open-modal").forEach((button) => {
-        button.addEventListener("click", (e) => {
-          e.preventDefault();
-          const adCard = button.parentElement;
-          if (!adCard) return;
-          const data = {
-            title: adCard.dataset.title,
-            phone: adCard.dataset.phone,
-            image: adCard.dataset.img,
-            address: "주소 미정",
-            category: adCard.dataset.category,
-            delivery: "정보 없음",
-            hours: "정보 없음",
-            serviceItems: "정보 없음",
-            events: [adCard.dataset.events, ""],
-            facilities: adCard.dataset.facilities,
-            pets: "정보 없음",
-            parking: adCard.dataset.parking,
-            sliderImages: [adCard.dataset.img]
-          };
-          console.log("광고 카드 클릭, data:", data);
-          openModalWithData(data);
-        });
-      });
-
-      // "가장 핫한 우리동네" 카드 제목 클릭 시 모달
-      const cards = document.querySelectorAll("#hotNeighborhoodBoxes h2");
-      cards.forEach((h2) => {
-        const card = h2.parentElement;
-        card.addEventListener("click", (e) => {
-          if (e.target.tagName.toLowerCase() === "a") return;
-          const adTitle = h2.textContent;
-          const adData = { title: adTitle };
-          openHotModal(adData);
-        });
-      });
     });
+
+    // (c) 슬라이더, 추천가게, 모달 연결 등
+    //    … 기존에 쓰시던 renderAds(), slider init, modal binding 코드 …
+  });
+
   </script>
 </body>
 
