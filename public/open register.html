@@ -83,20 +83,43 @@
     <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
 
     <script>
-        // (1) 등록 폼 show/hide + 지도 relayout
-        document.getElementById('toggleFormBtn').onclick = function () {
-            document.getElementById('openFormSection').classList.toggle('hidden');
-            setTimeout(function () {
-                if (window.map) window.map.relayout();
-            }, 250);
-        };
-
-        // (2) 등록 폼 제출 (이미지 미리보기, 로컬스토리지 저장, 등록 후 이동)
+        // (2) 등록 폼 제출 (서버 저장 + 로컬스토리지 + 이미지 미리보기 모두 반영)
         document.getElementById('openForm').onsubmit = async function (e) {
             e.preventDefault();
             const fd = new FormData(this);
 
-            // 이미지 미리보기 처리
+            // 1. 서버로 데이터 전송 (이미지 제외, 텍스트만)
+            const data = {
+                store_name: fd.get('name'),
+                open_date: fd.get('openDate'),
+                category: fd.get('category'),
+                phone: fd.get('phone'),
+                description: fd.get('desc'),
+                address: fd.get('addr'),
+                lat: fd.get('lat'),
+                lng: fd.get('lng')
+                // (owner, email 등 필요시 추가)
+            };
+
+            let serverOk = false;
+            try {
+                const res = await fetch("/open", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    serverOk = true;
+                    alert("서버 저장 성공!");
+                } else {
+                    alert("서버 저장 실패! " + (result.error || ""));
+                }
+            } catch (err) {
+                alert("서버 오류: " + err.message);
+            }
+
+            // 2. 이미지 미리보기 (로컬용)
             let imgURL = '';
             const file = fd.get('img');
             if (file && file.size) {
@@ -107,7 +130,7 @@
                 });
             }
 
-            // 카드 데이터 생성
+            // 3. 카드 데이터 생성 및 로컬스토리지 저장(옵션)
             const card = {
                 name: fd.get('name') || '',
                 openDate: fd.get('openDate') || '',
@@ -117,14 +140,14 @@
                 addr: fd.get('addr') || '',
                 img: imgURL
             };
-
-            // 기존 카드 목록에 추가 (로컬스토리지)
             let cards = JSON.parse(localStorage.getItem('openCards') || '[]');
             cards.unshift(card);
             localStorage.setItem('openCards', JSON.stringify(cards));
 
-            // 등록 후 목록 페이지로 이동
-            location.href = "/open.html";
+            // 4. 등록 후 이동
+            if (serverOk) {
+                location.href = "/open.html";
+            }
         };
 
         // (3) 지도 및 마커 전역 변수 선언
@@ -137,7 +160,7 @@
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) return;
                 window.map = new kakao.maps.Map(mapContainer, {
-                    center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청 좌표
+                    center: new kakao.maps.LatLng(37.5665, 126.9780),
                     level: 3
                 });
                 window.marker = new kakao.maps.Marker({ map: window.map });
@@ -186,7 +209,6 @@
             document.getElementById('address').value = '';
         }
     </script>
-
 </body>
 
 </html>
