@@ -1,101 +1,120 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>오픈예정 등록</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오픈예정 등록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-50">
 
-  <!-- 타이틀 + 등록 버튼 (flex) -->
-  <div class="max-w-3xl mx-auto px-4 mt-10">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
-      <button id="toggleFormBtn"
-        class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
-        등록
-      </button>
+    <!-- 타이틀 + 등록 버튼 (flex) -->
+    <div class="max-w-3xl mx-auto px-4 mt-10">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
+            <button id="toggleFormBtn"
+                class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+                등록
+            </button>
+        </div>
+
+        <!-- 등록 폼 (처음에는 숨김) -->
+        <section id="openFormSection" class="hidden mb-8">
+            <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
+                <!-- 상호명 -->
+                <div>
+                    <label class="block font-medium mb-1">상호명 <span class="text-red-500">*</span></label>
+                    <input name="name" type="text" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 오픈일 -->
+                <div>
+                    <label class="block font-medium mb-1">오픈일 <span class="text-red-500">*</span></label>
+                    <input name="openDate" type="date" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 업종(카테고리) -->
+                <div>
+                    <label class="block font-medium mb-1">업종(카테고리)</label>
+                    <input name="category" type="text" class="w-full border rounded px-3 py-2">
+                </div>
+                <!-- 전화번호 -->
+                <div>
+                    <label class="block font-medium mb-1">전화번호 <span class="text-red-500">*</span></label>
+                    <input name="phone" type="text" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 설명 -->
+                <div>
+                    <label class="block font-medium mb-1">설명</label>
+                    <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <!-- 주소 -->
+                <div>
+                    <label class="block font-medium mb-1">주소</label>
+                    <input name="addr" type="text" class="w-full border rounded px-3 py-2">
+                </div>
+                <!-- 대표 이미지 -->
+                <div>
+                    <label class="block font-medium mb-1">대표 이미지</label>
+                    <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+                </div>
+
+                <button type="submit"
+                    class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
+            </form>
+        </section>
     </div>
 
-    <!-- 등록 폼 (처음에는 숨김) -->
-    <section id="openFormSection" class="hidden mb-8">
-      <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
-        <div>
-          <label class="block font-medium mb-1">가게명 <span class="text-red-500">*</span></label>
-          <input name="name" type="text" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <div>
-          <label class="block font-medium mb-1">카테고리</label>
-          <input name="category" type="text" class="w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block font-medium mb-1">설명</label>
-          <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
-        </div>
-        <div>
-          <label class="block font-medium mb-1">주소</label>
-          <input name="addr" type="text" class="w-full border rounded px-3 py-2">
-        </div>
-        <div>
-          <label class="block font-medium mb-1">대표 이미지</label>
-          <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
-        </div>
-        <button type="submit" class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
-      </form>
-    </section>
-  </div>
+    <!-- 등록된 카드 리스트 출력 -->
+    <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
 
-  <!-- 등록된 카드 리스트 출력 -->
-  <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
+    <script>
+        // (1) 등록 폼 show/hide
+        document.getElementById('toggleFormBtn').onclick = function () {
+            document.getElementById('openFormSection').classList.toggle('hidden');
+        };
 
-  <script>
-    // (1) 등록 폼 show/hide
-    document.getElementById('toggleFormBtn').onclick = function () {
-      document.getElementById('openFormSection').classList.toggle('hidden');
-    };
+        // (2) 등록 카드 데이터 (메모리 임시)
+        const cards = [];
 
-    // (2) 등록 카드 데이터 (메모리 임시)
-    const cards = [];
+        // (3) 폼 제출 이벤트
+        document.getElementById('openForm').onsubmit = async function (e) {
+            e.preventDefault();
+            const fd = new FormData(this);
 
-    // (3) 폼 제출 이벤트
-    document.getElementById('openForm').onsubmit = async function (e) {
-      e.preventDefault();
-      const fd = new FormData(this);
+            // 이미지 미리보기 처리
+            let imgURL = '';
+            const file = fd.get('img');
+            if (file && file.size) {
+                imgURL = await new Promise(res => {
+                    const reader = new FileReader();
+                    reader.onload = e => res(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+            }
 
-      // 이미지 미리보기 처리
-      let imgURL = '';
-      const file = fd.get('img');
-      if (file && file.size) {
-        imgURL = await new Promise(res => {
-          const reader = new FileReader();
-          reader.onload = e => res(e.target.result);
-          reader.readAsDataURL(file);
-        });
-      }
+            // 카드 데이터 생성
+            const card = {
+                name: fd.get('name') || '',
+                category: fd.get('category') || '',
+                desc: fd.get('desc') || '',
+                addr: fd.get('addr') || '',
+                img: imgURL
+            };
+            cards.unshift(card); // 최신순
+            this.reset();
+            renderCards();
+            document.getElementById('openFormSection').classList.add('hidden'); // 등록 후 폼 닫기
+        };
 
-      // 카드 데이터 생성
-      const card = {
-        name: fd.get('name') || '',
-        category: fd.get('category') || '',
-        desc: fd.get('desc') || '',
-        addr: fd.get('addr') || '',
-        img: imgURL
-      };
-      cards.unshift(card); // 최신순
-      this.reset();
-      renderCards();
-      document.getElementById('openFormSection').classList.add('hidden'); // 등록 후 폼 닫기
-    };
-
-    // (4) 카드리스트 출력 함수
-    function renderCards() {
-      const list = document.getElementById('cardList');
-      if (!cards.length) {
-        list.innerHTML = `<div class="text-gray-400 py-12 text-center">등록된 오픈예정 가게가 없습니다.</div>`;
-        return;
-      }
-      list.innerHTML = cards.map(card => `
+        // (4) 카드리스트 출력 함수
+        function renderCards() {
+            const list = document.getElementById('cardList');
+            if (!cards.length) {
+                list.innerHTML = `<div class="text-gray-400 py-12 text-center">등록된 오픈예정 가게가 없습니다.</div>`;
+                return;
+            }
+            list.innerHTML = cards.map(card => `
         <div class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
           <div>
             <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
@@ -112,8 +131,9 @@
           </div>
         </div>
       `).join('');
-    }
-    renderCards(); // 최초 호출
-  </script>
+        }
+        renderCards(); // 최초 호출
+    </script>
 </body>
+
 </html>
