@@ -7,8 +7,8 @@
     <title>오픈예정 등록</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <!-- autoload=false 꼭! -->
-    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=de8ed0205bb623fdc8358ceb3c518d29&autoload=false&libraries=services"></script>
+    <script id="kakao-sdk"
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=de8ed0205bb623fdc8358ceb3c518d29&autoload=false&libraries=services"></script>
 </head>
 
 <body class="bg-gray-50">
@@ -148,8 +148,8 @@
         // 📦 주소검색(다음) + 카카오 지도 연동
         let map, marker;
 
-        // DOMContentLoaded: HTML 구조가 다 준비된 뒤에만 실행
-        document.addEventListener('DOMContentLoaded', function () {
+        // SDK가 로드된 뒤에만 kakaoInit 호출!
+        function kakaoInit() {
             kakao.maps.load(function () {
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) return;
@@ -159,6 +159,17 @@
                 });
                 marker = new kakao.maps.Marker({ map: map });
             });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var kakaoScript = document.getElementById('kakao-sdk');
+            if (kakaoScript) {
+                kakaoScript.onload = kakaoInit;
+                // 혹시 이미 로드됐으면 즉시 실행 (캐시 상황 등)
+                if (kakaoScript.readyState === 'complete' || kakaoScript.readyState === 'loaded') {
+                    kakaoInit();
+                }
+            }
         });
 
         function searchAddress() {
@@ -179,7 +190,6 @@
         }
 
         function updateMapByAddress(address) {
-            // map/marker가 생성된 이후에만 동작!
             if (!window.map || !window.marker) return;
             const geocoder = new kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, function (result, status) {
