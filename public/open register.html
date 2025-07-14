@@ -7,9 +7,8 @@
     <title>오픈예정 등록</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script
-        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=de8ed0205bb623fdc8358ceb3c518d29&autoload=false&libraries=services"></script>
-
+    <!-- autoload=false 꼭! -->
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=de8ed0205bb623fdc8358ceb3c518d29&autoload=false&libraries=services"></script>
 </head>
 
 <body class="bg-gray-50">
@@ -17,7 +16,6 @@
     <!-- 타이틀 + 등록 버튼 (flex) -->
     <div class="max-w-3xl mx-auto px-4 mt-10">
         <div class="flex items-center justify-between mb-6">
-
             <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
             <button id="toggleFormBtn"
                 class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
@@ -54,7 +52,6 @@
                     <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
                 </div>
                 <!-- 주소 -->
-                <!-- 주소 + 주소검색 버튼 -->
                 <div>
                     <label class="block font-medium mb-1">주소</label>
                     <div class="flex gap-2">
@@ -65,7 +62,7 @@
                 </div>
                 <!-- 지도 미리보기 -->
                 <div id="map" class="rounded my-4" style="width:100%;height:240px;"></div>
-                <!-- (필요하면) 좌표 hidden input -->
+                <!-- 좌표 hidden input -->
                 <input type="hidden" id="lat" name="lat">
                 <input type="hidden" id="lng" name="lng">
                 <!-- 대표 이미지 -->
@@ -73,7 +70,6 @@
                     <label class="block font-medium mb-1">대표 이미지</label>
                     <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
                 </div>
-
                 <button type="submit"
                     class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
             </form>
@@ -130,52 +126,31 @@
                 return;
             }
             list.innerHTML = cards.map(card => `
-        <div class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
-          <div>
-            <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
-              class="w-full h-44 object-cover rounded mb-4 border" alt="대표 이미지">
-          </div>
-          <h3 class="text-xl font-bold mb-2">${card.name}</h3>
-          <div class="text-sm text-blue-700 font-semibold mb-1">${card.category}</div>
-          <div class="text-gray-700 text-sm mb-2">${card.desc}</div>
-          <div class="text-gray-500 text-xs flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a2 2 0 002.828 0l4.243-4.243a8 8 0 10-11.314-11.314 8 8 0 0011.314 11.314z" />
-            </svg> 
-            ${card.addr}
-          </div>
-        </div>
-      `).join('');
+                <div class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
+                  <div>
+                    <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
+                      class="w-full h-44 object-cover rounded mb-4 border" alt="대표 이미지">
+                  </div>
+                  <h3 class="text-xl font-bold mb-2">${card.name}</h3>
+                  <div class="text-sm text-blue-700 font-semibold mb-1">${card.category}</div>
+                  <div class="text-gray-700 text-sm mb-2">${card.desc}</div>
+                  <div class="text-gray-500 text-xs flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a2 2 0 002.828 0l4.243-4.243a8 8 0 10-11.314-11.314 8 8 0 0011.314 11.314z" />
+                    </svg> 
+                    ${card.addr}
+                  </div>
+                </div>
+            `).join('');
         }
         renderCards(); // 최초 호출
 
         // 📦 주소검색(다음) + 카카오 지도 연동
-
         let map, marker;
 
-        function searchAddress() {
-            // 현재 팝업 기본 크기
-            const width = 500; // 기본값 (주소검색 기본 크기)
-            const height = 600;
-            // 화면 가운데 좌표 계산
-            const left = Math.ceil((window.screen.width - width) / 2);
-            const top = Math.ceil((window.screen.height - height) / 2);
-
-            new daum.Postcode({
-                oncomplete: function (data) {
-                    document.getElementById('address').value = data.address;
-                    updateMapByAddress(data.address);
-                }
-                // width, height 옵션은 제거!
-            }).open({
-                left,
-                top
-            });
-        }
-
-        window.onload = function () {
+        // DOMContentLoaded: HTML 구조가 다 준비된 뒤에만 실행
+        document.addEventListener('DOMContentLoaded', function () {
             kakao.maps.load(function () {
-                // 여기에만 kakao.maps 관련 코드 작성!
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) return;
                 map = new kakao.maps.Map(mapContainer, {
@@ -184,9 +159,28 @@
                 });
                 marker = new kakao.maps.Marker({ map: map });
             });
-        };
+        });
+
+        function searchAddress() {
+            const width = 500;
+            const height = 600;
+            const left = Math.ceil((window.screen.width - width) / 2);
+            const top = Math.ceil((window.screen.height - height) / 2);
+
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    document.getElementById('address').value = data.address;
+                    updateMapByAddress(data.address);
+                }
+            }).open({
+                left,
+                top
+            });
+        }
 
         function updateMapByAddress(address) {
+            // map/marker가 생성된 이후에만 동작!
+            if (!window.map || !window.marker) return;
             const geocoder = new kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, function (result, status) {
                 if (status === kakao.maps.services.Status.OK) {
@@ -201,8 +195,9 @@
             });
         }
 
-        // 지도 리셋(등록 후)
+        // 지도 리셋(등록 후, 필요시 사용)
         function resetMap() {
+            if (!window.map || !window.marker) return;
             map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
             marker.setPosition(new kakao.maps.LatLng(37.5665, 126.9780));
             document.getElementById('lat').value = '';
@@ -211,5 +206,4 @@
         }
     </script>
 </body>
-
 </html>
