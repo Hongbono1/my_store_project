@@ -1,53 +1,43 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>오픈예정 - 특정 레이아웃 배치 (10개 카드)</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-gray-100 min-h-screen w-full">
-  <!-- 헤더 -->
   <div id="header-container"></div>
 
-  <!-- 오픈예정 큰 외곽박스 시작 -->
   <section class="bg-white shadow-lg rounded-2xl border-2 border-gray-200 max-w-screen-xl mx-auto p-8 mt-12 mb-8">
-    <!-- 타이틀 + 등록 버튼 flex-row 배치 -->
     <div class="flex items-center justify-between mb-10">
       <h2 class="text-4xl font-bold text-cyan-700">오픈예정</h2>
       <button id="regBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow ml-4">
         등록
       </button>
     </div>
-    <!-- 카드 컨테이너 (내부 grid, 카드 10개) -->
     <div id="cardContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-      <!-- JS에서 카드 10개 동적 생성 -->
+      <!-- 카드 10개 동적 생성 -->
     </div>
   </section>
 
-  <!-- 페이지네이션 -->
   <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
 
-  <!-- 모달 오버레이 -->
   <div id="detailOverlay" class="fixed inset-0 bg-black bg-opacity-40 z-40 hidden"></div>
 
-  <!-- 모달 창 -->
   <div id="detailModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
     <div class="bg-white w-[80%] h-[90vh] max-w-5xl p-5 rounded-lg shadow-lg overflow-y-auto">
       <div class="flex justify-between items-center mb-2">
         <h2 class="text-2xl font-bold" id="modalTitle">상세 정보</h2>
         <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">✕</button>
       </div>
-      <!-- 이미지 섹션 -->
       <div class="w-full flex justify-center">
         <div class="flex flex-col items-center">
           <div class="overflow-y-auto border" style="width: 600px; height: 400px;">
             <img id="mainImage" src="" alt="상세 이미지" class="w-[600px] h-[200px] object-cover">
           </div>
-          <!-- 썸네일 (테스트용) -->
           <div class="mt-4 flex justify-center gap-2">
             <img id="thumb1" class="w-20 h-20 cursor-pointer border border-gray-200 hover:border-cyan-500 rounded">
             <img id="thumb2" class="w-20 h-20 cursor-pointer border border-gray-200 hover:border-cyan-500 rounded">
@@ -55,10 +45,8 @@
           </div>
         </div>
       </div>
-      <!-- 정보 섹션 -->
       <div class="mt-4 text-lg">
-        <p><strong>위치:</strong> <a id="modalLocation" href="#" target="_blank" class="underline text-blue-500">위치 보기</a>
-        </p>
+        <p><strong>위치:</strong> <a id="modalLocation" href="#" target="_blank" class="underline text-blue-500">위치 보기</a></p>
         <p><strong>오픈일:</strong> <span id="modalOpenDate"></span></p>
         <p><strong>업종:</strong> <span id="modalBiz"></span></p>
         <p><strong>전화번호:</strong> <span id="modalPhone"></span></p>
@@ -66,12 +54,10 @@
         <p><strong>이벤트:</strong> <span id="modalEvents"></span></p>
         <p><strong>장애인 편의 시설:</strong> <span id="modalFacilities"></span></p>
       </div>
-      <!-- 추가 정보 -->
       <div id="detailHiddenFields" class="hidden mt-4">
         <p class="font-bold text-lg mb-1">추가 정보:</p>
         <p id="modalAdditionalInfo" class="text-gray-700"></p>
       </div>
-      <!-- 더보기/이전 버튼 -->
       <div class="mt-4 flex justify-center gap-4">
         <button id="detailToggleBtn"
           class="bg-cyan-500 text-white rounded py-2 px-6 text-base transition duration-300 hover:bg-cyan-600">
@@ -85,14 +71,27 @@
     </div>
   </div>
 
-  <!-- 푸터 -->
   <div id="footer-container"></div>
 
-  <!-- 초기 데이터: 10개 -->
+  <!-- 초기 데이터: 10개 (예시, 실제 데이터로 교체 가능) -->
   <script>
+    let cards = JSON.parse(localStorage.getItem('openCards') || '[]');
     window.initialData = [
-      // ... (동일: 기존 10개)
-      // 그대로 두세요
+      {
+        name: "상호명1",
+        locationLink: "https://map.kakao.com/link/map/주소1",
+        openDate: "2025-01-05",
+        biz: "식당",
+        phone: "010-1111-2222",
+        images: [
+          "https://via.placeholder.com/600x400?text=Card+1+Image+1"
+        ],
+        delivery: "배달 가능",
+        events: "신메뉴 출시",
+        facilities: "휠체어 접근 가능",
+        additionalInfo: "상세 설명 1."
+      },
+      // ... (이하 10개, 혹은 부족하면 정보없음 카드로 채움)
     ];
   </script>
 
@@ -100,9 +99,7 @@
     async function loadComponent(url, containerId) {
       try {
         const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('HTTP error! status: ' + response.status);
-        }
+        if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
         const html = await response.text();
         document.getElementById(containerId).innerHTML = html;
       } catch (error) {
@@ -115,7 +112,6 @@
       await loadComponent("components/footer.html", "footer-container");
       init();
 
-      // 등록 버튼 클릭 이벤트: 로그인 체크 X, 바로 이동
       document.getElementById('regBtn').onclick = function () {
         location.href = "/open register.html";
       };
@@ -125,14 +121,13 @@
     let currentPage = 1;
     let data = window.initialData || [];
     let totalItems = data.length;
-    let totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    let totalPages = Math.ceil(Math.max(1, totalItems / ITEMS_PER_PAGE));
 
     // DOM
     const cardContainer = document.getElementById("cardContainer");
     const paginationContainer = document.getElementById("pagination");
     const detailOverlay = document.getElementById("detailOverlay");
     const detailModal = document.getElementById("detailModal");
-
     const modalTitle = document.getElementById("modalTitle");
     const mainImage = document.getElementById("mainImage");
     const modalLocation = document.getElementById("modalLocation");
@@ -143,19 +138,15 @@
     const modalEvents = document.getElementById("modalEvents");
     const modalFacilities = document.getElementById("modalFacilities");
     const modalAdditionalInfo = document.getElementById("modalAdditionalInfo");
-
     const closeModalBtn = document.getElementById("closeModalBtn");
     const detailToggleBtn = document.getElementById("detailToggleBtn");
     const detailToggleBtn2 = document.getElementById("detailToggleBtn2");
     const detailHiddenFields = document.getElementById("detailHiddenFields");
 
-    // 카드 생성 함수
     function createCard(item, globalIndex) {
-      // 정보 없음 카드
       if (!item) {
         const none = document.createElement("div");
-        none.className =
-          "bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60";
+        none.className = "bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60";
         none.innerHTML = `
           <img src="https://placehold.co/400x200?text=정보+없음" class="w-full h-44 object-cover rounded mb-4 border" alt="정보 없음">
           <div class="text-xl font-bold text-gray-400 mb-2">정보 없음</div>
@@ -168,67 +159,56 @@
       cardDiv.className =
         "bg-yellow-50 text-black p-5 rounded-xl shadow-md relative overflow-hidden flex flex-col md:flex-row transition duration-200 hover:scale-105";
 
-      // 특정 카드(4, 8) 스타일
+      // 와이드/위치
       if (globalIndex === 3 || globalIndex === 7) {
         cardDiv.classList.add("md:col-span-3", "mx-auto");
         cardDiv.style.width = "50%";
       }
-
-      // 10개 카드일 때 마지막 두 카드(9, 10) 위치 조정
       if (data.length === 10) {
-        if (globalIndex === 8) {
-          cardDiv.classList.add("md:col-start-1");
-        }
-        if (globalIndex === 9) {
-          cardDiv.classList.add("md:col-start-3");
-        }
+        if (globalIndex === 8) cardDiv.classList.add("md:col-start-1");
+        if (globalIndex === 9) cardDiv.classList.add("md:col-start-3");
       }
 
-      // 이미지 섹션
       const imageSection = `
-    <div class="flex-1 md:max-w-[50%] mr-5 flex items-center justify-center h-full">
-      <img
-        src="${item.images[0] || ''}"
-        alt="${item.name} 메인이미지"
-        class="w-[600px] h-[200px] object-cover rounded-md"
-      />
-    </div>
-  `;
+        <div class="flex-1 md:max-w-[50%] mr-5 flex items-center justify-center h-full">
+          <img
+            src="${item.images && item.images[0] ? item.images[0] : 'https://placehold.co/600x400?text=No+Image'}"
+            alt="${item.name} 메인이미지"
+            class="w-[600px] h-[200px] object-cover rounded-md"
+          />
+        </div>
+      `;
       const infoSection = `
-    <div class="flex-1 flex flex-col justify-between text-lg relative z-10 text-black">
-      <div class="mb-2">
-        <span class="text-2xl font-bold">${item.name}</span>
-      </div>
-      <div class="space-y-2">
-        <p class="flex items-center">
-          <img src="https://img.icons8.com/ios-filled/50/000000/marker.png" alt="location"
-            class="w-5 h-5 mr-2">
-          <a href="${item.locationLink}" target="_blank" class="underline text-black">
-            위치(클릭)
-          </a>
-        </p>
-        <p class="flex items-center">
-          <img src="https://img.icons8.com/ios-filled/50/000000/calendar.png" alt="open-date"
-            class="w-5 h-5 mr-2">
-          <span class="font-bold text-yellow-400">
-            오픈일: ${item.openDate.replace(/-/g, ".")}
-          </span>
-        </p>
-        <p class="flex items-center">
-          <img src="https://img.icons8.com/ios-filled/50/000000/business.png" alt="업종"
-            class="w-5 h-5 mr-2">
-          업종: ${item.biz}
-        </p>
-        <p class="flex items-center">
-          <img src="https://img.icons8.com/ios-filled/50/000000/phone.png" alt="phone"
-            class="w-5 h-5 mr-2">
-          ${item.phone}
-        </p>
-      </div>
-    </div>
-    <div class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
-      style="clip-path: ellipse(50% 100% at 100% 100%);"></div>
-  `;
+        <div class="flex-1 flex flex-col justify-between text-lg relative z-10 text-black">
+          <div class="mb-2">
+            <span class="text-2xl font-bold">${item.name || '-'}</span>
+          </div>
+          <div class="space-y-2">
+            <p class="flex items-center">
+              <img src="https://img.icons8.com/ios-filled/50/000000/marker.png" alt="location" class="w-5 h-5 mr-2">
+              <a href="${item.locationLink || '#'}" target="_blank" class="underline text-black">
+                위치(클릭)
+              </a>
+            </p>
+            <p class="flex items-center">
+              <img src="https://img.icons8.com/ios-filled/50/000000/calendar.png" alt="open-date" class="w-5 h-5 mr-2">
+              <span class="font-bold text-yellow-400">
+                오픈일: ${item.openDate ? item.openDate.replace(/-/g, ".") : '-'}
+              </span>
+            </p>
+            <p class="flex items-center">
+              <img src="https://img.icons8.com/ios-filled/50/000000/business.png" alt="업종" class="w-5 h-5 mr-2">
+              업종: ${item.biz || '-'}
+            </p>
+            <p class="flex items-center">
+              <img src="https://img.icons8.com/ios-filled/50/000000/phone.png" alt="phone" class="w-5 h-5 mr-2">
+              ${item.phone || '-'}
+            </p>
+          </div>
+        </div>
+        <div class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
+          style="clip-path: ellipse(50% 100% at 100% 100%);"></div>
+      `;
       cardDiv.innerHTML = imageSection + infoSection;
       cardDiv.addEventListener("click", () => displayDetail(globalIndex));
       return cardDiv;
@@ -238,10 +218,7 @@
       cardContainer.innerHTML = "";
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
       let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-      // 💡 10개보다 부족하면 null로 채우기
       while (pageData.length < ITEMS_PER_PAGE) pageData.push(null);
-
       pageData.forEach((item, i) => {
         const globalIndex = startIndex + i;
         const card = createCard(item, globalIndex);
@@ -255,9 +232,7 @@
         const btn = document.createElement("button");
         btn.textContent = i;
         btn.className = "py-2 px-4 rounded bg-gray-800 text-white text-base hover:bg-gray-700 transition";
-        if (i === currentPage) {
-          btn.classList.add("bg-cyan-500");
-        }
+        if (i === currentPage) btn.classList.add("bg-cyan-500");
         btn.addEventListener("click", () => {
           currentPage = i;
           renderPage(currentPage);
@@ -272,14 +247,14 @@
       const item = data[index];
       if (!item) return;
       modalTitle.textContent = item.name;
-      mainImage.src = item.images[0] || "";
+      mainImage.src = item.images && item.images[0] ? item.images[0] : "";
       modalLocation.href = item.locationLink || "#";
-      modalOpenDate.textContent = item.openDate;
-      modalBiz.textContent = item.biz;
-      modalPhone.textContent = item.phone;
-      modalDelivery.textContent = item.delivery;
-      modalEvents.textContent = item.events;
-      modalFacilities.textContent = item.facilities;
+      modalOpenDate.textContent = item.openDate || "";
+      modalBiz.textContent = item.biz || "";
+      modalPhone.textContent = item.phone || "";
+      modalDelivery.textContent = item.delivery || "";
+      modalEvents.textContent = item.events || "";
+      modalFacilities.textContent = item.facilities || "";
       modalAdditionalInfo.textContent = item.additionalInfo || "";
       detailOverlay.classList.remove("hidden");
       detailModal.classList.remove("hidden");
@@ -290,7 +265,6 @@
     }
     closeModalBtn.addEventListener("click", closeModal);
     detailOverlay.addEventListener("click", closeModal);
-
     detailToggleBtn.addEventListener("click", () => {
       detailHiddenFields.classList.remove("hidden");
       detailToggleBtn.classList.add("hidden");
@@ -301,16 +275,10 @@
       detailToggleBtn.classList.remove("hidden");
       detailToggleBtn2.classList.add("hidden");
     });
-
-    function changeMainImage(imgUrl) {
-      const mainImg = document.getElementById("mainImage");
-      if (mainImg) mainImg.src = imgUrl;
-    }
     function init() {
       renderPage(currentPage);
       renderPagination();
     }
   </script>
 </body>
-
 </html>
