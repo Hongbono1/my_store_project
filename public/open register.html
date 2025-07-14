@@ -7,8 +7,7 @@
     <title>오픈예정 등록</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script
-        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 </head>
 
 <body class="bg-gray-50">
@@ -82,9 +81,12 @@
     <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
 
     <script>
-        // (1) 등록 폼 show/hide
+        // (1) 등록 폼 show/hide + 지도 relayout
         document.getElementById('toggleFormBtn').onclick = function () {
             document.getElementById('openFormSection').classList.toggle('hidden');
+            setTimeout(function () {
+                if (window.map) window.map.relayout();
+            }, 250);
         };
 
         // (2) 등록 카드 데이터 (메모리 임시)
@@ -147,30 +149,20 @@
         }
         renderCards(); // 최초 호출
 
-        // 📦 주소검색(다음) + 카카오 지도 연동
-        let map, marker;
+        // 지도 및 마커 전역 변수!
+        window.map = null;
+        window.marker = null;
 
         // SDK가 로드된 뒤에만 kakaoInit 호출!
-        function kakaoInit() {
+        document.addEventListener('DOMContentLoaded', function () {
             kakao.maps.load(function () {
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) return;
-                map = new kakao.maps.Map(mapContainer, {
-                    center: new kakao.maps.LatLng(37.5665, 126.9780),
-                    level: 3
-                });
-                marker = new kakao.maps.Marker({ map: map });
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            kakao.maps.load(function () {
-                var mapContainer = document.getElementById('map');
-                var mapOption = {
+                window.map = new kakao.maps.Map(mapContainer, {
                     center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청
                     level: 3
-                };
-                var map = new kakao.maps.Map(mapContainer, mapOption);
+                });
+                window.marker = new kakao.maps.Marker({ map: window.map });
             });
         });
 
@@ -199,8 +191,8 @@
                     const lat = result[0].y;
                     const lng = result[0].x;
                     const loc = new kakao.maps.LatLng(lat, lng);
-                    map.setCenter(loc);
-                    marker.setPosition(loc);
+                    window.map.setCenter(loc);
+                    window.marker.setPosition(loc);
                     document.getElementById('lat').value = lat;
                     document.getElementById('lng').value = lng;
                 }
@@ -210,13 +202,12 @@
         // 지도 리셋(등록 후, 필요시 사용)
         function resetMap() {
             if (!window.map || !window.marker) return;
-            map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
-            marker.setPosition(new kakao.maps.LatLng(37.5665, 126.9780));
+            window.map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
+            window.marker.setPosition(new kakao.maps.LatLng(37.5665, 126.9780));
             document.getElementById('lat').value = '';
             document.getElementById('lng').value = '';
             document.getElementById('address').value = '';
         }
     </script>
 </body>
-
 </html>
