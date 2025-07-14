@@ -1,262 +1,211 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>오픈예정 등록</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오픈예정 등록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 </head>
+
 <body class="bg-gray-50">
-  <!-- 타이틀 + 등록 버튼 (flex) -->
-  <div class="max-w-3xl mx-auto px-4 mt-10">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
-      <button id="toggleFormBtn"
-        class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
-        등록
-      </button>
+
+    <!-- 타이틀 + 등록 버튼 (flex) -->
+    <div class="max-w-3xl mx-auto px-4 mt-10">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">오픈예정</h2>
+            <button id="toggleFormBtn"
+                class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+                등록
+            </button>
+        </div>
+
+        <!-- 등록 폼 (처음에는 숨김) -->
+        <section id="openFormSection" class="hidden mb-8">
+            <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
+                <!-- 상호명 -->
+                <div>
+                    <label class="block font-medium mb-1">상호명 <span class="text-red-500">*</span></label>
+                    <input name="name" type="text" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 오픈일 -->
+                <div>
+                    <label class="block font-medium mb-1">오픈일 <span class="text-red-500">*</span></label>
+                    <input name="openDate" type="date" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 업종(카테고리) -->
+                <div>
+                    <label class="block font-medium mb-1">업종(카테고리)</label>
+                    <input name="category" type="text" class="w-full border rounded px-3 py-2">
+                </div>
+                <!-- 전화번호 -->
+                <div>
+                    <label class="block font-medium mb-1">전화번호 <span class="text-red-500">*</span></label>
+                    <input name="phone" type="text" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <!-- 설명 -->
+                <div>
+                    <label class="block font-medium mb-1">설명</label>
+                    <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <!-- 주소 -->
+                <div>
+                    <label class="block font-medium mb-1">주소</label>
+                    <div class="flex gap-2">
+                        <input id="address" name="addr" type="text" class="flex-1 border rounded px-3 py-2" readonly>
+                        <button type="button" onclick="searchAddress()"
+                            class="px-3 py-2 bg-blue-500 text-white rounded w-24">
+                            검색
+                        </button>
+                    </div>
+                </div>
+                <!-- 지도 미리보기 -->
+                <div id="map" class="block mx-auto rounded my-4"
+                    style="width:100%; min-width:180px; height:260px; max-width:480px;"></div>
+                <!-- 좌표 hidden input -->
+                <input type="hidden" id="lat" name="lat">
+                <input type="hidden" id="lng" name="lng">
+                <!-- 대표 이미지 -->
+                <div>
+                    <label class="block font-medium mb-1">대표 이미지</label>
+                    <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+                </div>
+                <button type="submit"
+                    class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
+            </form>
+        </section>
     </div>
-    <!-- 등록 폼 (처음에는 숨김) -->
-    <section id="openFormSection" class="hidden mb-8">
-      <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
-        <!-- 상호명 -->
-        <div>
-          <label class="block font-medium mb-1">상호명 <span class="text-red-500">*</span></label>
-          <input name="name" type="text" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <!-- 오픈일 -->
-        <div>
-          <label class="block font-medium mb-1">오픈일 <span class="text-red-500">*</span></label>
-          <input name="openDate" type="date" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <!-- 업종(카테고리) -->
-        <div>
-          <label class="block font-medium mb-1">업종(카테고리)</label>
-          <input name="category" type="text" class="w-full border rounded px-3 py-2">
-        </div>
-        <!-- 전화번호 -->
-        <div>
-          <label class="block font-medium mb-1">전화번호 <span class="text-red-500">*</span></label>
-          <input name="phone" type="text" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <!-- 설명 -->
-        <div>
-          <label class="block font-medium mb-1">설명</label>
-          <textarea name="desc" class="w-full border rounded px-3 py-2"></textarea>
-        </div>
-        <!-- 주소 -->
-        <div>
-          <label class="block font-medium mb-1">주소</label>
-          <div class="flex gap-2">
-            <input id="address" name="addr" type="text" class="flex-1 border rounded px-3 py-2" readonly>
-            <button type="button" onclick="searchAddress()"
-              class="px-3 py-2 bg-blue-500 text-white rounded w-24">검색</button>
-          </div>
-        </div>
-        <!-- 지도 미리보기 -->
-        <div id="map" class="block mx-auto rounded my-4"
-          style="width:100%; min-width:180px; height:260px; max-width:480px;"></div>
-        <!-- 좌표 hidden input -->
-        <input type="hidden" id="lat" name="lat">
-        <input type="hidden" id="lng" name="lng">
-        <!-- 대표 이미지 -->
-        <div>
-          <label class="block font-medium mb-1">대표 이미지</label>
-          <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
-        </div>
-        <button type="submit"
-          class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">등록</button>
-      </form>
-    </section>
-  </div>
 
-  <!-- 등록된 카드 리스트 출력 -->
-  <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
-  <!-- 페이지네이션 -->
-  <div id="pagination" class="flex justify-center items-center gap-2 my-8"></div>
+    <!-- 등록된 카드 리스트 출력 -->
+    <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
 
-  <script>
-    document.getElementById('toggleFormBtn').onclick = function () {
-      document.getElementById('openFormSection').classList.toggle('hidden');
-      setTimeout(function () {
-        if (window.map) window.map.relayout();
-      }, 250);
-    };
+    <script>
+        document.getElementById('openForm').onsubmit = async function (e) {
+            e.preventDefault();
+            const fd = new FormData(this);
 
-    // 카드 데이터 (최신순 추가)
-    const cards = [];
+            // 이미지 미리보기 처리
+            let imgURL = '';
+            const file = fd.get('img');
+            if (file && file.size) {
+                imgURL = await new Promise(res => {
+                    const reader = new FileReader();
+                    reader.onload = e => res(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+            }
 
-    // 1) 폼 제출 이벤트
-    document.getElementById('openForm').onsubmit = async function (e) {
-      e.preventDefault();
-      const fd = new FormData(this);
+            // 카드 데이터 생성
+            const card = {
+                name: fd.get('name') || '',
+                category: fd.get('category') || '',
+                desc: fd.get('desc') || '',
+                addr: fd.get('addr') || '',
+                img: imgURL
+            };
 
-      let imgURL = '';
-      const file = fd.get('img');
-      if (file && file.size) {
-        imgURL = await new Promise(res => {
-          const reader = new FileReader();
-          reader.onload = e => res(e.target.result);
-          reader.readAsDataURL(file);
+            // 기존 카드 목록에 추가 (로컬스토리지)
+            let cards = JSON.parse(localStorage.getItem('openCards') || '[]');
+            cards.unshift(card);
+            localStorage.setItem('openCards', JSON.stringify(cards));
+
+            // 등록 후 목록으로 이동
+            location.href = "/open.html";
+        }; // ← 여기까지!
+
+        // (4) 카드리스트 출력 함수
+        function renderCards() {
+            const list = document.getElementById('cardList');
+            if (!cards.length) {
+                list.innerHTML = `<div class="text-gray-400 py-12 text-center">등록된 오픈예정 가게가 없습니다.</div>`;
+                return;
+            }
+            list.innerHTML = cards.map(card => `
+    <div
+        class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
+        <div>
+            <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
+                class="w-full h-44 object-cover rounded mb-4 border" alt="대표 이미지">
+        </div>
+        <h3 class="text-xl font-bold mb-2">${card.name}</h3>
+        <div class="text-sm text-blue-700 font-semibold mb-1">${card.category}</div>
+        <div class="text-gray-700 text-sm mb-2">${card.desc}</div>
+        <div class="text-gray-500 text-xs flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a2 2 0 002.828 0l4.243-4.243a8 8 0 10-11.314-11.314 8 8 0 0011.314 11.314z" />
+            </svg>
+            ${card.addr}
+        </div>
+    </div>
+    `).join('');
+        }
+        renderCards(); // 최초 호출
+
+        // 지도 및 마커 전역 변수!
+        window.map = null;
+        window.marker = null;
+
+        // SDK가 로드된 뒤에만 kakaoInit 호출!
+        document.addEventListener('DOMContentLoaded', function () {
+            kakao.maps.load(function () {
+                const mapContainer = document.getElementById('map');
+                if (!mapContainer) return;
+                window.map = new kakao.maps.Map(mapContainer, {
+                    center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청
+                    level: 3
+                });
+                window.marker = new kakao.maps.Marker({ map: window.map });
+            });
         });
-      }
 
-      const card = {
-        name: fd.get('name') || '',
-        category: fd.get('category') || '',
-        desc: fd.get('desc') || '',
-        addr: fd.get('addr') || '',
-        openDate: fd.get('openDate') || '',
-        phone: fd.get('phone') || '',
-        img: imgURL
-      };
-      cards.unshift(card); // 최신순
-      this.reset();
-      renderPage(currentPage);
-      renderPagination();
-      document.getElementById('openFormSection').classList.add('hidden');
-    };
+        function searchAddress() {
+            const width = 500;
+            const height = 600;
+            const left = Math.ceil((window.screen.width - width) / 2);
+            const top = Math.ceil((window.screen.height - height) / 2);
 
-    // 페이지네이션 관련 변수
-    const ITEMS_PER_PAGE = 10;
-    let currentPage = 1;
-
-    // 카드 10개씩 → 부족하면 정보 없음 카드
-    function renderPage(page = 1) {
-      const list = document.getElementById('cardList');
-      const total = cards.length;
-      const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-      currentPage = Math.min(page, totalPages);
-
-      // 1페이지 = 0~9, 2페이지=10~19, ...
-      const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-      const pageCards = cards.slice(startIdx, startIdx + ITEMS_PER_PAGE);
-
-      // 부족하면 빈칸
-      while (pageCards.length < ITEMS_PER_PAGE) {
-        pageCards.push(null); // null = 정보 없음
-      }
-
-      // 카드 그리기
-      list.innerHTML = pageCards.map((card, idx) => {
-        // 4, 8번 카드만 넓게(실제 index는 3, 7)
-        let extraClass = '';
-        if (idx === 3 || idx === 7) extraClass = 'lg:col-span-2';
-
-        if (!card) {
-          // 정보 없음 카드
-          return `
-            <div class="bg-yellow-100 flex flex-col md:flex-row relative overflow-hidden shadow rounded-xl ${extraClass} min-h-[200px] border border-yellow-300">
-              <div class="flex-1 flex items-center justify-center px-6 py-10">
-                <span class="text-xl font-bold text-gray-400">정보 없음</span>
-              </div>
-              <div
-                class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
-                style="clip-path: ellipse(50% 100% at 100% 100%);"
-              ></div>
-            </div>
-          `;
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    document.getElementById('address').value = data.address;
+                    updateMapByAddress(data.address);
+                }
+            }).open({
+                left,
+                top
+            });
         }
-        // 등록된 정보 카드
-        return `
-          <div class="bg-yellow-100 flex flex-col md:flex-row relative overflow-hidden shadow rounded-xl ${extraClass} min-h-[200px] border border-yellow-300">
-            <!-- 이미지 -->
-            <div class="flex-1 md:max-w-[50%] flex items-center justify-center p-3">
-              <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}" class="w-[300px] h-[160px] md:w-[240px] md:h-[120px] object-cover rounded shadow border border-yellow-200" alt="">
-            </div>
-            <!-- 정보 -->
-            <div class="flex-1 flex flex-col justify-center p-5 relative z-10 text-black gap-1">
-              <div class="text-xl font-bold mb-1">${card.name || '(상호명 없음)'}</div>
-              <div class="text-base"><b>업종</b>: ${card.category || '-'}</div>
-              <div class="text-base"><b>오픈일</b>: ${card.openDate || '-'}</div>
-              <div class="text-base"><b>전화</b>: ${card.phone || '-'}</div>
-              <div class="text-base"><b>주소</b>: ${card.addr || '-'}</div>
-              <div class="text-base text-gray-700 mt-2">${card.desc || ''}</div>
-            </div>
-            <div
-              class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
-              style="clip-path: ellipse(50% 100% at 100% 100%);"
-            ></div>
-          </div>
-        `;
-      }).join('');
-    }
 
-    // 페이지네이션 렌더링
-    function renderPagination() {
-      const pagination = document.getElementById('pagination');
-      const total = cards.length;
-      const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-
-      if (totalPages <= 1) {
-        pagination.innerHTML = '';
-        return;
-      }
-
-      let html = '';
-      for (let i = 1; i <= totalPages; i++) {
-        html += `<button onclick="gotoPage(${i})" class="px-4 py-2 rounded border ${i === currentPage ? 'bg-cyan-500 text-white' : 'bg-white text-gray-800 hover:bg-cyan-100'}">${i}</button>`;
-      }
-      pagination.innerHTML = html;
-    }
-    window.gotoPage = function (p) {
-      renderPage(p);
-      renderPagination();
-    }
-
-    renderPage(1);
-    renderPagination();
-
-    // 지도 및 마커 전역 변수!
-    window.map = null;
-    window.marker = null;
-    document.addEventListener('DOMContentLoaded', function () {
-      kakao.maps.load(function () {
-        const mapContainer = document.getElementById('map');
-        if (!mapContainer) return;
-        window.map = new kakao.maps.Map(mapContainer, {
-          center: new kakao.maps.LatLng(37.5665, 126.9780),
-          level: 3
-        });
-        window.marker = new kakao.maps.Marker({ map: window.map });
-      });
-    });
-    function searchAddress() {
-      const width = 500, height = 600;
-      const left = Math.ceil((window.screen.width - width) / 2);
-      const top = Math.ceil((window.screen.height - height) / 2);
-      new daum.Postcode({
-        oncomplete: function (data) {
-          document.getElementById('address').value = data.address;
-          updateMapByAddress(data.address);
+        function updateMapByAddress(address) {
+            if (!window.map || !window.marker) return;
+            const geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(address, function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const lat = result[0].y;
+                    const lng = result[0].x;
+                    const loc = new kakao.maps.LatLng(lat, lng);
+                    window.map.setCenter(loc);
+                    window.marker.setPosition(loc);
+                    document.getElementById('lat').value = lat;
+                    document.getElementById('lng').value = lng;
+                }
+            });
         }
-      }).open({ left, top });
-    }
-    function updateMapByAddress(address) {
-      if (!window.map || !window.marker) return;
-      const geocoder = new kakao.maps.services.Geocoder();
-      geocoder.addressSearch(address, function (result, status) {
-        if (status === kakao.maps.services.Status.OK) {
-          const lat = result[0].y;
-          const lng = result[0].x;
-          const loc = new kakao.maps.LatLng(lat, lng);
-          window.map.setCenter(loc);
-          window.marker.setPosition(loc);
-          document.getElementById('lat').value = lat;
-          document.getElementById('lng').value = lng;
+
+        // 지도 리셋(등록 후, 필요시 사용)
+        function resetMap() {
+            if (!window.map || !window.marker) return;
+            window.map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
+            window.marker.setPosition(new kakao.maps.LatLng(37.5665, 126.9780));
+            document.getElementById('lat').value = '';
+            document.getElementById('lng').value = '';
+            document.getElementById('address').value = '';
         }
-      });
-    }
-    function resetMap() {
-      if (!window.map || !window.marker) return;
-      window.map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
-      window.marker.setPosition(new kakao.maps.LatLng(37.5665, 126.9780));
-      document.getElementById('lat').value = '';
-      document.getElementById('lng').value = '';
-      document.getElementById('address').value = '';
-    }
-  </script>
+    </script>
 </body>
+
 </html>
