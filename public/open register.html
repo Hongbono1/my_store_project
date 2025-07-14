@@ -83,6 +83,15 @@
     <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"></div>
 
     <script>
+        // (1) 등록 폼 show/hide + 지도 relayout
+        document.getElementById('toggleFormBtn').onclick = function () {
+            document.getElementById('openFormSection').classList.toggle('hidden');
+            setTimeout(function () {
+                if (window.map) window.map.relayout();
+            }, 250);
+        };
+
+        // (2) 등록 폼 제출 (이미지 미리보기, 로컬스토리지 저장, 등록 후 이동)
         document.getElementById('openForm').onsubmit = async function (e) {
             e.preventDefault();
             const fd = new FormData(this);
@@ -101,7 +110,9 @@
             // 카드 데이터 생성
             const card = {
                 name: fd.get('name') || '',
+                openDate: fd.get('openDate') || '',
                 category: fd.get('category') || '',
+                phone: fd.get('phone') || '',
                 desc: fd.get('desc') || '',
                 addr: fd.get('addr') || '',
                 img: imgURL
@@ -112,57 +123,28 @@
             cards.unshift(card);
             localStorage.setItem('openCards', JSON.stringify(cards));
 
-            // 등록 후 목록으로 이동
+            // 등록 후 목록 페이지로 이동
             location.href = "/open.html";
-        }; // ← 여기까지!
+        };
 
-        // (4) 카드리스트 출력 함수
-        function renderCards() {
-            const list = document.getElementById('cardList');
-            if (!cards.length) {
-                list.innerHTML = `<div class="text-gray-400 py-12 text-center">등록된 오픈예정 가게가 없습니다.</div>`;
-                return;
-            }
-            list.innerHTML = cards.map(card => `
-    <div
-        class="bg-white border-2 border-gray-300 shadow-lg rounded-lg p-6 flex flex-col transform transition hover:-translate-y-1 hover:shadow-2xl">
-        <div>
-            <img src="${card.img || 'https://placehold.co/400x200?text=No+Image'}"
-                class="w-full h-44 object-cover rounded mb-4 border" alt="대표 이미지">
-        </div>
-        <h3 class="text-xl font-bold mb-2">${card.name}</h3>
-        <div class="text-sm text-blue-700 font-semibold mb-1">${card.category}</div>
-        <div class="text-gray-700 text-sm mb-2">${card.desc}</div>
-        <div class="text-gray-500 text-xs flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a2 2 0 002.828 0l4.243-4.243a8 8 0 10-11.314-11.314 8 8 0 0011.314 11.314z" />
-            </svg>
-            ${card.addr}
-        </div>
-    </div>
-    `).join('');
-        }
-        renderCards(); // 최초 호출
-
-        // 지도 및 마커 전역 변수!
+        // (3) 지도 및 마커 전역 변수 선언
         window.map = null;
         window.marker = null;
 
-        // SDK가 로드된 뒤에만 kakaoInit 호출!
+        // (4) Kakao 지도 초기화 (최초 1회)
         document.addEventListener('DOMContentLoaded', function () {
             kakao.maps.load(function () {
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) return;
                 window.map = new kakao.maps.Map(mapContainer, {
-                    center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청
+                    center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청 좌표
                     level: 3
                 });
                 window.marker = new kakao.maps.Marker({ map: window.map });
             });
         });
 
+        // (5) 다음 주소검색 (검색 → 주소입력 + 지도 좌표 이동)
         function searchAddress() {
             const width = 500;
             const height = 600;
@@ -174,12 +156,10 @@
                     document.getElementById('address').value = data.address;
                     updateMapByAddress(data.address);
                 }
-            }).open({
-                left,
-                top
-            });
+            }).open({ left, top });
         }
 
+        // (6) 지도 주소 → 좌표 갱신
         function updateMapByAddress(address) {
             if (!window.map || !window.marker) return;
             const geocoder = new kakao.maps.services.Geocoder();
@@ -196,7 +176,7 @@
             });
         }
 
-        // 지도 리셋(등록 후, 필요시 사용)
+        // (7) 지도 리셋 (필요시)
         function resetMap() {
             if (!window.map || !window.marker) return;
             window.map.setCenter(new kakao.maps.LatLng(37.5665, 126.9780));
@@ -206,6 +186,7 @@
             document.getElementById('address').value = '';
         }
     </script>
+
 </body>
 
 </html>
