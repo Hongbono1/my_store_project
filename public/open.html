@@ -29,24 +29,18 @@
   <div id="detailOverlay" class="fixed inset-0 bg-black bg-opacity-40 z-40 hidden"></div>
 
   <div id="detailModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
-    <div class="bg-white w-[80%] h-[90vh] max-w-5xl p-5 rounded-lg shadow-lg overflow-y-auto">
+    <div class="bg-white w-[80%] h-[90vh] max-w-3xl p-5 rounded-lg shadow-lg overflow-y-auto">
       <div class="flex justify-between items-center mb-2">
         <h2 class="text-2xl font-bold" id="modalTitle">상세 정보</h2>
         <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">✕</button>
       </div>
-      <div class="w-full flex justify-center">
-        <div class="flex flex-col items-center">
-          <div class="overflow-y-auto border" style="width: 600px; height: 400px;">
-            <img id="mainImage" src="" alt="상세 이미지" class="w-[600px] h-[200px] object-cover">
-          </div>
-          <div class="mt-4 flex justify-center gap-2">
-            <img id="thumb1" class="w-20 h-20 cursor-pointer border border-gray-200 hover:border-cyan-500 rounded">
-            <img id="thumb2" class="w-20 h-20 cursor-pointer border border-gray-200 hover:border-cyan-500 rounded">
-            <img id="thumb3" class="w-20 h-20 cursor-pointer border border-gray-200 hover:border-cyan-500 rounded">
-          </div>
-        </div>
+      <!-- 2분할: 대표사진(왼쪽) + 지도(오른쪽) -->
+      <div class="flex flex-row gap-4 items-start mb-4">
+        <img id="mainImage" src="" alt="상세 이미지" class="w-[240px] h-[160px] object-cover rounded shadow border" />
+        <div id="modalMap" class="w-[240px] h-[160px] rounded shadow border"></div>
       </div>
-      <div class="mt-4 text-lg">
+      <!-- 상세 정보 텍스트 -->
+      <div class="mt-2 text-lg space-y-1">
         <p><strong>위치:</strong> <a id="modalLocation" href="#" target="_blank" class="underline text-blue-500">위치 보기</a>
         </p>
         <p><strong>오픈일:</strong> <span id="modalOpenDate"></span></p>
@@ -62,15 +56,13 @@
       </div>
       <div class="mt-4 flex justify-center gap-4">
         <button id="detailToggleBtn"
-          class="bg-cyan-500 text-white rounded py-2 px-6 text-base transition duration-300 hover:bg-cyan-600">
-          더보기
-        </button>
+          class="bg-cyan-500 text-white rounded py-2 px-6 text-base transition duration-300 hover:bg-cyan-600">더보기</button>
         <button id="detailToggleBtn2"
-          class="bg-cyan-500 text-white rounded py-2 px-6 text-base transition duration-300 hover:bg-cyan-600 hidden">
-          이전
-        </button>
+          class="bg-cyan-500 text-white rounded py-2 px-6 text-base transition duration-300 hover:bg-cyan-600 hidden">이전</button>
       </div>
     </div>
+  </div>
+
   </div>
 
   <div id="footer-container"></div>
@@ -248,19 +240,42 @@
     function displayDetail(index) {
       const item = data[index];
       if (!item) return;
-      modalTitle.textContent = item.name;
-      mainImage.src = item.images && item.images[0] ? item.images[0] : "";
+
+      modalTitle.textContent = item.store_name || item.name || "-";
+      mainImage.src = item.thumbnail || item.images?.[0] || "";
       modalLocation.href = item.locationLink || "#";
-      modalOpenDate.textContent = item.openDate || "";
-      modalBiz.textContent = item.biz || "";
-      modalPhone.textContent = item.phone || "";
-      modalDelivery.textContent = item.delivery || "";
-      modalEvents.textContent = item.events || "";
-      modalFacilities.textContent = item.facilities || "";
-      modalAdditionalInfo.textContent = item.additionalInfo || "";
+      modalOpenDate.textContent = item.open_date || item.openDate || "-";
+      modalBiz.textContent = item.category || item.biz || "-";
+      modalPhone.textContent = item.phone || "-";
+      modalDelivery.textContent = item.delivery || "-";
+      modalEvents.textContent = item.events || "-";
+      modalFacilities.textContent = item.facilities || "-";
+      modalAdditionalInfo.textContent = item.description || item.additionalInfo || "-";
       detailOverlay.classList.remove("hidden");
       detailModal.classList.remove("hidden");
+
+      // 지도 위치 적용
+      if (window.modalMap && item.lat && item.lng) {
+        const loc = new kakao.maps.LatLng(item.lat, item.lng);
+        window.modalMap.setCenter(loc);
+        window.modalMarker.setPosition(loc);
+      }
     }
+
+    // 지도 객체 준비 (모달 최초 열릴 때 한 번만 실행)
+    document.addEventListener("DOMContentLoaded", function () {
+      kakao.maps.load(function () {
+        const mapContainer = document.getElementById("modalMap");
+        if (!mapContainer) return;
+        window.modalMap = new kakao.maps.Map(mapContainer, {
+          center: new kakao.maps.LatLng(37.5665, 126.9780),
+          level: 3
+        });
+        window.modalMarker = new kakao.maps.Marker({ map: window.modalMap });
+      });
+    });
+
+    // 모달 닫기/열기 등 기존 그대로
     function closeModal() {
       detailOverlay.classList.add("hidden");
       detailModal.classList.add("hidden");
@@ -277,6 +292,7 @@
       detailToggleBtn.classList.remove("hidden");
       detailToggleBtn2.classList.add("hidden");
     });
+
     function init() {
       renderPage(currentPage);
       renderPagination();
