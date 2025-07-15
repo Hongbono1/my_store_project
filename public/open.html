@@ -19,8 +19,7 @@
         등록
       </button>
     </div>
-    <div id="cardContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-      <!-- 카드 10개 동적 생성 -->
+    <!-- 카드 10개 동적 생성 -->
     </div>
     <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
   </section>
@@ -106,9 +105,12 @@
       }
     }
 
+    let data = [];
+
     document.addEventListener("DOMContentLoaded", async () => {
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
+      data = await fetchOpenStores();  // ← DB에서 데이터 받아옴
       init();
 
       document.getElementById('toggleFormBtn').onclick = function () {
@@ -116,9 +118,33 @@
       };
     });
 
+    // 실제 DB에서 데이터 fetch (이 함수도 추가)
+    async function fetchOpenStores() {
+      try {
+        const res = await fetch("/open");
+        if (!res.ok) throw new Error("데이터 조회 실패");
+        const rows = await res.json();
+        // DB row → 프론트엔드 객체로 변환
+        return rows.map(row => ({
+          name: row.store_name,
+          openDate: row.open_date,
+          category: row.category || row.biz,
+          phone: row.phone,
+          description: row.description,
+          address: row.address,
+          thumbnail: row.thumbnail,
+          images: row.thumbnail ? [row.thumbnail] : [],
+          lat: row.lat,
+          lng: row.lng,
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+    }
+
     const ITEMS_PER_PAGE = 10;
     let currentPage = 1;
-    let data = window.initialData || [];
     let totalItems = data.length;
     let totalPages = Math.ceil(Math.max(1, totalItems / ITEMS_PER_PAGE));
 
