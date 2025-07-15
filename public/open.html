@@ -11,17 +11,17 @@
 <body class="bg-gray-100 min-h-screen w-full">
   <div id="header-container"></div>
   <section class="bg-white shadow-lg rounded-2xl border-2 border-gray-200 max-w-screen-xl mx-auto p-8 mt-12 mb-8">
-  <div class="flex items-center justify-between mb-10">
-    <h2 class="text-4xl font-bold text-cyan-700">오픈예정</h2>
-    <button id="toggleFormBtn"
-      class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
-      등록
-    </button>
-  </div>
-  <!-- *** 이 부분을 추가! *** -->
-  <div id="cardContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-    <!-- 카드 10개 동적 생성 -->
-    <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
+    <div class="flex items-center justify-between mb-10">
+      <h2 class="text-4xl font-bold text-cyan-700">오픈예정</h2>
+      <button id="toggleFormBtn"
+        class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+        등록
+      </button>
+    </div>
+    <!-- *** 이 부분을 추가! *** -->
+    <div id="cardContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+      <!-- 카드 10개 동적 생성 -->
+      <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
   </section>
 
   <div id="detailOverlay" class="fixed inset-0 bg-black bg-opacity-40 z-40 hidden"></div>
@@ -73,27 +73,6 @@
 
   <!-- 초기 데이터: 10개 (예시, 실제 데이터로 교체 가능) -->
   <script>
-    let cards = JSON.parse(localStorage.getItem('openCards') || '[]');
-    window.initialData = [
-      {
-        name: "상호명1",
-        locationLink: "https://map.kakao.com/link/map/주소1",
-        openDate: "2025-01-05",
-        biz: "식당",
-        phone: "010-1111-2222",
-        images: [
-          "https://via.placeholder.com/600x400?text=Card+1+Image+1"
-        ],
-        delivery: "배달 가능",
-        events: "신메뉴 출시",
-        facilities: "휠체어 접근 가능",
-        additionalInfo: "상세 설명 1."
-      },
-      // ... (이하 10개, 혹은 부족하면 정보없음 카드로 채움)
-    ];
-  </script>
-
-  <script>
     async function loadComponent(url, containerId) {
       try {
         const response = await fetch(url);
@@ -110,7 +89,11 @@
     document.addEventListener("DOMContentLoaded", async () => {
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
-      data = await fetchOpenStores();  // ← DB에서 데이터 받아옴
+      data = await fetchOpenStores();  // DB에서 데이터 받아옴
+
+      // 페이지네이션/카드 초기화
+      totalItems = data.length;
+      totalPages = Math.ceil(Math.max(1, totalItems / ITEMS_PER_PAGE));
       init();
 
       document.getElementById('toggleFormBtn').onclick = function () {
@@ -118,22 +101,20 @@
       };
     });
 
-    // 실제 DB에서 데이터 fetch (이 함수도 추가)
+    // 실제 DB에서 데이터 fetch (컬럼명 그대로!)
     async function fetchOpenStores() {
       try {
         const res = await fetch("/open");
         if (!res.ok) throw new Error("데이터 조회 실패");
         const rows = await res.json();
-        // DB row → 프론트엔드 객체로 변환
         return rows.map(row => ({
-          name: row.store_name,
-          openDate: row.open_date,
-          category: row.category || row.biz,
+          store_name: row.store_name,
+          open_date: row.open_date,
+          category: row.category,
           phone: row.phone,
           description: row.description,
           address: row.address,
           thumbnail: row.thumbnail,
-          images: row.thumbnail ? [row.thumbnail] : [],
           lat: row.lat,
           lng: row.lng,
         }));
@@ -145,38 +126,22 @@
 
     const ITEMS_PER_PAGE = 10;
     let currentPage = 1;
-    let totalItems = data.length;
-    let totalPages = Math.ceil(Math.max(1, totalItems / ITEMS_PER_PAGE));
+    let totalItems = 0;
+    let totalPages = 1;
 
-    // DOM
+    // DOM (카드 리스트 컨테이너 등)
     const cardContainer = document.getElementById("cardContainer");
     const paginationContainer = document.getElementById("pagination");
-    const detailOverlay = document.getElementById("detailOverlay");
-    const detailModal = document.getElementById("detailModal");
-    const modalTitle = document.getElementById("modalTitle");
-    const mainImage = document.getElementById("mainImage");
-    const modalLocation = document.getElementById("modalLocation");
-    const modalOpenDate = document.getElementById("modalOpenDate");
-    const modalBiz = document.getElementById("modalBiz");
-    const modalPhone = document.getElementById("modalPhone");
-    const modalDelivery = document.getElementById("modalDelivery");
-    const modalEvents = document.getElementById("modalEvents");
-    const modalFacilities = document.getElementById("modalFacilities");
-    const modalAdditionalInfo = document.getElementById("modalAdditionalInfo");
-    const closeModalBtn = document.getElementById("closeModalBtn");
-    const detailToggleBtn = document.getElementById("detailToggleBtn");
-    const detailToggleBtn2 = document.getElementById("detailToggleBtn2");
-    const detailHiddenFields = document.getElementById("detailHiddenFields");
 
     function createCard(item, globalIndex) {
       if (!item) {
         const none = document.createElement("div");
         none.className = "bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60";
         none.innerHTML = `
-          <img src="https://placehold.co/400x200?text=정보+없음" class="w-full h-44 object-cover rounded mb-4 border" alt="정보 없음">
-          <div class="text-xl font-bold text-gray-400 mb-2">정보 없음</div>
-          <div class="text-gray-300 text-sm">아직 등록된 오픈예정 가게가 없습니다.</div>
-        `;
+        <img src="https://placehold.co/400x200?text=정보+없음" class="w-full h-44 object-cover rounded mb-4 border" alt="정보 없음">
+        <div class="text-xl font-bold text-gray-400 mb-2">정보 없음</div>
+        <div class="text-gray-300 text-sm">아직 등록된 오픈예정 가게가 없습니다.</div>
+      `;
         return none;
       }
 
@@ -184,56 +149,45 @@
       cardDiv.className =
         "bg-yellow-50 text-black p-5 rounded-xl shadow-md relative overflow-hidden flex flex-col md:flex-row transition duration-200 hover:scale-105";
 
-      // 와이드/위치
-      if (globalIndex === 3 || globalIndex === 7) {
-        cardDiv.classList.add("md:col-span-3", "mx-auto");
-        cardDiv.style.width = "50%";
-      }
-      if (data.length === 10) {
-        if (globalIndex === 8) cardDiv.classList.add("md:col-start-1");
-        if (globalIndex === 9) cardDiv.classList.add("md:col-start-3");
-      }
-
       const imageSection = `
-        <div class="flex-1 md:max-w-[50%] mr-5 flex items-center justify-center h-full">
-          <img
-            src="${item.images && item.images[0] ? item.images[0] : 'https://placehold.co/600x400?text=No+Image'}"
-            alt="${item.name} 메인이미지"
-            class="w-[600px] h-[200px] object-cover rounded-md"
-          />
-        </div>
-      `;
+      <div class="flex-1 md:max-w-[50%] mr-5 flex items-center justify-center h-full">
+        <img
+          src="${item.thumbnail ? item.thumbnail : 'https://placehold.co/600x400?text=No+Image'}"
+          alt="${item.store_name} 메인이미지"
+          class="w-[600px] h-[200px] object-cover rounded-md"
+        />
+      </div>
+    `;
       const infoSection = `
-        <div class="flex-1 flex flex-col justify-between text-lg relative z-10 text-black">
-          <div class="mb-2">
-            <span class="text-2xl font-bold">${item.name || '-'}</span>
-          </div>
-          <div class="space-y-2">
-            <p class="flex items-center">
-              <img src="https://img.icons8.com/ios-filled/50/000000/marker.png" alt="location" class="w-5 h-5 mr-2">
-              <a href="${item.locationLink || '#'}" target="_blank" class="underline text-black">
-                위치(클릭)
-              </a>
-            </p>
-            <p class="flex items-center">
-              <img src="https://img.icons8.com/ios-filled/50/000000/calendar.png" alt="open-date" class="w-5 h-5 mr-2">
-              <span class="font-bold text-yellow-400">
-                오픈일: ${item.openDate ? item.openDate.replace(/-/g, ".") : '-'}
-              </span>
-            </p>
-            <p class="flex items-center">
-              <img src="https://img.icons8.com/ios-filled/50/000000/business.png" alt="업종" class="w-5 h-5 mr-2">
-              업종: ${item.biz || '-'}
-            </p>
-            <p class="flex items-center">
-              <img src="https://img.icons8.com/ios-filled/50/000000/phone.png" alt="phone" class="w-5 h-5 mr-2">
-              ${item.phone || '-'}
-            </p>
-          </div>
+      <div class="flex-1 flex flex-col justify-between text-lg relative z-10 text-black">
+        <div class="mb-2">
+          <span class="text-2xl font-bold">${item.store_name || '-'}</span>
         </div>
-        <div class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
-          style="clip-path: ellipse(50% 100% at 100% 100%);"></div>
-      `;
+        <div class="space-y-2">
+          <p class="flex items-center">
+            <img src="https://img.icons8.com/ios-filled/50/000000/marker.png" alt="location" class="w-5 h-5 mr-2">
+            <span>${item.address || '주소없음'}</span>
+          </p>
+          <p class="flex items-center">
+            <img src="https://img.icons8.com/ios-filled/50/000000/calendar.png" alt="open-date" class="w-5 h-5 mr-2">
+            <span class="font-bold text-yellow-400">
+              오픈일: ${item.open_date ? item.open_date.split("T")[0].replace(/-/g, ".") : '-'}
+            </span>
+          </p>
+          <p class="flex items-center">
+            <img src="https://img.icons8.com/ios-filled/50/000000/business.png" alt="업종" class="w-5 h-5 mr-2">
+            업종: ${item.category || '-'}
+          </p>
+          <p class="flex items-center">
+            <img src="https://img.icons8.com/ios-filled/50/000000/phone.png" alt="phone" class="w-5 h-5 mr-2">
+            ${item.phone || '-'}
+          </p>
+        </div>
+        <div class="text-gray-600 text-xs mt-2">${item.description || ''}</div>
+      </div>
+      <div class="absolute bottom-0 right-0 w-1/2 h-full bg-[rgba(240,230,214,0.8)] z-0"
+        style="clip-path: ellipse(50% 100% at 100% 100%);"></div>
+    `;
       cardDiv.innerHTML = imageSection + infoSection;
       cardDiv.addEventListener("click", () => displayDetail(globalIndex));
       return cardDiv;
@@ -252,7 +206,7 @@
     }
 
     function renderPagination() {
-      if (!paginationContainer) return; // ← null이면 함수 종료
+      if (!paginationContainer) return;
       paginationContainer.innerHTML = "";
       for (let i = 1; i <= totalPages; i++) {
         const btn = document.createElement("button");
@@ -274,80 +228,55 @@
       renderPagination();
     }
 
+    // 상세보기 모달
     function displayDetail(index) {
       const item = data[index];
       if (!item) return;
 
-      // 대표 이미지
       const modalImage = document.getElementById("modalImage");
       if (modalImage) {
         modalImage.src = item.thumbnail || "/assets/images/no-thumb.png";
-        modalImage.alt = (item.store_name || item.name || "-") + " 대표 이미지";
+        modalImage.alt = (item.store_name || "-") + " 대표 이미지";
       }
-
-      // 정보 출력 (각각 id가 있는지 확인)
       const modalName = document.getElementById("modalName");
-      if (modalName) modalName.textContent = item.store_name || item.name || "-";
-
+      if (modalName) modalName.textContent = item.store_name || "-";
       const modalOpenDate = document.getElementById("modalOpenDate");
-      if (modalOpenDate) modalOpenDate.textContent = item.open_date || item.openDate || "-";
-
+      if (modalOpenDate) modalOpenDate.textContent = item.open_date || "-";
       const modalCategory = document.getElementById("modalCategory");
-      if (modalCategory) modalCategory.textContent = item.category || item.biz || "-";
-
+      if (modalCategory) modalCategory.textContent = item.category || "-";
       const modalPhone = document.getElementById("modalPhone");
       if (modalPhone) modalPhone.textContent = item.phone || "-";
-
       const modalDesc = document.getElementById("modalDesc");
       if (modalDesc) modalDesc.textContent = item.description || "-";
-
       const modalAddress = document.getElementById("modalAddress");
       if (modalAddress) modalAddress.textContent = item.address || "-";
-
-      // 지도 링크
       const modalMapLink = document.getElementById("modalMapLink");
       if (modalMapLink) {
         if (item.lat && item.lng) {
-          modalMapLink.href = `https://map.kakao.com/link/map/${encodeURIComponent(item.store_name || item.name)},${item.lat},${item.lng}`;
+          modalMapLink.href = `https://map.kakao.com/link/map/${encodeURIComponent(item.store_name)},${item.lat},${item.lng}`;
         } else {
           modalMapLink.href = "#";
         }
       }
 
-      // ✅ 모달 표시 (이건 자바스크립트니까 이렇게!)
       document.getElementById("detailModal").classList.remove("hidden");
       document.getElementById("detailOverlay").classList.remove("hidden");
     }
 
+    // 모달 닫기
+    function closeModal() {
+      document.getElementById("detailModal").classList.add("hidden");
+      document.getElementById("detailOverlay").classList.add("hidden");
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
-      // 안전하게 요소를 찾고 이벤트 연결 (초기에 변수 선언!)
       const closeModalBtn = document.getElementById("closeModalBtn");
       const detailOverlay = document.getElementById("detailOverlay");
-      const detailToggleBtn = document.getElementById("detailToggleBtn");
-      const detailToggleBtn2 = document.getElementById("detailToggleBtn2");
-      const detailHiddenFields = document.getElementById("detailHiddenFields");
-
-      function closeModal() {
-        document.getElementById("detailModal").classList.add("hidden");
-        document.getElementById("detailOverlay").classList.add("hidden");
-      }
-
       if (closeModalBtn) closeModalBtn.onclick = closeModal;
       if (detailOverlay) detailOverlay.onclick = closeModal;
-
-      // 더보기/이전 버튼 이벤트
-      if (detailToggleBtn) detailToggleBtn.addEventListener("click", () => {
-        detailHiddenFields.classList.remove("hidden");
-        detailToggleBtn.classList.add("hidden");
-        detailToggleBtn2.classList.remove("hidden");
-      });
-      if (detailToggleBtn2) detailToggleBtn2.addEventListener("click", () => {
-        detailHiddenFields.classList.add("hidden");
-        detailToggleBtn.classList.remove("hidden");
-        detailToggleBtn2.classList.add("hidden");
-      });
     });
   </script>
+
 </body>
 
 </html>
