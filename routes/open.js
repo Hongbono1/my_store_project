@@ -19,7 +19,7 @@ router.post("/", async (req, res) => {
 
   const sql = `
     INSERT INTO open_store
-      (owner, email, store_name, address, phone, open_date, description, thumbnail)
+      (store_name, address, phone, open_date, description)
     VALUES
       ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING id
@@ -27,14 +27,11 @@ router.post("/", async (req, res) => {
 
   try {
     const { rows } = await pool.query(sql, [
-      owner,
-      email,
       store_name,
       address,
       phone,
       open_date,
       description,
-      thumbnail
     ]);
     res.json({ success: true, id: rows[0].id });
   } catch (err) {
