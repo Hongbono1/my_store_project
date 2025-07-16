@@ -5,55 +5,38 @@ import path from "path";
 
 const router = express.Router();
 
-// 1️⃣ 저장시 원본명 포함하여 파일명 생성
+// multer: 원본 확장자까지 살려 저장
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: function (req, file, cb) {
     cb(null, "public/uploads/");
   },
-  filename: (req, file, cb) => {
-    // 예: 1752711813244-원본명.jpg
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-_]/g, "_");
-    cb(null, Date.now() + "-" + safeName);
+  filename: function (req, file, cb) {
+    // 예: 1689981234-originalname.jpg 처럼 저장 (중복방지)
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, Date.now() + "-" + basename + ext);
   }
 });
 const upload = multer({ storage });
 
-// 2️⃣ POST 등록 (원본 파일명 DB 저장)
 router.post("/", upload.single("img"), async (req, res) => {
-  // input name들과 일치!
   const {
-    name,
-    openDate,
-    category,
-    addr,
-    phone,
-    desc,
-    owner,
-    email
+    name, openDate, category, addr, phone, desc, owner, email
   } = req.body;
+
   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
-  const original_filename = req.file ? req.file.originalname : "";
 
   const sql = `
     INSERT INTO open_store
-      (store_name, address, phone, open_date, description, category, owner, email, thumbnail, original_filename)
+      (store_name, address, phone, open_date, description, category, owner, email, thumbnail)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING id
   `;
 
   try {
     const { rows } = await pool.query(sql, [
-      name,
-      addr,
-      phone,
-      openDate,
-      desc,
-      category,
-      owner,
-      email,
-      thumbnail,
-      original_filename
+      name, addr, phone, openDate, desc, category, owner, email, thumbnail
     ]);
     res.json({ success: true, id: rows[0].id });
   } catch (err) {
@@ -62,7 +45,6 @@ router.post("/", upload.single("img"), async (req, res) => {
   }
 });
 
-// 3️⃣ GET 목록 (기존과 동일)
 router.get("/", async (req, res) => {
   try {
     const sql = `SELECT * FROM open_store ORDER BY created_at DESC`;
