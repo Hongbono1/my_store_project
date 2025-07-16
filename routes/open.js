@@ -3,40 +3,38 @@ import { pool } from "../db/pool.js";
 import multer from "multer";
 
 const router = express.Router();
-
-// 이미지 업로드용 multer 설정
 const upload = multer({ dest: "uploads/" });
 
-// POST /open - 오픈예정 등록 (multer 적용!)
 router.post("/", upload.single("img"), async (req, res) => {
-  // multer가 req.body/req.file 자동 파싱
+  // 프론트 input의 name과 반드시 일치!
   const {
-    name,           // <input name="name">
-    openDate,       // <input name="openDate">
-    category,       // <input name="category">
-    phone,          // <input name="phone">
-    desc,           // <textarea name="desc">
-    addr            // <input name="addr">
-    // 필요시 lat, lng 추가
+    store_name,      // <input name="store_name">
+    open_date,       // <input name="open_date">
+    address,         // <input name="address">
+    phone,           // <input name="phone">
+    description,     // <textarea name="description">
+    owner,           // <input name="owner">
+    email            // <input name="email">
   } = req.body;
   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
 
   const sql = `
     INSERT INTO open_store
-      (store_name, address, phone, open_date, description, category, thumbnail)
+      (store_name, address, phone, open_date, description, owner, email, thumbnail)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7)
+      ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING id
   `;
 
   try {
     const { rows } = await pool.query(sql, [
-      name,
-      addr,
+      store_name,
+      address,
       phone,
-      openDate,
-      desc,
-      category,
+      open_date,
+      description,
+      owner,
+      email,
       thumbnail
     ]);
     res.json({ success: true, id: rows[0].id });
@@ -46,7 +44,6 @@ router.post("/", upload.single("img"), async (req, res) => {
   }
 });
 
-// GET /open - 오픈예정 리스트
 router.get("/", async (req, res) => {
   try {
     const sql = `SELECT * FROM open_store ORDER BY created_at DESC`;
@@ -59,4 +56,3 @@ router.get("/", async (req, res) => {
 });
 
 export default router;
-
