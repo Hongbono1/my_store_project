@@ -23,7 +23,7 @@ const upload = multer({ storage });
 // 등록
 router.post("/", upload.single("img"), async (req, res) => {
   const {
-    name, openDate, category, addr, phone, desc, owner, email
+    store_name, open_date, category, addr, phone, desc, owner, email
   } = req.body;
 
   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
@@ -38,7 +38,7 @@ router.post("/", upload.single("img"), async (req, res) => {
 
   try {
     const { rows } = await pool.query(sql, [
-      name, addr, phone, openDate, desc, category, owner, email, thumbnail
+      store_name, addr, phone, open_date, desc, category, owner, email, thumbnail
     ]);
     res.json({ success: true, id: rows[0].id });
   } catch (err) {
