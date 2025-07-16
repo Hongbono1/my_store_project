@@ -3,36 +3,39 @@ import { pool } from "../db/pool.js";
 import multer from "multer";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "public/uploads/" });  // 폴더 위치 변경!
 
 router.post("/", upload.single("img"), async (req, res) => {
-  // 프론트 input의 name과 반드시 일치!
+  // name은 프론트 input과 반드시 일치해야 함!
   const {
-    store_name,      // <input name="store_name">
-    open_date,       // <input name="open_date">
-    address,         // <input name="address">
-    phone,           // <input name="phone">
-    description,     // <textarea name="description">
-    owner,           // <input name="owner">
-    email            // <input name="email">
+    name,             // <input name="name">
+    openDate,         // <input name="openDate">
+    category,         // <input name="category">
+    addr,             // <input name="addr">
+    phone,            // <input name="phone">
+    desc,             // <textarea name="desc">
+    owner,
+    email
   } = req.body;
   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
 
+  // ★ DDL에 category 컬럼 추가했다고 가정
   const sql = `
     INSERT INTO open_store
-      (store_name, address, phone, open_date, description, owner, email, thumbnail)
+      (store_name, address, phone, open_date, description, category, owner, email, thumbnail)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING id
   `;
 
   try {
     const { rows } = await pool.query(sql, [
-      store_name,
-      address,
+      name,
+      addr,
       phone,
-      open_date,
-      description,
+      openDate,
+      desc,
+      category,
       owner,
       email,
       thumbnail
