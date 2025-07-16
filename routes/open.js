@@ -24,9 +24,9 @@ router.post("/", upload.single("img"), async (req, res) => {
     store_name,       // <input name="store_name">
     open_date,        // <input name="open_date">
     category,         // <input name="category">
-    addr,             // <input name="addr">   ← 주소
+    address,             // <input name="addr">   ← 주소
     phone,            // <input name="phone">
-    desc,             // <textarea name="desc">
+    description,             // <textarea name="desc">
     owner,
     email
   } = req.body;
@@ -51,10 +51,10 @@ router.post("/", upload.single("img"), async (req, res) => {
   try {
     const { rows } = await pool.query(sql, [
       store_name,
-      addr,
+      address,
       phone,
       open_date,
-      desc,
+      description,
       category,
       owner,
       email,
