@@ -32,7 +32,7 @@ router.post("/", upload.single("img"), async (req, res) => {
   } = req.body;
 
   /* 필수값 체크 (비어 있으면 400 에러) */
-  if (!store_name || !addr || !open_date) {
+  if (!store_name || !address || !open_date || !category) {
     return res.status(400).json({ success:false, error:"필수항목 누락" });
   }
 
