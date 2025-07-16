@@ -23,10 +23,16 @@ const upload = multer({ storage });
 // 등록
 router.post("/", upload.single("img"), async (req, res) => {
   const {
-    store_name, open_date, category, addr, phone, desc, owner, email
+    store_name,   // ✅ 반드시 form name="store_name"과 일치
+    open_date,
+    category,
+    addr,
+    phone,
+    desc,
+    owner,
+    email
   } = req.body;
-
-  const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
+   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
 
   const sql = `
     INSERT INTO open_store
