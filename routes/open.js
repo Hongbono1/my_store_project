@@ -5,20 +5,22 @@ import path from "path";
 
 const router = express.Router();
 
-// multer: 원본 확장자까지 살려 저장
+// 파일명: [타임스탬프]-[정제된원본명][.확장자]로 저장
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "public/uploads/");
   },
   filename: function (req, file, cb) {
-    // 예: 1689981234-originalname.jpg 처럼 저장 (중복방지)
+    // 특수문자/공백 제거, 한글-영어-숫자-_-만 허용 (자주 쓰는 패턴)
     const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, Date.now() + "-" + basename + ext);
+    const base = path.basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9가-힣_.-]/g, "_");
+    cb(null, Date.now() + "-" + base + ext);
   }
 });
 const upload = multer({ storage });
 
+// 등록
 router.post("/", upload.single("img"), async (req, res) => {
   const {
     name, openDate, category, addr, phone, desc, owner, email
@@ -45,6 +47,7 @@ router.post("/", upload.single("img"), async (req, res) => {
   }
 });
 
+// 목록 조회
 router.get("/", async (req, res) => {
   try {
     const sql = `SELECT * FROM open_store ORDER BY created_at DESC`;
