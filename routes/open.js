@@ -1,30 +1,44 @@
 import express from "express";
 import { pool } from "../db/pool.js";
 import multer from "multer";
+import path from "path";
 
 const router = express.Router();
-const upload = multer({ dest: "public/uploads/" });  // 폴더 위치 변경!
 
+// 1️⃣ 저장시 원본명 포함하여 파일명 생성
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "public/uploads/");
+  },
+  filename: (req, file, cb) => {
+    // 예: 1752711813244-원본명.jpg
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-_]/g, "_");
+    cb(null, Date.now() + "-" + safeName);
+  }
+});
+const upload = multer({ storage });
+
+// 2️⃣ POST 등록 (원본 파일명 DB 저장)
 router.post("/", upload.single("img"), async (req, res) => {
-  // name은 프론트 input과 반드시 일치해야 함!
+  // input name들과 일치!
   const {
-    name,             // <input name="name">
-    openDate,         // <input name="openDate">
-    category,         // <input name="category">
-    addr,             // <input name="addr">
-    phone,            // <input name="phone">
-    desc,             // <textarea name="desc">
+    name,
+    openDate,
+    category,
+    addr,
+    phone,
+    desc,
     owner,
     email
   } = req.body;
   const thumbnail = req.file ? "/uploads/" + req.file.filename : "";
+  const original_filename = req.file ? req.file.originalname : "";
 
-  // ★ DDL에 category 컬럼 추가했다고 가정
   const sql = `
     INSERT INTO open_store
-      (store_name, address, phone, open_date, description, category, owner, email, thumbnail)
+      (store_name, address, phone, open_date, description, category, owner, email, thumbnail, original_filename)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING id
   `;
 
@@ -38,7 +52,8 @@ router.post("/", upload.single("img"), async (req, res) => {
       category,
       owner,
       email,
-      thumbnail
+      thumbnail,
+      original_filename
     ]);
     res.json({ success: true, id: rows[0].id });
   } catch (err) {
@@ -47,6 +62,7 @@ router.post("/", upload.single("img"), async (req, res) => {
   }
 });
 
+// 3️⃣ GET 목록 (기존과 동일)
 router.get("/", async (req, res) => {
   try {
     const sql = `SELECT * FROM open_store ORDER BY created_at DESC`;
