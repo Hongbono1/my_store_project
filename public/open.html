@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,8 +9,10 @@
   <style>
     #cardContainer {
       position: relative;
-      min-height: 700px; /* 곡선 하단에 공간 확보 */
+      min-height: 700px;
+      /* 곡선 하단에 공간 확보 */
     }
+
     .curve-card {
       position: absolute;
       width: 220px;
@@ -17,14 +20,17 @@
       transition: transform 0.3s, box-shadow 0.3s;
       z-index: 10;
     }
+
     .curve-card:hover {
       transform: scale(1.07) rotate(-2deg);
       z-index: 30;
-      box-shadow: 0 8px 32px 0 rgba(0,0,0,0.20);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.20);
     }
+
     /* 카드끼리 안겹치게 z-index 계단식 주기 (JS에서 할 수도 있음) */
   </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen w-full">
   <div id="header-container"></div>
   <section class="bg-white shadow-lg rounded-2xl border-2 border-gray-200 max-w-screen-xl mx-auto p-8 mt-12 mb-8">
@@ -35,7 +41,7 @@
         등록
       </button>
     </div>
-    <div id="cardContainer" class="relative w-full min-h-[700px]"></div>
+    <div id="cardContainer" class="relative w-full min-h-[700px] mb-12" style="overflow:visible"></div>
     <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
   </section>
 
@@ -198,29 +204,33 @@
       let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
       // 곡선 좌표 공식
+      // ... (생략)
       const containerW = cardContainer.offsetWidth || 1200;
+      // ↓ 카드 크기만큼 여유 여백을 둠
       const cx = containerW / 2;
-      const cy = 340;           // 곡선의 세로 중앙값
-      const r = 300;            // 반지름 조절
-      const angleStart = Math.PI * 1.15;  // 곡선 시작 각도
-      const angleEnd = Math.PI * 1.85;    // 곡선 끝 각도
+      const cy = 380;    // 살짝 아래로 내림 (ex. 340 → 380)
+      const r = 250;     // 반지름을 살짝 줄임 (ex. 300 → 250)
+      const cardWidth = 220, cardHeight = 300;
+      const angleStart = Math.PI * 1.15;
+      const angleEnd = Math.PI * 1.85;
       const N = pageData.length;
       const angleStep = (angleEnd - angleStart) / (N > 1 ? N - 1 : 1);
 
       pageData.forEach((item, i) => {
         const card = createCard(item, startIndex + i);
-        // 곡선(반원) 위에 배치, 살짝씩 랜덤 offset주면 불규칙함 구현
         let theta = angleStart + i * angleStep;
-        let r2 = r + (Math.random() * 40 - 20); // 반지름 랜덤
-        let x = cx + Math.cos(theta) * r2 - 110; // 카드너비/2
-        let y = cy + Math.sin(theta) * r2 - 150; // 카드높이/2
+        let r2 = r + (Math.random() * 30 - 15); // 랜덤값 축소
+        let x = cx + Math.cos(theta) * r2 - cardWidth / 2;
+        let y = cy + Math.sin(theta) * r2 - cardHeight / 2;
+        // *** 경계 벗어나는 것 방지 ***
+        x = Math.max(0, Math.min(containerW - cardWidth, x));
         card.style.left = `${x}px`;
         card.style.top = `${y}px`;
-        card.style.zIndex = 10 + i; // 겹침 방지
+        card.style.zIndex = 10 + i;
         cardContainer.appendChild(card);
       });
     }
-
+    
     function renderPagination() {
       if (!paginationContainer) return;
       paginationContainer.innerHTML = "";
@@ -277,4 +287,5 @@
     }
   </script>
 </body>
+
 </html>
