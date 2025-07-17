@@ -57,6 +57,16 @@
 
       <!-- 초기 데이터: 10개 (예시, 실제 데이터로 교체 가능) -->
       <script>
+        function formatOpenDate(dateStr) {
+          if (!dateStr) return '';
+          const [year, month, day] = dateStr.split("T")[0].split("-");
+          return `${year.slice(-2)}. ${parseInt(month, 10)}. ${parseInt(day, 10)}`;
+        }
+        function shortAddress(addr) {
+          if (!addr) return "";
+          const tokens = addr.trim().replace(/\s+/g, " ").split(" ");
+          return tokens.slice(0, 4).join(" ");
+        }
         async function loadComponent(url, containerId) {
           try {
             const response = await fetch(url);
@@ -144,27 +154,12 @@
         </div>
       `;
 
-          // 최상단(스크립트 밖, 한 번만 선언)
-          function formatOpenDate(dateStr) {
-            if (!dateStr) return '';
-            // 예: 2025-08-01T15:00:00.000Z → 25. 8. 1
-            const [year, month, day] = dateStr.split("T")[0].split("-");
-            return `${year.slice(-2)}. ${parseInt(month, 10)}. ${parseInt(day, 10)}`;
-          }
-
-          function shortAddress(addr) {
-            if (!addr) return "";
-            const tokens = addr.trim().replace(/\s+/g, " ").split(" ");
-            return tokens.slice(0, 4).join(" ");
-          }
-
           const infoSection = `
   <div class="flex-1 flex flex-col justify-between relative z-10 text-black">
     <div class="font-bold text-3xl mb-1">${item.store_name || '-'}</div>
     <div class="text-xl font-bold text-cyan-700 mb-2">
       ${item.open_date ? "오픈 " + formatOpenDate(item.open_date) : ""}
     </div>
-    <!-- 주소는 "시군구 읍면동"까지만 -->
     <div class="text-xl font-bold mb-1">
       ${shortAddress(item.address)}
     </div>
@@ -180,114 +175,112 @@
   </div>
 `;
 
-          function renderPage(page) {
-            cardContainer.innerHTML = "";
-            const startIndex = (page - 1) * ITEMS_PER_PAGE;
-            let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-            while (pageData.length < ITEMS_PER_PAGE) pageData.push(null);
-            pageData.forEach((item, i) => {
-              const globalIndex = startIndex + i;
-              const card = createCard(item, globalIndex);
-              cardContainer.appendChild(card);
-            });
-          }
+          cardDiv.innerHTML = imageSection + infoSection;
+          cardDiv.addEventListener("click", () => displayDetail(globalIndex));
+          return cardDiv;
+        }
 
-          function renderPagination() {
-            if (!paginationContainer) return;
-            paginationContainer.innerHTML = "";
-            for (let i = 1; i <= totalPages; i++) {
-              const btn = document.createElement("button");
-              btn.textContent = i;
-              btn.className = "py-2 px-4 rounded bg-gray-800 text-white text-base hover:bg-gray-700 transition";
-              if (i === currentPage) btn.classList.add("bg-cyan-500");
-              btn.addEventListener("click", () => {
-                currentPage = i;
-                renderPage(currentPage);
-                renderPagination();
-                closeModal();
-              });
-              paginationContainer.appendChild(btn);
-            }
-          }
-
-          function init() {
-            renderPage(currentPage);
-            renderPagination();
-          }
-
-          // 이미지 확대 모달 열기
-          function openImageModal(src) {
-            document.getElementById('imageZoom').src = src;
-            document.getElementById('imageModal').classList.remove('hidden');
-          }
-          function closeImageModal() {
-            document.getElementById('imageModal').classList.add('hidden');
-          }
-
-          // 상세보기 모달
-          function formatOpenDate(dateStr) {
-            if (!dateStr) return '';
-            // dateStr이 "2025-08-01T15:00:00.000Z" 형태라면, "2025-08-01"만 남기기
-            const [year, month, day] = dateStr.split("T")[0].split("-");
-            return `오픈 ${year.slice(-2)}. ${parseInt(month, 10)}. ${parseInt(day, 10)}`;
-          }
-          // 모달 정보 출력 함수
-          function displayDetail(index) {
-            const item = data[index];
-            if (!item) return;
-
-            // 이미지
-            document.getElementById("modalImage").src = item.thumbnail || "/assets/images/no-thumb.png";
-            document.getElementById("modalImage").alt = (item.store_name || "-") + " 대표 이미지";
-            // 상호명
-            document.getElementById("modalName").textContent = item.store_name || "-";
-            // 시간/날짜 
-            document.getElementById("modalOpenDate").textContent =
-              item.open_date ? formatOpenDate(item.open_date) : "";
-            // 업종(카테고리) 진하게
-            document.getElementById("modalCategory").textContent = item.category || "-";
-            // 연락처
-            document.getElementById("modalPhone").textContent = item.phone || "-";
-            // 설명
-            document.getElementById("modalDesc").textContent = item.description || "-";
-            // 주소
-            document.getElementById("modalAddress").textContent = item.address || "-";
-
-            // 지도 링크
-            const modalMapLink = document.getElementById("modalMapLink");
-            if (item.lat && item.lng) {
-              modalMapLink.href = `https://map.kakao.com/link/map/${encodeURIComponent(item.store_name)},${item.lat},${item.lng}`;
-            } else {
-              modalMapLink.href = "#";
-            }
-
-            // 모달 show
-            document.getElementById("detailModal").classList.remove("hidden");
-            document.getElementById("detailOverlay").classList.remove("hidden");
-          }
-
-          // 모달 닫기 함수
-          function closeModal() {
-            document.getElementById("detailModal").classList.add("hidden");
-            document.getElementById("detailOverlay").classList.add("hidden");
-          }
-
-          // 이미지 클릭시 확대
-          function openImageModal(src) {
-            document.getElementById("fullImage").src = src;
-            document.getElementById("imageModal").classList.remove("hidden");
-          }
-          // 이미지 확대모달 닫기
-          document.getElementById("imageModal").onclick = function () {
-            this.classList.add("hidden");
-            document.getElementById("fullImage").src = "";
-          };
-
-          // 이벤트 바인딩 (최초 한 번만!)
-          document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("closeModalBtn").onclick = closeModal;
-            document.getElementById("detailOverlay").onclick = closeModal;
+        function renderPage(page) {
+          cardContainer.innerHTML = "";
+          const startIndex = (page - 1) * ITEMS_PER_PAGE;
+          let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+          while (pageData.length < ITEMS_PER_PAGE) pageData.push(null);
+          pageData.forEach((item, i) => {
+            const globalIndex = startIndex + i;
+            const card = createCard(item, globalIndex);
+            cardContainer.appendChild(card);
           });
+        }
+
+        function renderPagination() {
+          if (!paginationContainer) return;
+          paginationContainer.innerHTML = "";
+          for (let i = 1; i <= totalPages; i++) {
+            const btn = document.createElement("button");
+            btn.textContent = i;
+            btn.className = "py-2 px-4 rounded bg-gray-800 text-white text-base hover:bg-gray-700 transition";
+            if (i === currentPage) btn.classList.add("bg-cyan-500");
+            btn.addEventListener("click", () => {
+              currentPage = i;
+              renderPage(currentPage);
+              renderPagination();
+              closeModal();
+            });
+            paginationContainer.appendChild(btn);
+          }
+        }
+
+        function init() {
+          renderPage(currentPage);
+          renderPagination();
+        }
+
+        // 이미지 확대 모달 열기
+        function openImageModal(src) {
+          document.getElementById('imageZoom').src = src;
+          document.getElementById('imageModal').classList.remove('hidden');
+        }
+        function closeImageModal() {
+          document.getElementById('imageModal').classList.add('hidden');
+        }
+
+        // 모달 정보 출력 함수
+        function displayDetail(index) {
+          const item = data[index];
+          if (!item) return;
+
+          // 이미지
+          document.getElementById("modalImage").src = item.thumbnail || "/assets/images/no-thumb.png";
+          document.getElementById("modalImage").alt = (item.store_name || "-") + " 대표 이미지";
+          // 상호명
+          document.getElementById("modalName").textContent = item.store_name || "-";
+          // 시간/날짜 
+          document.getElementById("modalOpenDate").textContent =
+            item.open_date ? formatOpenDate(item.open_date) : "";
+          // 업종(카테고리) 진하게
+          document.getElementById("modalCategory").textContent = item.category || "-";
+          // 연락처
+          document.getElementById("modalPhone").textContent = item.phone || "-";
+          // 설명
+          document.getElementById("modalDesc").textContent = item.description || "-";
+          // 주소
+          document.getElementById("modalAddress").textContent = item.address || "-";
+
+          // 지도 링크
+          const modalMapLink = document.getElementById("modalMapLink");
+          if (item.lat && item.lng) {
+            modalMapLink.href = `https://map.kakao.com/link/map/${encodeURIComponent(item.store_name)},${item.lat},${item.lng}`;
+          } else {
+            modalMapLink.href = "#";
+          }
+
+          // 모달 show
+          document.getElementById("detailModal").classList.remove("hidden");
+          document.getElementById("detailOverlay").classList.remove("hidden");
+        }
+
+        // 모달 닫기 함수
+        function closeModal() {
+          document.getElementById("detailModal").classList.add("hidden");
+          document.getElementById("detailOverlay").classList.add("hidden");
+        }
+
+        // 이미지 클릭시 확대
+        function openImageModal(src) {
+          document.getElementById("fullImage").src = src;
+          document.getElementById("imageModal").classList.remove("hidden");
+        }
+        // 이미지 확대모달 닫기
+        document.getElementById("imageModal").onclick = function () {
+          this.classList.add("hidden");
+          document.getElementById("fullImage").src = "";
+        };
+
+        // 이벤트 바인딩 (최초 한 번만!)
+        document.addEventListener("DOMContentLoaded", function () {
+          document.getElementById("closeModalBtn").onclick = closeModal;
+          document.getElementById("detailOverlay").onclick = closeModal;
+        });
       </script>
 
 </body>
