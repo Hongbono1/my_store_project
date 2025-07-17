@@ -3,8 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>오픈예정 - 특정 레이아웃 배치 (10개 카드)</title>
+  <title>오픈예정 - 곡선 배치 (10개 카드)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #cardContainer {
+      position: relative;
+      min-height: 700px; /* 곡선 하단에 공간 확보 */
+    }
+    .curve-card {
+      position: absolute;
+      width: 220px;
+      height: 300px;
+      transition: transform 0.3s, box-shadow 0.3s;
+      z-index: 10;
+    }
+    .curve-card:hover {
+      transform: scale(1.07) rotate(-2deg);
+      z-index: 30;
+      box-shadow: 0 8px 32px 0 rgba(0,0,0,0.20);
+    }
+    /* 카드끼리 안겹치게 z-index 계단식 주기 (JS에서 할 수도 있음) */
+  </style>
 </head>
 <body class="bg-gray-100 min-h-screen w-full">
   <div id="header-container"></div>
@@ -16,23 +35,19 @@
         등록
       </button>
     </div>
-    <div id="cardContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"></div>
+    <div id="cardContainer" class="relative w-full min-h-[700px]"></div>
     <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
   </section>
 
   <!-- 상세보기 모달 -->
   <div id="detailModal" class="hidden fixed inset-0 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative" id="modalBox">
-      <!-- 닫기 버튼 -->
       <button id="closeModalBtn"
         class="absolute right-3 top-3 text-2xl text-gray-400 hover:text-gray-700">&times;</button>
-      <!-- 대표 이미지 -->
       <img id="modalImage" src="/assets/images/no-thumb.png" alt="대표 이미지"
         class="w-80 h-80 object-cover mx-auto rounded-xl border border-gray-200 cursor-zoom-in transition-transform"
         onclick="openImageModal(this.src)" />
-      <!-- 빨간 줄 구분선 -->
       <div class="my-5 border-t-4 border-red-500"></div>
-      <!-- 상세 정보 -->
       <div class="text-center">
         <div id="modalName" class="text-2xl font-bold mb-1">상호명</div>
         <div id="modalOpenDate" class="text-lg font-semibold text-cyan-700 mb-2">오픈일자</div>
@@ -42,7 +57,6 @@
         <div id="modalAddress" class="mb-2">주소</div>
         <a id="modalMapLink" href="#" target="_blank" class="text-blue-500 underline">지도 바로가기</a>
       </div>
-      <!-- 이미지 전체보기 모달 -->
       <div id="imageModal" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50">
         <img id="fullImage" src="" class="max-w-full max-h-[90vh] rounded-2xl shadow-xl" />
       </div>
@@ -59,10 +73,9 @@
     }
     function shortAddress(addr) {
       if (!addr) return "";
-      // 원하는대로 경기도/평택시 제거 → 동/로/길 등만 출력 (최대 2단어만)
       const tokens = addr.trim().replace(/\s+/g, " ").split(" ");
-      // "경기도 평택시 원창동 안현로 86 1층" => "원창동 안현로"
-      return tokens.length >= 4 ? tokens.slice(2, 4).join(" ") : tokens.slice(-2).join(" ");
+      // 동, 읍, 면, 리 이하만 보이게 (3~4번째 토큰부터)
+      return tokens.slice(2, 5).join(" "); // [2,3,4]
     }
     async function loadComponent(url, containerId) {
       try {
@@ -80,7 +93,7 @@
     document.addEventListener("DOMContentLoaded", async () => {
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
-      data = await fetchOpenStores();  // DB에서 데이터 받아옴
+      data = await fetchOpenStores();
 
       // 페이지네이션/카드 초기화
       totalItems = data.length;
@@ -133,23 +146,11 @@
     const cardContainer = document.getElementById("cardContainer");
     const paginationContainer = document.getElementById("pagination");
 
-    // --- 랜덤 카드 효과용 스타일 클래스 ---
-    const randomCardStyles = [
-      "rotate-1 -translate-y-1",
-      "-rotate-2 translate-y-2",
-      "rotate-3 -translate-x-1",
-      "-rotate-1 translate-x-1",
-      "rotate-2",
-      "rotate-0",
-      "-rotate-3 translate-y-1",
-      "rotate-1 translate-x-2",
-      "-rotate-2 -translate-y-2",
-    ];
-
+    // 카드 생성
     function createCard(item, globalIndex) {
       if (!item) {
         const none = document.createElement("div");
-        none.className = "bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60";
+        none.className = "curve-card bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60";
         none.innerHTML = `
           <img src="https://placehold.co/400x200?text=정보+없음" class="w-full h-44 object-cover rounded mb-4 border" alt="정보 없음">
           <div class="text-xl font-bold text-gray-400 mb-2">정보 없음</div>
@@ -159,12 +160,8 @@
       }
 
       const cardDiv = document.createElement("div");
-      // 랜덤 스타일 적용
-      const randomStyle = randomCardStyles[Math.floor(Math.random() * randomCardStyles.length)];
       cardDiv.className =
-        "bg-yellow-50 text-black p-5 rounded-xl shadow-md relative overflow-hidden flex flex-col md:flex-row transition duration-200 hover:scale-105 hover:shadow-2xl " +
-        randomStyle;
-
+        "curve-card bg-yellow-50 text-black p-5 rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row";
       const imageSection = `
         <div class="flex-shrink-0 w-32 h-64 mr-5 flex items-center justify-center border-2 border-black bg-white rounded-lg overflow-hidden">
           <img
@@ -175,41 +172,51 @@
           />
         </div>
       `;
-
       const infoSection = `
         <div class="flex-1 flex flex-col justify-between relative z-10 text-black">
           <div class="font-bold text-3xl mb-1">${item.store_name || '-'}</div>
           <div class="text-xl font-bold text-cyan-700 mb-2">
             ${item.open_date ? "오픈 " + formatOpenDate(item.open_date) : ""}
           </div>
-          <div class="text-xl font-bold mb-1">
-            ${shortAddress(item.address)}
-          </div>
-          <div class="text-xl mb-1">
-            업종: ${item.category || "-"}
-          </div>
-          <div class="text-xl mb-1">
-            ${item.phone || "-"}
-          </div>
+          <div class="text-xl font-bold mb-1">${shortAddress(item.address)}</div>
+          <div class="text-xl mb-1">업종: ${item.category || "-"}</div>
+          <div class="text-xl mb-1">${item.phone || "-"}</div>
           <div class="text-base text-gray-700 max-w-full overflow-hidden text-ellipsis whitespace-nowrap" title="${item.description || ''}">
             ${item.description || ''}
           </div>
         </div>
       `;
-
       cardDiv.innerHTML = imageSection + infoSection;
       cardDiv.addEventListener("click", () => displayDetail(globalIndex));
       return cardDiv;
     }
 
+    // ★★★★★ 여기서 카드 배치를 곡선으로 ★★★★★
     function renderPage(page) {
       cardContainer.innerHTML = "";
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
       let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-      while (pageData.length < ITEMS_PER_PAGE) pageData.push(null);
+
+      // 곡선 좌표 공식
+      const containerW = cardContainer.offsetWidth || 1200;
+      const cx = containerW / 2;
+      const cy = 340;           // 곡선의 세로 중앙값
+      const r = 300;            // 반지름 조절
+      const angleStart = Math.PI * 1.15;  // 곡선 시작 각도
+      const angleEnd = Math.PI * 1.85;    // 곡선 끝 각도
+      const N = pageData.length;
+      const angleStep = (angleEnd - angleStart) / (N > 1 ? N - 1 : 1);
+
       pageData.forEach((item, i) => {
-        const globalIndex = startIndex + i;
-        const card = createCard(item, globalIndex);
+        const card = createCard(item, startIndex + i);
+        // 곡선(반원) 위에 배치, 살짝씩 랜덤 offset주면 불규칙함 구현
+        let theta = angleStart + i * angleStep;
+        let r2 = r + (Math.random() * 40 - 20); // 반지름 랜덤
+        let x = cx + Math.cos(theta) * r2 - 110; // 카드너비/2
+        let y = cy + Math.sin(theta) * r2 - 150; // 카드높이/2
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.style.zIndex = 10 + i; // 겹침 방지
         cardContainer.appendChild(card);
       });
     }
@@ -237,17 +244,14 @@
       renderPagination();
     }
 
-    // 이미지 확대 모달 열기
     function openImageModal(src) {
       document.getElementById("fullImage").src = src;
       document.getElementById("imageModal").classList.remove("hidden");
     }
 
-    // 상세보기 모달 정보 출력 함수
     function displayDetail(index) {
       const item = data[index];
       if (!item) return;
-
       document.getElementById("modalImage").src = item.thumbnail || "/assets/images/no-thumb.png";
       document.getElementById("modalImage").alt = (item.store_name || "-") + " 대표 이미지";
       document.getElementById("modalName").textContent = item.store_name || "-";
@@ -263,7 +267,6 @@
       } else {
         modalMapLink.href = "#";
       }
-      // 모달 show
       document.getElementById("detailModal").classList.remove("hidden");
       document.getElementById("detailOverlay").classList.remove("hidden");
     }
