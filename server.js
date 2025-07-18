@@ -39,6 +39,7 @@ app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
+app.use("/storepride", storeprideRouter);
 
 
 /* ── 헬스 체크 ──────────────────────── */
