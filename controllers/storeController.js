@@ -18,6 +18,9 @@ export async function getStoreById(req, res) {
         image3,
         business_category    AS "category",
         business_subcategory AS "subcategory",
+        business_type        AS "businessType",      -- [★ 추가]
+        delivery_option      AS "deliveryOption",    -- [★ 추가]
+        business_hours       AS "businessHours",     -- [★ 추가]
         address,
         event1,
         event2,
