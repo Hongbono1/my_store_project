@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>우리 가게 자랑 등록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+  <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl border mt-10 mb-20 p-8">
+    <h1 class="text-3xl font-bold text-center mb-8 text-blue-700">우리 가게 자랑 등록</h1>
+    <form id="storePrideRegister" enctype="multipart/form-data" class="flex flex-col gap-8">
+
+      <!-- 1. 대표 정보 -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="font-bold">가게명 <span class="text-red-500">*</span></label>
+          <input name="store_name" required class="border rounded px-3 py-2 w-full mt-1" placeholder="상호명">
+        </div>
+        <div>
+          <label class="font-bold">업종(카테고리) <span class="text-red-500">*</span></label>
+          <input name="category" required class="border rounded px-3 py-2 w-full mt-1" placeholder="예: 한식, 카페 등">
+        </div>
+        <div>
+          <label class="font-bold">대표사진 <span class="text-red-500">*</span></label>
+          <input name="main_img" type="file" accept="image/*" required class="border rounded px-3 py-2 w-full mt-2">
+        </div>
+        <div>
+          <label class="font-bold">전화번호</label>
+          <input name="phone" class="border rounded px-3 py-2 w-full mt-1" placeholder="전화번호">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="font-bold">주소 <span class="text-red-500">*</span></label>
+          <input name="address" required class="border rounded px-3 py-2 w-full mt-1" placeholder="주소">
+        </div>
+      </div>
+
+      <!-- 2. 인터뷰 질문/답변/사진 (기본 8개) -->
+      <div id="qaCards" class="flex flex-col gap-8 mt-4">
+        <!-- 카드 하나 예시, 아래에서 JS로 자동 생성 -->
+      </div>
+
+      <!-- 3. 나만의 질문 추가 -->
+      <div>
+        <button type="button" id="addCustomQaBtn" class="bg-green-500 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-green-600 transition">나만의 질문 추가</button>
+      </div>
+
+      <!-- 4. 자유 PR/사장님 한마디 -->
+      <div>
+        <label class="font-bold">자유 PR/사장님 하고 싶은 말</label>
+        <textarea name="free_pr" rows="3" maxlength="300" class="border rounded px-3 py-2 w-full mt-1"
+          placeholder="자유롭게 가게 홍보나 전하고 싶은 말을 남겨주세요"></textarea>
+      </div>
+
+      <button type="submit" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold shadow hover:bg-blue-700 mt-4 text-xl">등록</button>
+    </form>
+  </div>
+
+  <script>
+    // [1] 고정 인터뷰 질문 세트
+    const questionList = [
+      "오늘 하루 일과는 어떻게 시작하세요?",
+      "가게를 준비할 때 꼭 하는 일이 있다면?",
+      "우리 가게만의 자랑거리는 뭔가요?",
+      "손님에게 꼭 드리고 싶은 마음, 서비스가 있나요?",
+      "우리 가게만의 스페셜 메뉴가 있다면?",
+      "가격/메뉴 선정은 어떻게 하나요?",
+      "사장님만의 경영철학/소신이 있다면?",
+      "오늘 하루 사장님의 다짐 or 한마디 PR"
+    ];
+    // [2] 고정 카드 자동 생성
+    function makeQaCard(idx, qText, isCustom) {
+      // isCustom=true면 질문 인풋, false면 readonly
+      return `
+        <div class="border rounded-xl p-4 shadow bg-gray-50 relative">
+          <label class="block font-bold mb-1">${isCustom ? "나만의 질문" : "질문"}</label>
+          <input name="q${idx}_question" class="border rounded px-3 py-2 w-full mb-2" 
+            ${isCustom ? `placeholder="질문을 입력하세요"` : `value="${qText.replace(/"/g,'&quot;')}" readonly`} >
+          <label class="block font-bold mb-1">답변</label>
+          <textarea name="q${idx}_answer" rows="2" maxlength="200" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
+          <label class="block font-bold mb-1">사진 (선택)</label>
+          <input name="q${idx}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+          ${isCustom ? `<button type="button" onclick="this.parentNode.remove(); customQCount--;" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
+        </div>
+      `;
+    }
+    // [3] 최초 8개 카드 생성
+    const qaCardsDiv = document.getElementById('qaCards');
+    let qaCount = questionList.length; // 고정 8
+    let customQCount = 0; // 나만의 질문 개수
+    questionList.forEach((q, i) => {
+      qaCardsDiv.innerHTML += makeQaCard(i+1, q, false);
+    });
+    // [4] 나만의 질문 추가
+    document.getElementById('addCustomQaBtn').onclick = function () {
+      if (customQCount >= 3) return alert('나만의 질문은 최대 3개까지 추가할 수 있습니다!');
+      customQCount++;
+      qaCount++;
+      qaCardsDiv.innerHTML += makeQaCard(qaCount, '', true);
+    };
+    // [5] 파일 여러장 선택 방지 (질문사진 1장만)
+    document.addEventListener('change', e => {
+      if(e.target && e.target.type === 'file' && e.target.files.length > 1) {
+        alert('사진은 한 장만 업로드 가능합니다.');
+        e.target.value = '';
+      }
+    });
+    // [6] 제출 이벤트(서버 연결 예시)
+    document.getElementById('storePrideRegister').onsubmit = async function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      // 서버 API 연결: 아래 fetch 경로/방식만 맞추면 바로 연동됨!
+      try {
+        const res = await fetch('/storepride/register', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if(data.success) {
+          alert('등록 완료! 곧 메인으로 이동합니다.');
+          location.href = '/storepride.html';
+        } else {
+          alert('등록 실패: ' + (data.error || '다시 시도해주세요.'));
+        }
+      } catch (err) {
+        alert('서버 연결에 실패했습니다.');
+      }
+    };
+  </script>
+</body>
+</html>
+
