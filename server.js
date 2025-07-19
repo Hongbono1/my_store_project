@@ -13,6 +13,9 @@ import restaurantRouter from "./routes/restaurant.js";
 import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
 
+import multer from "multer";
+const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") }); // public/uploads로 저장
+
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
@@ -39,8 +42,20 @@ app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
-app.use("/storepride", storeprideRouter);
+app.use("/storepride", storeprideRouter);  // 기존 프라이드 라우터
 
+/* ── 우리 가게 자랑 등록(multer로 파일+폼데이터) ───────────────── */
+app.post("/storeprideregister", upload.any(), async (req, res) => {
+  try {
+    // req.body: 폼 입력 데이터
+    // req.files: 업로드된 파일(이미지 등) 배열
+    // 실제 DB 저장 처리 등을 여기에 추가
+    res.json({ success: true, message: "등록 성공!", body: req.body, files: req.files });
+  } catch (err) {
+    console.error("자랑 등록 오류:", err);
+    res.status(500).json({ success: false, error: "서버 오류" });
+  }
+});
 
 /* ── 헬스 체크 ──────────────────────── */
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
