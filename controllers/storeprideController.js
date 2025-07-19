@@ -4,10 +4,10 @@ import pool from '../db.js';  // 본인 db 연결 파일 확장자에 맞게
 export async function insertStorePride(req, res) {
     try {
         // POST body 파싱 (req.body, req.file 등)
-        const { store_name, address, category, main_image, qna_list, owner_pr } = req.body;
+        const { store_name, address, category, phone, main_image, qna_list, owner_pr } = req.body;
         // qna_list는 JSON.stringify 해서 넘겨야 함 (배열 형태)
         const result = await pool.query(
-            `INSERT INTO store_pride (store_name, address, category, main_image, qna_list, owner_pr)
+            `INSERT INTO store_pride (store_name, address, category, phone, main_image, qna_list, owner_pr)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING pride_id`,
             [
                 store_name,
