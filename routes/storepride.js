@@ -1,15 +1,32 @@
 import express from "express";
-import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js";
 import multer from "multer";
+import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js";
+
 const router = express.Router();
+const upload = multer({ dest: "public/uploads" });
 
-const upload = multer({ dest: "public/uploads" }); // 필요시 경로 맞춰 조정
+// 고정질문(8개) + 자유질문(최대 5개)까지 모든 파일 필드 정의!
+const fileFields = [
+  { name: "main_img", maxCount: 1 },
+  { name: "q1_image", maxCount: 1 },
+  { name: "q2_image", maxCount: 1 },
+  { name: "q3_image", maxCount: 1 },
+  { name: "q4_image", maxCount: 1 },
+  { name: "q5_image", maxCount: 1 },
+  { name: "q6_image", maxCount: 1 },
+  { name: "q7_image", maxCount: 1 },
+  { name: "q8_image", maxCount: 1 },
+  { name: "customq1_image", maxCount: 1 },
+  { name: "customq2_image", maxCount: 1 },
+  { name: "customq3_image", maxCount: 1 },
+  { name: "customq4_image", maxCount: 1 },
+  { name: "customq5_image", maxCount: 1 }
+];
 
-// 대표사진만 받는 구조
-router.post("/register", upload.single("main_img"), insertStorePride);
+// 등록(POST) 시 여러 파일 필드를 모두 허용
+router.post("/register", upload.fields(fileFields), insertStorePride);
 
-// 상세 조회 등 다른 라우터도 여기에...
-// router.get("/:id", getStorePrideById);
+// pride_id로 상세 조회(GET)
+router.get("/:id", getStorePrideById);
 
 export default router;
-
