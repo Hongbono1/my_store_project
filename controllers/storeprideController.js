@@ -3,18 +3,23 @@ import pool from '../db.js';
 // 가게 자랑 등록 (insert)
 export async function insertStorePride(req, res) {
     try {
+        // multer로 받은 파일 (대표사진)
+        let main_image = null;
+        if (req.file) {
+            main_image = "/uploads/" + req.file.filename; // public/uploads 경로 (DB에는 /uploads/filename 저장)
+        }
+
         // POST body에서 값 추출
         const {
             store_name,
             address,
             category,
             phone,
-            main_image,
             qna_list,
             owner_pr
         } = req.body;
 
-        // qna_list 안전 처리 (항상 json 문자열로 저장)
+        // qna_list 처리 (문자열 또는 객체/배열)
         let qnaValue;
         if (qna_list === undefined || qna_list === null || qna_list === '') {
             qnaValue = '[]'; // 최소 빈 배열
@@ -26,18 +31,16 @@ export async function insertStorePride(req, res) {
                 qnaValue = JSON.stringify([{ question: '', answer: qna_list }]);
             }
         } else {
-            // 배열/객체면 문자열로
             qnaValue = JSON.stringify(qna_list);
         }
 
         const sql = `
-      INSERT INTO store_pride
-        (store_name, address, category, phone, main_image, qna_list, owner_pr)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING pride_id
-    `;
-
+            INSERT INTO store_pride
+                (store_name, address, category, phone, main_image, qna_list, owner_pr)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING pride_id
+        `;
         const params = [
             store_name || null,
             address || null,
@@ -76,7 +79,7 @@ export async function getStorePrideById(req, res) {
         }
 
         const data = result.rows[0];
-        // jsonb 타입이면 driver가 바로 JS 객체로 줄 수도 있음
+        // qna_list가 문자열이면 파싱
         if (typeof data.qna_list === 'string') {
             try {
                 data.qna_list = JSON.parse(data.qna_list);
