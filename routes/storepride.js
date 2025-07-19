@@ -1,5 +1,5 @@
 import express from "express";
-import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js"; // ← 컨트롤러 import
+import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js";
 const router = express.Router();
 
 router.post("/register", insertStorePride);   // 등록(POST)
