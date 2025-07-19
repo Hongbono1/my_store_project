@@ -1,42 +1,57 @@
-import pool from '../db.js';  // 본인 db 연결 파일 확장자에 맞게
+import pool from '../db.js';
 
 // 가게 자랑 등록 (insert)
 export async function insertStorePride(req, res) {
     try {
-        // POST body 파싱 (req.body, req.file 등)
+        // POST body에서 값 추출
         const {
-            store_name,   // 가게명
-            address,      // 주소
-            category,     // 업종/카테고리
-            phone,        // 전화번호
-            main_image,   // 대표사진 경로
-            qna_list,     // QnA 리스트 (배열 또는 문자열)
-            owner_pr      // 사장님 한마디(PR)
+            store_name,
+            address,
+            category,
+            phone,
+            main_image,
+            qna_list,
+            owner_pr
         } = req.body;
 
-        // qna_list가 객체(배열)이면 문자열로 변환
+        // qna_list 안전 처리 (항상 json 문자열로 저장)
         let qnaValue;
-        if (typeof qna_list === "string") {
-            qnaValue = qna_list;  // 이미 stringify된 상태 (프론트에서 JSON.stringfy로 보냄)
+        if (qna_list === undefined || qna_list === null || qna_list === '') {
+            qnaValue = '[]'; // 최소 빈 배열
+        } else if (typeof qna_list === 'string') {
+            try {
+                JSON.parse(qna_list); // 유효 JSON 확인
+                qnaValue = qna_list;
+            } catch {
+                qnaValue = JSON.stringify([{ question: '', answer: qna_list }]);
+            }
         } else {
+            // 배열/객체면 문자열로
             qnaValue = JSON.stringify(qna_list);
         }
 
-        const result = await pool.query(
-            `INSERT INTO store_pride
-                (store_name, address, category, phone, main_image, qna_list, owner_pr)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING pride_id`,
-            [
-                store_name,
-                address,
-                category,
-                phone,
-                main_image,
-                qnaValue,
-                owner_pr
-            ]
-        );
+        const sql = `
+      INSERT INTO store_pride
+        (store_name, address, category, phone, main_image, qna_list, owner_pr)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING pride_id
+    `;
+
+        const params = [
+            store_name || null,
+            address || null,
+            category || null,
+            phone || null,
+            main_image || null,
+            qnaValue,
+            owner_pr || null
+        ];
+
+        const result = await pool.query(sql, params);
+
+        // pride_id 응답에 포함
+        console.log('[store_pride INSERT] pride_id =', result.rows[0].pride_id);
         res.json({ success: true, pride_id: result.rows[0].pride_id });
     } catch (err) {
         console.error('insertStorePride error:', err);
@@ -47,22 +62,27 @@ export async function insertStorePride(req, res) {
 // pride_id로 상세조회
 export async function getStorePrideById(req, res) {
     try {
-        // pride_id는 반드시 숫자(정수)여야 함
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ error: '잘못된 pride_id' });
+            return res.status(400).json({ error: 'invalid pride_id' });
         }
 
         const result = await pool.query(
-            'SELECT * FROM store_pride WHERE pride_id=$1',
+            'SELECT * FROM store_pride WHERE pride_id = $1',
             [id]
         );
-        if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Not found' });
+        }
 
-        // qna_list 파싱 (jsonb 타입이면 프론트와 협의에 따라 생략 가능)
         const data = result.rows[0];
-        if (typeof data.qna_list === "string") {
-            data.qna_list = JSON.parse(data.qna_list || '[]');
+        // jsonb 타입이면 driver가 바로 JS 객체로 줄 수도 있음
+        if (typeof data.qna_list === 'string') {
+            try {
+                data.qna_list = JSON.parse(data.qna_list);
+            } catch {
+                data.qna_list = [];
+            }
         }
         res.json(data);
     } catch (err) {
