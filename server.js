@@ -42,7 +42,7 @@ app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
-app.use("/storepride", storeprideRouter);  // 기존 프라이드 라우터
+app.use("/api/storepride", storeprideRouter);
 
 /* ── 우리 가게 자랑 등록(multer로 파일+폼데이터) ───────────────── */
 app.post("/storeprideregister", upload.any(), async (req, res) => {
