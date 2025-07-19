@@ -13,6 +13,7 @@ export async function insertStorePride(req, res) {
                 store_name,
                 address,
                 category,
+                phone,
                 main_image,
                 JSON.stringify(qna_list),
                 owner_pr
