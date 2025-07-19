@@ -3,37 +3,52 @@ import pool from '../db.js';
 // 가게 자랑 등록 (insert)
 export async function insertStorePride(req, res) {
     try {
-        // multer로 받은 파일 (대표사진)
+        // 1. 대표사진(main_img)
         let main_image = null;
-        if (req.file) {
-            main_image = "/uploads/" + req.file.filename; // public/uploads 경로 (DB에는 /uploads/filename 저장)
+        if (req.files && req.files["main_img"] && req.files["main_img"][0]) {
+            main_image = "/uploads/" + req.files["main_img"][0].filename;
         }
 
-        // POST body에서 값 추출
+        // 2. 기본 데이터
         const {
             store_name,
             address,
             category,
             phone,
-            qna_list,
-            owner_pr
+            qa_mode,      // "fixed" or "custom"
+            free_pr
         } = req.body;
 
-        // qna_list 처리 (문자열 또는 객체/배열)
-        let qnaValue;
-        if (qna_list === undefined || qna_list === null || qna_list === '') {
-            qnaValue = '[]'; // 최소 빈 배열
-        } else if (typeof qna_list === 'string') {
-            try {
-                JSON.parse(qna_list); // 유효 JSON 확인
-                qnaValue = qna_list;
-            } catch {
-                qnaValue = JSON.stringify([{ question: '', answer: qna_list }]);
+        // 3. QnA 데이터 조립
+        let qna_list = [];
+
+        if (qa_mode === "fixed") {
+            // 고정질문 8개
+            for (let i = 1; i <= 8; i++) {
+                const question = req.body[`q${i}_question`] || "";
+                const answer = req.body[`q${i}_answer`] || "";
+                let image = null;
+                if (req.files && req.files[`q${i}_image`] && req.files[`q${i}_image`][0]) {
+                    image = "/uploads/" + req.files[`q${i}_image`][0].filename;
+                }
+                qna_list.push({ question, answer, image });
             }
-        } else {
-            qnaValue = JSON.stringify(qna_list);
+        } else if (qa_mode === "custom") {
+            // 자유질문 최대 5개
+            for (let i = 1; i <= 5; i++) {
+                // 자유질문이 실제로 몇 개 들어왔는지 판단
+                if (!req.body[`customq${i}_question`] && !req.body[`customq${i}_answer`]) continue;
+                const question = req.body[`customq${i}_question`] || "";
+                const answer = req.body[`customq${i}_answer`] || "";
+                let image = null;
+                if (req.files && req.files[`customq${i}_image`] && req.files[`customq${i}_image`][0]) {
+                    image = "/uploads/" + req.files[`customq${i}_image`][0].filename;
+                }
+                qna_list.push({ question, answer, image });
+            }
         }
 
+        // 4. DB 저장
         const sql = `
             INSERT INTO store_pride
                 (store_name, address, category, phone, main_image, qna_list, owner_pr)
@@ -47,18 +62,17 @@ export async function insertStorePride(req, res) {
             category || null,
             phone || null,
             main_image || null,
-            qnaValue,
-            owner_pr || null
+            JSON.stringify(qna_list),
+            free_pr || null
         ];
 
         const result = await pool.query(sql, params);
-
-        // pride_id 응답에 포함
         console.log('[store_pride INSERT] pride_id =', result.rows[0].pride_id);
+
         res.json({ success: true, pride_id: result.rows[0].pride_id });
     } catch (err) {
         console.error('insertStorePride error:', err);
-        res.status(500).json({ success: false, error: 'DB 저장 오류' });
+        res.status(500).json({ success: false, error: 'DB 저장 오류: ' + (err.message || '') });
     }
 }
 
@@ -79,7 +93,7 @@ export async function getStorePrideById(req, res) {
         }
 
         const data = result.rows[0];
-        // qna_list가 문자열이면 파싱
+        // qna_list 파싱
         if (typeof data.qna_list === 'string') {
             try {
                 data.qna_list = JSON.parse(data.qna_list);
