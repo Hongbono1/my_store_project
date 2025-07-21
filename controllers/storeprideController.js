@@ -36,7 +36,6 @@ export async function insertStorePride(req, res) {
         } else if (qa_mode === "custom") {
             // 자유질문 최대 5개
             for (let i = 1; i <= 5; i++) {
-                // 자유질문이 실제로 몇 개 들어왔는지 판단
                 if (!req.body[`customq${i}_question`] && !req.body[`customq${i}_answer`]) continue;
                 const question = req.body[`customq${i}_question`] || "";
                 const answer = req.body[`customq${i}_answer`] || "";
@@ -93,7 +92,6 @@ export async function getStorePrideById(req, res) {
         }
 
         const data = result.rows[0];
-        // qna_list 파싱
         if (typeof data.qna_list === 'string') {
             try {
                 data.qna_list = JSON.parse(data.qna_list);
@@ -105,5 +103,35 @@ export async function getStorePrideById(req, res) {
     } catch (err) {
         console.error('getStorePrideById error:', err);
         res.status(500).json({ error: 'DB 조회 오류' });
+    }
+}
+
+// 전체 리스트 조회
+export async function getStorePrideList(req, res) {
+    try {
+        const result = await pool.query(`
+            SELECT
+                pride_id,
+                store_name,
+                category,
+                address,
+                phone,
+                main_image,
+                owner_pr,
+                qna_list
+            FROM store_pride
+            ORDER BY created_at DESC
+        `);
+
+        const data = result.rows.map(row => ({
+            ...row,
+            qna_list: typeof row.qna_list === 'string'
+                ? JSON.parse(row.qna_list)
+                : row.qna_list
+        }));
+        res.json(data);
+    } catch (err) {
+        console.error('getStorePrideList error:', err);
+        res.status(500).json({ error: '리스트 조회 오류' });
     }
 }
