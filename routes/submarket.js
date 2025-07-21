@@ -10,9 +10,10 @@ const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") });
 router.post("/register", upload.fields([
   { name: "main_img", maxCount: 1 },
   { name: "parking_img", maxCount: 1 },
-  { name: "transport_img", maxCount: 1 },
+  { name: "transport_img", maxCount: 1 }
   // 고정질문/자유질문 이미지도 필요시 추가
-]), createMarket);
+]), createSubmarket); // ← 이름 통일!
 
 export default router;
+
 
