@@ -6,7 +6,7 @@ import hotRouter from "./routes/hot.js";
 import cors from "cors";
 import path from "path";
 import storeRouter from "./routes/store.js";
-import miscRouter  from "./routes/misc.js";
+import miscRouter from "./routes/misc.js";
 import categoryRouter from "./routes/category.js";
 import subcategoryRouter from "./routes/subcategory.js";
 import restaurantRouter from "./routes/restaurant.js";
@@ -16,7 +16,7 @@ import storeprideRouter from "./routes/storepride.js";
 import multer from "multer";
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") }); // public/uploads로 저장
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* ── 공통 미들웨어 ─────────────────── */
