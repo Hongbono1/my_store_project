@@ -34,3 +34,5 @@ router.get("/list", getStorePrideList);
 router.get("/:id", getStorePrideById);
 
 export default router;
+
+
