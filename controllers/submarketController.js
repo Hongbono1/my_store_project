@@ -1,6 +1,6 @@
 import { pool } from "../db/pool.js";
 
-export async function createMarket(req, res) {
+export async function createSubmarket(req, res) {
   try {
     const {
       market_name, address, phone, opening_hours, main_products,
