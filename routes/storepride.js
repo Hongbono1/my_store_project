@@ -1,7 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { insertStorePride, getStorePrideById, getStorePrideList } from "../controllers/storeprideController.js";
-
+import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js";
 const router = express.Router();
 const upload = multer({ dest: "public/uploads" });
 
