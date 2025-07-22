@@ -1,3 +1,5 @@
+console.log("=== 서버 파일 시작 ===");
+
 import dotenv from "dotenv";
 dotenv.config();
 
