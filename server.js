@@ -44,7 +44,7 @@ app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
-app.use("/submarket", submarketRouter);
+app.use("/api/market", submarketRouter);
 
 /* ── 우리 가게 자랑 등록(multer로 파일+폼데이터) ───────────────── */
 app.post("/storeprideregister", upload.any(), async (req, res) => {
