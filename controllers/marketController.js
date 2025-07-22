@@ -29,20 +29,17 @@ export async function createMarket(req, res) {
         }
 
         const sql = `
-      INSERT INTO market_info (
-        market_name, address, main_img, phone, opening_hours,
-        main_products, event_info, facilities,
-        parking_available, parking_img, transport_info, transport_img,
-        qa_mode, free_pr
-      ) VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,
-        $9,$10,$11,$12,
-        $13,$14
-      )
-      RETURNING id
-    `;
-
+          INSERT INTO market_info (
+            market_name, address, main_img, phone, opening_hours,
+            main_products, event_info, facilities, parking_available, parking_img,
+            transport_info, transport_img, qa_mode, free_pr
+          ) VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10,
+            $11, $12, $13, $14
+          )
+        `
+        
         const values = [
             market_name,
             address,
