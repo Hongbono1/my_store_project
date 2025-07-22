@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>전통시장 정보</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50">
+
+    <div id="header-container"></div>
+
+    <main class="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-8 my-10">
+        <div id="market-detail" class="text-gray-800"></div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script>
+        // 헤더/푸터
+        ['header', 'footer'].forEach(n => {
+            fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
+                document.getElementById(`${n}-container`).innerHTML = h;
+            });
+        });
+
+        const id = new URLSearchParams(location.search).get('id');
+        if (!id) {
+            document.getElementById('market-detail').innerHTML =
+                '<p class="text-red-500">ID가 없습니다.</p>';
+            throw new Error('no id');
+        }
+
+        fetch(`/api/market/${id}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success === false) { throw new Error(data.error || '조회 실패'); }
+                const d = data;
+                const html = `
+          ${d.main_img ? `<img src="${d.main_img}" class="w-full h-64 object-cover rounded-lg mb-6" alt="대표이미지">` : ''}
+
+          <h1 class="text-3xl font-bold text-indigo-700 mb-4">${d.market_name}</h1>
+          <ul class="space-y-2">
+            <li><strong>주소:</strong> ${d.address}</li>
+            ${d.phone ? `<li><strong>전화:</strong> ${d.phone}</li>` : ''}
+            <li><strong>운영시간:</strong> ${d.opening_hours}</li>
+            <li><strong>주요 품목·특산물:</strong> ${d.main_products}</li>
+            ${d.event_info ? `<li><strong>이벤트/축제:</strong> ${d.event_info}</li>` : ''}
+            ${d.facilities ? `<li><strong>편의 시설:</strong> ${d.facilities}</li>` : ''}
+            <li><strong>주차장:</strong> ${d.parking_available}</li>
+          </ul>
+
+          ${d.parking_img ? `<img src="${d.parking_img}" class="w-full rounded-lg mt-4" alt="주차장">` : ''}
+
+          ${d.transport_info ? `<p class="mt-4"><strong>대중교통 안내:</strong> ${d.transport_info}</p>` : ''}
+          ${d.transport_img ? `<img src="${d.transport_img}" class="w-full rounded-lg mt-2" alt="약도">` : ''}
+
+          ${d.free_pr ? `
+            <section class="mt-8">
+              <h2 class="text-2xl font-bold mb-2">운영자 한마디</h2>
+              <p class="bg-gray-100 p-4 rounded-lg whitespace-pre-line">${d.free_pr}</p>
+            </section>` : ''}
+
+          <section class="mt-8">
+            <h2 class="text-2xl font-bold mb-2">질문 & 답변</h2>
+            <p class="text-gray-500">현재 QA 데이터 컬럼이 없어 별도 저장되지 않았습니다.</p>
+          </section>
+        `;
+                document.getElementById('market-detail').innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('market-detail').innerHTML =
+                    '<p class="text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</p>';
+            });
+    </script>
+</body>
+
+</html>
