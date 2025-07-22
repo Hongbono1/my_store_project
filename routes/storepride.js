@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { insertStorePride, getStorePrideById } from "../controllers/storeprideController.js";
+import { insertStorePride, getStorePrideById, getStorePrideList } from "../controllers/storeprideController.js";
 const router = express.Router();
 const upload = multer({ dest: "public/uploads" });
 
@@ -22,14 +22,12 @@ const fileFields = [
   { name: "customq5_image", maxCount: 1 }
 ];
 
-// 등록(POST) 시 여러 파일 필드를 모두 허용
 router.post("/register", upload.fields(fileFields), insertStorePride);
 
-// ➊ 리스트 조회 라우트는 ID 조회보다 위에!
+// 리스트 조회 라우트
 router.get("/list", getStorePrideList);
 
-
-// pride_id로 상세 조회(GET)
+// pride_id로 상세 조회
 router.get("/:id", getStorePrideById);
 
 export default router;
