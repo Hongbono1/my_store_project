@@ -1,3 +1,4 @@
+
 console.log("=== 서버 파일 시작 ===");
 
 import dotenv from "dotenv";
@@ -14,7 +15,6 @@ import subcategoryRouter from "./routes/subcategory.js";
 import restaurantRouter from "./routes/restaurant.js";
 import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
-import submarketRouter from "./routes/submarket.js";
 
 import multer from "multer";
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") }); // public/uploads로 저장
@@ -46,7 +46,6 @@ app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
-app.use("/api/market", submarketRouter);
 
 /* ── 우리 가게 자랑 등록(multer로 파일+폼데이터) ───────────────── */
 app.post("/storeprideregister", upload.any(), async (req, res) => {
@@ -61,7 +60,9 @@ app.post("/storeprideregister", upload.any(), async (req, res) => {
   }
 });
 
+
 /* ── 헬스 체크 ──────────────────────── */
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
 
 app.listen(PORT, () => console.log(`🚀 서버 실행 중! http://localhost:${PORT}`));
+
