@@ -15,6 +15,7 @@ import subcategoryRouter from "./routes/subcategory.js";
 import restaurantRouter from "./routes/restaurant.js";
 import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
+import marketRouter from "./routes/market.js";
 
 import multer from "multer";
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") }); // public/uploads로 저장
@@ -46,6 +47,7 @@ app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
+app.use("/market", marketRouter);
 
 /* ── 우리 가게 자랑 등록(multer로 파일+폼데이터) ───────────────── */
 app.post("/storeprideregister", upload.any(), async (req, res) => {
