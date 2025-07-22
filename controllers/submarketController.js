@@ -1,33 +1,30 @@
 import { pool } from "../db/pool.js";
 
-export async function createSubmarket(req, res) {
-    try {
-        const {
-            market_name, address, phone, opening_hours, main_products,
-            event_info, facilities, parking_available, transport_info,
-            qa_mode, free_pr
-        } = req.body;
-        const main_img = req.files["main_img"] ? "/uploads/" + req.files["main_img"][0].filename : null;
-        const parking_img = req.files["parking_img"] ? "/uploads/" + req.files["parking_img"][0].filename : null;
-        const transport_img = req.files["transport_img"] ? "/uploads/" + req.files["transport_img"][0].filename : null;
+/** 단일 시장 조회 */
+export async function getSubmarketById(req, res) {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM market_info WHERE id = $1`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: "Not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "조회 오류" });
+  }
+}
 
-        const sql = `
-      INSERT INTO market_info
-        (market_name, address, main_img, phone, opening_hours, main_products, event_info, facilities, parking_available, parking_img, transport_info, transport_img, qa_mode, free_pr)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id
-    `;
-        const values = [
-            market_name, address, main_img, phone, opening_hours, main_products,
-            event_info, facilities, parking_available, parking_img, transport_info,
-            transport_img, qa_mode, free_pr
-        ];
-
-        const { rows } = await pool.query(sql, values);
-        res.json({ success: true, id: rows[0].id });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: "등록 오류" });
-    }
+/** 목록 조회 (필요 시) */
+export async function getSubmarketList(req, res) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, market_name, address, main_img FROM market_info ORDER BY id DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "목록 조회 오류" });
+  }
 }
