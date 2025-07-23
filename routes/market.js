@@ -1,86 +1,62 @@
-// routes/market.js
-import express from "express";
-import multer from "multer";
-import path from "path";
-import {
-  createMarket,
-  getMarketById,
-  getAllMarkets,
-} from "../controllers/marketController.js";
+import pool from '../db.js';
 
-/* ───────────────── Multer 설정 ───────────────── */
-const uploadDir = path.join(process.cwd(), "public", "uploads");
+// ▣ 마켓 등록 (POST)
+export async function createMarket(req, res) {
+  try {
+    const b = req.body;
+    const f = req.files || {};
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext).replace(/[^\w.-]/g, "_");
-    cb(null, `${Date.now()}-${base}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-});
-
-// 서버가 허용하는 파일 필드 목록
-const fileFields = [
-  { name: "main_img", maxCount: 1 },
-  { name: "parking_img", maxCount: 1 },
-  { name: "transport_img", maxCount: 1 },
-  { name: "q1_image", maxCount: 1 },
-  { name: "q2_image", maxCount: 1 },
-  { name: "q3_image", maxCount: 1 },
-  { name: "q4_image", maxCount: 1 },
-  { name: "q5_image", maxCount: 1 },
-  { name: "q6_image", maxCount: 1 },
-  { name: "q7_image", maxCount: 1 },
-  { name: "q8_image", maxCount: 1 },
-  { name: "customq1_image", maxCount: 1 },
-  { name: "customq2_image", maxCount: 1 },
-  { name: "customq3_image", maxCount: 1 },
-  { name: "customq4_image", maxCount: 1 },
-  { name: "customq5_image", maxCount: 1 },
-  { name: "customq6_image", maxCount: 1 },
-  { name: "customq7_image", maxCount: 1 },
-  { name: "customq8_image", maxCount: 1 },
-];
-
-// Multer 에러 처리 래퍼
-function multerFieldsMiddleware(req, res, next) {
-  upload.fields(fileFields)(req, res, (err) => {
-    if (!err) return next();
-    if (err instanceof multer.MulterError && err.code === "LIMIT_UNEXPECTED_FILE") {
-      console.error("❌ Unexpected file field:", err.field);
-      return res.status(400).json({
-        success: false,
-        error: `Unexpected file field: ${err.field}`,
+    // qa_list(질문/답변/이미지) JSON으로 받아서, 각 이미지 파일명 매칭
+    let qa_list = [];
+    if (b.qa_list) {
+      qa_list = JSON.parse(b.qa_list);
+      // 각 질문별로 (q1_image ~ q8_image) 파일명 매칭
+      qa_list.forEach((qa, idx) => {
+        const imgField = `q${idx+1}_image`;
+        if (f[imgField] && f[imgField][0]) {
+          // multer에서 저장된 파일명
+          qa.img = f[imgField][0].filename;
+        } else {
+          qa.img = ""; // 이미지 없는 경우 빈값
+        }
       });
     }
-    return next(err);
-  });
+
+    // 기타 단일 이미지 필드들
+    const main_img = f.main_img?.[0]?.filename || null;
+    const parking_img = f.parking_img?.[0]?.filename || null;
+    const transport_img = f.transport_img?.[0]?.filename || null;
+
+    const sql = `
+      INSERT INTO market_info (
+        market_name, address, main_img, phone, opening_hours, main_products,
+        event_info, facilities, parking_available, parking_img,
+        transport_info, transport_img, qa_list, free_pr
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+      ) RETURNING id
+    `;
+    const values = [
+      b.market_name,
+      b.address,
+      main_img,
+      b.phone || null,
+      b.opening_hours,
+      b.main_products,
+      b.event_info || null,
+      b.facilities || null,
+      b.parking_available,
+      parking_img,
+      b.transport_info || null,
+      transport_img,
+      JSON.stringify(qa_list),
+      b.free_pr || null
+    ];
+
+    const { rows } = await pool.query(sql, values);
+    res.status(201).json({ success: true, id: rows[0].id });
+  } catch (err) {
+    console.error('[market 등록 오류]', err);
+    res.status(500).json({ success: false, error: '서버 오류' });
+  }
 }
-
-/* ───────────────── Router ───────────────── */
-const router = express.Router();
-
-/** 디버그용: 어떤 필드가 오는지 확인 (/:id보다 위에 둬야 함) */
-router.post("/_debug_files", upload.any(), (req, res) => {
-  const fileNames = (req.files || []).map((f) => f.fieldname);
-  console.log("FILES >>>", fileNames);
-  console.log("BODY  >>>", Object.keys(req.body));
-  res.json({ ok: true, files: fileNames, bodyKeys: Object.keys(req.body) });
-});
-
-/** POST /market - 전통시장 등록 */
-router.post("/", multerFieldsMiddleware, createMarket);
-
-/** GET /market/:id - 단일 시장 조회 */
-router.get("/:id", getMarketById);
-
-/** GET /market - 전체 시장 목록 */
-router.get("/", getAllMarkets);
-
-export default router;
