@@ -1,103 +1,168 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>전통시장 상세</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>우리동네 전통시장</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .bg-gradient-overlay {
+      background: linear-gradient(120deg, rgba(29,78,216,0.6) 0%, rgba(236,72,153,0.45) 100%);
+    }
+  </style>
 </head>
-
 <body class="bg-gray-50 min-h-screen">
-    <div id="header-container"></div>
-    <main class="max-w-2xl mx-auto my-10 px-2">
-        <div id="market-detail"></div>
-    </main>
-    <div id="footer-container"></div>
 
-    <script>
-        // 헤더/푸터 불러오기
-        ['header', 'footer'].forEach(n => {
-            fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
-                document.getElementById(`${n}-container`).innerHTML = h;
-            });
-        });
+  <div id="header-container"></div>
 
-        // 이미지 경로 자동 보정
-        function toUrl(path) {
-            if (!path) return "";
-            return path.startsWith("/uploads/") ? path : "/uploads/" + path;
-        }
+  <!-- 대표사진 + 상호명 + 슬로건 -->
+  <section id="top-section" class="relative h-[320px] md:h-[400px] flex items-end mb-0">
+    <div id="main-image-box" class="absolute inset-0 rounded-b-3xl overflow-hidden">
+      <img id="main-img" src="" alt="대표이미지" class="w-full h-full object-cover"/>
+      <div class="absolute inset-0 bg-gradient-overlay"></div>
+    </div>
+    <div class="relative z-10 px-6 pb-8 w-full">
+      <h1 id="market-name" class="text-3xl md:text-4xl font-extrabold text-white drop-shadow-lg mb-1">상호명</h1>
+      <p id="main-products" class="text-lg text-white/90 font-medium drop-shadow-md">주요 품목</p>
+    </div>
+  </section>
 
-        const id = new URLSearchParams(location.search).get('id');
-        if (!id) {
-            document.getElementById('market-detail').innerHTML =
-                '<p class="text-red-500">ID가 없습니다.</p>';
-            throw new Error('no id');
-        }
+  <main class="max-w-3xl mx-auto px-4">
 
-        fetch(`/market/${id}`)
-            .then(r => r.json())
-            .then(d => {
-                if (d.success === false) { throw new Error(d.error || '조회 실패'); }
+    <!-- 운영자 한마디/히스토리(Quote카드) -->
+    <section class="mt-10 mb-6">
+      <div class="bg-white rounded-2xl shadow-xl p-6 border-l-8 border-indigo-400 flex items-start gap-4">
+        <svg class="w-8 h-8 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24"><path d="M8.625 17A4.125 4.125 0 0 1 4.5 12.875v-.75A8.625 8.625 0 0 1 13.125 3.5h.375a1.125 1.125 0 0 1 1.125 1.125V8A1.125 1.125 0 0 1 13.5 9.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V7.25A2.25 2.25 0 0 1 12.375 5h.375a6.375 6.375 0 0 1 6.375 6.375v1.125A7.5 7.5 0 0 1 8.625 17Z" fill="currentColor"/></svg>
+        <blockquote id="free-pr" class="text-gray-800 text-lg leading-relaxed italic">항상 곁에 있는 우리시장 놀러오세요</blockquote>
+      </div>
+    </section>
 
-                // Q&A 리스트 예시 (DB에 배열로 저장된 경우, 없으면 기본 질문 3개)
-                let qas = d.qa_list || [
-                    { q: "이 시장만의 특별한 점은?", a: "" },
-                    { q: "운영자가 직접 추천하는 품목은?", a: "" },
-                    { q: "가족 단위 방문에 적합한가요?", a: "" }
-                ];
+    <!-- Q&A(질문/답변), Bubble 카드 슬라이드/리스트 -->
+    <section class="mb-8">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">질문 & 답변</h2>
+      <div id="qa-list" class="flex flex-col gap-4">
+        <!-- Q&A 카드(버블 스타일) JS로 채움 -->
+      </div>
+    </section>
 
-                // Q&A 카드 렌더
-                let qaHtml = qas.map((qa, i) => `
-          <div class="mb-4">
-            <div class="bg-indigo-50 rounded-lg px-4 py-2 font-semibold text-indigo-700 mb-1">Q${i + 1}. ${qa.q}</div>
-            <div class="bg-white rounded-lg px-4 py-2 ml-2 text-gray-800 shadow">${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}</div>
+    <!-- 주요 정보/시설/이벤트/주차 등 카드 그리드 -->
+    <section class="mb-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">주소</span>
+          <span id="address" class="font-semibold"></span>
+        </div>
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">운영시간</span>
+          <span id="opening-hours" class="font-semibold"></span>
+        </div>
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">주차장</span>
+          <span id="parking-available" class="font-semibold"></span>
+        </div>
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">편의시설</span>
+          <span id="facilities" class="font-semibold"></span>
+        </div>
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">이벤트</span>
+          <span id="event-info" class="font-semibold"></span>
+        </div>
+        <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
+          <span class="text-gray-500 text-sm mb-1">대중교통</span>
+          <span id="transport-info" class="font-semibold"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 지도/주차/약도/시장사진 등(옵셔널) -->
+    <section class="mb-10">
+      <div class="flex flex-col md:flex-row gap-6">
+        <div class="flex-1 bg-white rounded-xl shadow p-4">
+          <div class="mb-2 text-sm text-gray-500">주차장/시장사진</div>
+          <img id="parking-img" src="" class="w-full h-40 object-cover rounded-lg" alt="주차장" style="display:none;">
+        </div>
+        <div class="flex-1 bg-white rounded-xl shadow p-4">
+          <div class="mb-2 text-sm text-gray-500">약도</div>
+          <img id="transport-img" src="" class="w-full h-40 object-cover rounded-lg" alt="약도" style="display:none;">
+        </div>
+      </div>
+    </section>
+
+  </main>
+  <div id="footer-container"></div>
+
+  <script>
+    // 헤더/푸터
+    ['header', 'footer'].forEach(n => {
+      fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
+        document.getElementById(`${n}-container`).innerHTML = h;
+      });
+    });
+
+    // 이미지 경로 보정
+    function toUrl(path) {
+      if (!path) return "";
+      return path.startsWith("/uploads/") ? path : "/uploads/" + path;
+    }
+
+    // 쿼리에서 id 추출
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) {
+      document.body.innerHTML = '<div class="max-w-xl mx-auto mt-20 text-center text-2xl text-red-600">ID가 없습니다.</div>';
+      throw new Error('no id');
+    }
+
+    fetch(`/market/${id}`)
+      .then(r => r.json())
+      .then(d => {
+        // 대표사진/상호명/품목
+        if (d.main_img) document.getElementById('main-img').src = toUrl(d.main_img);
+        document.getElementById('market-name').textContent = d.market_name || "-";
+        document.getElementById('main-products').textContent = d.main_products || "";
+
+        // 운영자 한마디(quote)
+        document.getElementById('free-pr').textContent = d.free_pr || "소개글이 없습니다.";
+
+        // Q&A 포럼형 카드
+        let qas = d.qa_list || [
+          { q: "이 시장만의 특별한 점은?", a: "" },
+          { q: "운영자가 직접 추천하는 품목은?", a: "" },
+          { q: "가족 단위 방문에 적합한가요?", a: "" }
+        ];
+        let qaHtml = qas.map((qa, i) => `
+          <div class="flex gap-3 items-start">
+            <div class="bg-indigo-500 text-white rounded-full px-4 py-2 font-bold shadow">Q${i+1}</div>
+            <div>
+              <div class="font-semibold text-indigo-700 mb-1">${qa.q}</div>
+              <div class="bg-white rounded-xl px-4 py-2 shadow min-w-[160px]">${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}</div>
+            </div>
           </div>
         `).join("");
+        document.getElementById('qa-list').innerHTML = qaHtml;
 
-                // 전체 큰 카드형 레이아웃
-                const html = `
-          <!-- 대표 이미지(상단 전체) -->
-          <div class="bg-white rounded-2xl shadow p-6 mb-6 flex flex-col items-center">
-            ${d.main_img ? `<img src="${toUrl(d.main_img)}" class="w-full max-h-60 object-cover rounded-xl mb-4" alt="대표이미지">` : ''}
-            <h1 class="text-3xl font-bold text-indigo-700 mb-2">${d.market_name}</h1>
-          </div>
-          <!-- 설명/운영자 한마디 -->
-          <div class="bg-yellow-50 rounded-2xl shadow p-6 mb-6">
-            <h2 class="text-lg font-semibold mb-2">운영자 한마디</h2>
-            <p class="whitespace-pre-line">${d.free_pr || "소개글이 없습니다."}</p>
-          </div>
-          <!-- 질문 & 답변 섹션 (큰 카드형) -->
-          <div class="bg-blue-50 rounded-2xl shadow p-6 mb-6">
-            <h2 class="text-lg font-semibold mb-4">질문 & 답변</h2>
-            ${qaHtml}
-          </div>
-          <!-- 기타 정보 (주소, 품목 등) -->
-          <div class="bg-purple-50 rounded-2xl shadow p-6">
-            <h2 class="text-lg font-semibold mb-2">시장 정보</h2>
-            <ul class="space-y-1 text-sm">
-              <li><b>주소:</b> ${d.address}</li>
-              ${d.phone ? `<li><b>전화:</b> ${d.phone}</li>` : ''}
-              <li><b>운영시간:</b> ${d.opening_hours}</li>
-              <li><b>주요 품목·특산물:</b> ${d.main_products}</li>
-              ${d.event_info ? `<li><b>이벤트/축제:</b> ${d.event_info}</li>` : ''}
-              ${d.facilities ? `<li><b>편의 시설:</b> ${d.facilities}</li>` : ''}
-              <li><b>주차장:</b> ${d.parking_available}</li>
-              ${d.parking_img ? `<li><img src="${toUrl(d.parking_img)}" class="w-full rounded mt-2" alt="주차장"></li>` : ''}
-              ${d.transport_info ? `<li><b>대중교통 안내:</b> ${d.transport_info}</li>` : ''}
-              ${d.transport_img ? `<li><img src="${toUrl(d.transport_img)}" class="w-full rounded mt-2" alt="약도"></li>` : ''}
-            </ul>
-          </div>
-        `;
-                document.getElementById('market-detail').innerHTML = html;
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById('market-detail').innerHTML =
-                    '<p class="text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</p>';
-            });
-    </script>
+        // 주요 정보
+        document.getElementById('address').textContent = d.address || "-";
+        document.getElementById('opening-hours').textContent = d.opening_hours || "-";
+        document.getElementById('parking-available').textContent = d.parking_available || "-";
+        document.getElementById('facilities').textContent = d.facilities || "-";
+        document.getElementById('event-info').textContent = d.event_info || "-";
+        document.getElementById('transport-info').textContent = d.transport_info || "-";
+
+        // 주차장사진/약도
+        if (d.parking_img) {
+          document.getElementById('parking-img').src = toUrl(d.parking_img);
+          document.getElementById('parking-img').style.display = "";
+        }
+        if (d.transport_img) {
+          document.getElementById('transport-img').src = toUrl(d.transport_img);
+          document.getElementById('transport-img').style.display = "";
+        }
+      })
+      .catch(err => {
+        document.body.innerHTML = `<div class="max-w-xl mx-auto mt-20 text-center text-2xl text-red-600">데이터를 불러오는 중 오류가 발생했습니다.</div>`;
+        console.error(err);
+      });
+  </script>
 </body>
-
 </html>
