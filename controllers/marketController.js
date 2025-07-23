@@ -13,6 +13,9 @@ function safeJsonParse(str, fallback = []) {
   } catch (e) {
     return fallback;
   }
+  console.log("BODY >>>", req.body);
+console.log("FILES >>>", Object.keys(req.files || {}));
+console.log("qa_list length >>>", Array.isArray(qa_list) ? qa_list.length : 'not array');
 }
 
 /* ▣ 마켓 등록 (POST) */
