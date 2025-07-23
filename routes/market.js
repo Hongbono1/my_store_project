@@ -6,39 +6,43 @@ export async function createMarket(req, res) {
     const b = req.body;
     const f = req.files || {};
 
-    // qa_list(질문/답변/이미지) JSON으로 받아서, 각 이미지 파일명 매칭
+    // qa_list(질문/답변/이미지)
     let qa_list = [];
     if (b.qa_list) {
       qa_list = JSON.parse(b.qa_list);
-      // 각 질문별로 (q1_image ~ q8_image) 파일명 매칭
       qa_list.forEach((qa, idx) => {
         const imgField = `q${idx+1}_image`;
         if (f[imgField] && f[imgField][0]) {
-          // multer에서 저장된 파일명
           qa.img = f[imgField][0].filename;
         } else {
-          qa.img = ""; // 이미지 없는 경우 빈값
+          qa.img = "";
         }
       });
     }
 
-    // 기타 단일 이미지 필드들
+    // 기타 이미지 필드들
     const main_img = f.main_img?.[0]?.filename || null;
     const parking_img = f.parking_img?.[0]?.filename || null;
     const transport_img = f.transport_img?.[0]?.filename || null;
 
+    // 필수값 체크
+    if (!b.market_name || !b.address || !main_img || !b.opening_hours ||
+        !b.main_products || !b.parking_available || !b.qa_mode || qa_list.length !== 8) {
+      return res.status(400).json({ success: false, error: "필수항목 누락" });
+    }
+
+    // ← 컬럼 순서 맞게!
     const sql = `
       INSERT INTO market_info (
-        market_name, address, main_img, phone, opening_hours, main_products,
-        event_info, facilities, parking_available, parking_img,
-        transport_info, transport_img, qa_list, free_pr
+        qa_list, main_img, phone, opening_hours, main_products, event_info,
+        facilities, parking_available, parking_img, transport_info, transport_img,
+        qa_mode, free_pr, market_name, address
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
       ) RETURNING id
     `;
     const values = [
-      b.market_name,
-      b.address,
+      JSON.stringify(qa_list),
       main_img,
       b.phone || null,
       b.opening_hours,
@@ -49,8 +53,10 @@ export async function createMarket(req, res) {
       parking_img,
       b.transport_info || null,
       transport_img,
-      JSON.stringify(qa_list),
-      b.free_pr || null
+      b.qa_mode,
+      b.free_pr || null,
+      b.market_name,
+      b.address
     ];
 
     const { rows } = await pool.query(sql, values);

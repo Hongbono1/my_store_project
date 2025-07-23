@@ -1,4 +1,3 @@
-// controllers/marketController.js
 import pool from "../db.js";
 
 // 공통: 업로드된 파일 경로 만들기
@@ -45,11 +44,12 @@ export async function createMarket(req, res) {
       return res.status(400).json({ success: false, error: "필수항목 누락" });
     }
 
+    // ★★★ 컬럼 순서 맞춰서 INSERT! ★★★
     const sql = `
       INSERT INTO market_info (
-        market_name, address, main_img, phone, opening_hours, main_products,
-        event_info, facilities, parking_available, parking_img,
-        transport_info, transport_img, qa_mode, free_pr, qa_list
+        qa_list, main_img, phone, opening_hours, main_products, event_info,
+        facilities, parking_available, parking_img, transport_info, transport_img,
+        qa_mode, free_pr, market_name, address
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
       )
@@ -57,21 +57,21 @@ export async function createMarket(req, res) {
     `;
 
     const values = [
-      b.market_name,
-      b.address,
-      main_img,
-      b.phone || null,
-      b.opening_hours,
-      b.main_products,
-      b.event_info || null,
-      b.facilities || null,
-      b.parking_available,
-      parking_img,
-      b.transport_info || null,
-      transport_img,
-      b.qa_mode,
-      b.free_pr || null,
-      JSON.stringify(qa_list),  // <-- qa_list 추가!
+      JSON.stringify(qa_list),   // $1: qa_list
+      main_img,                  // $2
+      b.phone || null,           // $3
+      b.opening_hours,           // $4
+      b.main_products,           // $5
+      b.event_info || null,      // $6
+      b.facilities || null,      // $7
+      b.parking_available,       // $8
+      parking_img,               // $9
+      b.transport_info || null,  // $10
+      transport_img,             // $11
+      b.qa_mode,                 // $12
+      b.free_pr || null,         // $13
+      b.market_name,             // $14
+      b.address                  // $15
     ];
 
     const { rows } = await pool.query(sql, values);
