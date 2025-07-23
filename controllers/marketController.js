@@ -10,12 +10,9 @@ function safeJsonParse(str, fallback = []) {
   try {
     if (!str) return fallback;
     return JSON.parse(str);
-  } catch (e) {
+  } catch {
     return fallback;
   }
-  console.log("BODY >>>", req.body);
-console.log("FILES >>>", Object.keys(req.files || {}));
-console.log("qa_list length >>>", Array.isArray(qa_list) ? qa_list.length : 'not array');
 }
 
 /* ▣ 마켓 등록 (POST) */
@@ -24,9 +21,12 @@ export async function createMarket(req, res) {
     const b = req.body;
     const f = req.files || {};
 
+    // 디버그 로그 (필요 없으면 주석 처리)
+    console.log("BODY >>>", b);
+    console.log("FILES >>>", Object.keys(f));
     // 기본 이미지 필드
-    const main_img = filePath(f, "main_img");
-    const parking_img = filePath(f, "parking_img");
+    const main_img      = filePath(f, "main_img");
+    const parking_img   = filePath(f, "parking_img");
     const transport_img = filePath(f, "transport_img");
 
     // qa_list(질문/답변/이미지) 처리
@@ -37,17 +37,19 @@ export async function createMarket(req, res) {
     });
 
     // 필수값 체크
-    if (
-      !b.market_name ||
-      !b.address ||
-      !main_img ||
-      !b.opening_hours ||
-      !b.main_products ||
-      !b.parking_available ||
-      !b.qa_mode ||
-      qa_list.length !== 8
-    ) {
-      return res.status(400).json({ success: false, error: "필수항목 누락" });
+    const missing = [];
+    if (!b.market_name)        missing.push("market_name");
+    if (!b.address)            missing.push("address");
+    if (!main_img)             missing.push("main_img");
+    if (!b.opening_hours)      missing.push("opening_hours");
+    if (!b.main_products)      missing.push("main_products");
+    if (!b.parking_available)  missing.push("parking_available");
+    if (!b.qa_mode)            missing.push("qa_mode");
+    if (!Array.isArray(qa_list) || qa_list.length !== 8) missing.push("qa_list(8)");
+
+    if (missing.length) {
+      console.log("❌ Missing fields:", missing);
+      return res.status(400).json({ success: false, error: "필수항목 누락", missing });
     }
 
     // DB 컬럼 순서에 맞춰 INSERT
@@ -93,7 +95,6 @@ export async function getMarketById(req, res) {
     const { id } = req.params;
     const sql = `SELECT * FROM market_info WHERE id = $1`;
     const { rows } = await pool.query(sql, [id]);
-
     if (rows.length === 0) {
       return res.status(404).json({ success: false, error: "마켓 정보 없음" });
     }
