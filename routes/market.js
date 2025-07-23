@@ -1,3 +1,10 @@
+router.post("/_debug_files", upload.any(), (req, res) => {
+  console.log("FILES >>>", req.files.map(f => f.fieldname));
+  console.log("BODY  >>>", Object.keys(req.body));
+  res.json({ ok: true, files: req.files.map(f => f.fieldname) });
+});
+
+
 // routes/market.js
 import express from "express";
 import multer from "multer";
