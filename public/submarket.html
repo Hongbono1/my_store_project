@@ -1,74 +1,79 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>전통시장 상세</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>전통시장 상세</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-50 min-h-screen">
-  <div id="header-container"></div>
-  <main class="max-w-2xl mx-auto my-10 px-2">
-    <div id="market-detail"></div>
-  </main>
-  <div id="footer-container"></div>
+    <div id="header-container"></div>
+    <main class="max-w-2xl mx-auto my-10 px-2">
+        <div id="market-detail"></div>
+    </main>
+    <div id="footer-container"></div>
 
-  <script>
-    // 헤더/푸터 불러오기
-    ['header', 'footer'].forEach(n => {
-      fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
-        document.getElementById(`${n}-container`).innerHTML = h;
-      });
-    });
+    <script>
+        // 헤더/푸터 불러오기
+        ['header', 'footer'].forEach(n => {
+            fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
+                document.getElementById(`${n}-container`).innerHTML = h;
+            });
+        });
 
-    // 이미지 경로 자동 보정
-    function toUrl(path) {
-      if (!path) return "";
-      return path.startsWith("/uploads/") ? path : "/uploads/" + path;
-    }
+        // 이미지 경로 자동 보정
+        function toUrl(path) {
+            if (!path) return "";
+            return path.startsWith("/uploads/") ? path : "/uploads/" + path;
+        }
 
-    const id = new URLSearchParams(location.search).get('id');
-    if (!id) {
-      document.getElementById('market-detail').innerHTML =
-        '<p class="text-red-500">ID가 없습니다.</p>';
-      throw new Error('no id');
-    }
+        const id = new URLSearchParams(location.search).get('id');
+        if (!id) {
+            document.getElementById('market-detail').innerHTML =
+                '<p class="text-red-500">ID가 없습니다.</p>';
+            throw new Error('no id');
+        }
 
-    fetch(`/market/${id}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.success === false) { throw new Error(d.error || '조회 실패'); }
+        fetch(`/market/${id}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.success === false) { throw new Error(d.error || '조회 실패'); }
 
-        // Q&A 리스트 예시 (DB에 배열로 저장된 경우, 없으면 기본 질문 3개)
-        let qas = d.qa_list || [
-          { q: "이 시장만의 특별한 점은?", a: "" },
-          { q: "운영자가 직접 추천하는 품목은?", a: "" },
-          { q: "가족 단위 방문에 적합한가요?", a: "" }
-        ];
-        // 답변 컬럼이 따로 없을 경우, 자유/고정 배열별로 커스터마이즈 가능
+                // Q&A 리스트 예시 (DB에 배열로 저장된 경우, 없으면 기본 질문 3개)
+                let qas = d.qa_list || [
+                    { q: "이 시장만의 특별한 점은?", a: "" },
+                    { q: "운영자가 직접 추천하는 품목은?", a: "" },
+                    { q: "가족 단위 방문에 적합한가요?", a: "" }
+                ];
 
-        // Q&A 카드 렌더
-        let qaHtml = qas.map((qa, i) => `
-          <div class="bg-white rounded-xl shadow p-4 mb-4">
-            <div class="font-semibold text-indigo-700 mb-2">Q${i + 1}. ${qa.q}</div>
-            <div class="text-gray-800 ml-4">${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}</div>
+                // Q&A 카드 렌더
+                let qaHtml = qas.map((qa, i) => `
+          <div class="mb-4">
+            <div class="bg-indigo-50 rounded-lg px-4 py-2 font-semibold text-indigo-700 mb-1">Q${i + 1}. ${qa.q}</div>
+            <div class="bg-white rounded-lg px-4 py-2 ml-2 text-gray-800 shadow">${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}</div>
           </div>
         `).join("");
 
-        // 전체 카드형 레이아웃
-        const html = `
-          <div class="bg-white rounded-2xl shadow p-6 mb-6">
-            ${d.main_img ? `<img src="${toUrl(d.main_img)}" class="w-full h-48 object-cover rounded-xl mb-4" alt="대표이미지">` : ''}
-            <h1 class="text-2xl font-bold text-indigo-700 mb-2">${d.market_name}</h1>
+                // 전체 큰 카드형 레이아웃
+                const html = `
+          <!-- 대표 이미지(상단 전체) -->
+          <div class="bg-white rounded-2xl shadow p-6 mb-6 flex flex-col items-center">
+            ${d.main_img ? `<img src="${toUrl(d.main_img)}" class="w-full max-h-60 object-cover rounded-xl mb-4" alt="대표이미지">` : ''}
+            <h1 class="text-3xl font-bold text-indigo-700 mb-2">${d.market_name}</h1>
           </div>
+          <!-- 설명/운영자 한마디 -->
           <div class="bg-yellow-50 rounded-2xl shadow p-6 mb-6">
             <h2 class="text-lg font-semibold mb-2">운영자 한마디</h2>
             <p class="whitespace-pre-line">${d.free_pr || "소개글이 없습니다."}</p>
           </div>
+          <!-- 질문 & 답변 섹션 (큰 카드형) -->
           <div class="bg-blue-50 rounded-2xl shadow p-6 mb-6">
             <h2 class="text-lg font-semibold mb-4">질문 & 답변</h2>
             ${qaHtml}
           </div>
+          <!-- 기타 정보 (주소, 품목 등) -->
           <div class="bg-purple-50 rounded-2xl shadow p-6">
             <h2 class="text-lg font-semibold mb-2">시장 정보</h2>
             <ul class="space-y-1 text-sm">
@@ -85,13 +90,14 @@
             </ul>
           </div>
         `;
-        document.getElementById('market-detail').innerHTML = html;
-      })
-      .catch(err => {
-        console.error(err);
-        document.getElementById('market-detail').innerHTML =
-          '<p class="text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</p>';
-      });
-  </script>
+                document.getElementById('market-detail').innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('market-detail').innerHTML =
+                    '<p class="text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</p>';
+            });
+    </script>
 </body>
+
 </html>
