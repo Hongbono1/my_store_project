@@ -4,7 +4,8 @@ import { pool } from "../db/pool.js";
  * ▣ 파워 광고 목록
  * GET /restaurant/ads
  */
-export async function getPowerAds(req, res) {
+export async function getPowerAds(req, res) { 
+  return res.json([]); // 임시로 빈 배열 반환
   console.log("▶ getPowerAds 호출됨");
   try {
     const { rows } = await pool.query(`
