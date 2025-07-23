@@ -31,7 +31,7 @@
 
     <main class="max-w-3xl mx-auto px-4">
 
-        <!-- 운영자 한마디/히스토리(Quote카드) -->
+        <!-- 운영자 한마디 -->
         <section class="mt-8 mb-6">
             <div class="bg-white rounded-2xl shadow-xl p-6 border-l-8 border-indigo-400 flex items-start gap-4">
                 <svg class="w-8 h-8 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24">
@@ -44,7 +44,7 @@
             </div>
         </section>
 
-        <!-- 주요 정보/시설/이벤트/주차 등 카드 그리드 -->
+        <!-- 기본 정보 카드 -->
         <section class="mb-8">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div class="bg-white shadow rounded-xl p-5 flex flex-col items-start">
@@ -74,7 +74,7 @@
             </div>
         </section>
 
-        <!-- 지도/주차/약도/시장사진 등(옵셔널) -->
+        <!-- 사진 영역 -->
         <section class="mb-10">
             <div class="flex flex-col md:flex-row gap-6">
                 <div class="flex-1 bg-white rounded-xl shadow p-4">
@@ -90,29 +90,40 @@
             </div>
         </section>
 
-        <!-- 인터뷰(질문/답변/사진) 영역 -->
+        <!-- 인터뷰 -->
         <section class="mb-10">
             <h2 class="text-2xl font-bold text-indigo-700 mb-4">인터뷰</h2>
-            <div id="qa-list" class="flex flex-col gap-4">
-                <!-- JS로 Q&A 8개 출력 -->
-            </div>
+            <div id="qa-list" class="flex flex-col gap-4"></div>
         </section>
 
     </main>
     <div id="footer-container"></div>
 
     <script>
-        // 헤더/푸터
+        // 헤더/푸터 로드
         ['header', 'footer'].forEach(n => {
             fetch(`/components/${n}.html`).then(r => r.text()).then(h => {
                 document.getElementById(`${n}-container`).innerHTML = h;
             });
         });
 
+        // 이미지 경로 정리
         function toUrl(path) {
             if (!path) return "";
-            return path.startsWith("/uploads/") ? path : "/uploads/" + path;
+            if (path.startsWith("/uploads/") || path.startsWith("http")) return path;
+            return "/uploads/" + path;
         }
+
+        const defaultQuestions = [
+            "이 시장만의 특별한 점은?",
+            "가장 인기 있는 품목은?",
+            "시장만의 숨은 명소가 있다면?",
+            "가장 분주한 시간대는 언제인가요?",
+            "운영자가 추천하는 식당/가게는?",
+            "시장 활성화를 위해 하고 있는 활동은?",
+            "주차와 교통은 편리한가요?",
+            "시장만의 행사/축제는 무엇인가요?"
+        ];
 
         const id = new URLSearchParams(location.search).get('id');
         if (!id) {
@@ -128,10 +139,10 @@
                 document.getElementById('market-name').textContent = d.market_name || "-";
                 document.getElementById('main-products').textContent = d.main_products || "";
 
-                // 운영자 한마디(quote)
+                // 운영자 한마디
                 document.getElementById('free-pr').textContent = d.free_pr || "소개글이 없습니다.";
 
-                // 주요 정보
+                // 기본 정보
                 document.getElementById('address').textContent = d.address || "-";
                 document.getElementById('opening-hours').textContent = d.opening_hours || "-";
                 document.getElementById('parking-available').textContent = d.parking_available || "-";
@@ -139,7 +150,7 @@
                 document.getElementById('event-info').textContent = d.event_info || "-";
                 document.getElementById('transport-info').textContent = d.transport_info || "-";
 
-                // 주차장사진/약도
+                // 사진
                 if (d.parking_img) {
                     document.getElementById('parking-img').src = toUrl(d.parking_img);
                     document.getElementById('parking-img').style.display = "";
@@ -149,29 +160,30 @@
                     document.getElementById('transport-img').style.display = "";
                 }
 
-                // 인터뷰(Q&A) 8개 + 사진
-                let qas = d.qa_list || [
-                    { q: "이 시장만의 특별한 점은?", a: "" },
-                    { q: "가장 인기 있는 품목은?", a: "" },
-                    { q: "시장만의 숨은 명소가 있다면?", a: "" },
-                    { q: "가장 분주한 시간대는 언제인가요?", a: "" },
-                    { q: "운영자가 추천하는 식당/가게는?", a: "" },
-                    { q: "시장 활성화를 위해 하고 있는 활동은?", a: "" },
-                    { q: "주차와 교통은 편리한가요?", a: "" },
-                    { q: "시장만의 행사/축제는 무엇인가요?", a: "" }
-                ];
-                let qaHtml = qas.map((qa, i) => `
-                    <div class="flex gap-3 items-start">
-                        <div class="bg-indigo-500 text-white rounded-full px-4 py-2 font-bold shadow">Q${i + 1}</div>
-                        <div>
-                            <div class="font-semibold text-indigo-700 mb-1">${qa.q}</div>
-                            <div class="bg-white rounded-xl px-4 py-2 shadow min-w-[160px] mb-2">
-                                ${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}
-                                ${qa.img ? `<img src="${toUrl(qa.img)}" class="mt-3 w-32 rounded-lg border" alt="질문 이미지">` : ""}
-                            </div>
-                        </div>
-                    </div>
-                `).join("");
+                // qa_list 타입 방어
+                let qas = d.qa_list;
+                if (typeof qas === "string") {
+                    try { qas = JSON.parse(qas); } catch { qas = []; }
+                }
+                if (!Array.isArray(qas) || qas.length !== 8) {
+                    // 기본 질문 세트로 보정
+                    qas = defaultQuestions.map(q => ({ q, a: "", img: "" }));
+                }
+
+                // Q&A 렌더링
+                const qaHtml = qas.map((qa, i) => `
+          <div class="flex gap-3 items-start">
+            <div class="bg-indigo-500 text-white rounded-full px-4 py-2 font-bold shadow">Q${i + 1}</div>
+            <div>
+              <div class="font-semibold text-indigo-700 mb-1">${qa.q || defaultQuestions[i] || ""}</div>
+              <div class="bg-white rounded-xl px-4 py-2 shadow min-w-[160px] mb-2">
+                ${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}
+                ${qa.img ? `<img src="${toUrl(qa.img)}" class="mt-3 w-32 rounded-lg border" alt="질문 이미지">` : ""}
+              </div>
+            </div>
+          </div>
+        `).join("");
+
                 document.getElementById('qa-list').innerHTML = qaHtml;
             })
             .catch(err => {
