@@ -99,6 +99,10 @@
     </main>
     <div id="footer-container"></div>
 
+    <div id="img-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+        <img id="img-modal-img" src="" class="max-w-[90vw] max-h-[90vh] rounded-2xl border-4 border-white shadow-xl" />
+    </div>
+
     <script>
         // 헤더/푸터 로드
         ['header', 'footer'].forEach(n => {
@@ -130,6 +134,16 @@
             document.body.innerHTML = '<div class="max-w-xl mx-auto mt-20 text-center text-2xl text-red-600">ID가 없습니다.</div>';
             throw new Error('no id');
         }
+        // 모달 열기
+        window.openImgModal = function (src) {
+            document.getElementById('img-modal-img').src = src;
+            document.getElementById('img-modal').style.display = 'flex';
+        };
+        // 모달 닫기
+        document.getElementById('img-modal').onclick = function () {
+            this.style.display = 'none';
+            this.querySelector('img').src = "";
+        };
 
         fetch(`/market/${id}`)
             .then(r => r.json())
@@ -172,17 +186,22 @@
 
                 // Q&A 렌더링
                 const qaHtml = qas.map((qa, i) => `
-          <div class="flex gap-3 items-start">
-            <div class="bg-indigo-500 text-white rounded-full px-4 py-2 font-bold shadow">Q${i + 1}</div>
-            <div>
-              <div class="font-semibold text-indigo-700 mb-1">${qa.q || defaultQuestions[i] || ""}</div>
-              <div class="bg-white rounded-xl px-4 py-2 shadow min-w-[160px] mb-2">
-                ${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}
-                ${qa.img ? `<img src="${toUrl(qa.img)}" class="mt-3 w-32 rounded-lg border" alt="질문 이미지">` : ""}
-              </div>
-            </div>
-          </div>
-        `).join("");
+  <div class="flex gap-4 items-start bg-white rounded-xl shadow p-4">
+    ${qa.img ? `<img src="${toUrl(qa.img)}" class="w-28 h-28 object-cover rounded-lg border flex-shrink-0 mr-2" alt="질문 이미지">` : `
+      <div class="w-28 h-28 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 mr-2">No Image</div>
+    `}
+    <div class="flex-1">
+      <div class="flex items-center mb-1">
+        <div class="bg-indigo-500 text-white rounded-full px-3 py-1 font-bold shadow mr-3">Q${i + 1}</div>
+        <span class="font-semibold text-indigo-700">${qa.q || defaultQuestions[i] || ""}</span>
+      </div>
+      <div class="text-gray-700 pl-2">
+        ${qa.a ? qa.a : "<span class='text-gray-400'>답변 준비중</span>"}
+      </div>
+    </div>
+  </div>
+`).join("");
+
 
                 document.getElementById('qa-list').innerHTML = qaHtml;
             })
