@@ -1,6 +1,5 @@
 import pool from '../db.js';
 
-// 아트 등록
 export async function registerArt(req, res) {
   try {
     const {
@@ -9,7 +8,6 @@ export async function registerArt(req, res) {
       social1, social2, social3, booking_url, phone
     } = req.body;
 
-    // 이미지 파일명
     const image1 = req.files?.images?.[0]?.filename || null;
     const image2 = req.files?.images?.[1]?.filename || null;
     const image3 = req.files?.images?.[2]?.filename || null;
@@ -31,36 +29,6 @@ export async function registerArt(req, res) {
     );
 
     res.json({ success: true, art: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-}
-
-// 아트 목록 전체 조회
-export async function getArtList(req, res) {
-  try {
-    const result = await pool.query(
-      "SELECT id, type, title, start_date, end_date, venue, address, image1, created_at FROM art_info ORDER BY created_at DESC"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-}
-
-// 아트 상세 조회
-export async function getArtById(req, res) {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      "SELECT * FROM art_info WHERE id = $1",
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Not found" });
-    }
-    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
