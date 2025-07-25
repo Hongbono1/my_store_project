@@ -2,28 +2,34 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>공연/예술/축제 상세보기</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-gradient-to-r from-indigo-100 via-blue-50 to-blue-200 min-h-screen">
-    <!-- 헤더 영역 -->
+    <!-- 헤더 -->
     <div id="header"></div>
 
     <main class="max-w-2xl mx-auto bg-white/90 p-8 mt-12 mb-20 rounded-3xl shadow-2xl border border-indigo-200">
-        <!-- 이미지 및 기본정보 -->
+        <!-- 이미지 & 썸네일 -->
         <div id="mainImageWrap" class="flex flex-col items-center mb-8">
             <img id="mainImg" src="/assets/images/no-thumb.png" alt="대표이미지"
                 class="w-full max-w-lg rounded-xl shadow mb-4">
+            <div id="thumbs" class="flex gap-2"></div>
         </div>
+
+        <!-- 기본 정보 -->
         <div class="text-center mb-6">
             <h1 id="title" class="text-3xl font-extrabold text-indigo-800 mb-1">제목</h1>
-            <div id="category" class="inline-block text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full mb-2">
-                카테고리</div>
-            <p id="date" class="text-gray-700 mb-1">일정: </p>
-            <p id="place" class="text-gray-700">장소: </p>
+            <div id="typeBadge" class="inline-block text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full mb-2">
+                타입</div>
+
+            <p id="date" class="text-gray-700 mb-1">일정: -</p>
+            <p id="time" class="text-gray-700 mb-1">시간: -</p>
+            <p id="venue" class="text-gray-700 mb-1">장소명: -</p>
+            <p id="address" class="text-gray-700">주소: -</p>
         </div>
 
         <!-- 상세설명 -->
@@ -34,19 +40,22 @@
 
         <!-- 추가 정보 -->
         <div id="extraInfo" class="space-y-2 mt-6">
-            <!-- 주최자, 참가비, 문의 등 필요시 표시 -->
-            <div id="hostWrap" class="hidden">
-                <span class="font-bold">주최자: </span><span id="host"></span>
+            <div id="priceWrap" class="hidden"><span class="font-bold">참가비: </span><span id="price"></span></div>
+            <div id="hostWrap" class="hidden"><span class="font-bold">주최/주관: </span><span id="host"></span></div>
+            <div id="ageWrap" class="hidden"><span class="font-bold">관람 등급: </span><span id="age_limit"></span></div>
+            <div id="capWrap" class="hidden"><span class="font-bold">정원: </span><span id="capacity"></span></div>
+            <div id="phoneWrap" class="hidden"><span class="font-bold">연락처: </span><span id="phone"></span></div>
+            <div id="bookingWrap" class="hidden"><span class="font-bold">예매: </span>
+                <a id="booking_url" class="text-indigo-600 underline" target="_blank" rel="noopener">바로가기</a>
             </div>
-            <div id="feeWrap" class="hidden">
-                <span class="font-bold">참가비: </span><span id="fee"></span>
-            </div>
-            <div id="contactWrap" class="hidden">
-                <span class="font-bold">문의: </span><span id="contact"></span>
+            <div id="tagsWrap" class="hidden"><span class="font-bold">태그: </span><span id="tags"></span></div>
+            <div id="socialWrap" class="hidden flex flex-col gap-1">
+                <span class="font-bold">공식/소셜</span>
+                <div id="socialLinks" class="flex flex-col text-indigo-600 underline"></div>
             </div>
         </div>
 
-        <!-- 지도/위치 정보 (필요시) -->
+        <!-- 지도 -->
         <div id="mapWrap" class="mt-8">
             <div class="font-bold text-indigo-700 mb-2">지도</div>
             <div id="kakaoMap" class="w-full h-60 rounded-xl border"></div>
@@ -54,78 +63,119 @@
         </div>
     </main>
 
-    <!-- 헤더 fetch/지도/데이터 fetch 스크립트 -->
     <script>
-        // 헤더 fetch (공통)
+        // 헤더 로드
         fetch("/components/header.html")
             .then(res => res.text())
             .then(html => { document.getElementById("header").innerHTML = html; });
 
-        // 1. URL에서 id값 추출
-        function getParam(name) {
-            const url = new URL(window.location.href);
-            return url.searchParams.get(name);
-        }
-        const subartId = getParam('id');
-        if (!subartId) {
+        // URL ?id= 추출
+        const getParam = (name) => new URL(location.href).searchParams.get(name);
+        const artId = getParam('id');
+        if (!artId) {
             alert('잘못된 접근입니다.');
-            window.location.href = '/';
+            location.href = '/';
         }
 
-        // 2. 서버에서 상세 데이터 가져오기
-        async function loadSubartDetail() {
+        // 상세 로드
+        async function loadArtDetail() {
             try {
-                // 실제 서버 API 주소로 변경
-                const res = await fetch(`/subart/${subartId}`);
+                const res = await fetch(`/art/${artId}`); // ★ /subart → /art 로 변경
                 if (!res.ok) throw new Error('데이터 없음');
                 const data = await res.json();
 
-                // 대표 이미지
-                if (data.main_img) {
-                    document.getElementById('mainImg').src = data.main_img.startsWith('http') ? data.main_img : `/uploads/${data.main_img}`;
+                // 이미지 (image1~3)
+                const imgs = [data.image1, data.image2, data.image3].filter(Boolean);
+                const mainImgEl = document.getElementById('mainImg');
+                if (imgs.length > 0) {
+                    mainImgEl.src = `/uploads/${imgs[0]}`;
                 }
-                // 제목, 카테고리, 일정, 장소
+                const thumbs = document.getElementById('thumbs');
+                thumbs.innerHTML = '';
+                imgs.forEach((f, i) => {
+                    const el = document.createElement('img');
+                    el.src = `/uploads/${f}`;
+                    el.className = "w-20 h-20 object-cover rounded border cursor-pointer";
+                    el.onclick = () => mainImgEl.src = `/uploads/${f}`;
+                    thumbs.appendChild(el);
+                });
+
+                // 기본 정보
                 document.getElementById('title').textContent = data.title || '-';
-                document.getElementById('category').textContent = data.category || '-';
-                document.getElementById('date').textContent = '일정: ' + (data.date || '-');
-                document.getElementById('place').textContent = '장소: ' + (data.place || '-');
+                document.getElementById('typeBadge').textContent = data.type || '-';
+
+                // 일정/시간
+                const sd = data.start_date ? data.start_date : '';
+                const ed = data.end_date ? data.end_date : '';
+                const dateText = sd && ed ? `${sd} ~ ${ed}` : (sd || ed || '-');
+                document.getElementById('date').textContent = '일정: ' + dateText;
+                document.getElementById('time').textContent = '시간: ' + (data.time || '-');
+
+                // 장소/주소
+                document.getElementById('venue').textContent = '장소명: ' + (data.venue || '-');
+                document.getElementById('address').textContent = '주소: ' + (data.address || '-');
+
                 // 상세 설명
                 document.getElementById('description').textContent = data.description || '-';
 
-                // 추가정보(주최, 참가비, 문의)
-                if (data.host) {
-                    document.getElementById('hostWrap').classList.remove('hidden');
-                    document.getElementById('host').textContent = data.host;
+                // 추가 정보
+                showIf('priceWrap', 'price', data.price);
+                showIf('hostWrap', 'host', data.host);
+                showIf('ageWrap', 'age_limit', data.age_limit);
+                showIf('capWrap', 'capacity', data.capacity);
+                showIf('phoneWrap', 'phone', data.phone);
+                if (data.booking_url) {
+                    document.getElementById('booking_url').href = data.booking_url;
+                    document.getElementById('bookingWrap').classList.remove('hidden');
                 }
-                if (data.fee) {
-                    document.getElementById('feeWrap').classList.remove('hidden');
-                    document.getElementById('fee').textContent = data.fee;
-                }
-                if (data.contact) {
-                    document.getElementById('contactWrap').classList.remove('hidden');
-                    document.getElementById('contact').textContent = data.contact;
+                showIf('tagsWrap', 'tags', data.tags);
+
+                // 소셜
+                const socials = [data.social1, data.social2, data.social3].filter(Boolean);
+                if (socials.length) {
+                    const box = document.getElementById('socialLinks');
+                    box.innerHTML = '';
+                    socials.forEach(url => {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.target = "_blank";
+                        a.rel = "noopener";
+                        a.textContent = url;
+                        box.appendChild(a);
+                    });
+                    document.getElementById('socialWrap').classList.remove('hidden');
                 }
 
-                // 지도 표시 (카카오맵)
-                if (window.kakao && window.kakao.maps && data.place) {
-                    kakao.maps.load(() => showKakaoMap(data.place));
+                // 지도
+                if (window.kakao && window.kakao.maps && data.address) {
+                    kakao.maps.load(() => showKakaoMap(data.address));
                 } else {
-                    window.kakaoReady = () => showKakaoMap(data.place);
+                    window.kakaoReady = () => showKakaoMap(data.address);
                 }
-                document.getElementById('mapAddress').textContent = data.place || '';
-            } catch (err) {
+                document.getElementById('mapAddress').textContent = data.address || '';
+
+            } catch (e) {
+                console.error(e);
                 alert('상세 정보가 없습니다.');
-                window.location.href = '/';
+                location.href = '/';
             }
         }
 
-        // 3. 카카오맵 띄우기
+        function showIf(wrapId, valueId, value) {
+            if (value !== undefined && value !== null && value !== '') {
+                document.getElementById(wrapId).classList.remove('hidden');
+                document.getElementById(valueId).textContent = value;
+            }
+        }
+
+        // 카카오맵
         function showKakaoMap(address) {
             if (!address) return;
             const container = document.getElementById('kakaoMap');
-            const mapOption = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 3 };
-            const map = new kakao.maps.Map(container, mapOption);
-
+            const map = new kakao.maps.Map(container, {
+                center: new kakao.maps.LatLng(37.5665, 126.9780),
+                level: 3
+            });
             const geocoder = new kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, (result, status) => {
                 if (status === kakao.maps.services.Status.OK) {
@@ -136,17 +186,16 @@
             });
         }
 
-        // 카카오맵 SDK 동적로딩 (API_KEY 직접 입력!)
+        // Kakao SDK 동적 로드 (키 넣기!)
         (function () {
             if (window.kakao && window.kakao.maps) return;
             const script = document.createElement("script");
-            script.src = "//dapi.kakao.com/v2/maps/sdk.js?appkey=카카오API키&autoload=false&libraries=services";
+            script.src = "//dapi.kakao.com/v2/maps/sdk.js?appkey=여기에_카카오_API_KEY&autoload=false&libraries=services";
             script.onload = () => { kakao.maps.load(() => window.kakaoReady && window.kakaoReady()); };
             document.head.appendChild(script);
         })();
 
-        // 페이지 진입시 데이터 로드
-        loadSubartDetail();
+        loadArtDetail();
     </script>
 </body>
 
