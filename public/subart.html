@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공연 상세</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 min-h-screen">
+    <div id="header"></div>
+
+    <main class="max-w-5xl mx-auto p-8 mt-10 flex flex-col md:flex-row gap-8 bg-white/90 shadow-2xl rounded-3xl border">
+        <!-- 좌측 메인 이미지 -->
+        <div class="flex-shrink-0 w-full md:w-[330px] flex flex-col items-center">
+            <img id="mainImage" src="/uploads/sample-main.jpg" alt="포스터"
+                class="rounded-2xl w-full h-[470px] object-cover border shadow-xl">
+            <!-- 썸네일 이미지(3개) -->
+            <div class="flex gap-3 mt-6">
+                <img src="/uploads/sample-thumb1.jpg"
+                    class="w-20 h-20 rounded-lg border object-cover shadow cursor-pointer" alt="썸네일1">
+                <img src="/uploads/sample-thumb2.jpg"
+                    class="w-20 h-20 rounded-lg border object-cover shadow cursor-pointer" alt="썸네일2">
+                <img src="/uploads/sample-thumb3.jpg"
+                    class="w-20 h-20 rounded-lg border object-cover shadow cursor-pointer" alt="썸네일3">
+            </div>
+        </div>
+
+        <!-- 우측 정보 -->
+        <div class="flex-1 flex flex-col">
+            <!-- 제목 -->
+            <h1 id="title" class="text-3xl md:text-4xl font-extrabold text-indigo-800 mb-3">태양의 노래 Midnight Sun</h1>
+
+            <!-- 공연 일정/장소 -->
+            <div class="mb-4 flex gap-6 flex-wrap text-base font-semibold">
+                <span>2021.05.01 ~ 2021.07.25</span>
+                <span>장소: 광림아트센터 BBCH홀</span>
+            </div>
+
+            <!-- 시놉시스/설명 -->
+            <div class="mb-6">
+                <h2 class="font-bold text-lg text-indigo-600 mb-2">시놉시스</h2>
+                <div id="synopsis" class="text-gray-800 leading-relaxed">
+                    태양을 피해서 살아야 하는 소녀 하늘과 바다를 사랑하게 되는 소년 하람의 이야기...
+                </div>
+            </div>
+
+            <!-- 출연진 -->
+            <div class="mb-6">
+                <h2 class="font-bold text-lg text-indigo-600 mb-2">CAST</h2>
+                <div class="flex gap-5 flex-wrap">
+                    <div class="flex flex-col items-center">
+                        <img src="/uploads/cast1.jpg" class="w-16 h-16 rounded-full border object-cover mb-1">
+                        <span class="text-xs font-medium">온유</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <img src="/uploads/cast2.jpg" class="w-16 h-16 rounded-full border object-cover mb-1">
+                        <span class="text-xs font-medium">원필</span>
+                    </div>
+                    <!-- ...필요만큼 반복 -->
+                </div>
+            </div>
+
+            <!-- 상세 정보(예매, SNS 등) -->
+            <div class="flex gap-4 flex-wrap">
+                <a href="https://ticketlink.com" target="_blank"
+                    class="px-5 py-2 bg-indigo-500 text-white font-bold rounded-full shadow hover:bg-indigo-700 transition">예매하기</a>
+                <a href="https://www.instagram.com/" target="_blank"
+                    class="px-5 py-2 bg-gradient-to-r from-pink-500 to-yellow-500 text-white font-bold rounded-full shadow hover:scale-105 transition">공식
+                    인스타</a>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer"></div>
+
+    <script>
+        function getIdParam() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        async function fetchSubartDetail(id) {
+            try {
+                const res = await fetch(`/subart/${id}`);
+                if (!res.ok) throw new Error('데이터 없음');
+                const data = await res.json();
+
+                // 대표 이미지
+                document.getElementById('mainImage').src = data.image1 ? `/uploads/${data.image1}` : '/assets/no-image.png';
+
+                // 썸네일(2~3장까지)
+                const thumbs = [data.image1, data.image2, data.image3].filter(Boolean);
+                document.querySelectorAll('.thumb-image').forEach((img, i) => {
+                    img.style.display = thumbs[i] ? 'block' : 'none';
+                    if (thumbs[i]) {
+                        img.src = `/uploads/${thumbs[i]}`;
+                        img.onclick = () => { document.getElementById('mainImage').src = `/uploads/${thumbs[i]}`; };
+                    }
+                });
+
+                // 제목, 일정, 장소
+                document.getElementById('title').textContent = data.title;
+                document.getElementById('dateVenue').textContent =
+                    (data.start_date ? formatDate(data.start_date) : '-') +
+                    (data.end_date ? ' ~ ' + formatDate(data.end_date) : '') +
+                    (data.venue ? ' | ' + data.venue : '');
+
+                // 시놉시스/설명
+                document.getElementById('synopsis').textContent = data.description || '-';
+
+                // 출연진(데이터 없으면 숨김)
+                const castBox = document.getElementById('castBox');
+                if (data.cast && Array.isArray(data.cast) && data.cast.length > 0) {
+                    castBox.innerHTML = data.cast.map(c =>
+                        `<div class="flex flex-col items-center">
+          <img src="${c.img ? `/uploads/${c.img}` : '/assets/no-cast.png'}"
+               class="w-16 h-16 rounded-full border object-cover mb-1">
+          <span class="text-xs font-medium">${c.name}</span>
+        </div>`
+                    ).join('');
+                    castBox.parentElement.style.display = '';
+                } else {
+                    castBox.parentElement.style.display = 'none';
+                }
+
+                // 예매/SNS
+                document.getElementById('bookingBtn').href = data.booking_url || "#";
+                document.getElementById('bookingBtn').style.display = data.booking_url ? '' : 'none';
+                document.getElementById('snsBtn').href = data.social1 || "#";
+                document.getElementById('snsBtn').style.display = data.social1 ? '' : 'none';
+
+            } catch (e) {
+                document.querySelector('main').innerHTML = `<div class="text-center text-red-500 text-xl py-16">상세정보를 불러올 수 없습니다.</div>`;
+            }
+        }
+
+        function formatDate(str) {
+            if (!str) return '';
+            return str.slice(0, 10).replace(/-/g, '.');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const id = getIdParam();
+            if (!id) {
+                document.querySelector('main').innerHTML = `<div class="text-center text-gray-500 text-xl py-20">잘못된 접근입니다.</div>`;
+                return;
+            }
+            fetchSubartDetail(id);
+        });
+    </script>
+
+</body>
+
+</html>
