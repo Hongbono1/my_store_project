@@ -172,7 +172,7 @@
     <div id="footer"></div>
 
     <script>
-        // 헤더/푸터
+        // 헤더/푸터 불러오기
         fetch('components/header.html')
             .then(r => r.text())
             .then(html => { document.getElementById('header').innerHTML = html; });
@@ -180,21 +180,31 @@
             .then(r => r.text())
             .then(html => { document.getElementById('footer').innerHTML = html; });
 
-        // -------- 여기부터 미리보기/전송 로직 (단 한 번만 바인딩되도록 보호) --------
+        // -------- 미리보기 & 전송 로직(중복방지) --------
         if (!window.__artregisterBound) {
             window.__artregisterBound = true;
 
+            const form = document.getElementById("artregister");
             const imageInput = document.getElementById('imageInput');
             const preview = document.getElementById('imagePreview');
             let localFiles = [];
 
+            // 이미지 변경 시 미리보기
             imageInput.addEventListener('change', function (e) {
                 const files = Array.from(e.target.files);
-                localFiles = localFiles.concat(files).slice(0, 3); // 최대 3장만 유지
+                // 기존 localFiles + 새로 선택한 파일들 (중복 제거)
+                files.forEach(file => {
+                    if (!localFiles.find(f => f.name === file.name && f.size === file.size)) {
+                        localFiles.push(file);
+                    }
+                });
+                // 3장까지만 유지
+                localFiles = localFiles.slice(0, 3);
                 renderPreviews();
-                e.target.value = ""; // 같은 파일 또 올릴 수 있게
+                imageInput.value = ""; // 같은 파일 또 올릴 수 있게
             });
 
+            // 미리보기 렌더
             function renderPreviews() {
                 preview.innerHTML = "";
                 localFiles.forEach((file, idx) => {
@@ -207,6 +217,7 @@
                         img.className = "w-24 h-24 object-cover rounded shadow border cursor-pointer";
                         img.title = (idx === 0) ? "대표사진(메인)" : "클릭해서 대표사진으로";
                         if (idx === 0) img.style.outline = "3px solid #6366f1";
+                        // 대표로 승격
                         img.onclick = function () {
                             if (idx !== 0) {
                                 const temp = localFiles[idx];
@@ -233,21 +244,20 @@
                 });
             }
 
+            // 폼 전송
             form.addEventListener("submit", async function (e) {
                 e.preventDefault();
                 const formData = new FormData();
-
-                const form = e.target; // ← 여기 선언!
+                // 파일 외 모든 input/textarea/select 등 추가
                 Array.from(form.elements).forEach(el => {
                     if (el.name && el.type !== "file") formData.append(el.name, el.value);
                 });
-
+                // 이미지 (대표-1번 순서대로 첨부)
                 if (localFiles.length > 3) {
                     alert("이미지는 최대 3장까지만 업로드 가능합니다.");
                     return;
                 }
                 localFiles.forEach(file => formData.append("images", file));
-
                 try {
                     const res = await fetch('/art', {
                         method: 'POST',
@@ -255,7 +265,6 @@
                     });
                     if (!res.ok) throw new Error('서버 오류');
                     const result = await res.json();
-
                     alert('정상적으로 등록되었습니다!');
                     const type = form.type.value;
                     if (type === "event") {
@@ -273,12 +282,12 @@
             });
         }
 
-        // feather
+        // Heroicons/Feather 아이콘 적용
         window.onload = () => {
             if (window.feather) feather.replace();
         };
-
     </script>
+
 </body>
 
 </html>
