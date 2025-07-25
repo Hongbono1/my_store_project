@@ -33,26 +33,26 @@
             <div id="pamphletContent" class="flex flex-col items-center gap-2"></div>
         </div>
 
-        <!-- 3. 정보 박스 -->
+        <!-- 3. 정보 박스 (상단 정보) -->
         <section class="px-6 py-5 border-b border-indigo-50 bg-blue-50/30 rounded-b-lg mb-2">
-            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <dt class="text-xs text-gray-500">일정</dt>
-                    <dd id="date" class="font-bold text-indigo-700"></dd>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
+                <div class="flex items-start gap-2 border-b border-indigo-50 pb-2 last:border-none">
+                    <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5">일정</div>
+                    <div id="date" class="flex-1 font-bold text-indigo-700"></div>
                 </div>
-                <div>
-                    <dt class="text-xs text-gray-500">시간</dt>
-                    <dd id="time" class="font-bold text-indigo-700"></dd>
+                <div class="flex items-start gap-2 border-b border-indigo-50 pb-2 last:border-none">
+                    <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5">시간</div>
+                    <div id="time" class="flex-1 font-bold text-indigo-700"></div>
                 </div>
-                <div>
-                    <dt class="text-xs text-gray-500">장소명</dt>
-                    <dd id="venue" class="font-bold text-indigo-700"></dd>
+                <div class="flex items-start gap-2 border-b border-indigo-50 pb-2 last:border-none">
+                    <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5">장소명</div>
+                    <div id="venue" class="flex-1 font-bold text-indigo-700"></div>
                 </div>
-                <div>
-                    <dt class="text-xs text-gray-500">주소</dt>
-                    <dd id="address" class="font-bold text-indigo-700 truncate"></dd>
+                <div class="flex items-start gap-2 border-b border-indigo-50 pb-2 last:border-none">
+                    <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5">주소</div>
+                    <div id="address" class="flex-1 font-bold text-indigo-700 truncate"></div>
                 </div>
-            </dl>
+            </div>
         </section>
 
         <!-- 4. 상세 소개 -->
@@ -64,11 +64,9 @@
             </p>
         </section>
 
-        <!-- 5. 추가 정보 -->
+        <!-- 5. 추가 정보 (아래 정보 카드식) -->
         <section class="px-6 py-6 border-b border-indigo-50 bg-white/60">
-            <table class="w-full text-sm mb-3">
-                <tbody id="extraList"></tbody>
-            </table>
+            <div id="extraInfoBox" class="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3"></div>
             <div id="tagsWrap" class="hidden mt-4 flex flex-wrap gap-2"></div>
             <div id="socialWrap" class="hidden mt-2">
                 <div class="font-bold mb-1">공식/소셜</div>
@@ -135,7 +133,7 @@
                 // 2-1. 팜플렛
                 showPamphlet(data);
 
-                // 3. 정보
+                // 3. 정보 박스 (상단)
                 const sd = formatShort(data.start_date);
                 const ed = formatShort(data.end_date);
                 const dateText = (sd && ed) ? `${sd} ~ ${ed}` : (sd || ed || '-');
@@ -148,7 +146,7 @@
                 // 4. 상세 설명
                 document.getElementById('description').textContent = data.description || '상세 설명이 없습니다.';
 
-                // 5. 추가 정보 (표로!)
+                // 5. 추가 정보(카드)
                 renderExtraInfo(data);
 
                 // 6. 지도
@@ -187,17 +185,23 @@
             }
         }
 
-        // 추가 정보(ul → 표)
+        // 추가 정보(카드 스타일)
         function renderExtraInfo(data) {
-            const tableRows = [
-                data.price ? `<tr><td class="font-semibold text-gray-700 pr-3">참가비</td><td>${data.price}</td></tr>` : "",
-                data.host ? `<tr><td class="font-semibold text-gray-700 pr-3">주최/주관</td><td>${data.host}</td></tr>` : "",
-                data.age_limit ? `<tr><td class="font-semibold text-gray-700 pr-3">관람 등급</td><td>${data.age_limit}</td></tr>` : "",
-                data.capacity ? `<tr><td class="font-semibold text-gray-700 pr-3">정원</td><td>${data.capacity}</td></tr>` : "",
-                data.phone ? `<tr><td class="font-semibold text-gray-700 pr-3">연락처</td><td>${data.phone}</td></tr>` : "",
-                data.booking_url ? `<tr><td class="font-semibold text-gray-700 pr-3">예매</td><td><a href="${data.booking_url}" target="_blank" class="text-indigo-600 underline font-semibold">바로가기</a></td></tr>` : "",
-            ].filter(Boolean).join("");
-            document.getElementById('extraList').innerHTML = tableRows;
+            const items = [
+                { label: "참가비", value: data.price },
+                { label: "주최/주관", value: data.host },
+                { label: "관람 등급", value: data.age_limit },
+                { label: "정원", value: data.capacity },
+                { label: "연락처", value: data.phone },
+                { label: "예매", value: data.booking_url ? `<a href="${data.booking_url}" target="_blank" class="text-indigo-600 underline font-semibold">바로가기</a>` : "" },
+            ];
+            const html = items.filter(i => i.value).map(i => `
+              <div class="flex items-start gap-2 border-b border-indigo-50 pb-2 last:border-none">
+                <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5">${i.label}</div>
+                <div class="flex-1 text-base text-gray-800">${i.value}</div>
+              </div>
+            `).join('');
+            document.getElementById('extraInfoBox').innerHTML = html;
 
             // 태그
             if (data.tags) {
@@ -207,7 +211,6 @@
                 tagsWrap.innerHTML = tagsHtml;
                 tagsWrap.classList.remove('hidden');
             }
-
             // 소셜
             const socials = [data.social1, data.social2, data.social3].filter(Boolean);
             if (socials.length) {
