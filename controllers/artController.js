@@ -34,7 +34,17 @@ export async function registerArt(req, res) {
   }
 }
 
-// ← 여기에 getArtById 함수!
+// ★ 여기에 getArtList 함수!
+export async function getArtList(req, res) {
+  try {
+    const result = await pool.query("SELECT * FROM art_info ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// ★ 여기에 getArtById 함수!
 export async function getArtById(req, res) {
   try {
     const id = req.params.id;
