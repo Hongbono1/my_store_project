@@ -11,7 +11,7 @@ router.post(
   "/",
   upload.fields([
     { name: "images", maxCount: 3 },     // 이미지 최대 3장
-    { name: "pamphlet", maxCount: 1 }    // 팜플렛(포스터/리플릿/행사자료 등) 1개
+    { name: "pamphlet", maxCount: 6 }    // 팜플렛(포스터/리플릿/행사자료 등) 6개
   ]),
   registerArt
 );
