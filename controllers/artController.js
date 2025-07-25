@@ -1,6 +1,6 @@
 import pool from '../db.js';
 
-// 공연/예술/축제/버스커 등록 (팜플렛 포함)
+// 공연/예술/축제/버스커 등록 (팜플렛 여러개)
 export async function registerArt(req, res) {
   try {
     const {
@@ -14,8 +14,10 @@ export async function registerArt(req, res) {
     const image2 = req.files?.images?.[1]?.filename || null;
     const image3 = req.files?.images?.[2]?.filename || null;
 
-    // 팜플렛 업로드 (1개, 이미지 or PDF)
-    const pamphlet = req.files?.pamphlet?.[0]?.filename || null;
+    // 팜플렛 업로드 (여러 개, 이미지 or PDF)
+    const pamphletFiles = req.files?.pamphlet?.map(f => f.filename) || [];
+    // DB pamphlet 칼럼은 text 또는 jsonb 타입 (파일명 배열을 JSON 문자열로 저장)
+    const pamphlet = JSON.stringify(pamphletFiles);
 
     const result = await pool.query(
       `INSERT INTO art_info (
@@ -35,7 +37,6 @@ export async function registerArt(req, res) {
       ]
     );
 
-    // 프론트에서 result.rows[0].id 바로 쓰게 편의성 맞춤
     res.json({ success: true, id: result.rows[0]?.id, art: result.rows[0] });
   } catch (err) {
     console.error('[registerArt] ', err);
