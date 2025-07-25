@@ -180,99 +180,113 @@
             .then(r => r.text())
             .then(html => { document.getElementById('footer').innerHTML = html; });
 
-        // 폼 전송
-        document.getElementById("artregister").addEventListener("submit", async function (e) {
-            e.preventDefault();
-            const form = e.target;
-            const formData = new FormData(form);
+        // -------- 여기부터 미리보기/전송 로직 (단 한 번만 바인딩되도록 보호) --------
+        if (!window.__artregisterBound) {
+            window.__artregisterBound = true;
 
-            // 최대 3장만 첨부 허용
-            if (formData.getAll('images').length > 3) {
-                alert("이미지는 최대 3장까지만 업로드 가능합니다.");
-                return;
-            }
+            const form = document.getElementById("artregister");
+            const imageInput = document.getElementById('imageInput');
+            const preview = document.getElementById('imagePreview');
+            let localFiles = [];
 
-            // 서버로 전송 (예시)
-            try {
-                const res = await fetch('/art', {
-                    method: 'POST',
-                    body: formData
+            imageInput.addEventListener('change', function (e) {
+                // 새로 선택한 파일을 기존 배열 뒤에 붙이고 최대 3장만 유지
+                const files = Array.from(e.target.files);
+                localFiles = localFiles.concat(files).slice(0, 3);
+                renderPreviews();
+                e.target.value = ""; // 동일 파일 다시 선택 가능하도록 초기화
+            });
+
+            function renderPreviews() {
+                preview.innerHTML = "";
+                localFiles.forEach((file, idx) => {
+                    const reader = new FileReader();
+                    reader.onload = function (ev) {
+                        const box = document.createElement('div');
+                        box.className = "relative inline-block";
+
+                        const img = document.createElement('img');
+                        img.src = ev.target.result;
+                        img.className = "w-24 h-24 object-cover rounded shadow border cursor-pointer";
+                        img.title = (idx === 0) ? "대표사진(메인)" : "클릭해서 대표사진으로";
+                        if (idx === 0) img.style.outline = "3px solid #6366f1";
+
+                        // 클릭 시 대표로 승격
+                        img.onclick = function () {
+                            if (idx !== 0) {
+                                const temp = localFiles[idx];
+                                localFiles.splice(idx, 1);
+                                localFiles.unshift(temp);
+                                renderPreviews();
+                            }
+                        };
+
+                        // 삭제 버튼
+                        const del = document.createElement('button');
+                        del.innerHTML = "&#10006;";
+                        del.className = "absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow text-xs hover:bg-red-700";
+                        del.title = "사진 삭제";
+                        del.onclick = function (ev2) {
+                            ev2.stopPropagation();
+                            localFiles.splice(idx, 1);
+                            renderPreviews();
+                        };
+
+                        box.appendChild(img);
+                        box.appendChild(del);
+                        preview.appendChild(box);
+                    };
+                    reader.readAsDataURL(file);
                 });
-                if (!res.ok) throw new Error('서버 오류');
-                const result = await res.json();
-
-                // 타입별 이동
-                const type = form.type.value;
-                if (type === "event") {
-                    location.href = "/event-details.html";
-                } else if (type === "art") {
-                    location.href = "/art-details.html";
-                } else if (type === "busker") {
-                    location.href = "/busker-details.html";
-                } else {
-                    location.href = "/";
-                }
-            } catch (err) {
-                alert('등록 실패: ' + err.message);
             }
-        });
 
-        // Heroicons 적용
+            // 폼 전송
+            form.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                const formData = new FormData();
+
+                // 텍스트/라디오 등 파일 외 필드 채우기
+                Array.from(form.elements).forEach(el => {
+                    if (el.name && el.type !== "file") formData.append(el.name, el.value);
+                });
+
+                // 이미지(대표 -> image1) 순서대로 첨부
+                if (localFiles.length > 3) {
+                    alert("이미지는 최대 3장까지만 업로드 가능합니다.");
+                    return;
+                }
+                localFiles.forEach(file => formData.append("images", file));
+
+                try {
+                    const res = await fetch('/art', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!res.ok) throw new Error('서버 오류');
+                    const result = await res.json();
+
+                    alert('정상적으로 등록되었습니다!');
+                    const type = form.type.value;
+                    // 타입별 이동 (원하면 경로 수정)
+                    if (type === "event") {
+                        location.href = "/event-details.html";
+                    } else if (type === "art") {
+                        location.href = "/art-details.html";
+                    } else if (type === "busker") {
+                        location.href = "/busker-details.html";
+                    } else {
+                        location.href = "/subart.html";
+                    }
+                } catch (err) {
+                    alert('등록 실패: ' + err.message);
+                }
+            });
+        }
+
+        // feather
         window.onload = () => {
             if (window.feather) feather.replace();
         };
-
-        const imageInput = document.getElementById('imageInput');
-        const preview = document.getElementById('imagePreview');
-        let localFiles = [];
-
-        imageInput.addEventListener('change', function (e) {
-            // 파일 input에서 여러 장 선택 가능, 새로 올릴 때마다 이전 것 유지!
-            const files = Array.from(e.target.files);
-            // 기존 localFiles + 새로 선택한 파일들, 최대 3장만 남김
-            localFiles = localFiles.concat(files).slice(0, 3);
-            renderPreviews();
-            e.target.value = ""; // 같은 파일을 다시 선택할 때도 change 이벤트 발생하게
-        });
-
-        function renderPreviews() {
-            preview.innerHTML = "";
-            localFiles.forEach((file, idx) => {
-                const reader = new FileReader();
-                reader.onload = function (ev) {
-                    const box = document.createElement('div');
-                    box.className = "relative inline-block";
-                    const img = document.createElement('img');
-                    img.src = ev.target.result;
-                    img.className = "w-24 h-24 object-cover rounded shadow border cursor-pointer";
-                    img.title = (idx === 0) ? "대표사진(메인)" : "클릭해서 대표사진으로";
-                    if (idx === 0) img.style.outline = "3px solid #6366f1";
-                    img.onclick = function () {
-                        if (idx !== 0) {
-                            // 대표로 올리기
-                            const temp = localFiles[idx];
-                            localFiles.splice(idx, 1);
-                            localFiles.unshift(temp);
-                            renderPreviews();
-                        }
-                    };
-                    // X(삭제) 버튼
-                    const del = document.createElement('button');
-                    del.innerHTML = "&#10006;";
-                    del.className = "absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow text-xs hover:bg-red-700";
-                    del.title = "사진 삭제";
-                    del.onclick = function (ev) {
-                        ev.stopPropagation();
-                        localFiles.splice(idx, 1);
-                        renderPreviews();
-                    };
-                    box.appendChild(img);
-                    box.appendChild(del);
-                    preview.appendChild(box);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
 
     </script>
 </body>
