@@ -99,12 +99,12 @@
             <div>
                 <label class="font-bold flex items-center gap-2 mb-1">
                     <span data-feather="file-text"></span>
-                    팜플렛 업로드 (이미지/PDF)
+                    팜플렛 업로드 (이미지/PDF, 최대 6개)
                 </label>
-                <input type="file" name="pamphlet" accept="image/*,application/pdf"
+                <input type="file" name="pamphlet" accept="image/*,application/pdf" multiple
                     class="block w-full rounded border-gray-300 focus:ring-2 focus:ring-indigo-200" id="pamphletInput">
-                <span class="text-xs text-gray-400">포스터, 리플릿, 행사자료 등 1개만 첨부 (이미지/PDF)</span>
-                <div id="pamphletPreview" class="mt-2"></div>
+                <span class="text-xs text-gray-400">포스터, 리플릿, 행사자료 등 최대 6개 첨부</span>
+                <div id="pamphletPreview" class="mt-2 flex flex-wrap gap-2"></div>
             </div>
 
             <!-- 참가비/입장료 -->
@@ -197,22 +197,29 @@
         const pamphletPreview = document.getElementById('pamphletPreview');
         if (pamphletInput) {
             pamphletInput.addEventListener('change', function (e) {
-                const file = e.target.files[0];
-                if (!file) return pamphletPreview.innerHTML = '';
-                const ext = file.name.split('.').pop().toLowerCase();
-                if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        pamphletPreview.innerHTML = `<img src="${ev.target.result}" class="max-w-[120px] rounded shadow border" />`;
-                    };
-                    reader.readAsDataURL(file);
-                } else if (ext === 'pdf') {
-                    pamphletPreview.innerHTML = `<span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 rounded">PDF 첨부됨</span>`;
-                } else {
-                    pamphletPreview.innerHTML = `<span class="text-red-600">지원되지 않는 파일</span>`;
-                }
+                pamphletPreview.innerHTML = "";
+                const files = Array.from(e.target.files).slice(0, 6); // 최대 6개 제한
+                files.forEach((file, idx) => {
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            const img = document.createElement('img');
+                            img.src = ev.target.result;
+                            img.className = "max-w-[80px] max-h-[100px] rounded shadow border";
+                            pamphletPreview.appendChild(img);
+                        };
+                        reader.readAsDataURL(file);
+                    } else if (ext === 'pdf') {
+                        const span = document.createElement('span');
+                        span.className = "inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded";
+                        span.textContent = "PDF";
+                        pamphletPreview.appendChild(span);
+                    }
+                });
             });
         }
+
 
         // -------- 이미지 미리보기 & 대표 지정 --------
         if (!window.__artregisterBound) {
