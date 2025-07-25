@@ -9,7 +9,10 @@ const upload = multer({ dest: path.join(process.cwd(), "public/uploads/") });
 
 router.post(
   "/",
-  upload.fields([{ name: "images", maxCount: 3 }]), // input name="images" multiple
+  upload.fields([
+    { name: "images", maxCount: 3 },     // 이미지 최대 3장
+    { name: "pamphlet", maxCount: 1 }    // 팜플렛(포스터/리플릿/행사자료 등) 1개
+  ]),
   registerArt
 );
 
