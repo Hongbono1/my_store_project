@@ -34,27 +34,25 @@
         </div>
 
         <!-- 3. 정보 박스 -->
-        <section class="px-6 py-5 border-b border-indigo-50">
-            <div class="flex flex-col gap-2">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                        <div class="text-xs text-gray-400">일정</div>
-                        <div id="date" class="font-bold text-indigo-700">-</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">시간</div>
-                        <div id="time" class="font-bold text-indigo-700">-</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">장소명</div>
-                        <div id="venue" class="font-bold text-indigo-700">-</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">주소</div>
-                        <div id="address" class="font-bold text-indigo-700 truncate">-</div>
-                    </div>
+        <section class="px-6 py-5 border-b border-indigo-50 bg-blue-50/30 rounded-b-lg mb-2">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <dt class="text-xs text-gray-500">일정</dt>
+                    <dd id="date" class="font-bold text-indigo-700"></dd>
                 </div>
-            </div>
+                <div>
+                    <dt class="text-xs text-gray-500">시간</dt>
+                    <dd id="time" class="font-bold text-indigo-700"></dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">장소명</dt>
+                    <dd id="venue" class="font-bold text-indigo-700"></dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">주소</dt>
+                    <dd id="address" class="font-bold text-indigo-700 truncate"></dd>
+                </div>
+            </dl>
         </section>
 
         <!-- 4. 상세 소개 -->
@@ -68,7 +66,9 @@
 
         <!-- 5. 추가 정보 -->
         <section class="px-6 py-6 border-b border-indigo-50 bg-white/60">
-            <ul id="extraList" class="space-y-1 text-base"></ul>
+            <table class="w-full text-sm mb-3">
+                <tbody id="extraList"></tbody>
+            </table>
             <div id="tagsWrap" class="hidden mt-4 flex flex-wrap gap-2"></div>
             <div id="socialWrap" class="hidden mt-2">
                 <div class="font-bold mb-1">공식/소셜</div>
@@ -148,7 +148,7 @@
                 // 4. 상세 설명
                 document.getElementById('description').textContent = data.description || '상세 설명이 없습니다.';
 
-                // 5. 추가 정보
+                // 5. 추가 정보 (표로!)
                 renderExtraInfo(data);
 
                 // 6. 지도
@@ -172,16 +172,13 @@
             content.innerHTML = '';
             if (data.pamphlet) {
                 wrap.classList.remove('hidden');
-                // 이미지 or pdf 구분
                 const ext = data.pamphlet.split('.').pop().toLowerCase();
                 if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-                    // 이미지
                     content.innerHTML = `
                         <img src="/uploads/${data.pamphlet}" alt="팜플렛 이미지" class="w-64 max-w-full rounded-lg border shadow mb-2">
                         <a href="/uploads/${data.pamphlet}" download class="inline-block mt-1 px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">다운로드</a>
                     `;
                 } else {
-                    // 파일 (pdf 등)
                     content.innerHTML = `
                         <a href="/uploads/${data.pamphlet}" download class="inline-block px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">팜플렛 다운로드</a>
                         <span class="text-sm text-gray-500 mt-1 block">* 지원 파일: PDF, 이미지 등</span>
@@ -190,17 +187,17 @@
             }
         }
 
-        // 추가 정보(ul/태그/소셜)
+        // 추가 정보(ul → 표)
         function renderExtraInfo(data) {
-            const list = [];
-            if (data.price) list.push(`<li><b>참가비:</b> ${data.price}</li>`);
-            if (data.host) list.push(`<li><b>주최/주관:</b> ${data.host}</li>`);
-            if (data.age_limit) list.push(`<li><b>관람 등급:</b> ${data.age_limit}</li>`);
-            if (data.capacity) list.push(`<li><b>정원:</b> ${data.capacity}</li>`);
-            if (data.phone) list.push(`<li><b>연락처:</b> ${data.phone}</li>`);
-            if (data.booking_url)
-                list.push(`<li><b>예매:</b> <a href="${data.booking_url}" class="text-indigo-600 underline" target="_blank">바로가기</a></li>`);
-            document.getElementById('extraList').innerHTML = list.join('');
+            const tableRows = [
+                data.price ? `<tr><td class="font-semibold text-gray-700 pr-3">참가비</td><td>${data.price}</td></tr>` : "",
+                data.host ? `<tr><td class="font-semibold text-gray-700 pr-3">주최/주관</td><td>${data.host}</td></tr>` : "",
+                data.age_limit ? `<tr><td class="font-semibold text-gray-700 pr-3">관람 등급</td><td>${data.age_limit}</td></tr>` : "",
+                data.capacity ? `<tr><td class="font-semibold text-gray-700 pr-3">정원</td><td>${data.capacity}</td></tr>` : "",
+                data.phone ? `<tr><td class="font-semibold text-gray-700 pr-3">연락처</td><td>${data.phone}</td></tr>` : "",
+                data.booking_url ? `<tr><td class="font-semibold text-gray-700 pr-3">예매</td><td><a href="${data.booking_url}" target="_blank" class="text-indigo-600 underline font-semibold">바로가기</a></td></tr>` : "",
+            ].filter(Boolean).join("");
+            document.getElementById('extraList').innerHTML = tableRows;
 
             // 태그
             if (data.tags) {
@@ -229,25 +226,32 @@
         function showKakaoMap(address) {
             if (!address) return;
             const container = document.getElementById('kakaoMap');
+            container.innerHTML = '';
+            if (!(window.kakao && window.kakao.maps)) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">지도를 불러올 수 없습니다. (카카오맵 로드 실패)</div>';
+                return;
+            }
             const map = new kakao.maps.Map(container, {
                 center: new kakao.maps.LatLng(37.5665, 126.9780),
                 level: 3
             });
             const geocoder = new kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, (result, status) => {
-                if (status === kakao.maps.services.Status.OK) {
+                if (status === kakao.maps.services.Status.OK && result[0]) {
                     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
                     map.setCenter(coords);
                     new kakao.maps.Marker({ map, position: coords });
+                } else {
+                    container.innerHTML = '<div class="text-center text-gray-500 py-8">지도를 불러올 수 없습니다.</div>';
                 }
             });
         }
 
-        // Kakao SDK 동적 로드 (키 입력! 교체!)
+        // Kakao SDK 동적 로드 (***API키 직접 입력***)
         (function () {
             if (window.kakao && window.kakao.maps) return;
             const script = document.createElement("script");
-            script.src = "//dapi.kakao.com/v2/maps/sdk.js?appkey=카카오API키&autoload=false&libraries=services";
+            script.src = "//dapi.kakao.com/v2/maps/sdk.js?appkey=카카오API키입력&autoload=false&libraries=services";
             script.onload = () => { kakao.maps.load(() => window.kakaoReady && window.kakaoReady()); };
             document.head.appendChild(script);
         })();
