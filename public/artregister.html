@@ -254,6 +254,7 @@
             // 남은 자리에만 추가
             const remain = 3 - localFiles.length;
             const filesToAdd = files.slice(0, remain);
+            // 이미 있는 파일 뒤에 붙임(순서 유지)
             localFiles = localFiles.concat(filesToAdd).slice(0, 3);
             renderPreviews();
             // input value 초기화(동일 파일 다시 선택 가능하게)
@@ -273,9 +274,15 @@
                     img.src = ev.target.result;
                     img.className = "w-24 h-24 object-cover rounded shadow border cursor-pointer";
                     img.title = (idx === 0) ? "대표사진(메인)" : "클릭해서 대표사진으로";
+                    if (idx === 0) {
+                        img.style.outline = "3px solid #6366f1"; // 대표사진 강조 (indigo-500)
+                    }
                     img.onclick = function () {
                         if (idx !== 0) {
-                            [localFiles[0], localFiles[idx]] = [localFiles[idx], localFiles[0]];
+                            // 대표로 바꾸기 (선택한 사진을 0번으로)
+                            const temp = localFiles[idx];
+                            localFiles.splice(idx, 1);
+                            localFiles.unshift(temp);
                             renderPreviews();
                         }
                     };
@@ -307,7 +314,7 @@
             Array.from(form.elements).forEach(el => {
                 if (el.name && el.type !== "file") formData.append(el.name, el.value);
             });
-            // 이미지들 순서대로 추가
+            // 이미지들 순서대로 추가(대표가 항상 1번)
             localFiles.forEach(file => formData.append("images", file));
             // 서버 전송 fetch
             fetch('/art', {
@@ -322,7 +329,6 @@
                     alert("등록 실패: " + err.message);
                 });
         };
-
     </script>
 </body>
 
