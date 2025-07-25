@@ -33,7 +33,8 @@
                 </label>
                 <label class="flex items-center gap-2 font-semibold text-lg">
                     <input type="radio" name="type" value="busker">
-                    <span class="px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">버스커</span>
+                    <span
+                        class="px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">버스커</span>
                 </label>
             </div>
 
@@ -242,6 +243,86 @@
         window.onload = () => {
             if (window.feather) feather.replace();
         };
+
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('imagePreview');
+        let localFiles = [];
+
+        imageInput.addEventListener('change', function (e) {
+            // 새로 올릴 때마다 추가(최대 3장)
+            const files = Array.from(e.target.files);
+            // 남은 자리에만 추가
+            const remain = 3 - localFiles.length;
+            const filesToAdd = files.slice(0, remain);
+            localFiles = localFiles.concat(filesToAdd).slice(0, 3);
+            renderPreviews();
+            // input value 초기화(동일 파일 다시 선택 가능하게)
+            e.target.value = "";
+        });
+
+        function renderPreviews() {
+            preview.innerHTML = "";
+            localFiles.forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = function (ev) {
+                    // 이미지 박스
+                    const box = document.createElement('div');
+                    box.className = "relative inline-block";
+                    // 썸네일 이미지
+                    const img = document.createElement('img');
+                    img.src = ev.target.result;
+                    img.className = "w-24 h-24 object-cover rounded shadow border cursor-pointer";
+                    img.title = (idx === 0) ? "대표사진(메인)" : "클릭해서 대표사진으로";
+                    img.onclick = function () {
+                        if (idx !== 0) {
+                            [localFiles[0], localFiles[idx]] = [localFiles[idx], localFiles[0]];
+                            renderPreviews();
+                        }
+                    };
+                    box.appendChild(img);
+                    // 삭제(X) 버튼
+                    const del = document.createElement('button');
+                    del.innerHTML = "&#10006;";
+                    del.className = "absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow text-xs hover:bg-red-700";
+                    del.title = "사진 삭제";
+                    del.onclick = function (ev) {
+                        ev.stopPropagation();
+                        localFiles.splice(idx, 1);
+                        renderPreviews();
+                    };
+                    box.appendChild(del);
+
+                    preview.appendChild(box);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 실제 submit 시, 순서·삭제 반영된 localFiles로 FormData 전송
+        document.getElementById('artregister').onsubmit = function (event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData();
+            // 나머지 필드 추가
+            Array.from(form.elements).forEach(el => {
+                if (el.name && el.type !== "file") formData.append(el.name, el.value);
+            });
+            // 이미지들 순서대로 추가
+            localFiles.forEach(file => formData.append("images", file));
+            // 서버 전송 fetch
+            fetch('/art', {
+                method: 'POST',
+                body: formData
+            })
+                .then(res => res.json())
+                .then(result => {
+                    alert("등록 완료!");
+                    location.href = "/";
+                }).catch(err => {
+                    alert("등록 실패: " + err.message);
+                });
+        };
+
     </script>
 </body>
 
