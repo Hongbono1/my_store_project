@@ -19,6 +19,7 @@ import restaurantRouter from "./routes/restaurant.js";
 import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
 import marketRouter from "./routes/market.js";
+import artRouter from './routes/art.js';
 
 // multer 설정 (업로드 폴더)
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") });
@@ -51,6 +52,7 @@ app.use("/open", openRouter);
 app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
 app.use("/market", marketRouter);
+app.use('/art', artRouter);
 
 // ── 우리 가게 자랑 등록 (단일 폼 업로드 예시)
 app.post("/storeprideregister", upload.any(), async (req, res) => {
