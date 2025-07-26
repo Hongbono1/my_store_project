@@ -1,10 +1,10 @@
 import pool from '../db.js';
 
-// 공연/예술/축제/버스커 등록 (팜플렛 여러개)
+// 공연/예술/축제/버스커 등록
 export async function registerArt(req, res) {
   try {
     const {
-      type, title, start_date, end_date, time, venue, address, description,
+      category, title, start_date, end_date, time, venue, address, description,
       price, host, age_limit, capacity, tags,
       social1, social2, social3, booking_url, phone
     } = req.body;
@@ -14,14 +14,13 @@ export async function registerArt(req, res) {
     const image2 = req.files?.images?.[1]?.filename || null;
     const image3 = req.files?.images?.[2]?.filename || null;
 
-    // 팜플렛 업로드 (여러 개, 이미지 or PDF)
+    // 팜플렛 업로드
     const pamphletFiles = req.files?.pamphlet?.map(f => f.filename) || [];
-    // DB pamphlet 칼럼은 text 또는 jsonb 타입 (파일명 배열을 JSON 문자열로 저장)
     const pamphlet = JSON.stringify(pamphletFiles);
 
     const result = await pool.query(
       `INSERT INTO art_info (
-        type, title, start_date, end_date, time, venue, address, description,
+        category, title, start_date, end_date, time, venue, address, description,
         price, host, age_limit, capacity, tags,
         social1, social2, social3, booking_url, phone,
         image1, image2, image3, pamphlet
@@ -30,7 +29,7 @@ export async function registerArt(req, res) {
       )
       RETURNING *`,
       [
-        type, title, start_date, end_date, time, venue, address, description,
+        category, title, start_date, end_date, time, venue, address, description,
         price, host, age_limit, capacity ? Number(capacity) : null, tags,
         social1, social2, social3, booking_url, phone,
         image1, image2, image3, pamphlet
@@ -44,17 +43,25 @@ export async function registerArt(req, res) {
   }
 }
 
-// 전체 리스트 조회
+// 전체 리스트 (상위에서 모두 불러옴)
 export async function getArtList(req, res) {
   try {
-    const result = await pool.query("SELECT * FROM art_info ORDER BY created_at DESC");
+    // category별 필터링 (예: /api/events → 쿼리에서 WHERE category='공연' 등)
+    let sql = "SELECT * FROM art_info";
+    let params = [];
+    if (req.query.category) {
+      sql += " WHERE category = $1";
+      params = [req.query.category];
+    }
+    sql += " ORDER BY created_at DESC";
+    const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
 
-// ID로 상세 조회
+// 상세 조회
 export async function getArtById(req, res) {
   try {
     const id = req.params.id;
