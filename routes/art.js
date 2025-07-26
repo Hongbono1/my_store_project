@@ -4,7 +4,6 @@ import path from "path";
 import { registerArt, getArtList, getArtById } from "../controllers/artController.js";
 
 const router = express.Router();
-
 const upload = multer({ dest: path.join(process.cwd(), "public/uploads/") });
 
 router.post(
@@ -15,9 +14,7 @@ router.post(
   ]),
   registerArt
 );
-
 router.get("/", getArtList);
 router.get("/:id", getArtById);
 
-// 반드시 마지막 줄!
 export default router;
