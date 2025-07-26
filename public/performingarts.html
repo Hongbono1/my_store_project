@@ -59,41 +59,57 @@
         // 카드 출력 함수 (대표이미지/제목/전화번호)
         function createFestivalCard(item, detailPage) {
             return `
-          <div class="bg-white border shadow-lg rounded-lg p-4 text-center hover:shadow-2xl transition-transform transform hover:scale-105">
-              <a href="${detailPage}?id=${item.id}" class="block">
-                  <img class="h-48 w-full object-cover rounded mb-4"
-                       src="${item.image1 ? '/uploads/' + item.image1 : '/assets/images/no-thumb.png'}"
-                       alt="${item.title}">
-                  <h4 class="text-xl font-semibold mb-2 truncate">${item.title || '-'}</h4>
-                  <p class="text-gray-500 text-sm">연락처: <span class="text-gray-700">${item.phone || '-'}</span></p>
-              </a>
-          </div>
-      `;
+        <div class="bg-white border shadow-lg rounded-lg p-4 text-center hover:shadow-2xl transition-transform transform hover:scale-105"
+             data-id="${item.id}">
+            <a href="${detailPage}?id=${item.id}" class="block">
+                <img class="h-48 w-full object-cover rounded mb-4"
+                     src="${item.image1 ? '/uploads/' + item.image1 : '/assets/images/no-thumb.png'}"
+                     alt="${item.title}">
+                <h4 class="text-xl font-semibold mb-2 truncate">${item.title || '-'}</h4>
+                <p class="text-gray-500 text-sm">연락처: <span class="text-gray-700">${item.phone || '-'}</span></p>
+            </a>
+        </div>
+    `;
         }
 
-        // fetch + 출력
         async function loadFestivals(api, containerId, detailPage) {
             const container = document.getElementById(containerId);
             container.innerHTML = '<div class="col-span-3 text-center py-10 text-gray-400">로딩중...</div>';
             try {
-                const res = await fetch(api);
+                const res = await fetch(`${api}?t=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!Array.isArray(data) || !data.length) {
                     container.innerHTML = '<div class="col-span-3 text-center py-10 text-gray-400">등록된 정보가 없습니다.</div>';
-                    return;
+                    return false;
                 }
                 container.innerHTML = data.map(item => createFestivalCard(item, detailPage)).join('');
+                return true;
             } catch (e) {
                 container.innerHTML = '<div class="col-span-3 text-center py-10 text-red-400">정보를 불러올 수 없습니다.</div>';
+                return false;
             }
         }
 
-        // ✅ 반드시 DOMContentLoaded로 감싸기!
-        document.addEventListener("DOMContentLoaded", function () {
-            loadFestivals('/api/events', 'event-container', 'subart.html');
-            loadFestivals('/api/arts', 'art-container', 'subart.html');
-            loadFestivals('/api/buskers', 'busker-container', 'subart.html');
+        function highlightJustAdded() {
+            const params = new URLSearchParams(location.search);
+            const just = params.get('just_added');
+            if (!just) return;
+            const el = document.querySelector(`[data-id="${just}"]`);
+            if (!el) return;
+            el.classList.add('ring-4', 'ring-emerald-400', 'animate-pulse');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => el.classList.remove('ring-4', 'ring-emerald-400', 'animate-pulse'), 2200);
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await Promise.all([
+                loadFestivals('/api/events', 'event-container', 'subart.html'),
+                loadFestivals('/api/arts', 'art-container', 'subart.html'),
+                loadFestivals('/api/buskers', 'busker-container', 'subart.html'),
+            ]);
+            highlightJustAdded();
         });
+
     </script>
 </body>
 
