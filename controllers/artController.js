@@ -1,4 +1,4 @@
-import pool from '../db.js';
+import { pool } from '../db/pool.js';
 
 // 등록
 export async function registerArt(req, res) {
