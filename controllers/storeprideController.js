@@ -1,15 +1,16 @@
-import pool from '../db.js';
+// controllers/storeprideController.js
+import { pool } from "../db/pool.js";
 
 // 가게 자랑 등록 (insert)
 export async function insertStorePride(req, res) {
     try {
-        // 1. 대표사진(main_img)
+        // 대표사진(main_img)
         let main_image = null;
         if (req.files && req.files["main_img"] && req.files["main_img"][0]) {
             main_image = "/uploads/" + req.files["main_img"][0].filename;
         }
 
-        // 2. 기본 데이터
+        // 기본 데이터
         const {
             store_name,
             address,
@@ -19,9 +20,8 @@ export async function insertStorePride(req, res) {
             free_pr
         } = req.body;
 
-        // 3. QnA 데이터 조립
+        // QnA 데이터 조립
         let qna_list = [];
-
         if (qa_mode === "fixed") {
             // 고정질문 8개
             for (let i = 1; i <= 8; i++) {
@@ -47,14 +47,14 @@ export async function insertStorePride(req, res) {
             }
         }
 
-        // 4. DB 저장
+        // DB 저장
         const sql = `
-            INSERT INTO store_pride
-                (store_name, address, category, phone, main_image, qna_list, owner_pr)
-            VALUES
-                ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING pride_id
-        `;
+      INSERT INTO store_pride
+        (store_name, address, category, phone, main_image, qna_list, owner_pr)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING pride_id
+    `;
         const params = [
             store_name || null,
             address || null,
@@ -64,7 +64,6 @@ export async function insertStorePride(req, res) {
             JSON.stringify(qna_list),
             free_pr || null
         ];
-
         const result = await pool.query(sql, params);
         console.log('[store_pride INSERT] pride_id =', result.rows[0].pride_id);
 
@@ -82,7 +81,6 @@ export async function getStorePrideById(req, res) {
         if (!Number.isInteger(id) || id <= 0) {
             return res.status(400).json({ error: 'invalid pride_id' });
         }
-
         const result = await pool.query(
             'SELECT * FROM store_pride WHERE pride_id = $1',
             [id]
@@ -90,14 +88,10 @@ export async function getStorePrideById(req, res) {
         if (!result.rows.length) {
             return res.status(404).json({ error: 'Not found' });
         }
-
         const data = result.rows[0];
         if (typeof data.qna_list === 'string') {
-            try {
-                data.qna_list = JSON.parse(data.qna_list);
-            } catch {
-                data.qna_list = [];
-            }
+            try { data.qna_list = JSON.parse(data.qna_list); }
+            catch { data.qna_list = []; }
         }
         res.json(data);
     } catch (err) {
@@ -106,22 +100,25 @@ export async function getStorePrideById(req, res) {
     }
 }
 
-// 전체 리스트 조회
+// 전체 리스트 조회 (최신순)
 export async function getStorePrideList(req, res) {
     try {
         const result = await pool.query(`
-            SELECT
-                pride_id,
-                store_name,
-                category,
-                address,
-                phone,
-                main_image,
-                owner_pr,
-                qna_list
-            FROM store_pride
-            ORDER BY created_at DESC
-        `);
+      SELECT
+        pride_id,
+        store_name,
+        category,
+        address,
+        phone,
+        main_image,
+        owner_pr,
+        qna_list,
+        COALESCE(view_count, 0) AS views, -- 만약 조회수 컬럼 사용시
+        created_at
+      FROM store_pride
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
 
         const data = result.rows.map(row => ({
             ...row,
