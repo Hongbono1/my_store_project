@@ -4,7 +4,6 @@ import { insertStorePride, getStorePrideById, getStorePrideList } from "../contr
 const router = express.Router();
 const upload = multer({ dest: "public/uploads" });
 
-// 고정질문(8개) + 자유질문(최대 5개)까지 모든 파일 필드 정의!
 const fileFields = [
   { name: "main_img", maxCount: 1 },
   { name: "q1_image", maxCount: 1 },
@@ -22,14 +21,13 @@ const fileFields = [
   { name: "customq5_image", maxCount: 1 }
 ];
 
+// 가게자랑 등록
 router.post("/register", upload.fields(fileFields), insertStorePride);
 
-// 리스트 조회 라우트
+// 추천 가게 리스트 (조회수 순, 8개)
 router.get("/list", getStorePrideList);
 
 // pride_id로 상세 조회
 router.get("/:id", getStorePrideById);
 
 export default router;
-
-
