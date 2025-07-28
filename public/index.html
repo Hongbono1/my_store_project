@@ -363,9 +363,7 @@
 
   <!-- JS: 필요 시 동적 데이터/광고 삽입. 데이터 없을 때는 위의 안내문구 유지 -->
   <script>
-    /** =========================
-     *  공통 유틸
-     *  ========================= */
+    // 공통: 헤더/푸터 불러오기
     async function loadComponent(url, containerId) {
       try {
         const res = await fetch(url);
@@ -376,23 +374,19 @@
       }
     }
 
+    // 날짜 변환 YY. M. D
     function formatDate(dateStr) {
       if (!dateStr) return "-";
       const d = new Date(dateStr);
       return `${String(d.getFullYear()).slice(2)}. ${d.getMonth() + 1}. ${d.getDate()}`;
     }
-
     function shortAddress(addr) {
       if (!addr) return "";
       const t = addr.trim().replace(/\s+/g, " ").split(" ");
       return t.slice(2, 5).join(" ");
     }
 
-    /** =========================
-     *  카드 컴포넌트
-     *  size: 'sm' (w-64, img h-36) | 'lg' (w-72, img h-40)
-     *  type: 'open' | 'pride' | 'market' | 'art' | 'hot' | 'recommend' | 'default'
-     *  ========================= */
+    // 카드 생성 함수 (sm: w-64/h-36, lg: w-72/h-40)
     function createCard(item, type = "open", size = "sm") {
       if (!item) return createEmptyCard(type, size);
 
@@ -431,6 +425,7 @@
       return el;
     }
 
+    // 빈 카드
     function createEmptyCard(type = "open", size = "sm") {
       const cardW = size === "sm" ? "w-64 p-4" : "w-72 p-6";
       const imgH = size === "sm" ? "h-36" : "h-40";
@@ -447,24 +442,16 @@
       return el;
     }
 
-    /** =========================
-     *  섹션 렌더 (컨테이너 가드 포함)
-     *  ========================= */
+    // 카드 섹션 렌더(에러 발생해도 조용)
     async function renderSectionCards(apiUrl, containerId, type = "open", total = 8, size = "sm") {
       let items = [];
       try {
         const resp = await fetch(apiUrl);
         if (resp.ok) items = await resp.json();
-        else console.warn("[fetch warn]", apiUrl, resp.status);
-      } catch (e) {
-        console.error("[fetch error]", apiUrl, e);
-      }
-
+        // 404 또는 네트워크 오류는 무시(콘솔 미출력)
+      } catch (e) { }
       const container = document.getElementById(containerId);
-      if (!container) {
-        console.error("[container not found]", containerId);
-        return;
-      }
+      if (!container) return;
 
       container.innerHTML = "";
       const data = (items || []).slice(0, total);
@@ -472,15 +459,12 @@
       data.forEach(item => container.appendChild(createCard(item, type, size)));
     }
 
-    /** =========================
-     *  초기화
-     *  ========================= */
+    // DOMContentLoaded: 필요한 것만 호출!
     document.addEventListener("DOMContentLoaded", async () => {
-      // 헤더/푸터
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
 
-      // '+더보기' 토글
+      // 카테고리 +더보기
       const toggleButton = document.getElementById("toggleButton");
       const hiddenCategories = document.getElementById("hiddenCategories");
       if (toggleButton && hiddenCategories) {
@@ -498,24 +482,16 @@
         });
       }
 
-      // 섹션 렌더링
-      // 오픈예정: 예전 모양(작은 카드, 가로 스크롤)
-      await renderSectionCards("/open", "open-hot-list", "open", 8, "sm");
+      // 실제 데이터 나오는 것만 렌더
+      await renderSectionCards("/open", "open-hot-list", "open", 8, "sm"); // 오픈예정
+      await renderSectionCards("/index/hot", "hotNeighborhoodContainer", "hot", 8, "lg"); // 핫한우리동네
 
-      // 가장 핫한 우리동네: 그리드용 넉넉한 카드
-      await renderSectionCards("/index/hot", "hotNeighborhoodContainer", "hot", 8, "lg");
-
-      // 홍보의 추천: (API 없으면 placeholder만 표시)
-      await renderSectionCards("/recommend/api", "promoRecommendationContainer", "recommend", 8, "lg");
-
-      // 가게자랑
-      await renderSectionCards("/api/storepride", "storeprideContainer", "pride", 8, "lg");
-
-      // 전통시장
-      await renderSectionCards("/api/market", "traditionalmarketContainer", "market", 8, "lg");
-
-      // 지역 공연/예술/축제
-      await renderSectionCards("/api/arts", "localartContainer", "art", 8, "lg");
+      // ===== 아래 섹션(추천/가게자랑/시장/예술)은 
+      //      "라우터 붙고 나면" 주석 해제 =====
+      // await renderSectionCards("/recommend/api", "promoRecommendationContainer", "recommend", 8, "lg");
+      // await renderSectionCards("/api/storepride", "storeprideContainer", "pride", 8, "lg");
+      // await renderSectionCards("/api/market", "traditionalmarketContainer", "market", 8, "lg");
+      // await renderSectionCards("/api/arts", "localartContainer", "art", 8, "lg");
     });
   </script>
 
