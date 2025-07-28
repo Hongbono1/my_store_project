@@ -22,6 +22,7 @@ import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
 import marketRouter from "./routes/market.js";
 import artRouter from "./routes/art.js";
+import indexRouter from "./routes/index.js";
 
 // multer 업로드 폴더
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") });
@@ -55,6 +56,8 @@ app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
 app.use("/api/market", marketRouter);
 app.use('/art', artRouter);
+app.use("/index", indexRouter);
+
 
 // ★★★ 공연/예술/버스커 리스트 분리 API (카테고리별) 추가! ★★★
 app.use("/api/events", (req, res, next) => {
