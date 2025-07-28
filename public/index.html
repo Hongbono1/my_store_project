@@ -368,96 +368,109 @@
       try {
         const response = await fetch(url);
         if (!response.ok) throw new Error("HTTP error! status: " + response.status);
-        const html = await response.text();
-        document.getElementById(containerId).innerHTML = html;
+        document.getElementById(containerId).innerHTML = await response.text();
       } catch (error) {
         console.error("Error loading " + url + ":", error);
       }
     }
 
-    // 안전 fetch
-    async function safeFetch(url) {
-      try { const r = await fetch(url); if (r.ok) return await r.json(); }
-      catch (e) { console.error(url, e); }
-      return [];
-    }
-
-    // 오픈예정 카드 UI
-    function createOpenCard(item) {
-      if (!item) return createEmptyOpenCard();
-      const card = document.createElement("div");
-      card.className = "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transition hover:-translate-y-2 hover:shadow-2xl w-72";
-      card.innerHTML = `
-      <img src="${item.thumbnail || '/assets/images/no-thumb.png'}" 
-        alt="${item.store_name || '정보 없음'}" 
-        class="h-40 w-full object-cover rounded mb-4 bg-gray-50">
-      <h2 class="text-xl font-bold text-center mb-2 truncate" title="${item.store_name || '-'}">
-        ${item.store_name || '정보 없음'}
-      </h2>
-      <div class="text-cyan-700 text-sm font-semibold text-center mb-1">
-        ${item.open_date ? '오픈 ' + formatOpenDate(item.open_date) : ''}
-      </div>
-      <div class="text-gray-700 text-center mb-1 truncate">
-        ${shortAddress(item.address)}
-      </div>
-      <div class="text-xs text-gray-500 text-center mb-1">${item.category || ""}</div>
-      <a href="/opendetail.html?id=${item.id}" 
-         class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">
-         상세보기
-      </a>
-    `;
-      return card;
-    }
-
-    // Placeholder 카드
-    function createEmptyOpenCard() {
-      const card = document.createElement("div");
-      card.className = "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 opacity-50 w-72";
-      card.innerHTML = `
-      <div class="h-40 w-full bg-gray-100 rounded mb-4 animate-pulse"></div>
-      <h2 class="text-xl font-bold text-center mb-2 text-gray-400">정보 없음</h2>
-      <div class="text-base font-semibold text-center text-gray-300">오픈예정</div>
-      <p class="text-base text-gray-300 text-center">-</p>
-      <a class="mt-4 bg-gray-300 text-white py-2 px-4 rounded text-center shadow-lg cursor-not-allowed">대기 중</a>
-    `;
-      return card;
-    }
-
-    // 오픈예정 카드 최대 8개 출력
-    function renderOpenCards(containerId, items, totalCards = 8) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = "";
-      const data = (items || []).slice(0, totalCards);
-      while (data.length < totalCards) data.push(null);
-      data.forEach(item => container.appendChild(createOpenCard(item)));
-    }
-
     // 날짜 YY. M. D 변환
-    function formatOpenDate(dateStr) {
+    function formatDate(dateStr) {
       if (!dateStr) return "-";
       const d = new Date(dateStr);
       return `${String(d.getFullYear()).slice(2)}. ${d.getMonth() + 1}. ${d.getDate()}`;
     }
-
-    // 주소 짧게
     function shortAddress(addr) {
       if (!addr) return "";
       const t = addr.trim().replace(/\s+/g, " ").split(" ");
       return t.slice(2, 5).join(" ");
     }
 
+    // 공통 카드 생성 함수 (type에 따라 상세 페이지 분기)
+    function createCard(item, type = "open") {
+      if (!item) return createEmptyCard(type);
+
+      let detailUrl = "#";
+      if (type === "open") detailUrl = `/opendetail.html?id=${item.id || item._id || ""}`;
+      else if (type === "pride") detailUrl = `/storepridedetail.html?id=${item.id || item._id || ""}`;
+      else if (type === "market") detailUrl = `/marketdetail.html?id=${item.id || item._id || ""}`;
+      else if (type === "art") detailUrl = `/artdetail.html?id=${item.id || item._id || ""}`;
+      else detailUrl = `/detail.html?id=${item.id || item._id || ""}`;
+
+      return Object.assign(document.createElement("div"), {
+        className: "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transition hover:-translate-y-2 hover:shadow-2xl w-72",
+        innerHTML: `
+        <img src="${item.thumbnail || item.img || '/assets/images/no-thumb.png'}" 
+          alt="${item.store_name || item.title || '정보 없음'}" 
+          class="h-40 w-full object-cover rounded mb-4 bg-gray-50">
+        <h2 class="text-xl font-bold text-center mb-2 truncate" title="${item.store_name || item.title || '-'}">
+          ${item.store_name || item.title || '정보 없음'}
+        </h2>
+        <div class="text-cyan-700 text-sm font-semibold text-center mb-1">
+          ${item.open_date ? '오픈 ' + formatDate(item.open_date) : (item.date ? formatDate(item.date) : '')}
+        </div>
+        <div class="text-gray-700 text-center mb-1 truncate">
+          ${shortAddress(item.address) || item.address || ""}
+        </div>
+        <div class="text-xs text-gray-500 text-center mb-1">${item.category || ""}</div>
+        <a href="${detailUrl}" 
+          class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">
+          상세보기
+        </a>
+      `
+      });
+    }
+
+    function createEmptyCard(type = "open") {
+      return Object.assign(document.createElement("div"), {
+        className: "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 opacity-50 w-72",
+        innerHTML: `
+        <div class="h-40 w-full bg-gray-100 rounded mb-4 animate-pulse"></div>
+        <h2 class="text-xl font-bold text-center mb-2 text-gray-400">정보 없음</h2>
+        <div class="text-base font-semibold text-center text-gray-300">${type === "open" ? "오픈예정" : "정보 없음"}</div>
+        <p class="text-base text-gray-300 text-center">-</p>
+        <a class="mt-4 bg-gray-300 text-white py-2 px-4 rounded text-center shadow-lg cursor-not-allowed">대기 중</a>
+      `
+      });
+    }
+
+    // 공통 카드 출력 함수
+    async function renderSectionCards(apiUrl, containerId, type = "open", total = 8) {
+      let items = [];
+      try {
+        const resp = await fetch(apiUrl);
+        if (resp.ok) items = await resp.json();
+      } catch (e) { }
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      const data = (items || []).slice(0, total);
+      while (data.length < total) data.push(null);
+      data.forEach(item => container.appendChild(createCard(item, type)));
+    }
+
     document.addEventListener("DOMContentLoaded", async () => {
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
 
-      // 오픈예정: 최신순 8개
-      const openItems = await safeFetch("/open");
-      renderOpenCards("openHotContainer", openItems, 8);
+      // 오픈예정 (이름/타입만 바꿔서 모든 섹션 복사/확장 사용)
+      await renderSectionCards("/open", "openHotContainer", "open");
 
-      // 기존 "가장 핫한 우리동네", "추천" 등 필요한 곳은 기존대로 renderAds 등 사용
-      // 예)
-      // const hotAds = await safeFetch("/index/hot");
-      // renderAds("hotNeighborhoodContainer", hotAds, 8);
+      // 가장 핫한 우리동네
+      await renderSectionCards("/index/hot", "hotNeighborhoodContainer", "hot");
+
+      // 홍보의 추천
+      await renderSectionCards("/recommend/api", "promoRecommendationContainer", "recommend");
+
+      // 가게자랑
+      await renderSectionCards("/api/storepride", "storeprideContainer", "pride");
+
+      // 전통시장
+      await renderSectionCards("/api/market", "traditionalmarketContainer", "market");
+
+      // 지역 예술/공연/축제
+      await renderSectionCards("/api/arts", "localartContainer", "art");
     });
-
   </script>
+</body>
+
+</html>
