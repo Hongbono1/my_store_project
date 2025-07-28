@@ -1,3 +1,4 @@
+// routes/art.js
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -17,4 +18,4 @@ router.post(
 router.get("/", getArtList);
 router.get("/:id", getArtById);
 
-export default router;
+export default router; // ← 반드시 존재
