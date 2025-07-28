@@ -293,13 +293,13 @@
       </div>
     </section>
 
-    <section id="hotNeighborhoodSection" class="bg-white border-2 border-gray-300 rounded-lg p-6 mt-8 shadow relative">
+    <section id="hotNeighborhoodSection" class="...">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-3xl font-bold">가장 핫한 우리 동네 (CSR)</h2>
         <a href="hottest neighborhood.html"
           class="text-blue-500 text-lg font-semibold hover:underline transition">+더보기</a>
       </div>
-      <div id="hotNeighborhoodContainer" class="grid grid-cols-4 gap-6">
+      <div id="hotNeighborhoodContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div class="col-span-4 text-center text-gray-400 py-8 text-lg">광고 없음</div>
       </div>
     </section>
@@ -363,7 +363,7 @@
 
   <!-- JS: 필요 시 동적 데이터/광고 삽입. 데이터 없을 때는 위의 안내문구 유지 -->
   <script>
-    // 헤더/푸터
+    // 헤더/푸터 동적 로딩
     async function loadComponent(url, containerId) {
       try {
         const response = await fetch(url);
@@ -374,22 +374,75 @@
         console.error("Error loading " + url + ":", error);
       }
     }
+
+    // 안전 fetch
+    async function safeFetch(url) {
+      try { const r = await fetch(url); if (r.ok) return await r.json(); }
+      catch (e) { console.error(url, e); }
+      return [];
+    }
+
+    // 광고 카드 UI 생성
+    function createAdCard(ad) {
+      if (!ad) return createEmptyAdCard();
+      const adBox = document.createElement("div");
+      adBox.className = "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 transition hover:-translate-y-2 hover:shadow-2xl";
+      adBox.innerHTML = `
+      <img src="${ad.img || '/assets/images/no-thumb.png'}" alt="${ad.business_name}" class="h-40 w-full object-cover rounded mb-4">
+      <h2 class="text-2xl font-bold text-center mb-2">${ad.business_name}</h2>
+      <div class="text-gray-500 text-sm text-center mb-1">${ad.category || ""}</div>
+      <p class="text-lg text-gray-500 text-center mb-1">${ad.phone || ""}</p>
+      <p class="text-gray-700 text-center line-clamp-2">${ad.description || ""}</p>
+      <div class="mt-2 text-xs text-gray-400 text-right">조회수 ${ad.views ?? 0}</div>
+      <a href="/detail.html?id=${ad.id}" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded text-center shadow-lg hover:bg-blue-600 transition">상세보기</a>
+    `;
+      return adBox;
+    }
+
+    // 정보 없음 카드
+    function createEmptyAdCard() {
+      const adBox = document.createElement("div");
+      adBox.className = "bg-white shadow-lg rounded-lg p-6 flex flex-col border-2 border-gray-300 opacity-50";
+      adBox.innerHTML = `
+      <div class="h-40 w-full bg-gray-100 rounded mb-4 animate-pulse"></div>
+      <h2 class="text-2xl font-bold text-center mb-2 text-gray-400">정보 없음</h2>
+      <div class="text-xl font-semibold text-center text-gray-300">카테고리</div>
+      <p class="text-lg text-gray-300 text-center">-</p>
+      <a class="mt-4 bg-gray-300 text-white py-2 px-4 rounded text-center shadow-lg cursor-not-allowed">대기 중</a>
+    `;
+      return adBox;
+    }
+
+    // 카드 최대 8개 출력
+    function renderAds(containerId, ads, totalCards = 8) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      const data = ads.slice(0, totalCards);
+      while (data.length < totalCards) data.push(null);
+      data.forEach(ad => container.appendChild(createAdCard(ad)));
+    }
+
     document.addEventListener("DOMContentLoaded", async () => {
+      // 헤더/푸터 로드
       await loadComponent("components/header.html", "header-container");
       await loadComponent("components/footer.html", "footer-container");
-      // 각 섹션의 실제 데이터가 있을 때, js로 동적으로 box 추가하면 됨
-      // (데이터 없으면 안내문구 유지)
+
+      // 가장 핫한 우리동네: 조회수 순 8개 카드 출력
+      const hotAds = await safeFetch("/index/hot");
+      renderAds("hotNeighborhoodContainer", hotAds, 8);
     });
 
+    // 카테고리 +더보기 토글
     document.addEventListener("DOMContentLoaded", function () {
       const toggleButton = document.getElementById("toggleButton");
       const hiddenCategories = document.getElementById("hiddenCategories");
 
+      if (!toggleButton || !hiddenCategories) return;
       toggleButton.addEventListener("click", function () {
         // 토글: hidden 클래스 추가/제거
         hiddenCategories.classList.toggle("hidden");
 
-        // 버튼 텍스트 변경 예시(선택)
+        // 버튼 텍스트 및 색상 변경
         if (!hiddenCategories.classList.contains("hidden")) {
           toggleButton.textContent = "접기";
           toggleButton.classList.add("bg-orange-500");
@@ -402,6 +455,7 @@
       });
     });
   </script>
+
 </body>
 
 </html>
