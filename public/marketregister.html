@@ -119,8 +119,8 @@
         const customBtn = document.getElementById('showCustomQaBtn');
         const qaSection = document.getElementById('qaSection');
         const guide = document.getElementById('qaModeGuide');
-        let qaMode = '';
-        let customQCount = 1;
+        let qaMode = "";
+        let customQuestions = [{ question: "", answer: "" }];
 
         const fixedQuestions = [
             '이 시장의 가장 오래된 가게는 어디인가요?',
@@ -133,6 +133,7 @@
             '미래에 시장에 추가되었으면 하는 시설이나 서비스가 있나요?'
         ];
 
+        // 고정질문 카드
         function makeFixedQaCards() {
             return fixedQuestions.map((q, i) => `
       <div class="border rounded-xl p-4 bg-gray-50 mb-4">
@@ -144,49 +145,72 @@
     `).join('');
         }
 
-        function makeCustomQaCards(n) {
+        // 자유질문 카드 (입력값 유지)
+        function makeCustomQaCards(list) {
             let html = '';
-            for (let i = 1; i <= n; i++) {
+            for (let i = 0; i < list.length; i++) {
                 html += `
-        <div class="border rounded-xl p-4 bg-gray-50 mb-4 relative">
-          <label class="block font-bold mb-1">자유질문 ${i}</label>
-          <input name="customq${i}_question" class="border rounded px-3 py-2 w-full mb-2" maxlength="100" placeholder="질문을 입력하세요" required>
-          <label class="block font-bold mb-1">답변</label>
-          <textarea name="customq${i}_answer" rows="2" maxlength="300" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
-          <label class="block font-bold mb-1">사진 (선택)</label>
-          <input name="customq${i}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-          ${i > 1 ? `<button type="button" onclick="removeCustomQaCard(this)" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ''}
-        </div>
-      `;
+      <div class="border rounded-xl p-4 bg-gray-50 mb-4 relative">
+        <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
+        <input
+          name="customq${i + 1}_question"
+          class="border rounded px-3 py-2 w-full mb-2"
+          maxlength="100"
+          placeholder="질문을 입력하세요"
+          required
+          value="${list[i].question.replace(/"/g, '&quot;')}"
+          oninput="handleCustomQInput(${i}, 'question', this.value)"
+        >
+        <label class="block font-bold mb-1">답변</label>
+        <textarea
+          name="customq${i + 1}_answer"
+          rows="2"
+          maxlength="300"
+          required
+          class="border rounded px-3 py-2 w-full mb-2"
+          placeholder="답변을 입력하세요"
+          oninput="handleCustomQInput(${i}, 'answer', this.value)"
+        >${list[i].answer || ''}</textarea>
+        <label class="block font-bold mb-1">사진 (선택)</label>
+        <input name="customq${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+        ${i > 0 ? `<button type="button" onclick="removeCustomQaCard(${i})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
+      </div>
+    `;
             }
-            if (n < 8) {
+            if (list.length < 8) {
                 html += `
-        <div class="flex justify-center mb-2">
-          <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
-            + 자유질문 추가
-          </button>
-        </div>
-      `;
+      <div class="flex justify-center mb-2">
+        <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
+          + 자유질문 추가
+        </button>
+      </div>
+    `;
             }
             return html;
         }
 
-        window.removeCustomQaCard = function (btn) {
-            btn.parentNode.remove();
-            customQCount--;
+        // 입력 핸들러
+        window.handleCustomQInput = function (idx, key, val) {
+            customQuestions[idx][key] = val;
+        };
+        // 개별 삭제 핸들러
+        window.removeCustomQaCard = function (idx) {
+            customQuestions.splice(idx, 1);
+            if (customQuestions.length === 0) customQuestions.push({ question: "", answer: "" });
             renderCustomQa();
         };
-
+        // 자유질문 렌더 함수
         function renderCustomQa() {
-            qaSection.innerHTML = makeCustomQaCards(customQCount);
+            qaSection.innerHTML = makeCustomQaCards(customQuestions);
             const addBtn = document.getElementById('addCustomQaBtnInner');
             if (addBtn) addBtn.onclick = () => {
-                if (customQCount >= 8) return alert('자유질문은 최대 8개까지 추가할 수 있습니다!');
-                customQCount++;
+                if (customQuestions.length >= 8) return alert('자유질문은 최대 8개까지 추가할 수 있습니다!');
+                customQuestions.push({ question: "", answer: "" });
                 renderCustomQa();
             };
         }
 
+        // 버튼 이벤트
         fixedBtn.onclick = function () {
             if (qaMode === "fixed") {
                 qaMode = "";
@@ -201,7 +225,6 @@
                 customBtn.classList.remove("ring", "ring-green-400");
             }
         }
-
         customBtn.onclick = function () {
             if (qaMode === "custom") {
                 qaMode = "";
@@ -212,76 +235,11 @@
                 qaMode = "custom";
                 if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
                 renderCustomQa();
-                guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 5개)';
+                guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 8개)';
                 customBtn.classList.add("ring", "ring-green-400");
                 fixedBtn.classList.remove("ring", "ring-blue-400");
             }
         }
-
-        document.getElementById('marketRegister').onsubmit = async function (e) {
-            e.preventDefault();
-
-            if (!qaMode) {
-                alert('고정질문/자유질문 중 하나를 선택해 주세요!');
-                return;
-            }
-
-            // qa_mode hidden 보장
-            if (!this.querySelector('input[name="qa_mode"]')) {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.name = 'qa_mode';
-                hidden.value = qaMode;
-                this.appendChild(hidden);
-            }
-
-            const fd = new FormData(this);
-
-            // ---------- qa_list 생성 ----------
-            let qa_list = [];
-            if (qaMode === 'fixed') {
-                for (let i = 1; i <= 8; i++) {
-                    qa_list.push({
-                        q: fixedQuestions[i - 1],
-                        a: (this[`q${i}_answer`]?.value || '').trim(),
-                        img: '' // 서버에서 q1_image~q8_image로 채움
-                    });
-                }
-            } else { // custom
-                const qInputs = qaSection.querySelectorAll('input[name^="customq"][name$="_question"]');
-                qInputs.forEach((qInput, idx) => {
-                    const n = idx + 1;
-                    qa_list.push({
-                        q: (this[`customq${n}_question`]?.value || '').trim(),
-                        a: (this[`customq${n}_answer`]?.value || '').trim(),
-                        img: ''
-                    });
-                });
-                // 필요 시 8개 미만이면 채워넣기(안 하면 서버에서 막힘)
-                while (qa_list.length < 8) qa_list.push({ q: "", a: "", img: "" });
-                qa_list = qa_list.slice(0, 8);
-            }
-            fd.set('qa_list', JSON.stringify(qa_list));
-
-
-            try {
-                const res = await fetch('/api/market', { method: 'POST', body: fd });
-                const data = await res.json();
-                if (data.success) {
-                    alert('등록이 완료되었습니다.');
-                    location.href = `/submarket.html?id=${data.id}`;
-
-                    location.href = `/submarket.html?id=${data.id}`;
-
-                } else {
-                    alert('등록 실패: ' + (data.error || '다시 시도해주세요.'));
-                    console.log(data);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('서버 오류로 등록에 실패했습니다.');
-            }
-        };
     </script>
 
 </body>
