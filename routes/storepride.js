@@ -1,23 +1,29 @@
+// routes/storepride.js
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { insertStorePride, getStorePrideById, getStorePrideList } from "../controllers/storeprideController.js";
+import {
+  insertStorePride,
+  getStorePrideById,
+  getStorePrideList
+} from "../controllers/storeprideController.js";
 
 const router = express.Router();
 
-// **multer storage 커스텀: 확장자 포함해서 저장**
+// multer storage: 파일명에 랜덤값+타임스탬프+확장자
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "public/uploads");
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname); // 예) .jpg, .png
-    const basename = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    const ext = path.extname(file.originalname);
+    const basename = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     cb(null, basename + ext);
   }
 });
-const upload = multer({ storage }); // ← 기존 dest:...에서 storage로 교체!
+const upload = multer({ storage });
 
+// 등록폼의 파일필드 모두 정의
 const fileFields = [
   { name: "main_img", maxCount: 1 },
   { name: "q1_image", maxCount: 1 },
@@ -35,13 +41,13 @@ const fileFields = [
   { name: "customq5_image", maxCount: 1 }
 ];
 
-// 가게자랑 등록
+// 1. 가게자랑 등록 (이미지 포함)
 router.post("/register", upload.fields(fileFields), insertStorePride);
 
-// 추천 가게 리스트 (조회수 순, 8개)
+// 2. 가게자랑 리스트 (최신순, 8개) - 메인 노출
 router.get("/list", getStorePrideList);
 
-// pride_id로 상세 조회
+// 3. pride_id로 상세 조회
 router.get("/:id", getStorePrideById);
 
 export default router;
