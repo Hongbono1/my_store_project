@@ -1,13 +1,19 @@
+// routes/recommend.js
 import express from "express";
 import pool from "../db.js";
 const router = express.Router();
 
-// 메인에서 최신 8개(여기선 2개지만, 최대 8개까지!)
-router.get("/", async (req, res) => {
+// (하위 페이지·메인 둘 다 쓰도록 동일 로직)
+async function fetchRecommendation(req, res) {
+  const pageSize = Number(req.query.pageSize) || 8;      // 기본 8
   const { rows } = await pool.query(
-    "SELECT * FROM recommendation_info ORDER BY id DESC LIMIT 8"
+    "SELECT * FROM recommendation_info ORDER BY id DESC LIMIT $1",
+    [pageSize]
   );
   res.json(rows);
-});
+}
+
+router.get("/", fetchRecommendation);      // /recommend?pageSize=8
+router.get("/api", fetchRecommendation);   // /recommend/api?pageSize=8
 
 export default router;
