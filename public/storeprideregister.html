@@ -101,44 +101,46 @@
       `).join('');
         }
 
-        // 자유질문 카드 생성 (입력값 유지)
+        // 자유질문 카드 생성 (입력값 유지 + 파일 핸들러 추가)
         function makeCustomQaCards(list) {
             let html = '';
             for (let i = 0; i < list.length; i++) {
                 html += `
-          <div class="border rounded-xl p-4 shadow bg-gray-50 mb-4 relative">
-            <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
-            <input
-              name="customq${i + 1}_question"
-              class="border rounded px-3 py-2 w-full mb-2"
-              maxlength="50"
-              placeholder="질문을 입력하세요"
-              required
-              value="${list[i].question.replace(/"/g, '&quot;')}"
-              oninput="handleCustomQInput(${i}, 'question', this.value)"
-            >
-            <label class="block font-bold mb-1">답변</label>
-            <textarea
-              name="customq${i + 1}_answer"
-              rows="2"
-              maxlength="200"
-              required
-              class="border rounded px-3 py-2 w-full mb-2"
-              placeholder="답변을 입력하세요"
-              oninput="handleCustomQInput(${i}, 'answer', this.value)"
-            >${list[i].answer || ''}</textarea>
-            <label class="block font-bold mb-1">사진 (선택)</label>
-            <input name="customq${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-            ${i > 0 ? `<button type="button" onclick="removeCustomQaCard(${i})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
-          </div>
-        `;
+      <div class="border rounded-xl p-4 shadow bg-gray-50 mb-4 relative">
+        <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
+        <input
+          name="customq${i + 1}_question"
+          class="border rounded px-3 py-2 w-full mb-2"
+          maxlength="50"
+          placeholder="질문을 입력하세요"
+          required
+          value="${list[i].question.replace(/"/g, '&quot;')}"
+          oninput="handleCustomQInput(${i}, 'question', this.value)"
+        >
+        <label class="block font-bold mb-1">답변</label>
+        <textarea
+          name="customq${i + 1}_answer"
+          rows="2"
+          maxlength="200"
+          required
+          class="border rounded px-3 py-2 w-full mb-2"
+          placeholder="답변을 입력하세요"
+          oninput="handleCustomQInput(${i}, 'answer', this.value)"
+        >${list[i].answer || ''}</textarea>
+        <label class="block font-bold mb-1">사진 (선택)</label>
+        <input name="customq${i + 1}_image" type="file" accept="image/*"
+          class="border rounded px-3 py-2 w-full"
+          onchange="handleCustomQFile(${i}, this.files[0])">
+        ${i > 0 ? `<button type="button" onclick="removeCustomQaCard(${i})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
+      </div>
+    `;
             }
             if (list.length < 5) {
                 html += `
-          <div class="flex justify-center mb-2">
-            <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">+ 자유질문 추가</button>
-          </div>
-        `;
+      <div class="flex justify-center mb-2">
+        <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">+ 자유질문 추가</button>
+      </div>
+    `;
             }
             return html;
         }
@@ -146,6 +148,10 @@
         // 입력 핸들러 - 전역에 등록
         window.handleCustomQInput = function (idx, key, val) {
             customQuestions[idx][key] = val;
+        };
+        // 파일 핸들러(동적으로 선택된 파일 객체를 배열에 저장)
+        window.handleCustomQFile = function (idx, file) {
+            customQuestions[idx].file = file;
         };
 
         // 개별 삭제 핸들러
@@ -168,46 +174,7 @@
             }
         }
 
-        // 버튼 토글 로직
-        fixedBtn.onclick = function () {
-            if (qaMode === "fixed") {
-                qaMode = "";
-                qaSection.innerHTML = "";
-                guide.textContent = "질문 유형을 선택해주세요.";
-                fixedBtn.classList.remove("ring", "ring-blue-400");
-            } else {
-                qaMode = "fixed";
-                qaSection.innerHTML = makeFixedQaCards();
-                guide.textContent = '고정질문 8개에 답변을 입력해주세요.';
-                fixedBtn.classList.add("ring", "ring-blue-400");
-                customBtn.classList.remove("ring", "ring-green-400");
-            }
-        }
-        customBtn.onclick = function () {
-            if (qaMode === "custom") {
-                qaMode = "";
-                qaSection.innerHTML = "";
-                guide.textContent = "질문 유형을 선택해주세요.";
-                customBtn.classList.remove("ring", "ring-green-400");
-            } else {
-                qaMode = "custom";
-                if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
-                renderCustomQa();
-                guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 5개)';
-                customBtn.classList.add("ring", "ring-green-400");
-                fixedBtn.classList.remove("ring", "ring-blue-400");
-            }
-        }
-
-        // 파일 여러장 방지
-        document.addEventListener('change', e => {
-            if (e.target && e.target.type === 'file' && e.target.files.length > 1) {
-                alert('사진은 한 장만 업로드 가능합니다.');
-                e.target.value = '';
-            }
-        });
-
-        // 폼 제출 시 유형 미선택 방지 & 서버 전송
+        // 폼 제출 시 유형 미선택 방지 & 서버 전송 (동적으로 file 직접 추가!)
         document.getElementById('storePrideRegister').onsubmit = async function (e) {
             if (!qaMode) {
                 alert("고정질문/자유질문 중 하나를 선택해 주세요!");
@@ -224,6 +191,16 @@
             // 제출
             e.preventDefault();
             const formData = new FormData(this);
+
+            // (★) 자유질문인 경우 file도 직접 넣어준다!
+            if (qaMode === "custom") {
+                customQuestions.forEach((q, i) => {
+                    if (q.file) {
+                        formData.set(`customq${i + 1}_image`, q.file);
+                    }
+                });
+            }
+
             try {
                 const res = await fetch('/api/storepride/register', {
                     method: 'POST',
