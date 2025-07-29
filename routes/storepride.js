@@ -50,6 +50,8 @@ router.get("/list", getStorePrideList);
 // **아래 추가** GET /storepride/api?pageSize=8 로도 받을 수 있게
 router.get("/api", getStorePrideList);
 
+router.get("/",    getStorePrideList);   // storepride.html 에서 쓰는 루트 호출 대응
+
 // 3. pride_id로 상세 조회
 router.get("/:id", getStorePrideById);
 
