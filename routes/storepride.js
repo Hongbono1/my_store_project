@@ -47,6 +47,9 @@ router.post("/register", upload.fields(fileFields), insertStorePride);
 // 2. 가게자랑 리스트 (최신순, 8개) - 메인 노출
 router.get("/list", getStorePrideList);
 
+// **아래 추가** GET /storepride/api?pageSize=8 로도 받을 수 있게
+router.get("/api", getStorePrideList);
+
 // 3. pride_id로 상세 조회
 router.get("/:id", getStorePrideById);
 
