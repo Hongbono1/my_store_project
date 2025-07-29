@@ -12,17 +12,18 @@ import path from "path";
 import multer from "multer";
 
 // 라우터 import
-import hotRouter        from "./routes/hot.js";
+import hotRouter from "./routes/hot.js";
 import restaurantRouter from "./routes/restaurant.js";
-import storeRouter      from "./routes/store.js";
-import categoryRouter   from "./routes/category.js";
+import storeRouter from "./routes/store.js";
+import categoryRouter from "./routes/category.js";
 import subcategoryRouter from "./routes/subcategory.js";
-import openRouter       from "./routes/open.js";
+import openRouter from "./routes/open.js";
 import storeprideRouter from "./routes/storepride.js";
-import marketRouter     from "./routes/market.js";
-import artRouter        from "./routes/art.js";
-import indexRouter      from "./routes/index.js";
-import recommendRouter  from "./routes/recommend.js";
+import marketRouter from "./routes/market.js";
+import artRouter from "./routes/art.js";
+import indexRouter from "./routes/index.js";
+import recommendRouter from "./routes/recommend.js";
+import miscRouter from "./routes/misc.js";
 
 
 // multer 업로드 폴더
@@ -37,8 +38,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ── 정적 파일 서빙 ─────────────────── */
+// static 미들웨어는 반드시 라우터 등록보다 위에!
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 app.use(express.static(path.join(process.cwd(), "public")));
+
 
 /* HTML charset=UTF-8 강제 */
 app.use((req, res, next) => {
