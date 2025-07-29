@@ -12,18 +12,18 @@ import path from "path";
 import multer from "multer";
 
 // 라우터 import
-import hotRouter from "./routes/hot.js";
-import storeRouter from "./routes/store.js";
-import miscRouter from "./routes/misc.js";
-import categoryRouter from "./routes/category.js";
-import subcategoryRouter from "./routes/subcategory.js";
+import hotRouter        from "./routes/hot.js";
 import restaurantRouter from "./routes/restaurant.js";
-import openRouter from "./routes/open.js";
-import storeprideRouter  from "./routes/storepride.js";
-import marketRouter      from "./routes/market.js";
-import artRouter         from "./routes/art.js";
-import indexRouter       from "./routes/index.js";
-import recommendRouter   from "./routes/recommend.js";
+import storeRouter      from "./routes/store.js";
+import categoryRouter   from "./routes/category.js";
+import subcategoryRouter from "./routes/subcategory.js";
+import openRouter       from "./routes/open.js";
+import storeprideRouter from "./routes/storepride.js";
+import marketRouter     from "./routes/market.js";
+import artRouter        from "./routes/art.js";
+import indexRouter      from "./routes/index.js";
+import recommendRouter  from "./routes/recommend.js";
+
 
 // multer 업로드 폴더
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") });
