@@ -56,7 +56,7 @@ app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
-app.use("/storepride",       storeprideRouter);
+app.use("/storepride", storeprideRouter);
 app.use("/market",     marketRouter);
 app.use('/art', artRouter);
 app.use("/index", indexRouter);
