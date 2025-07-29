@@ -8,11 +8,10 @@ router.get("/", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM recommendation_info ORDER BY id DESC LIMIT 10");
   res.json(rows);
 });
-
-// /recommend/api (ex. 하위 페이지에서 사용)
 router.get("/api", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM recommendation_info ORDER BY id DESC LIMIT 10");
   res.json(rows);
 });
+
 
 export default router;
