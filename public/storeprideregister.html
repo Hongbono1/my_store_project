@@ -85,7 +85,7 @@
         const fixedBtn = document.getElementById('showFixedQaBtn');
         const customBtn = document.getElementById('showCustomQaBtn');
         let qaMode = ""; // "fixed" or "custom" or ""
-        let customQCount = 1;
+        let customQuestions = [{ question: "", answer: "" }]; // 상태 저장용
 
         // 고정 질문 카드 생성
         function makeFixedQaCards() {
@@ -100,23 +100,40 @@
         </div>
       `).join('');
         }
-        // 자유 질문 카드 생성
-        function makeCustomQaCards(n) {
+
+        // 자유질문 카드 생성 (입력값 유지)
+        function makeCustomQaCards(list) {
             let html = '';
-            for (let i = 1; i <= n; i++) {
+            for (let i = 0; i < list.length; i++) {
                 html += `
           <div class="border rounded-xl p-4 shadow bg-gray-50 mb-4 relative">
-            <label class="block font-bold mb-1">자유질문 ${i}</label>
-            <input name="customq${i}_question" class="border rounded px-3 py-2 w-full mb-2" maxlength="50" placeholder="질문을 입력하세요" required>
+            <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
+            <input
+              name="customq${i + 1}_question"
+              class="border rounded px-3 py-2 w-full mb-2"
+              maxlength="50"
+              placeholder="질문을 입력하세요"
+              required
+              value="${list[i].question.replace(/"/g, '&quot;')}"
+              oninput="handleCustomQInput(${i}, 'question', this.value)"
+            >
             <label class="block font-bold mb-1">답변</label>
-            <textarea name="customq${i}_answer" rows="2" maxlength="200" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
+            <textarea
+              name="customq${i + 1}_answer"
+              rows="2"
+              maxlength="200"
+              required
+              class="border rounded px-3 py-2 w-full mb-2"
+              placeholder="답변을 입력하세요"
+              oninput="handleCustomQInput(${i}, 'answer', this.value)"
+            >${list[i].answer || ''}</textarea>
             <label class="block font-bold mb-1">사진 (선택)</label>
-            <input name="customq${i}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-            ${i > 1 ? `<button type="button" onclick="removeCustomQaCard(this)" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
+            <input name="customq${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+            ${i > 0 ? `<button type="button" onclick="removeCustomQaCard(${i})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
           </div>
         `;
             }
-            if (n < 5) {
+            if (list.length < 5) {
                 html += `
           <div class="flex justify-center mb-2">
             <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">+ 자유질문 추가</button>
@@ -125,20 +142,27 @@
             }
             return html;
         }
-        // 자유질문 카드 개별 삭제
-        window.removeCustomQaCard = function (btn) {
-            btn.parentNode.remove();
-            customQCount--;
+
+        // 입력 핸들러 - 전역에 등록
+        window.handleCustomQInput = function (idx, key, val) {
+            customQuestions[idx][key] = val;
+        };
+
+        // 개별 삭제 핸들러
+        window.removeCustomQaCard = function (idx) {
+            customQuestions.splice(idx, 1);
+            if (customQuestions.length === 0) customQuestions.push({ question: "", answer: "" });
             renderCustomQa();
-        }
+        };
+
         // 자유질문 렌더 함수
         function renderCustomQa() {
-            qaSection.innerHTML = makeCustomQaCards(customQCount);
+            qaSection.innerHTML = makeCustomQaCards(customQuestions);
             const addBtn = document.getElementById('addCustomQaBtnInner');
             if (addBtn) {
                 addBtn.onclick = function () {
-                    if (customQCount >= 5) return alert('자유질문은 최대 5개까지 추가할 수 있습니다!');
-                    customQCount++;
+                    if (customQuestions.length >= 5) return alert('자유질문은 최대 5개까지 추가할 수 있습니다!');
+                    customQuestions.push({ question: "", answer: "" });
                     renderCustomQa();
                 }
             }
@@ -167,7 +191,7 @@
                 customBtn.classList.remove("ring", "ring-green-400");
             } else {
                 qaMode = "custom";
-                customQCount = 1;
+                if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
                 renderCustomQa();
                 guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 5개)';
                 customBtn.classList.add("ring", "ring-green-400");
@@ -182,6 +206,7 @@
                 e.target.value = '';
             }
         });
+
         // 폼 제출 시 유형 미선택 방지 & 서버 전송
         document.getElementById('storePrideRegister').onsubmit = async function (e) {
             if (!qaMode) {
@@ -207,7 +232,7 @@
                 const data = await res.json();
                 if (data.success) {
                     alert('등록 완료! 곧 메인으로 이동합니다.');
-                  location.href = `/substorepride.html?id=${data.pride_id}`;
+                    location.href = `/substorepride.html?id=${data.pride_id}`;
                 } else {
                     alert('등록 실패: ' + (data.error || '다시 시도해주세요.'));
                 }
