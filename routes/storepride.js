@@ -1,8 +1,22 @@
 import express from "express";
 import multer from "multer";
+import path from "path";
 import { insertStorePride, getStorePrideById, getStorePrideList } from "../controllers/storeprideController.js";
+
 const router = express.Router();
-const upload = multer({ dest: "public/uploads" });
+
+// **multer storage 커스텀: 확장자 포함해서 저장**
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "public/uploads");
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname); // 예) .jpg, .png
+    const basename = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    cb(null, basename + ext);
+  }
+});
+const upload = multer({ storage }); // ← 기존 dest:...에서 storage로 교체!
 
 const fileFields = [
   { name: "main_img", maxCount: 1 },
