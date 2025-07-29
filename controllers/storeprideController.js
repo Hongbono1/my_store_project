@@ -1,29 +1,24 @@
 // controllers/storeprideController.js
+// ★ 우리가게 자랑(스토어프라이드) 전용 컨트롤러 ★
+// 메인/인덱스 컨트롤러(indexController)와 완전히 별도!
+
 import { pool } from "../db/pool.js";
 
-// 가게 자랑 등록 (insert)
+// 가게 자랑 등록
 export async function insertStorePride(req, res) {
     try {
-        // 대표사진(main_img)
         let main_image = null;
         if (req.files && req.files["main_img"] && req.files["main_img"][0]) {
             main_image = "/uploads/" + req.files["main_img"][0].filename;
         }
 
-        // 기본 데이터
         const {
-            store_name,
-            address,
-            category,
-            phone,
-            qa_mode,      // "fixed" or "custom"
-            free_pr
+            store_name, address, category, phone, qa_mode, free_pr
         } = req.body;
 
-        // QnA 데이터 조립
+        // QnA 리스트 구성
         let qna_list = [];
         if (qa_mode === "fixed") {
-            // 고정질문 8개
             for (let i = 1; i <= 8; i++) {
                 const question = req.body[`q${i}_question`] || "";
                 const answer = req.body[`q${i}_answer`] || "";
@@ -34,7 +29,6 @@ export async function insertStorePride(req, res) {
                 qna_list.push({ question, answer, image });
             }
         } else if (qa_mode === "custom") {
-            // 자유질문 최대 5개
             for (let i = 1; i <= 5; i++) {
                 if (!req.body[`customq${i}_question`] && !req.body[`customq${i}_answer`]) continue;
                 const question = req.body[`customq${i}_question`] || "";
@@ -49,12 +43,12 @@ export async function insertStorePride(req, res) {
 
         // DB 저장
         const sql = `
-      INSERT INTO store_pride
-        (store_name, address, category, phone, main_image, qna_list, owner_pr)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING pride_id
-    `;
+          INSERT INTO store_pride
+            (store_name, address, category, phone, main_image, qna_list, owner_pr)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING pride_id
+        `;
         const params = [
             store_name || null,
             address || null,
@@ -65,7 +59,6 @@ export async function insertStorePride(req, res) {
             free_pr || null
         ];
         const result = await pool.query(sql, params);
-        console.log('[store_pride INSERT] pride_id =', result.rows[0].pride_id);
 
         res.json({ success: true, pride_id: result.rows[0].pride_id });
     } catch (err) {
@@ -74,7 +67,7 @@ export async function insertStorePride(req, res) {
     }
 }
 
-// pride_id로 상세조회
+// pride_id로 상세 조회
 export async function getStorePrideById(req, res) {
     try {
         const id = Number(req.params.id);
@@ -104,21 +97,21 @@ export async function getStorePrideById(req, res) {
 export async function getStorePrideList(req, res) {
     try {
         const result = await pool.query(`
-      SELECT
-        pride_id,
-        store_name,
-        category,
-        address,
-        phone,
-        main_image,
-        owner_pr,
-        qna_list,
-        COALESCE(view_count, 0) AS views, -- 만약 조회수 컬럼 사용시
-        created_at
-      FROM store_pride
-      ORDER BY created_at DESC
-      LIMIT 50
-    `);
+            SELECT
+              pride_id,
+              store_name,
+              category,
+              address,
+              phone,
+              main_image,
+              owner_pr,
+              qna_list,
+              COALESCE(view_count, 0) AS views,
+              created_at
+            FROM store_pride
+            ORDER BY created_at DESC
+            LIMIT 50
+        `);
 
         const data = result.rows.map(row => ({
             ...row,
