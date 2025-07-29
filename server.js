@@ -56,12 +56,12 @@ app.use("/store", storeRouter);
 app.use("/category", categoryRouter);
 app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
-app.use("/", miscRouter);
 app.use("/api/storepride", storeprideRouter);
 app.use("/api/market", marketRouter);
 app.use('/art', artRouter);
 app.use("/index", indexRouter);
 app.use("/recommend", recommendRouter);
+app.use("/", miscRouter);
 
 // ★★★ 공연/예술/버스커 리스트 분리 API (카테고리별) 추가! ★★★
 app.use("/api/events", (req, res, next) => {
