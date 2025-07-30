@@ -115,13 +115,73 @@
     </div>
 
     <script>
+        /* 1. 전역 상태 (자유질문 배열/모드) */
+        let customQuestions = []; // append/remove로 직접 관리
+
+        function renderCustomQa() {
+            const qaSection = document.getElementById('qaSection');
+            qaSection.innerHTML = '';
+
+            customQuestions.forEach((qObj, idx) => {
+                const div = document.createElement('div');
+                div.className = 'border rounded-xl p-4 bg-gray-50 mb-4 relative';
+                div.innerHTML = `
+            <label class="block font-bold mb-1">자유질문 ${idx + 1}</label>
+            <input name="customq${idx + 1}_question"
+                   class="border rounded px-3 py-2 w-full mb-2"
+                   maxlength="100"
+                   placeholder="질문을 입력하세요"
+                   required
+                   value="${qObj.question ? qObj.question.replace(/"/g, '&quot;') : ''}">
+            <label class="block font-bold mb-1">답변</label>
+            <textarea name="customq${idx + 1}_answer"
+                      rows="2"
+                      maxlength="300"
+                      required
+                      class="border rounded px-3 py-2 w-full mb-2"
+                      placeholder="답변을 입력하세요">${qObj.answer || ''}</textarea>
+            <label class="block font-bold mb-1">사진 (선택)</label>
+            <input name="customq${idx + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+            ${idx > 0 ? `<button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold remove-custom" data-idx="${idx}">×</button>` : ""}
+        `;
+                qaSection.appendChild(div);
+
+                // 값 변경시 배열 반영
+                div.querySelector(`[name="customq${idx + 1}_question"]`).oninput = e => customQuestions[idx].question = e.target.value;
+                div.querySelector(`[name="customq${idx + 1}_answer"]`).oninput = e => customQuestions[idx].answer = e.target.value;
+
+                // 삭제 버튼
+                if (idx > 0) {
+                    div.querySelector('.remove-custom').onclick = () => {
+                        customQuestions.splice(idx, 1);
+                        renderCustomQa();
+                    }
+                }
+            });
+
+            // 추가 버튼
+            if (customQuestions.length < 8) {
+                const btnDiv = document.createElement('div');
+                btnDiv.className = 'flex justify-center mb-2';
+                btnDiv.innerHTML = `<button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
+          + 자유질문 추가
+        </button>`;
+                qaSection.appendChild(btnDiv);
+                btnDiv.querySelector('#addCustomQaBtnInner').onclick = () => {
+                    if (customQuestions.length >= 8) return alert('자유질문은 최대 8개!');
+                    customQuestions.push({ question: "", answer: "" });
+                    renderCustomQa();
+                };
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             const fixedBtn = document.getElementById('showFixedQaBtn');
             const customBtn = document.getElementById('showCustomQaBtn');
             const qaSection = document.getElementById('qaSection');
             const guide = document.getElementById('qaModeGuide');
             let qaMode = "";
-            let customQuestions = [{ question: "", answer: "" }];
+
             const fixedQuestions = [
                 '이 시장의 가장 오래된 가게는 어디인가요?',
                 '특별히 추천하는 대표 먹거리나 특산물은?',
@@ -132,91 +192,16 @@
                 '계절마다 달라지는 시장의 매력은 무엇인가요?',
                 '미래에 시장에 추가되었으면 하는 시설이나 서비스가 있나요?'
             ];
-
             function makeFixedQaCards() {
                 return fixedQuestions.map((q, i) => `
-      <div class="border rounded-xl p-4 bg-gray-50 mb-4">
-        <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
-        <textarea name="q${i + 1}_answer" rows="2" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
-        <label class="block font-bold mb-1">사진 (선택)</label>
-        <input name="q${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-      </div>
-    `).join('');
+          <div class="border rounded-xl p-4 bg-gray-50 mb-4">
+            <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
+            <textarea name="q${i + 1}_answer" rows="2" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
+            <label class="block font-bold mb-1">사진 (선택)</label>
+            <input name="q${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+          </div>
+        `).join('');
             }
-
-            function makeCustomQaCards(list) {
-                let html = '';
-                for (let i = 0; i < list.length; i++) {
-                    html += `
-      <div class="border rounded-xl p-4 bg-gray-50 mb-4 relative">
-        <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
-        <input
-          name="customq${i + 1}_question"
-          class="border rounded px-3 py-2 w-full mb-2"
-          maxlength="100"
-          placeholder="질문을 입력하세요"
-          required
-          value="${list[i].question.replace(/"/g, '&quot;')}"
-        >
-        <label class="block font-bold mb-1">답변</label>
-        <textarea
-          name="customq${i + 1}_answer"
-          rows="2"
-          maxlength="300"
-          required
-          class="border rounded px-3 py-2 w-full mb-2"
-          placeholder="답변을 입력하세요"
-        >${list[i].answer || ''}</textarea>
-        <label class="block font-bold mb-1">사진 (선택)</label>
-        <input name="customq${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-        ${i > 0 ? `<button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold remove-custom" data-idx="${i}">×</button>` : ""}
-      </div>
-    `;
-                }
-                if (list.length < 8) {
-                    html += `
-      <div class="flex justify-center mb-2">
-        <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
-          + 자유질문 추가
-        </button>
-      </div>
-    `;
-                }
-                return html;
-            }
-
-            // 전역 함수 대신 내부 함수
-            // 질문 추가(append만) 예시
-            function addCustomQa() {
-                const idx = customQuestions.length;
-                if (idx >= 8) return alert('최대 8개!');
-                // 배열에 새 질문 추가
-                customQuestions.push({ question: "", answer: "" });
-
-                // DOM 생성
-                const div = document.createElement('div');
-                div.className = 'border rounded-xl p-4 bg-gray-50 mb-4 relative';
-                div.innerHTML = `
-        <label class="block font-bold mb-1">자유질문 ${idx + 1}</label>
-        <input name="customq${idx + 1}_question" class="border rounded px-3 py-2 w-full mb-2" maxlength="100" placeholder="질문을 입력하세요" required>
-        <label class="block font-bold mb-1">답변</label>
-        <textarea name="customq${idx + 1}_answer" rows="2" maxlength="300" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
-        <label class="block font-bold mb-1">사진 (선택)</label>
-        <input name="customq${idx + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-        ${idx > 0 ? `<button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold remove-custom" data-idx="${idx}">×</button>` : ""}
-    `;
-                // 추가
-                qaSection.appendChild(div);
-
-                // remove 버튼
-                div.querySelector('.remove-custom')?.addEventListener('click', () => {
-                    div.remove();
-                    customQuestions.splice(idx, 1);
-                });
-            }
-
-            // 초기 1개만 렌더
-            addCustomQa();
 
             // 버튼 작동
             fixedBtn.onclick = function () {
@@ -241,7 +226,7 @@
                     customBtn.classList.remove("ring", "ring-green-400");
                 } else {
                     qaMode = "custom";
-                    if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
+                    if (!customQuestions.length) customQuestions = [{ question: "", answer: "" }];
                     renderCustomQa();
                     guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 8개)';
                     customBtn.classList.add("ring", "ring-green-400");
@@ -268,12 +253,11 @@
                         qa_list.push({
                             q: document.querySelector(`[name="q${i}_answer"]`).previousElementSibling.textContent.replace(/^Q\d+\.\s*/, ""),
                             a: document.querySelector(`[name="q${i}_answer"]`).value,
-                            img: "" // 서버에서 파일명으로 자동치환
+                            img: ""
                         });
                     }
                     formData.set("qa_list", JSON.stringify(qa_list));
                 } else if (qaModeVal === "custom") {
-                    // custom Q&A는 질문/답변이 입력된 것만 모음
                     const qa_list = [];
                     for (let i = 0; i < customQuestions.length; i++) {
                         if (customQuestions[i].question && customQuestions[i].answer) {
@@ -296,7 +280,6 @@
                     const data = await res.json();
                     if (data.success && data.id) {
                         alert('등록되었습니다!');
-                        // 바로 상세페이지 이동 (id는 DB에서 반환된 실제 id)
                         location.href = `/submarket.html?id=${data.id}`;
                     } else {
                         alert('저장 실패: ' + (data.error || '서버 오류'));
