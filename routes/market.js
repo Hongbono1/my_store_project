@@ -30,8 +30,10 @@ const fileFields = [
   { name: "main_img", maxCount: 1 },
   { name: "parking_img", maxCount: 1 },
   { name: "transport_img", maxCount: 1 },
-  // Q&A 이미지 8개
+  // 고정질문 이미지 (q1_image ~ q8_image)
   ...Array.from({ length: 8 }, (_, i) => ({ name: `q${i + 1}_image`, maxCount: 1 })),
+  // 자유질문 이미지 (customq1_image ~ customq8_image)
+  ...Array.from({ length: 8 }, (_, i) => ({ name: `customq${i + 1}_image`, maxCount: 1 })),
 ];
 
 /** Multer 에러 핸들 */
