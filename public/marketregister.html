@@ -186,39 +186,41 @@
             }
 
             // 전역 함수 대신 내부 함수
-            function renderCustomQa() {
-                qaSection.innerHTML = makeCustomQaCards(customQuestions);
+            // 질문 추가(append만) 예시
+            function addCustomQa() {
+                const idx = customQuestions.length;
+                if (idx >= 8) return alert('최대 8개!');
+                // 배열에 새 질문 추가
+                customQuestions.push({ question: "", answer: "" });
 
-                // remove 버튼 (동적 이벤트 바인딩)
-                qaSection.querySelectorAll('.remove-custom').forEach(btn => {
-                    btn.onclick = () => {
-                        const idx = parseInt(btn.getAttribute("data-idx"));
-                        customQuestions.splice(idx, 1);
-                        if (customQuestions.length === 0) customQuestions.push({ question: "", answer: "" });
-                        renderCustomQa();
-                    }
-                });
+                // DOM 생성
+                const div = document.createElement('div');
+                div.className = 'border rounded-xl p-4 bg-gray-50 mb-4 relative';
+                div.innerHTML = `
+        <label class="block font-bold mb-1">자유질문 ${idx + 1}</label>
+        <input name="customq${idx + 1}_question" class="border rounded px-3 py-2 w-full mb-2" maxlength="100" placeholder="질문을 입력하세요" required>
+        <label class="block font-bold mb-1">답변</label>
+        <textarea name="customq${idx + 1}_answer" rows="2" maxlength="300" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
+        <label class="block font-bold mb-1">사진 (선택)</label>
+        <input name="customq${idx + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
+        ${idx > 0 ? `<button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold remove-custom" data-idx="${idx}">×</button>` : ""}
+    `;
+                // 추가
+                qaSection.appendChild(div);
 
-                // 추가 버튼
-                const addBtn = document.getElementById('addCustomQaBtnInner');
-                if (addBtn) addBtn.onclick = () => {
-                    if (customQuestions.length >= 8) return alert('자유질문은 최대 8개까지 추가할 수 있습니다!');
-                    customQuestions.push({ question: "", answer: "" });
-                    renderCustomQa();
-                };
-
-                // 인풋/텍스트에 값 변경시 데이터 반영
-                qaSection.querySelectorAll('[name^="customq"][name$="_question"]').forEach((input, idx) => {
-                    input.oninput = e => {
-                        customQuestions[idx].question = e.target.value;
-                    }
-                });
-                qaSection.querySelectorAll('[name^="customq"][name$="_answer"]').forEach((input, idx) => {
-                    input.oninput = e => {
-                        customQuestions[idx].answer = e.target.value;
-                    }
+                // remove 버튼
+                div.querySelector('.remove-custom')?.addEventListener('click', () => {
+                    div.remove();
+                    customQuestions.splice(idx, 1);
                 });
             }
+
+            // 초기 1개만 렌더
+            addCustomQa();
+
+            // 추가 버튼 따로
+            document.getElementById('addCustomQaBtn').onclick = addCustomQa;
+
 
             // 버튼 작동
             fixedBtn.onclick = function () {
