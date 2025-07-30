@@ -4,6 +4,7 @@ const clamp = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) :
 
 // 등록
 export async function registerArt(req, res) {
+  console.log('DEBUG req.body:', req.body);
   try {
     const {
       category, title, start_date, end_date, time, venue, address, description,
