@@ -2,6 +2,7 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
+import pool from "../db.js"; // 반드시 pool import!
 import {
   createMarket,
   getMarketById,
@@ -51,22 +52,37 @@ function multerFieldsMiddleware(req, res, next) {
   });
 }
 
-/* ─────────── Router ─────────── */
 const router = express.Router();
 
-// 디버그용 (전송된 필드 체크)
+/* ─────────── [1] 마켓 리스트 (카드 컨테이너용) ─────────── */
+// GET /market/list?pageSize=8
+router.get("/list", async (req, res) => {
+  try {
+    const pageSize = parseInt(req.query.pageSize, 10) || 8;
+    const sql = `SELECT id, market_name, main_img, address, phone FROM market_info ORDER BY id DESC LIMIT $1`;
+    const { rows } = await pool.query(sql, [pageSize]);
+    // 프론트 카드 필드(name, img) 맞춰줌
+    const mapped = rows.map(m => ({
+      ...m,
+      name: m.market_name,
+      img: m.main_img
+    }));
+    res.json(mapped);
+  } catch (err) {
+    console.error("[GET /market/list]", err);
+    res.status(500).json({ success: false, error: "DB 조회 실패" });
+  }
+});
+
+/* ─────────── 디버그: 전송된 파일 필드 체크 ─────────── */
 router.post("/_debug_files", upload.any(), (req, res) => {
   const fileNames = (req.files || []).map((f) => f.fieldname);
   res.json({ ok: true, files: fileNames, bodyKeys: Object.keys(req.body) });
 });
 
-// 등록
+/* ─────────── 등록/상세/전체 ─────────── */
 router.post("/", multerFieldsMiddleware, createMarket);
-
-// 단일 조회
 router.get("/:id", getMarketById);
-
-// 전체 조회
 router.get("/", getAllMarkets);
 
 export default router;
