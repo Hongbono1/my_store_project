@@ -32,7 +32,12 @@ export async function createMarket(req, res) {
     // qa_list(질문/답변/이미지) 처리
     let qa_list = safeJsonParse(b.qa_list, []);
     qa_list.forEach((qa, idx) => {
-      const imgField = `q${idx + 1}_image`;
+      let imgField = "";
+      if (b.qa_mode === "custom") {
+        imgField = `customq${idx + 1}_image`;
+      } else {
+        imgField = `q${idx + 1}_image`;
+      }
       qa.img = f[imgField]?.[0]?.filename || "";
     });
 
