@@ -115,74 +115,124 @@
     </div>
 
     <script>
-        /* 1. 전역 상태 (자유질문 배열/모드) */
-        let customQuestions = []; // append/remove로 직접 관리
+        /* ────────────── 전역 상태 및 헬퍼 ────────────── */
+        let customQuestions = [];       // 질문·답변만 보관(파일은 DOM 그대로)
+        const MAX_CUSTOM = 8;
 
-        function renderCustomQa() {
-            const qaSection = document.getElementById('qaSection');
-            qaSection.innerHTML = '';
+        /* 새 자유질문 박스 생성 */
+        function makeCustomBox(idx) {
+            const div = document.createElement('div');
+            div.className = 'custom-box border rounded-xl p-4 bg-gray-50 mb-4 relative';
+            div.dataset.idx = idx;        // 현재 인덱스 보관
 
-            customQuestions.forEach((qObj, idx) => {
-                const div = document.createElement('div');
-                div.className = 'border rounded-xl p-4 bg-gray-50 mb-4 relative';
-                div.innerHTML = `
-            <label class="block font-bold mb-1">자유질문 ${idx + 1}</label>
-            <input name="customq${idx + 1}_question"
-                   class="border rounded px-3 py-2 w-full mb-2"
-                   maxlength="100"
-                   placeholder="질문을 입력하세요"
-                   required
-                   value="${qObj.question ? qObj.question.replace(/"/g, '&quot;') : ''}">
-            <label class="block font-bold mb-1">답변</label>
-            <textarea name="customq${idx + 1}_answer"
-                      rows="2"
-                      maxlength="300"
-                      required
-                      class="border rounded px-3 py-2 w-full mb-2"
-                      placeholder="답변을 입력하세요">${qObj.answer || ''}</textarea>
-            <label class="block font-bold mb-1">사진 (선택)</label>
-            <input name="customq${idx + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-            ${idx > 0 ? `<button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold remove-custom" data-idx="${idx}">×</button>` : ""}
-        `;
-                qaSection.appendChild(div);
+            /* 템플릿 */
+            div.innerHTML = `
+    <label class="block font-bold mb-1">자유질문 ${idx + 1}</label>
+    <input name="customq${idx + 1}_question" class="border rounded px-3 py-2 w-full mb-2"
+           maxlength="100" required placeholder="질문을 입력하세요"
+           value="${customQuestions[idx]?.question?.replace(/"/g, '&quot;') || ''}">
+    <label class="block font-bold mb-1">답변</label>
+    <textarea name="customq${idx + 1}_answer" rows="2" maxlength="300" required
+              class="border rounded px-3 py-2 w-full mb-2"
+              placeholder="답변을 입력하세요">${customQuestions[idx]?.answer || ''}</textarea>
+    <label class="block font-bold mb-1">사진 (선택)</label>
+    <input name="customq${idx + 1}_image" type="file" accept="image/*"
+           class="border rounded px-3 py-2 w-full">
+    ${idx > 0 ? `<button type="button"
+                      class="remove-custom absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ''}
+  `;
 
-                // 값 변경시 배열 반영
-                div.querySelector(`[name="customq${idx + 1}_question"]`).oninput = e => customQuestions[idx].question = e.target.value;
-                div.querySelector(`[name="customq${idx + 1}_answer"]`).oninput = e => customQuestions[idx].answer = e.target.value;
+            /* 값 변경 시 배열 반영 */
+            div.querySelector(`[name="customq${idx + 1}_question"]`).oninput =
+                e => customQuestions[idx].question = e.target.value;
+            div.querySelector(`[name="customq${idx + 1}_answer"]`).oninput =
+                e => customQuestions[idx].answer = e.target.value;
 
-                // 삭제 버튼
-                if (idx > 0) {
-                    div.querySelector('.remove-custom').onclick = () => {
-                        customQuestions.splice(idx, 1);
-                        renderCustomQa();
-                    }
-                }
-            });
+            /* 삭제 버튼 */
+            const del = div.querySelector('.remove-custom');
+            if (del) del.onclick = () => removeCustomBox(div);
 
-            // 추가 버튼
-            if (customQuestions.length < 8) {
-                const btnDiv = document.createElement('div');
-                btnDiv.className = 'flex justify-center mb-2';
-                btnDiv.innerHTML = `<button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
-          + 자유질문 추가
-        </button>`;
-                qaSection.appendChild(btnDiv);
-                btnDiv.querySelector('#addCustomQaBtnInner').onclick = () => {
-                    if (customQuestions.length >= 8) return alert('자유질문은 최대 8개!');
-                    customQuestions.push({ question: "", answer: "" });
-                    renderCustomQa();
-                };
-            }
+            return div;
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
+        /* 삭제 후 남은 박스 이름·라벨 재정렬 */
+        function reindexCustomBoxes() {
+            const boxes = document.querySelectorAll('#qaSection .custom-box');
+            boxes.forEach((box, i) => {
+                box.dataset.idx = i;
+                box.querySelector('label').textContent = `자유질문 ${i + 1}`;
+                box.querySelector('[name$="_question"]').name = `customq${i + 1}_question`;
+                box.querySelector('[name$="_answer"]').name = `customq${i + 1}_answer`;
+                box.querySelector('[name$="_image"]').name = `customq${i + 1}_image`;
+
+                /* 첫 번째 박스에는 삭제 버튼 숨김, 나머지엔 존재하도록 */
+                const delBtn = box.querySelector('.remove-custom');
+                if (i === 0 && delBtn) delBtn.remove();
+                if (i > 0 && !delBtn) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'remove-custom absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold';
+                    btn.textContent = '×';
+                    btn.onclick = () => removeCustomBox(box);
+                    box.appendChild(btn);
+                }
+            });
+            toggleAddBtn();
+        }
+
+        /* 박스 삭제 */
+        function removeCustomBox(box) {
+            const idx = Number(box.dataset.idx);
+            customQuestions.splice(idx, 1);
+            box.remove();
+            reindexCustomBoxes();
+        }
+
+        /* '추가' 버튼 표시/숨김 */
+        function toggleAddBtn() {
+            document.getElementById('addCustomBox').style.display =
+                customQuestions.length >= MAX_CUSTOM ? 'none' : 'flex';
+        }
+
+        /* 커스텀 모드 진입 */
+        function enterCustomMode() {
+            const qaSection = document.getElementById('qaSection');
+            qaSection.innerHTML = '';            // 초기화(고정질문 제거)
+
+            if (!customQuestions.length) customQuestions.push({ question: '', answer: '' });
+
+            customQuestions.forEach((_, i) => qaSection.appendChild(makeCustomBox(i)));
+
+            /* 하단 '추가' 버튼 */
+            const addWrap = document.createElement('div');
+            addWrap.id = 'addCustomBox';
+            addWrap.className = 'flex justify-center mb-2';
+            addWrap.innerHTML = `
+    <button type="button"
+            class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow
+                   hover:bg-green-600 transition">
+      + 자유질문 추가
+    </button>`;
+            addWrap.querySelector('button').onclick = () => {
+                if (customQuestions.length >= MAX_CUSTOM) return alert('자유질문은 최대 8개!');
+                customQuestions.push({ question: '', answer: '' });
+                qaSection.insertBefore(makeCustomBox(customQuestions.length - 1), addWrap);
+                reindexCustomBoxes();
+            };
+            qaSection.appendChild(addWrap);
+            toggleAddBtn();
+        }
+
+        /* ────────────── DOMContentLoaded ────────────── */
+        document.addEventListener('DOMContentLoaded', () => {
             const fixedBtn = document.getElementById('showFixedQaBtn');
             const customBtn = document.getElementById('showCustomQaBtn');
             const qaSection = document.getElementById('qaSection');
             const guide = document.getElementById('qaModeGuide');
-            let qaMode = "";
+            let qaMode = '';
 
-            const fixedQuestions = [
+            /* 고정질문 헬퍼 */
+            const fixedQ = [
                 '이 시장의 가장 오래된 가게는 어디인가요?',
                 '특별히 추천하는 대표 먹거리나 특산물은?',
                 '이 시장을 방문할 때 꼭 경험해야 할 맛집은 어디인가요?',
@@ -192,91 +242,75 @@
                 '계절마다 달라지는 시장의 매력은 무엇인가요?',
                 '미래에 시장에 추가되었으면 하는 시설이나 서비스가 있나요?'
             ];
-            function makeFixedQaCards() {
-                return fixedQuestions.map((q, i) => `
-          <div class="border rounded-xl p-4 bg-gray-50 mb-4">
-            <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
-            <textarea name="q${i + 1}_answer" rows="2" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
-            <label class="block font-bold mb-1">사진 (선택)</label>
-            <input name="q${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
-          </div>
-        `).join('');
-            }
+            const makeFixedCards = () => fixedQ.map((q, i) => `
+    <div class="border rounded-xl p-4 bg-gray-50 mb-4">
+      <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
+      <textarea name="q${i + 1}_answer" rows="2" required
+                class="border rounded px-3 py-2 w-full mb-2"
+                placeholder="답변을 입력하세요"></textarea>
+      <label class="block font-bold mb-1">사진 (선택)</label>
+      <input name="q${i + 1}_image" type="file" accept="image/*"
+             class="border rounded px-3 py-2 w-full">
+    </div>`).join('');
 
-            // 버튼 작동
-            fixedBtn.onclick = function () {
-                if (qaMode === "fixed") {
-                    qaMode = "";
-                    qaSection.innerHTML = "";
-                    guide.textContent = "질문 유형을 선택해주세요.";
-                    fixedBtn.classList.remove("ring", "ring-blue-400");
-                } else {
-                    qaMode = "fixed";
-                    qaSection.innerHTML = makeFixedQaCards();
+            /* 버튼 토글 */
+            fixedBtn.onclick = () => {
+                if (qaMode === 'fixed') {           // 취소
+                    qaMode = ''; qaSection.innerHTML = ''; guide.textContent = '질문 유형을 선택해주세요.';
+                    fixedBtn.classList.remove('ring', 'ring-blue-400');
+                } else {                            // 고정질문 ON
+                    qaMode = 'fixed'; qaSection.innerHTML = makeFixedCards();
                     guide.textContent = '고정질문 8개에 답변을 입력해주세요.';
-                    fixedBtn.classList.add("ring", "ring-blue-400");
-                    customBtn.classList.remove("ring", "ring-green-400");
+                    fixedBtn.classList.add('ring', 'ring-blue-400');
+                    customBtn.classList.remove('ring', 'ring-green-400');
                 }
-            }
-            customBtn.onclick = function () {
-                if (qaMode === "custom") {
-                    qaMode = "";
-                    qaSection.innerHTML = "";
-                    guide.textContent = "질문 유형을 선택해주세요.";
-                    customBtn.classList.remove("ring", "ring-green-400");
-                } else {
-                    qaMode = "custom";
-                    if (!customQuestions.length) customQuestions = [{ question: "", answer: "" }];
-                    renderCustomQa();
+            };
+
+            customBtn.onclick = () => {
+                if (qaMode === 'custom') {          // 취소
+                    qaMode = ''; qaSection.innerHTML = ''; guide.textContent = '질문 유형을 선택해주세요.';
+                    customBtn.classList.remove('ring', 'ring-green-400');
+                } else {                            // 자유질문 ON
+                    qaMode = 'custom'; enterCustomMode();
                     guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 8개)';
-                    customBtn.classList.add("ring", "ring-green-400");
-                    fixedBtn.classList.remove("ring", "ring-blue-400");
+                    customBtn.classList.add('ring', 'ring-green-400');
+                    fixedBtn.classList.remove('ring', 'ring-blue-400');
                 }
-            }
+            };
 
-            // 제출
-            document.getElementById('marketRegister').addEventListener('submit', async function (e) {
+            /* ---------- 제출 ---------- */
+            document.getElementById('marketRegister').addEventListener('submit', async e => {
                 e.preventDefault();
-                const form = e.target;
-                const formData = new FormData(form);
+                const fd = new FormData(e.target);
 
-                // 질문 유형 처리
-                let qaModeVal = "";
-                if (fixedBtn.classList.contains("ring")) qaModeVal = "fixed";
-                if (customBtn.classList.contains("ring")) qaModeVal = "custom";
-                formData.set("qa_mode", qaModeVal);
+                const qaModeVal = fixedBtn.classList.contains('ring') ? 'fixed'
+                    : customBtn.classList.contains('ring') ? 'custom' : '';
+                fd.set('qa_mode', qaModeVal);
 
-                // Q&A 데이터 직렬화 (fixed/custom)
-                if (qaModeVal === "fixed") {
-                    const qa_list = [];
+                if (qaModeVal === 'fixed') {
+                    const list = [];
                     for (let i = 1; i <= 8; i++) {
-                        qa_list.push({
-                            q: document.querySelector(`[name="q${i}_answer"]`).previousElementSibling.textContent.replace(/^Q\d+\.\s*/, ""),
+                        list.push({
+                            q: document.querySelector(`[name="q${i}_answer"]`)
+                                .previousElementSibling.textContent.replace(/^Q\d+\.\s*/, ''),
                             a: document.querySelector(`[name="q${i}_answer"]`).value,
-                            img: ""
+                            img: ''
                         });
                     }
-                    formData.set("qa_list", JSON.stringify(qa_list));
-                } else if (qaModeVal === "custom") {
-                    const qa_list = [];
-                    for (let i = 0; i < customQuestions.length; i++) {
-                        if (customQuestions[i].question && customQuestions[i].answer) {
-                            qa_list.push({
-                                q: customQuestions[i].question,
-                                a: customQuestions[i].answer,
-                                img: ""
-                            });
-                        }
-                    }
-                    formData.set("qa_list", JSON.stringify(qa_list));
+                    fd.set('qa_list', JSON.stringify(list));
+                } else if (qaModeVal === 'custom') {
+                    const list = customQuestions
+                        .map((q, i) => ({
+                            q: q.question,
+                            a: q.answer,
+                            img: ''      // 파일은 FormData로 전송
+                        }))
+                        .filter(item => item.q && item.a);
+                    fd.set('qa_list', JSON.stringify(list));
                 }
 
-                // 전송!
                 try {
-                    const res = await fetch('/api/market', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    const res = await fetch('/api/market', { method: 'POST', body: fd });
                     const data = await res.json();
                     if (data.success && data.id) {
                         alert('등록되었습니다!');
