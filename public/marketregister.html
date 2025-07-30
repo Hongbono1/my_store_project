@@ -132,9 +132,10 @@
                 '계절마다 달라지는 시장의 매력은 무엇인가요?',
                 '미래에 시장에 추가되었으면 하는 시설이나 서비스가 있나요?'
             ];
-
-            function makeFixedQaCards() {
-                return fixedQuestions.map((q, i) => `
+        });
+        
+        function makeFixedQaCards() {
+            return fixedQuestions.map((q, i) => `
           <div class="border rounded-xl p-4 bg-gray-50 mb-4">
             <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
             <textarea name="q${i + 1}_answer" rows="2" required class="border rounded px-3 py-2 w-full mb-2" placeholder="답변을 입력하세요"></textarea>
@@ -142,12 +143,12 @@
             <input name="q${i + 1}_image" type="file" accept="image/*" class="border rounded px-3 py-2 w-full">
           </div>
         `).join('');
-            }
+        }
 
-            function makeCustomQaCards(list) {
-                let html = '';
-                for (let i = 0; i < list.length; i++) {
-                    html += `
+        function makeCustomQaCards(list) {
+            let html = '';
+            for (let i = 0; i < list.length; i++) {
+                html += `
           <div class="border rounded-xl p-4 bg-gray-50 mb-4 relative">
             <label class="block font-bold mb-1">자유질문 ${i + 1}</label>
             <input
@@ -174,65 +175,118 @@
             ${i > 0 ? `<button type="button" onclick="removeCustomQaCard(${i})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
           </div>
         `;
-                }
-                if (list.length < 8) {
-                    html += `
+            }
+            if (list.length < 8) {
+                html += `
           <div class="flex justify-center mb-2">
             <button type="button" id="addCustomQaBtnInner" class="bg-green-500 text-white px-4 py-1 rounded-lg font-bold shadow hover:bg-green-600 transition">
               + 자유질문 추가
             </button>
           </div>
         `;
-                }
-                return html;
             }
+            return html;
+        }
 
-            window.handleCustomQInput = function (idx, key, val) {
-                customQuestions[idx][key] = val;
-            };
-            window.removeCustomQaCard = function (idx) {
-                customQuestions.splice(idx, 1);
-                if (customQuestions.length === 0) customQuestions.push({ question: "", answer: "" });
+        window.handleCustomQInput = function (idx, key, val) {
+            customQuestions[idx][key] = val;
+        };
+        window.removeCustomQaCard = function (idx) {
+            customQuestions.splice(idx, 1);
+            if (customQuestions.length === 0) customQuestions.push({ question: "", answer: "" });
+            renderCustomQa();
+        };
+        function renderCustomQa() {
+            qaSection.innerHTML = makeCustomQaCards(customQuestions);
+            const addBtn = document.getElementById('addCustomQaBtnInner');
+            if (addBtn) addBtn.onclick = () => {
+                if (customQuestions.length >= 8) return alert('자유질문은 최대 8개까지 추가할 수 있습니다!');
+                customQuestions.push({ question: "", answer: "" });
                 renderCustomQa();
             };
-            function renderCustomQa() {
-                qaSection.innerHTML = makeCustomQaCards(customQuestions);
-                const addBtn = document.getElementById('addCustomQaBtnInner');
-                if (addBtn) addBtn.onclick = () => {
-                    if (customQuestions.length >= 8) return alert('자유질문은 최대 8개까지 추가할 수 있습니다!');
-                    customQuestions.push({ question: "", answer: "" });
-                    renderCustomQa();
-                };
+        }
+
+        fixedBtn.onclick = function () {
+            if (qaMode === "fixed") {
+                qaMode = "";
+                qaSection.innerHTML = "";
+                guide.textContent = "질문 유형을 선택해주세요.";
+                fixedBtn.classList.remove("ring", "ring-blue-400");
+            } else {
+                qaMode = "fixed";
+                qaSection.innerHTML = makeFixedQaCards();
+                guide.textContent = '고정질문 8개에 답변을 입력해주세요.';
+                fixedBtn.classList.add("ring", "ring-blue-400");
+                customBtn.classList.remove("ring", "ring-green-400");
+            }
+        }
+        customBtn.onclick = function () {
+            if (qaMode === "custom") {
+                qaMode = "";
+                qaSection.innerHTML = "";
+                guide.textContent = "질문 유형을 선택해주세요.";
+                customBtn.classList.remove("ring", "ring-green-400");
+            } else {
+                qaMode = "custom";
+                if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
+                renderCustomQa();
+                guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 8개)';
+                customBtn.classList.add("ring", "ring-green-400");
+                fixedBtn.classList.remove("ring", "ring-blue-400");
+            }
+        }
+
+        document.getElementById('marketRegister').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+
+            // 질문 유형 처리
+            let qaMode = "";
+            if (document.getElementById("showFixedQaBtn").classList.contains("ring")) qaMode = "fixed";
+            if (document.getElementById("showCustomQaBtn").classList.contains("ring")) qaMode = "custom";
+            formData.set("qa_mode", qaMode);
+
+            // Q&A 데이터 직렬화 (fixed/custom)
+            if (qaMode === "fixed") {
+                const qa_list = [];
+                for (let i = 1; i <= 8; i++) {
+                    qa_list.push({
+                        q: document.querySelector(`[name="q${i}_answer"]`).previousElementSibling.textContent.replace(/^Q\d+\.\s*/, ""),
+                        a: document.querySelector(`[name="q${i}_answer"]`).value,
+                        img: "" // 서버에서 파일명으로 자동치환
+                    });
+                }
+                formData.set("qa_list", JSON.stringify(qa_list));
+            } else if (qaMode === "custom") {
+                // custom Q&A는 질문/답변이 입력된 것만 모음
+                const qa_list = [];
+                for (let i = 1; i <= 8; i++) {
+                    const q = form.querySelector(`[name="customq${i}_question"]`);
+                    const a = form.querySelector(`[name="customq${i}_answer"]`);
+                    if (q && q.value && a && a.value) {
+                        qa_list.push({ q: q.value, a: a.value, img: "" });
+                    }
+                }
+                formData.set("qa_list", JSON.stringify(qa_list));
             }
 
-            fixedBtn.onclick = function () {
-                if (qaMode === "fixed") {
-                    qaMode = "";
-                    qaSection.innerHTML = "";
-                    guide.textContent = "질문 유형을 선택해주세요.";
-                    fixedBtn.classList.remove("ring", "ring-blue-400");
+            // 전송!
+            try {
+                const res = await fetch('/api/market', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success && data.id) {
+                    alert('등록되었습니다!');
+                    // 바로 상세페이지 이동 (id는 DB에서 반환된 실제 id)
+                    location.href = `/submarket.html?id=${data.id}`;
                 } else {
-                    qaMode = "fixed";
-                    qaSection.innerHTML = makeFixedQaCards();
-                    guide.textContent = '고정질문 8개에 답변을 입력해주세요.';
-                    fixedBtn.classList.add("ring", "ring-blue-400");
-                    customBtn.classList.remove("ring", "ring-green-400");
+                    alert('저장 실패: ' + (data.error || '서버 오류'));
                 }
-            }
-            customBtn.onclick = function () {
-                if (qaMode === "custom") {
-                    qaMode = "";
-                    qaSection.innerHTML = "";
-                    guide.textContent = "질문 유형을 선택해주세요.";
-                    customBtn.classList.remove("ring", "ring-green-400");
-                } else {
-                    qaMode = "custom";
-                    if (customQuestions.length === 0) customQuestions = [{ question: "", answer: "" }];
-                    renderCustomQa();
-                    guide.textContent = '자유롭게 질문을 만들어 답변을 입력해주세요. (최대 8개)';
-                    customBtn.classList.add("ring", "ring-green-400");
-                    fixedBtn.classList.remove("ring", "ring-blue-400");
-                }
+            } catch (err) {
+                alert('서버 연결 오류: ' + err.message);
             }
         });
     </script>
