@@ -45,7 +45,7 @@ export async function createMarket(req, res) {
     if (!b.main_products)      missing.push("main_products");
     if (!b.parking_available)  missing.push("parking_available");
     if (!b.qa_mode)            missing.push("qa_mode");
-    if (!Array.isArray(qa_list) || qa_list.length !== 8) missing.push("qa_list(8)");
+    if (!Array.isArray(qa_list) || qa_list.length !== 8) missing.push("qa_list(1이상)");
 
     if (missing.length) {
       console.log("❌ Missing fields:", missing);
