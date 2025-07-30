@@ -25,8 +25,8 @@ export async function createMarket(req, res) {
     console.log("BODY >>>", b);
     console.log("FILES >>>", Object.keys(f));
     // 기본 이미지 필드
-    const main_img      = filePath(f, "main_img");
-    const parking_img   = filePath(f, "parking_img");
+    const main_img = filePath(f, "main_img");
+    const parking_img = filePath(f, "parking_img");
     const transport_img = filePath(f, "transport_img");
 
     // qa_list(질문/답변/이미지) 처리
@@ -38,14 +38,22 @@ export async function createMarket(req, res) {
 
     // 필수값 체크
     const missing = [];
-    if (!b.market_name)        missing.push("market_name");
-    if (!b.address)            missing.push("address");
-    if (!main_img)             missing.push("main_img");
-    if (!b.opening_hours)      missing.push("opening_hours");
-    if (!b.main_products)      missing.push("main_products");
-    if (!b.parking_available)  missing.push("parking_available");
-    if (!b.qa_mode)            missing.push("qa_mode");
-    if (!Array.isArray(qa_list) || qa_list.length !== 1) missing.push("qa_list(1이상)");
+    if (!b.market_name) missing.push("market_name");
+    if (!b.address) missing.push("address");
+    if (!main_img) missing.push("main_img");
+    if (!b.opening_hours) missing.push("opening_hours");
+    if (!b.main_products) missing.push("main_products");
+    if (!b.parking_available) missing.push("parking_available");
+    if (!b.qa_mode) missing.push("qa_mode");
+
+    // 고정질문 모드: 8개 배열만 있으면 OK (답변 빈칸 허용!)
+    if (b.qa_mode === 'fixed') {
+      if (!Array.isArray(qa_list) || qa_list.length !== 8) missing.push("qa_list(8)");
+    }
+    // 자유질문 모드: 1개 이상만 있으면 OK
+    else if (b.qa_mode === 'custom') {
+      if (!Array.isArray(qa_list) || qa_list.length < 1) missing.push("qa_list(1이상)");
+    }
 
     if (missing.length) {
       console.log("❌ Missing fields:", missing);
