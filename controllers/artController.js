@@ -1,7 +1,5 @@
-// controllers/artController.js
-import { pool } from "../db/pool.js";  // ← 프로젝트에서 공통으로 쓰는 pool 경로로 통일
+import { pool } from "../db/pool.js";
 
-// (임시) 문자열 길이 초과 방지용 — 스키마 확장 전에만 사용
 const clamp = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) : s);
 
 // 등록
@@ -13,16 +11,15 @@ export async function registerArt(req, res) {
       social1, social2, social3, booking_url, phone
     } = req.body;
 
-    // 업로드 파일(브라우저 접근 편하도록 /uploads 접두어 포함 저장)
+    // 이미지 경로
     const image1 = req.files?.images?.[0]?.filename ? `/uploads/${req.files.images[0].filename}` : null;
     const image2 = req.files?.images?.[1]?.filename ? `/uploads/${req.files.images[1].filename}` : null;
     const image3 = req.files?.images?.[2]?.filename ? `/uploads/${req.files.images[2].filename}` : null;
     const pamphletFiles = (req.files?.pamphlet || []).map(f => `/uploads/${f.filename}`);
     const pamphlet = JSON.stringify(pamphletFiles);
 
-    // (임시) 일부 컬럼이 짧게 잡혀있을 수 있어 방어
-    const phoneSafe = clamp(phone, 20);   // phone이 varchar(20)인 경우 대비
-    const timeSafe = clamp(time, 50);    // 필요시 조정
+    const phoneSafe = clamp(phone, 20);
+    const timeSafe = clamp(time, 50);
 
     const result = await pool.query(
       `INSERT INTO art_info (
