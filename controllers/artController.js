@@ -70,14 +70,15 @@ export async function getArtList(req, res) {
 }
 
 /* ───────── 3. 카테고리별 리스트 ───────── */
+// controllers/artController.js (수정 부분만)
 export async function getArtListByCategory(req, res, category) {
   try {
     const result = await pool.query(
       `
       SELECT *
       FROM   art_info
-      WHERE  TRIM(LOWER(type))     = TRIM(LOWER($1))
-         OR  $1 = ANY(category)
+      WHERE  TRIM(LOWER(type)) = TRIM(LOWER($1))
+         OR  $1 = ANY(category::text[])      -- ← 캐스팅 추가
       ORDER  BY created_at DESC NULLS LAST, id DESC
       `,
       [category]
@@ -88,6 +89,7 @@ export async function getArtListByCategory(req, res, category) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
+
 
 /* ───────── 4. 상세 ───────── */
 export async function getArtById(req, res) {
