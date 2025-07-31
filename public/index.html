@@ -435,6 +435,41 @@
       return div;
     }
 
+    function artCard(item) {
+      const img = item?.image1 ? (item.image1.startsWith('/uploads/') ? item.image1 : '/uploads/' + item.image1) : '/assets/images/no-thumb.png';
+      return `
+    <div class="bg-white border shadow-lg rounded-lg p-4 text-center hover:shadow-2xl transform hover:scale-105 transition" data-id="${item?.id}">
+      <a href="subart.html?id=${item?.id}" class="block">
+        <img class="h-48 w-full object-cover rounded mb-3" src="${img}" alt="${item?.title}">
+        <h4 class="text-xl font-semibold truncate mb-1">${item?.title || '-'}</h4>
+        <p class="text-gray-500 text-sm">연락처: <span class="text-gray-700">${item?.phone || '-'}</span></p>
+      </a>
+    </div>
+  `;
+    }
+
+    async function loadLocalArtPreview() {
+      const box = document.getElementById('localartContainer');
+      box.innerHTML = '<div class="col-span-4 text-center py-10 text-gray-400">로딩중...</div>';
+      try {
+        // 공연/예술/버스커 각각 2개씩만 보여주기
+        const apis = ['/api/events', '/api/arts', '/api/buskers'];
+        const all = await Promise.all(apis.map(url => fetch(url + '?t=' + Date.now()).then(r => r.json())));
+        const items = [
+          ...(all[0]?.slice(0, 2) || []),
+          ...(all[1]?.slice(0, 2) || []),
+          ...(all[2]?.slice(0, 2) || []),
+        ];
+        if (!items.length) {
+          box.innerHTML = '<div class="col-span-4 text-center py-10 text-gray-400">등록된 정보가 없습니다.</div>';
+          return;
+        }
+        box.innerHTML = items.map(artCard).join('');
+      } catch {
+        box.innerHTML = '<div class="col-span-4 text-center py-10 text-red-400">정보를 불러올 수 없습니다.</div>';
+      }
+    }
+
     // 5) 섹션 렌더러
     async function renderSectionCards(api, containerId, type = "open", max = 8) {
       // 여기가 함수 내부 시작
@@ -481,6 +516,7 @@
 
       await renderSectionCards("/market/list?pageSize=8", "traditionalmarketContainer", "market", 8);
       await renderSectionCards("/api/arts", "localartContainer", "art", 8);
+      await loadLocalArtPreview();
     });
 
   </script>
