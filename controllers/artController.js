@@ -1,12 +1,11 @@
 // controllers/artController.js
 import { pool } from "../db/pool.js";
 
-// 긴 문자열 자르기(보호용)
+/* ───────── 유틸 ───────── */
 const clamp = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) : s);
 
-// 1. 등록
+/* ───────── 1. 등록 ───────── */
 export async function registerArt(req, res) {
-  console.log('DEBUG req.body:', req.body);
   try {
     const {
       category, title, start_date, end_date, time, venue, address, description,
@@ -14,15 +13,12 @@ export async function registerArt(req, res) {
       social1, social2, social3, booking_url, phone, type
     } = req.body;
 
-    // 이미지 경로
-    const image1 = req.files?.images?.[0]?.filename ? `/uploads/${req.files.images[0].filename}` : null;
-    const image2 = req.files?.images?.[1]?.filename ? `/uploads/${req.files.images[1].filename}` : null;
-    const image3 = req.files?.images?.[2]?.filename ? `/uploads/${req.files.images[2].filename}` : null;
-    const pamphletFiles = (req.files?.pamphlet || []).map(f => `/uploads/${f.filename}`);
-    const pamphlet = JSON.stringify(pamphletFiles);
-
-    const phoneSafe = clamp(phone, 20);
-    const timeSafe = clamp(time, 50);
+    /* 이미지 경로 */
+    const imgPath = (f) => (f ? `/uploads/${f.filename}` : null);
+    const image1 = imgPath(req.files?.images?.[0]);
+    const image2 = imgPath(req.files?.images?.[1]);
+    const image3 = imgPath(req.files?.images?.[2]);
+    const pamphlet = JSON.stringify((req.files?.pamphlet || []).map(imgPath));
 
     const result = await pool.query(
       `INSERT INTO art_info (
@@ -31,13 +27,14 @@ export async function registerArt(req, res) {
         social1, social2, social3, booking_url, phone,
         image1, image2, image3, pamphlet, type
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+        $14,$15,$16,$17,$18,
         $19,$20,$21,$22,$23
       ) RETURNING *`,
       [
-        category, title, start_date, end_date, timeSafe, venue, address, description,
+        category, title, start_date, end_date, clamp(time, 50), venue, address, description,
         price, host, age_limit, capacity, tags,
-        social1, social2, social3, booking_url, phoneSafe,
+        social1, social2, social3, booking_url, clamp(phone, 20),
         image1, image2, image3, pamphlet, type
       ]
     );
@@ -48,7 +45,7 @@ export async function registerArt(req, res) {
   }
 }
 
-// 2. 전체 리스트 + 쿼리(category/type) 필터 지원
+/* ───────── 2. 전체 리스트(옵션) ───────── */
 export async function getArtList(req, res) {
   try {
     const { category } = req.query;
@@ -57,13 +54,12 @@ export async function getArtList(req, res) {
 
     if (category) {
       sql += `
-        WHERE (category ILIKE '%"${category}%"'
-               OR TRIM(LOWER(type)) = TRIM(LOWER($1)))
+        WHERE  TRIM(LOWER(type))     = TRIM(LOWER($1))
+        OR     $1 = ANY(category)
       `;
       params = [category];
     }
     sql += " ORDER BY created_at DESC NULLS LAST, id DESC";
-    console.log("[getArtList] sql:", sql, "params:", params);
 
     const result = await pool.query(sql, params);
     res.json(result.rows);
@@ -73,15 +69,19 @@ export async function getArtList(req, res) {
   }
 }
 
-// 3. 카테고리별 리스트(performingarts.html에서 /events, /arts, /buskers)
+/* ───────── 3. 카테고리별 리스트 ───────── */
 export async function getArtListByCategory(req, res, category) {
   try {
-    const sql = `
-      SELECT * FROM art_info
-      WHERE TRIM(LOWER(category)) = TRIM(LOWER($1))
-      ORDER BY created_at DESC NULLS LAST, id DESC
-    `;
-    const result = await pool.query(sql, [category]);
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM   art_info
+      WHERE  TRIM(LOWER(type))     = TRIM(LOWER($1))
+         OR  $1 = ANY(category)
+      ORDER  BY created_at DESC NULLS LAST, id DESC
+      `,
+      [category]
+    );
     res.json(result.rows);
   } catch (err) {
     console.error("[getArtListByCategory]", err);
@@ -89,14 +89,12 @@ export async function getArtListByCategory(req, res, category) {
   }
 }
 
-// 4. 상세 조회
+/* ───────── 4. 상세 ───────── */
 export async function getArtById(req, res) {
   try {
-    const id = req.params.id;
+    const { id } = req.params;
     const result = await pool.query("SELECT * FROM art_info WHERE id = $1", [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Not found" });
-    }
+    if (!result.rowCount) return res.status(404).json({ success: false, error: "Not found" });
     res.json(result.rows[0]);
   } catch (err) {
     console.error("[getArtById]", err);
