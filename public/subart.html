@@ -15,7 +15,8 @@
     <main class="max-w-2xl mx-auto bg-white/95 p-0 sm:p-8 mt-12 mb-20 rounded-3xl shadow-2xl border border-indigo-200">
 
         <!-- 1. 제목 -->
-        <div class="bg-gradient-to-r from-indigo-200 via-sky-100 to-blue-100 py-7 rounded-t-3xl shadow text-center border-b border-indigo-100">
+        <div
+            class="bg-gradient-to-r from-indigo-200 via-sky-100 to-blue-100 py-7 rounded-t-3xl shadow text-center border-b border-indigo-100">
             <h1 id="title" class="text-4xl font-extrabold text-indigo-800 mb-1 tracking-tight drop-shadow">제목</h1>
         </div>
 
@@ -116,16 +117,22 @@
                 document.getElementById('title').textContent = data.title || '-';
 
                 // 2. 이미지
-                const imgs = [data.image1, data.image2, data.image3].filter(Boolean);
+                function getImageUrl(img) {
+                    if (!img) return "/assets/images/no-thumb.png";
+                    return img.startsWith("/uploads/") ? img : `/uploads/${img}`;
+                }
+
+                // 상세 데이터 로딩 내 이미지 영역 부분만 아래처럼 수정
+                const imgs = [data.image1, data.image2, data.image3].filter(Boolean).map(getImageUrl);
                 const mainImgEl = document.getElementById('mainImg');
-                if (imgs.length > 0) mainImgEl.src = `/uploads/${imgs[0]}`;
+                if (imgs.length > 0) mainImgEl.src = imgs[0];
                 const thumbs = document.getElementById('thumbs');
                 thumbs.innerHTML = '';
-                imgs.forEach((f, i) => {
+                imgs.forEach((src, i) => {
                     const el = document.createElement('img');
-                    el.src = `/uploads/${f}`;
+                    el.src = src;
                     el.className = "w-16 h-16 object-cover rounded border cursor-pointer";
-                    el.onclick = () => mainImgEl.src = `/uploads/${f}`;
+                    el.onclick = () => mainImgEl.src = src;
                     thumbs.appendChild(el);
                 });
 
@@ -163,26 +170,35 @@
 
         // 팜플렛 표시/다운로드
         function showPamphlet(data) {
-            const wrap = document.getElementById('pamphletWrap');
-            const content = document.getElementById('pamphletContent');
-            wrap.classList.add('hidden');
-            content.innerHTML = '';
-            if (data.pamphlet) {
-                wrap.classList.remove('hidden');
-                const ext = data.pamphlet.split('.').pop().toLowerCase();
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-                    content.innerHTML = `
-                        <img src="/uploads/${data.pamphlet}" alt="팜플렛 이미지" class="w-64 max-w-full rounded-lg border shadow mb-2">
-                        <a href="/uploads/${data.pamphlet}" download class="inline-block mt-1 px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">다운로드</a>
-                    `;
-                } else {
-                    content.innerHTML = `
-                        <a href="/uploads/${data.pamphlet}" download class="inline-block px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">팜플렛 다운로드</a>
-                        <span class="text-sm text-gray-500 mt-1 block">* 지원 파일: PDF, 이미지 등</span>
-                    `;
-                }
-            }
+    const wrap = document.getElementById('pamphletWrap');
+    const content = document.getElementById('pamphletContent');
+    wrap.classList.add('hidden');
+    content.innerHTML = '';
+    if (data.pamphlet) {
+        let files = [];
+        try {
+            files = JSON.parse(data.pamphlet);
+        } catch (e) {
+            // 혹시 JSON 아니면 단일 파일일 수도 있음
+            files = [data.pamphlet];
         }
+        if (files.length > 0) wrap.classList.remove('hidden');
+        files.forEach(file => {
+            const ext = file.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                content.innerHTML += `
+                    <img src="${getImageUrl(file)}" alt="팜플렛 이미지" class="w-64 max-w-full rounded-lg border shadow mb-2">
+                    <a href="${getImageUrl(file)}" download class="inline-block mt-1 px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">다운로드</a>
+                `;
+            } else {
+                content.innerHTML += `
+                    <a href="${getImageUrl(file)}" download class="inline-block px-4 py-2 bg-indigo-600 text-white rounded shadow font-bold hover:bg-indigo-700">팜플렛 다운로드</a>
+                    <span class="text-sm text-gray-500 mt-1 block">* 지원 파일: PDF, 이미지 등</span>
+                `;
+            }
+        });
+    }
+}
 
         // 추가 정보(카드 스타일, 줄맞춤+border)
         function renderExtraInfo(data) {
@@ -262,4 +278,5 @@
         loadArtDetail();
     </script>
 </body>
+
 </html>
