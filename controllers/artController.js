@@ -76,10 +76,10 @@ export async function getArtListByCategory(req, res, category) {
     const result = await pool.query(
       `
       SELECT *
-      FROM   art_info
-      WHERE  TRIM(LOWER(type)) = TRIM(LOWER($1))
-         OR  $1 = ANY(category::text[])      -- ← 캐스팅 추가
-      ORDER  BY created_at DESC NULLS LAST, id DESC
+      FROM art_info
+      WHERE TRIM(LOWER(category)) = TRIM(LOWER($1))
+         OR TRIM(LOWER(type))     = TRIM(LOWER($1))
+      ORDER BY created_at DESC NULLS LAST, id DESC
       `,
       [category]
     );
