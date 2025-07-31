@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>광고 관리자 - 홍보의 추천</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-r from-indigo-100 via-blue-50 to-blue-200 min-h-screen">
+    <div class="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl mt-14 mb-16 border border-indigo-200 p-8">
+
+        <h1 class="text-3xl font-extrabold text-indigo-800 mb-6 text-center">홍보의 추천 광고 관리자</h1>
+
+        <!-- 광고 등록 폼 -->
+        <form id="adRegister" enctype="multipart/form-data" class="grid grid-cols-1 gap-4 mb-10">
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">광고 제목 *</label>
+                <input name="title" required class="border rounded px-3 py-2" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">광고주명 *</label>
+                <input name="advertiser" required class="border rounded px-3 py-2" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">분야(카테고리) *</label>
+                <input name="category" required class="border rounded px-3 py-2" placeholder="예: 음식, 미용, 학원" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">유료/무료 *</label>
+                <select name="is_paid" class="border rounded px-3 py-2">
+                    <option value="true">유료</option>
+                    <option value="false">무료</option>
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">광고 이미지 *</label>
+                <input type="file" name="img" accept="image/*" class="border rounded px-3 py-2" required />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">한 줄 설명</label>
+                <input name="description" class="border rounded px-3 py-2" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">광고 클릭시 이동할 링크(URL)</label>
+                <input name="target_link" class="border rounded px-3 py-2" placeholder="https:// 또는 /detail/123" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">노출 횟수 (ex: 1000)</label>
+                <input type="number" name="exposure_limit" class="border rounded px-3 py-2" min="1" value="1000" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-semibold">노출 종료일 (선택)</label>
+                <input type="date" name="exposure_period" class="border rounded px-3 py-2" />
+            </div>
+            <button class="mt-4 bg-indigo-700 text-white font-bold rounded-xl py-3 hover:bg-indigo-800 transition"
+                type="submit">
+                광고 등록
+            </button>
+        </form>
+
+        <hr class="my-10 border-indigo-200">
+
+        <!-- 광고 리스트 -->
+        <h2 class="text-xl font-bold mb-4">등록된 광고 목록</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white text-sm text-center border border-indigo-100 rounded-xl shadow">
+                <thead class="bg-indigo-50 text-indigo-700">
+                    <tr>
+                        <th class="py-2">이미지</th>
+                        <th class="py-2">제목</th>
+                        <th class="py-2">광고주</th>
+                        <th class="py-2">분야</th>
+                        <th class="py-2">유료</th>
+                        <th class="py-2">노출(남음/총)</th>
+                        <th class="py-2">종료일</th>
+                        <th class="py-2">상태</th>
+                        <th class="py-2">관리</th>
+                    </tr>
+                </thead>
+                <tbody id="adList" class="bg-white"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 광고 등록
+        document.getElementById('adRegister').onsubmit = async function (e) {
+            e.preventDefault();
+            const form = e.target;
+            const fd = new FormData(form);
+
+            // 실제 API 주소로 교체 필요!
+            const res = await fetch('/admin/main-ads', { method: 'POST', body: fd });
+            if (res.ok) {
+                alert('광고 등록 완료!');
+                form.reset();
+                loadAdList();
+            } else {
+                alert('광고 등록 실패!');
+            }
+        }
+
+        // 광고 리스트 불러오기
+        async function loadAdList() {
+            // 실제 API 주소로 교체 필요!
+            const res = await fetch('/admin/main-ads');
+            const list = await res.json();
+            adList.innerHTML = list.map(ad => `
+        <tr class="border-t">
+          <td class="py-2"><img src="${ad.img_url}" class="w-20 h-12 object-cover rounded-xl mx-auto"></td>
+          <td>${ad.title}</td>
+          <td>${ad.advertiser}</td>
+          <td>${ad.category}</td>
+          <td>${ad.is_paid ? '유료' : '무료'}</td>
+          <td>${ad.exposure_left} / ${ad.exposure_limit}</td>
+          <td>${ad.exposure_period ? ad.exposure_period : '-'}</td>
+          <td>${ad.status === 'active' ? '노출중' : '중지'}</td>
+          <td>
+            <button onclick="editAd(${ad.ad_id})" class="text-blue-700 underline">수정</button>
+            <button onclick="deleteAd(${ad.ad_id})" class="ml-2 text-red-600 underline">삭제</button>
+          </td>
+        </tr>
+      `).join('');
+        }
+
+        // 수정/삭제 이벤트 핸들러 예시(구현 필요)
+        function editAd(ad_id) {
+            alert('수정 기능은 추후 추가');
+            // 필요 시 모달/폼 띄워서 구현
+        }
+        async function deleteAd(ad_id) {
+            if (!confirm('정말 삭제할까요?')) return;
+            // 실제 API 주소로 교체 필요!
+            const res = await fetch('/admin/main-ads/' + ad_id, { method: 'DELETE' });
+            if (res.ok) loadAdList();
+            else alert('삭제 실패!');
+        }
+
+        // 최초 로드
+        loadAdList();
+    </script>
+</body>
+
+</html>
