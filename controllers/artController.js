@@ -1,5 +1,7 @@
+// controllers/artController.js
 import { pool } from "../db/pool.js";
 
+// 긴 문자열 자르기(보호용)
 const clamp = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) : s);
 
 // 등록
@@ -9,7 +11,7 @@ export async function registerArt(req, res) {
     const {
       category, title, start_date, end_date, time, venue, address, description,
       price, host, age_limit, capacity, tags,
-      social1, social2, social3, booking_url, phone, type // ← 반드시 type도 추가!
+      social1, social2, social3, booking_url, phone, type
     } = req.body;
 
     // 이미지 경로
@@ -24,19 +26,19 @@ export async function registerArt(req, res) {
 
     const result = await pool.query(
       `INSERT INTO art_info (
-    category, title, start_date, end_date, time, venue, address, description,
-    price, host, age_limit, capacity, tags,
-    social1, social2, social3, booking_url, phone,
-    image1, image2, image3, pamphlet, type  -- ★type 마지막에 추가
-  ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-    $19,$20,$21,$22,$23   -- ★$23 = type
-  ) RETURNING *`,
-      [
         category, title, start_date, end_date, time, venue, address, description,
         price, host, age_limit, capacity, tags,
         social1, social2, social3, booking_url, phone,
-        image1, image2, image3, pamphlet, type // ★여기도 마지막에 type!
+        image1, image2, image3, pamphlet, type
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+        $19,$20,$21,$22,$23
+      ) RETURNING *`,
+      [
+        category, title, start_date, end_date, timeSafe, venue, address, description,
+        price, host, age_limit, capacity, tags,
+        social1, social2, social3, booking_url, phoneSafe,
+        image1, image2, image3, pamphlet, type
       ]
     );
     res.json({ success: true, id: result.rows[0]?.id, art: result.rows[0] });
@@ -46,17 +48,23 @@ export async function registerArt(req, res) {
   }
 }
 
-// 리스트
+// 리스트: category와 type 모두 대응!
 export async function getArtList(req, res) {
   try {
+    const { category } = req.query;
     let sql = "SELECT * FROM art_info";
     let params = [];
-    if (req.query.category) {
-      sql += " WHERE TRIM(category) = TRIM($1)";
-      params = [req.query.category];
+
+    if (category) {
+      sql += `
+        WHERE TRIM(LOWER(category)) = TRIM(LOWER($1))
+           OR TRIM(LOWER(type))     = TRIM(LOWER($1))
+      `;
+      params = [category];
     }
     sql += " ORDER BY created_at DESC NULLS LAST, id DESC";
     console.log("[getArtList] sql:", sql, "params:", params);
+
     const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (err) {
@@ -64,7 +72,6 @@ export async function getArtList(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-
 
 // 상세
 export async function getArtById(req, res) {
