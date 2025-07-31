@@ -52,10 +52,11 @@ export async function getArtList(req, res) {
     let sql = "SELECT * FROM art_info";
     let params = [];
     if (req.query.category) {
-      sql += " WHERE category = $1";
+      sql += " WHERE TRIM(category) = TRIM($1)";
       params = [req.query.category];
     }
     sql += " ORDER BY created_at DESC NULLS LAST, id DESC";
+    console.log("[getArtList] sql:", sql, "params:", params);
     const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (err) {
@@ -63,6 +64,7 @@ export async function getArtList(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
+
 
 // 상세
 export async function getArtById(req, res) {
