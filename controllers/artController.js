@@ -57,8 +57,8 @@ export async function getArtList(req, res) {
 
     if (category) {
       sql += `
-        WHERE TRIM(LOWER(category)) = TRIM(LOWER($1))
-           OR TRIM(LOWER(type))     = TRIM(LOWER($1))
+        WHERE (category ILIKE '%"${category}"%'
+               OR TRIM(LOWER(type)) = TRIM(LOWER($1)))
       `;
       params = [category];
     }
@@ -72,6 +72,7 @@ export async function getArtList(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
+
 
 // 상세
 export async function getArtById(req, res) {
