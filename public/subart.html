@@ -108,66 +108,59 @@
 
         // 상세 데이터 로딩
         async function loadArtDetail() {
-            try {
-                const res = await fetch(`/art/${artId}`);
-                if (!res.ok) throw new Error('데이터 없음');
-                const dataArr = await res.json();
-                const data = Array.isArray(dataArr) ? dataArr[0] : dataArr;
-                if (!data) throw new Error('데이터 없음');
-                console.log("불러온 데이터", data);
-
-                // 1. 제목/타입
-                document.getElementById('art-title').textContent = data.title || '-';
-
-                // 2. 이미지
-                function getImageUrl(img) {
-                    if (!img) return "/assets/images/no-thumb.png";
-                    return img.startsWith("/uploads/") ? img : `/uploads/${img}`;
-                }
-
-                // 이미지 처리 (중복된 /uploads/ 제거)
-                const imgs = [data.image1, data.image2, data.image3].filter(Boolean);
-                const mainImgEl = document.getElementById('mainImg');
-                if (imgs.length > 0) {
-                    // 만약 imgs[0]이 이미 /uploads/로 시작하면 그대로, 아니면 붙이기
-                    mainImgEl.src = imgs[0].startsWith('/uploads/') ? imgs[0] : `/uploads/${imgs[0]}`;
-                }
-                const thumbs = document.getElementById('thumbs');
-                thumbs.innerHTML = '';
-                imgs.forEach((f, i) => {
-                    const url = f.startsWith('/uploads/') ? f : `/uploads/${f}`;
-                    const el = document.createElement('img');
-                    el.src = url;
-                    el.className = "w-16 h-16 object-cover rounded border cursor-pointer";
-                    el.onclick = () => mainImgEl.src = url;
-                    thumbs.appendChild(el);
-                });
-                // 2-1. 팜플렛
-                showPamphlet(data);
-
-                // 3. 정보 박스 (상단)
-                const sd = formatShort(data.start_date);
-                const ed = formatShort(data.end_date);
-                const dateText = (sd && ed) ? `${sd} ~ ${ed}` : (sd || ed || '-');
-                document.getElementById('art-date').textContent = dateText;
-                document.getElementById('art-time').textContent = data.time || '-';
-                document.getElementById('art-venue').textContent = data.venue || '-';
-                document.getElementById('art-address').textContent = data.address || '-';
-                document.getElementById('art-description').textContent = data.description || '상세 설명이 없습니다.';
-
-                // 5. 추가 정보(카드)
-                renderExtraInfo(data);
-
-                // 6. 지도
-                if (window.kakao && window.kakao.maps && data.address) {
-                    kakao.maps.load(() => showKakaoMap(data.address));
-                } else {
-                    window.kakaoReady = () => showKakaoMap(data.address);
-                }
-
-            } catch (e) {
+            const res = await fetch(`/art/${artId}`);
+            if (!res.ok) {
                 alert('상세 정보가 없습니다.');
-                //location.href = '/';
+                return;
+            }
+            const data = await res.json();
+            console.log("불러온 데이터", data);
+
+            // 2. 이미지
+            function getImageUrl(img) {
+                if (!img) return "/assets/images/no-thumb.png";
+                return img.startsWith("/uploads/") ? img : `/uploads/${img}`;
+            }
+
+            // 이미지 처리
+            const imgs = [data.image1, data.image2, data.image3].filter(Boolean);
+            const mainImgEl = document.getElementById('mainImg');
+            if (imgs.length > 0) {
+                mainImgEl.src = getImageUrl(imgs[0]);
+            }
+            const thumbs = document.getElementById('thumbs');
+            thumbs.innerHTML = '';
+            imgs.forEach((f, i) => {
+                const url = getImageUrl(f);
+                const el = document.createElement('img');
+                el.src = url;
+                el.className = "w-16 h-16 object-cover rounded border cursor-pointer";
+                el.onclick = () => mainImgEl.src = url;
+                thumbs.appendChild(el);
+            });
+
+            // 2-1. 팜플렛
+            showPamphlet(data);
+
+            // 3. 정보 박스 (상단)
+            const sd = formatShort(data.start_date);
+            const ed = formatShort(data.end_date);
+            const dateText = (sd && ed) ? `${sd} ~ ${ed}` : (sd || ed || '-');
+            document.getElementById('art-title').textContent = data.title || '-';
+            document.getElementById('art-date').textContent = dateText;
+            document.getElementById('art-time').textContent = data.time || '-';
+            document.getElementById('art-venue').textContent = data.venue || '-';
+            document.getElementById('art-address').textContent = data.address || '-';
+            document.getElementById('art-description').textContent = data.description || '상세 설명이 없습니다.';
+
+            // 5. 추가 정보(카드)
+            renderExtraInfo(data);
+
+            // 6. 지도
+            if (window.kakao && window.kakao.maps && data.address) {
+                kakao.maps.load(() => showKakaoMap(data.address));
+            } else {
+                window.kakaoReady = () => showKakaoMap(data.address);
             }
         }
 
@@ -180,7 +173,7 @@
             if (data.pamphlet) {
                 let files = [];
                 try {
-                    files = JSON.parse(data.pamphlet);
+                    files = Array.isArray(data.pamphlet) ? data.pamphlet : JSON.parse(data.pamphlet);
                 } catch (e) {
                     files = [data.pamphlet];
                 }
@@ -203,7 +196,6 @@
             }
         }
 
-
         // 추가 정보(카드 스타일, 줄맞춤+border)
         function renderExtraInfo(data) {
             const items = [
@@ -214,13 +206,12 @@
                 { label: "연락처", value: data.phone },
                 { label: "예매", value: data.booking_url ? `<a href="${data.booking_url}" target="_blank" class="text-indigo-600 underline font-semibold">바로가기</a>` : "" },
             ];
-            // border-b 항상 적용, 상단정렬, 여러줄 줄맞춤
             const html = items.filter(i => i.value).map(i => `
-        <div class="flex items-start gap-2 border-b border-indigo-100 pb-2 min-h-[2.4rem]">
-            <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5 leading-snug">${i.label}</div>
-            <div class="flex-1 text-base text-gray-800 leading-snug break-keep">${i.value}</div>
-        </div>
-    `).join('');
+                <div class="flex items-start gap-2 border-b border-indigo-100 pb-2 min-h-[2.4rem]">
+                    <div class="w-24 shrink-0 text-sm text-gray-500 font-bold pt-0.5 leading-snug">${i.label}</div>
+                    <div class="flex-1 text-base text-gray-800 leading-snug break-keep">${i.value}</div>
+                </div>
+            `).join('');
             document.getElementById('extraInfoBox').innerHTML = html;
 
             // 태그
@@ -238,9 +229,9 @@
                 const box = document.getElementById('socialLinks');
                 box.innerHTML = socials.map(url =>
                     `<a href="${url}" target="_blank" rel="noopener" class="text-indigo-600 underline flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="inline h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5h6M10 19H4m4 0V5a2 2 0 012-2h4a2 2 0 012 2v14m4-14v14m-4 0v-4m-4 4V5" /></svg>
-            ${url}
-          </a>`
+                        <svg xmlns="http://www.w3.org/2000/svg" class="inline h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5h6M10 19H4m4 0V5a2 2 0 012-2h4a2 2 0 012 2v14m4-14v14m-4 0v-4m-4 4V5" /></svg>
+                        ${url}
+                    </a>`
                 ).join('');
                 document.getElementById('socialWrap').classList.remove('hidden');
             }
@@ -271,7 +262,7 @@
             });
         }
 
-        // Kakao SDK 동적 로드 (***API키 직접 입력***)
+        // Kakao SDK 동적 로드 (API키 직접 입력)
         (function () {
             if (window.kakao && window.kakao.maps) return;
             const script = document.createElement("script");
