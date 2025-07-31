@@ -60,7 +60,7 @@ app.use("/storepride", storeprideRouter);
 app.use("/api/storepride", storeprideRouter);
 app.use("/market",     marketRouter);
 app.use("/api/market", marketRouter);
-app.use('/art', artRouter);
+app.use("/api", artRouter);
 app.use("/index", indexRouter);
 app.use("/recommend", recommendRouter);
 app.use("/", miscRouter);

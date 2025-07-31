@@ -37,6 +37,7 @@ router.post(
 router.get("/events",  (req, res) => getArtListByCategory(req, res, "공연"));
 router.get("/arts",    (req, res) => getArtListByCategory(req, res, "예술"));
 router.get("/buskers", (req, res) => getArtListByCategory(req, res, "버스커"));
+router.get("/:id(\\d+)", getArtById);
 
 /* (선택) 전체 리스트가 필요하면 아래 주석 해제
 // import { getArtList } from "../controllers/artController.js";
