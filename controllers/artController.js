@@ -4,7 +4,7 @@ import { pool } from "../db/pool.js";
 // 긴 문자열 자르기(보호용)
 const clamp = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) : s);
 
-// 등록
+// 1. 등록
 export async function registerArt(req, res) {
   console.log('DEBUG req.body:', req.body);
   try {
@@ -48,7 +48,7 @@ export async function registerArt(req, res) {
   }
 }
 
-// 리스트: category와 type 모두 대응!
+// 2. 전체 리스트 + 쿼리(category/type) 필터 지원
 export async function getArtList(req, res) {
   try {
     const { category } = req.query;
@@ -57,7 +57,7 @@ export async function getArtList(req, res) {
 
     if (category) {
       sql += `
-        WHERE (category ILIKE '%"${category}"%'
+        WHERE (category ILIKE '%"${category}%"'
                OR TRIM(LOWER(type)) = TRIM(LOWER($1)))
       `;
       params = [category];
@@ -73,8 +73,23 @@ export async function getArtList(req, res) {
   }
 }
 
+// 3. 카테고리별 리스트(performingarts.html에서 /events, /arts, /buskers)
+export async function getArtListByCategory(req, res, category) {
+  try {
+    const sql = `
+      SELECT * FROM art_info
+      WHERE TRIM(LOWER(category)) = TRIM(LOWER($1))
+      ORDER BY created_at DESC NULLS LAST, id DESC
+    `;
+    const result = await pool.query(sql, [category]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("[getArtListByCategory]", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
 
-// 상세
+// 4. 상세 조회
 export async function getArtById(req, res) {
   try {
     const id = req.params.id;
