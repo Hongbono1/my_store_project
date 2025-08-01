@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>라이더 등록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_API_KEY&libraries=services"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl border mt-10 mb-20 p-8">
+        <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">배달 라이더 등록</h1>
+
+        <form id="riderForm" class="space-y-6">
+
+            <!-- 프로필 사진 & 이름 -->
+            <div class="flex gap-4">
+                <div class="w-1/2">
+                    <label class="font-semibold">프로필 사진 <span class="text-red-500">*</span></label>
+                    <input name="profile_image" type="file" accept="image/*" required
+                        class="mt-1 w-full border rounded px-3 py-2 h-12" />
+                </div>
+                <div class="w-1/2">
+                    <label class="font-semibold">이름 <span class="text-red-500">*</span></label>
+                    <input name="name" type="text" required class="mt-1 w-full border rounded px-3 py-2 h-12" />
+                </div>
+            </div>
+
+            <!-- 생년월일 -->
+            <div>
+                <label class="font-semibold">생년월일 <span class="text-red-500">*</span></label>
+                <input name="birth" type="date" required class="mt-1 w-full border rounded px-3 py-2" />
+            </div>
+
+            <!-- 휴대폰 인증 -->
+            <div>
+                <label class="font-semibold">휴대폰 번호 <span class="text-red-500">*</span></label>
+                <div class="flex gap-2 mt-1">
+                    <input id="phoneInput" name="phone" type="tel" required placeholder="010-1234-5678"
+                        class="flex-1 border rounded px-3 py-2" />
+                    <button type="button" id="sendCodeBtn"
+                        class="bg-blue-500 hover:bg-blue-600 text-white rounded px-4 py-2">인증번호 요청</button>
+                </div>
+                <div id="codeSection" class="hidden mt-2">
+                    <label class="font-semibold">인증번호 입력</label>
+                    <div class="flex gap-2 mt-1">
+                        <input id="codeInput" type="text" placeholder="인증번호" class="flex-1 border rounded px-3 py-2" />
+                        <button type="button" id="verifyCodeBtn"
+                            class="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2">인증하기</button>
+                    </div>
+                    <p id="codeMessage" class="mt-1 text-sm text-red-500"></p>
+                </div>
+            </div>
+
+            <!-- 거주지 주소 -->
+            <div>
+                <label class="font-semibold">거주지 주소 <span class="text-red-500">*</span></label>
+                <div class="flex gap-2 mt-1">
+                    <input id="address" name="address" type="text" readonly placeholder="주소 검색"
+                        class="flex-1 border rounded px-3 py-2" />
+                    <button type="button" onclick="searchAddress()"
+                        class="bg-gray-200 border rounded px-4 py-2">검색</button>
+                </div>
+            </div>
+
+            <!-- 배달 수단 -->
+            <div>
+                <label class="font-semibold">배달 수단 <span class="text-red-500">*</span></label>
+                <select id="vehicleSelect" name="vehicle" required class="mt-1 w-full border rounded px-3 py-2">
+                    <option value="">선택하세요</option>
+                    <option value="도보">도보</option>
+                    <option value="자전거">자전거</option>
+                    <option value="킥보드">킥보드</option>
+                    <option value="오토바이">오토바이</option>
+                    <option value="자동차">자동차</option>
+                </select>
+            </div>
+
+            <!-- 면허/보험 (조건부) -->
+            <div id="licenseSection" class="hidden space-y-4">
+                <div>
+                    <label class="font-semibold">운전면허 종류</label>
+                    <select name="license_type" class="mt-1 w-full border rounded px-3 py-2">
+                        <option value="">선택하세요</option>
+                        <option>1종 보통</option>
+                        <option>1종 대형</option>
+                        <option>2종 보통</option>
+                        <option>2종 소형</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="font-semibold">운전면허 번호</label>
+                    <input name="license_number" type="text" class="mt-1 w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                    <label class="font-semibold">면허증 이미지 업로드</label>
+                    <input name="license_image" type="file" accept="image/*"
+                        class="mt-1 w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                    <label class="font-semibold">보험증 이미지 업로드</label>
+                    <input name="insurance_image" type="file" accept="image/*"
+                        class="mt-1 w-full border rounded px-3 py-2" />
+                </div>
+            </div>
+
+            <!-- 희망 활동 지역 -->
+            <div>
+                <label class="font-semibold">희망 활동 지역 <span class="text-red-500">*</span></label>
+                <div class="grid grid-cols-2 gap-4 mt-1">
+                    <select id="regionProvince" name="region_province" required class="border rounded px-3 py-2">
+                        <option value="">도/광역시 선택</option>
+                        <!-- 17개 도/광역시 -->
+                        <option>서울특별시</option>
+                        <option>부산광역시</option>
+                        <option>대구광역시</option>
+                        <option>인천광역시</option>
+                        <option>광주광역시</option>
+                        <option>대전광역시</option>
+                        <option>울산광역시</option>
+                        <option>세종특별자치시</option>
+                        <option>경기도</option>
+                        <option>강원특별자치도</option>
+                        <option>충청북도</option>
+                        <option>충청남도</option>
+                        <option>전라북도</option>
+                        <option>전라남도</option>
+                        <option>경상북도</option>
+                        <option>경상남도</option>
+                        <option>제주특별자치도</option>
+                    </select>
+                    <select id="regionCity" name="region_city" required class="border rounded px-3 py-2">
+                        <option value="">시/군/구 선택</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 활동 가능 시간대 -->
+            <div>
+                <label class="font-semibold">활동 가능 시간대</label>
+                <input name="available_time" type="text" placeholder="예: 오전 10시 ~ 오후 6시"
+                    class="mt-1 w-full border rounded px-3 py-2" />
+            </div>
+
+            <!-- 현재 위치 -->
+            <div>
+                <label class="font-semibold">현재 위치</label>
+                <input id="locationText" type="text" readonly
+                    class="mt-1 w-full border rounded px-3 py-2 bg-gray-100" />
+                <input id="latitude" name="latitude" type="hidden" />
+                <input id="longitude" name="longitude" type="hidden" />
+                <div id="map" class="w-full h-60 mt-3 rounded-lg border"></div>
+            </div>
+
+            <!-- 약관 동의 -->
+            <div class="flex items-start">
+                <input id="agree" name="agree" type="checkbox" required class="mt-1 mr-2" />
+                <label for="agree" class="text-sm text-gray-600">[필수] 개인정보 수집 및 이용에 동의합니다.</label>
+            </div>
+
+            <!-- 제출 -->
+            <div class="text-center">
+                <button type="submit"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2 rounded-full shadow">
+                    등록하기
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // 지역 데이터 로드
+        let regionData = {};
+        fetch('regions.json')
+            .then(r => r.json())
+            .then(json => regionData = json);
+
+        // province → city 자동 연결
+        document.getElementById('regionProvince').addEventListener('change', function () {
+            const cities = regionData[this.value] || [];
+            const sel = document.getElementById('regionCity');
+            sel.innerHTML = '<option value=\"\">시/군/구 선택</option>' +
+                cities.map(c => `<option>${c}</option>`).join('');
+        });
+
+        // 배달 수단 조건부
+        document.getElementById('vehicleSelect').addEventListener('change', e => {
+            document.getElementById('licenseSection')
+                .classList.toggle('hidden', !(e.target.value === '자동차' || e.target.value === '오토바이'));
+        });
+
+        // 휴대폰 인증
+        document.getElementById('sendCodeBtn').addEventListener('click', () => {
+            /* 휴대폰 인증 요청 로직 */
+        });
+        document.getElementById('verifyCodeBtn').addEventListener('click', () => {
+            /* 인증번호 검증 로직 */
+        });
+
+        // 주소 검색
+        function searchAddress() {
+            new daum.Postcode({
+                oncomplete: data => {
+                    document.getElementById('address').value = data.address;
+                }
+            }).open();
+        }
+
+        // 현재 위치 표시
+        navigator.geolocation.getCurrentPosition(pos => {
+            const { latitude: lat, longitude: lng } = pos.coords;
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lng;
+            document.getElementById('locationText').value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            const map = new kakao.maps.Map(document.getElementById('map'), {
+                center: new kakao.maps.LatLng(lat, lng), level: 3
+            });
+            new kakao.maps.Marker({ position: map.getCenter(), map });
+        });
+
+        // 폼 제출
+        document.getElementById('riderForm').addEventListener('submit', e => {
+            e.preventDefault();
+            /* 서버 전송 로직 */
+        });
+    </script>
+</body>
+
+</html>
