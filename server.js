@@ -1,7 +1,4 @@
-
-
 console.log("=== 서버 파일 시작 ===");
-
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -26,23 +23,25 @@ import indexRouter from "./routes/index.js";
 import recommendRouter from "./routes/recommend.js";
 import miscRouter from "./routes/misc.js";
 
-
-// multer 업로드 폴더
+// 임시 업로드 라우트에서만 쓸 multer
 const upload = multer({ dest: path.join(process.cwd(), "public", "uploads/") });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* ── 공통 미들웨어 ─────────────────── */
-app.use(cors({ origin: ["https://www.hongbono1.com", "http://localhost:3000"] }));
+app.use(cors({
+  origin: [
+    "https://www.hongbono1.com",
+    "http://localhost:3000"
+  ]
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ── 정적 파일 서빙 ─────────────────── */
-// static 미들웨어는 반드시 라우터 등록보다 위에!
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 app.use(express.static(path.join(process.cwd(), "public")));
-
 
 /* HTML charset=UTF-8 강제 */
 app.use((req, res, next) => {
@@ -60,14 +59,14 @@ app.use("/subcategory", subcategoryRouter);
 app.use("/open", openRouter);
 app.use("/storepride", storeprideRouter);
 app.use("/api/storepride", storeprideRouter);
-app.use("/market",     marketRouter);
+app.use("/market", marketRouter);
 app.use("/api/market", marketRouter);
 app.use("/api", artRouter);
 app.use("/index", indexRouter);
 app.use("/recommend", recommendRouter);
 app.use("/", miscRouter);
 
-// ★★★ 공연/예술/버스커 리스트 분리 API (카테고리별) 추가! ★★★
+// 공연/예술/버스커 리스트 분리 API (카테고리별)
 app.use("/api/events", (req, res, next) => {
   req.query.category = "공연";
   next();
@@ -83,7 +82,7 @@ app.use("/api/buskers", (req, res, next) => {
   next();
 }, artRouter);
 
-// (예시: 임시 업로드 라우트)
+// 임시 업로드 테스트 라우트 (실운영 불필요시 삭제 가능)
 app.post("/storeprideregister", upload.any(), async (req, res) => {
   try {
     res.json({ success: true, message: "등록 성공!", body: req.body, files: req.files });
@@ -96,4 +95,3 @@ app.post("/storeprideregister", upload.any(), async (req, res) => {
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
 
 app.listen(PORT, () => console.log(`🚀 서버 실행 중! http://localhost:${PORT}`));
-
