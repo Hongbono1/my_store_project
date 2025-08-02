@@ -12,6 +12,7 @@ import path from "path";
 import multer from "multer";
 
 // 라우터 import
+import deliveryregisterRouter from "./routes/deliveryregister.js";
 import hotRouter from "./routes/hot.js";
 import restaurantRouter from "./routes/restaurant.js";
 import storeRouter from "./routes/store.js";
@@ -50,6 +51,7 @@ app.use((req, res, next) => {
 });
 
 /* ── 라우터 ─────────────────────────── */
+app.use("/deliveryregister", deliveryregisterRouter);
 app.use("/hot", hotRouter);
 app.use("/restaurant", restaurantRouter);
 app.use("/store", storeRouter);
