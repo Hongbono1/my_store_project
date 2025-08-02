@@ -1,790 +1,413 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>가게 상세 · 3-섹션 레이아웃</title>
-
-    <!-- Tailwind -->
-    <link rel="stylesheet" href="/assets/css/tailwind.css" />
-
-    <style>
-        /* 💎 즐겨찾기 버튼 */
-        .bookmark-container {
-            width: 40px;
-            height: 60px;
-            background: #A9D7FF;
-            border: 2px solid #000;
-            border-radius: 6px 6px 3px 3px;
-            clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: .3s;
-        }
-
-        .bookmark-star {
-            width: 22px;
-            height: 22px;
-            transition: fill .3s;
-        }
-
-        .bookmark-container .bookmark-star path {
-            fill: #fff;
-        }
-
-        /* 기본 흰색 */
-        .bookmark-container.active .bookmark-star path {
-            fill: gold;
-        }
-
-        /* 클릭 시 노란색 */
-
-        /* 클릭: 노란색 */
-    </style>
-    <!-- 다음 우편번호 API (나중에 주소 검색용) -->
-    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>가게 상세 · 3분할 레이아웃</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Kakao Maps (동적 로딩은 JS에서) -->
 </head>
-
 <body class="bg-gray-100 min-h-screen flex flex-col">
-    <!-- ── (헤더) ─────────────────────────────────────────────────────── -->
-    <div id="header-placeholder"></div>
-
-    <!-- ── 메인 ──────────────────────────────────────────────────────── -->
-    <main class="container mx-auto px-4 py-8 flex flex-col lg:flex-row min-h-screen gap-6">
-        <div class="flex flex-col lg:flex-row flex-1 min-h-0 gap-6">
-
-            <!-- ▣ 1. 왼쪽 : 이미지 슬라이더 + 지도 -->
-            <section class="flex flex-col flex-1 min-h-0 bg-white p-6 rounded shadow gap-6 overflow-y-auto">
-
-                <!-- 🔹 라벨 -->
-                <div class="mb-2">
-                    <h2 class="text-center text-2xl font-bold border-b-2 border-gray-300 pb-2 mb-4">
-                        가게 이미지
-                    </h2>
-
-                    <!-- 🔹 이미지 슬라이더 + 썸네일 -->
-                    <div class="relative">
-                        <!-- 슬라이더 높이 고정 -->
-                        <div id="sliderWrapper" class="w-full h-80 overflow-hidden relative rounded shadow">
-
-                            <!-- (1) 이미지만 들어가는 컨테이너 -->
-                            <div id="sliderImages" class="flex transition-transform duration-500 ease-in-out h-full">
-                            </div>
-
-                            <!-- (2) 버튼은 sliderImages **밖**, wrapper 안에 배치 -->
-                            <button id="prevBtn" class="absolute left-2 top-1/2 -translate-y-1/2
-                                bg-black text-white rounded-full px-3 py-1
-                                opacity-70 hover:opacity-100 z-10">‹</button>
-
-                            <button id="nextBtn" class="absolute right-2 top-1/2 -translate-y-1/2
-                                bg-black text-white rounded-full px-3 py-1
-                                opacity-70 hover:opacity-100 z-10">›</button>
-                        </div>
-
-
-                        <!-- 썸네일은 슬라이더 외부에 위치 -->
-                        <div id="thumbBox" class="flex gap-2 justify-center mt-3"></div>
-                    </div>
-
-                    <!-- 모달: 처음엔 숨김 상태 -->
-                    <div id="imageModal"
-                        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
-                        <div class="relative">
-                            <img id="modalImage" class="w-[600px] h-[400px] object-contain rounded shadow-xl" />
-                            <button id="closeModal"
-                                class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">
-                                ×
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 지도 -->
-                    <div class="bg-white p-4 rounded shadow flex flex-col gap-2 min-h-[400px] overflow-y-auto">
-                        <h2 class="text-xl font-semibold mb-1 border-b pb-2">가게 위치</h2>
-                        <p id="addressText" class="text-base text-gray-700 mb-2">
-                            📍 서울특별시 강남구 역삼동
-                        </p>
-
-                        <!-- 여기에 map 컨테이너를 넣어주세요 -->
-                        <div id="map" class="w-full h-64 rounded border"></div>
-                    </div>
-
-                    <!-- 광고 박스 2개 : 세로 배치 -->
-                    <div class="flex flex-col gap-4 mt-6 h-[420px] justify-between">
-                        <!-- 광고 #1 -->
-                        <a href="https://ad-link1.com" target="_blank"
-                            class="w-full bg-gray-200 rounded shadow overflow-hidden">
-                            <img src="/images/ad-1.jpg" alt="광고 1"
-                                class="w-full h-48 object-cover hover:scale-105 transition-transform">
-                        </a>
-
-                        <!-- 광고 #2 -->
-                        <a href="https://ad-link2.com" target="_blank"
-                            class="w-full bg-gray-200 rounded shadow overflow-hidden">
-                            <img src="/images/ad-2.jpg" alt="광고 2"
-                                class="w-full h-48 object-cover hover:scale-105 transition-transform">
-                        </a>
-                    </div>
-            </section>
-
-            <!-- ▣ 2. 가운데 : 상호·정보·설명 -->
-            <section class="flex flex-col flex-1 min-h-0 bg-white p-6 rounded shadow gap-4 overflow-y-auto">
-                <h2 id="businessNameHeader" class="text-3xl font-bold text-center border-b pb-3"></h2>
-
-                <div class="bg-gray-50 p-4 rounded border space-y-2">
-                    <h3 class="text-2xl font-bold">기본 정보</h3>
-                    <p id="businessType" class="text-lg text-gray-800">업종: 분식</p>
-                    <p id="businessCategory" class="text-lg text-gray-800">구분: 한식</p>
-                    <p id="deliveryOption" class="text-lg text-gray-800">배달: 가능</p>
-                    <p id="businessHours" class="text-lg text-gray-800">영업시간: 11:00 – 21:00</p>
-                </div>
-
-                <div class="bg-gray-50 p-4 rounded border">
-                    <h3 class="text-xl font-bold mb-2">서비스 내용</h3>
-                    <p id="serviceDetails" class="text-gray-800"></p>
-                </div>
-
-                <!-- ── 이벤트 ────────────────── -->
-                <div class="bg-gray-50 p-4 rounded border">
-                    <h3 class="text-xl font-bold mb-2">이벤트</h3>
-                    <ul id="eventsList" class="list-disc pl-6 space-y-2 text-lg text-gray-800 leading-relaxed">
-                        <!-- JS로 채워질 곳 -->
-                    </ul>
-                </div>
-
-                <!-- ── 기타 정보 ────────────────── -->
-                <div class="bg-gray-50 p-4 rounded border">
-                    <h3 class="text-xl font-bold mb-2">기타 정보</h3>
-                    <ul id="infoEtcList" class="list-disc pl-6 space-y-2 text-lg text-gray-800 leading-relaxed">
-                        <!-- JS로 채워질 곳 -->
-                    </ul>
-                </div>
-
-                <!-- ── 추가 정보 ────────────────── -->
-                <div class="bg-gray-50 p-4 rounded border">
-                    <h3 class="text-xl font-bold mb-2">추가 정보</h3>
-                    <ul id="additionalInfoList" class="list-disc pl-6 space-y-2 text-lg text-gray-800 leading-relaxed">
-                        <!-- JS로 채워질 곳 -->
-                    </ul>
-                </div>
-
-                <!-- 연락처 섹션 -->
-                <div class="bg-gray-50 p-4 rounded border space-y-2">
-                    <h3 class="text-xl font-bold mb-2 border-b pb-1">연락처</h3>
-                    <p id="contactPhone" class="text-lg text-gray-800 leading-relaxed"></p>
-                    <p id="contactHomepage" class="text-lg text-gray-800 leading-relaxed"></p>
-                    <p id="contactInstagram" class="text-lg text-gray-800 leading-relaxed"></p>
-                    <p id="contactFacebook" class="text-lg text-gray-800 leading-relaxed"></p>
-                </div>
-            </section>
-
-            <!-- ▣ 3. 오른쪽 : 메뉴 + 장바구니 -->
-            <div class="flex flex-col flex-1 min-h-0 gap-6">
-
-                <!-- ▷ 메뉴 박스 -->
-                <div id="menuBox" class="flex flex-col flex-1 min-h-0 overflow-y-auto bg-white p-4 rounded shadow">
-
-                    <!-- 헤더 (고정) -->
-                    <h3 class="text-center text-2xl font-bold border-b-2 border-gray-300 pb-2 mb-4">
-                        메뉴
-                    </h3>
-
-                    <!-- 리스트 (가변 + 스크롤) -->
-                    <div id="menuList" class="flex flex-col gap-4 divide-y overflow-y-auto pr-2"
-                        style="max-height:1080px;">
-                        <!-- JS가 여기에 9장 카드를 출력 -->
-                    </div>
-                </div>
-
-                <!-- ▷ 장바구니 (고정) -->
-                <div id="cartBox" class="shrink-0 bg-white rounded shadow p-4">
-                    <h3 class="text-lg font-semibold mb-2">장바구니</h3>
-                    <ul id="cartItems" class="space-y-2 text-sm"></ul>
-
-                    <div class="flex justify-between items-center mt-4">
-                        <span class="font-bold text-gray-800">합계:</span>
-                        <span id="cartTotal" class="text-xl font-bold text-blue-600">0원</span>
-                    </div>
-
-                    <button class="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-                        결제하기
-                    </button>
-                </div>
+  <!-- (헤더) -->
+  <div id="header-placeholder"></div>
+  <main class="container mx-auto px-4 py-8 flex flex-col lg:flex-row min-h-screen gap-8">
+    <!-- ▣ 1. 왼쪽 : 이미지, 지도, 위치 -->
+    <section class="flex flex-col flex-1 min-h-0 bg-blue-900 rounded-3xl shadow-2xl px-6 py-10 items-center text-white">
+      <div class="w-full flex flex-col items-center gap-4">
+        <div class="w-full">
+          <div class="text-lg font-bold text-center mb-2">가게 이미지</div>
+          <!-- 이미지 슬라이더 -->
+          <div class="relative w-full rounded-2xl overflow-hidden mb-4 shadow">
+            <div id="sliderWrapper" class="w-full h-64 relative">
+              <div id="sliderImages" class="flex transition-transform duration-500 ease-in-out h-full"></div>
+              <button id="prevBtn" class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/70 text-white rounded-full px-3 py-1 opacity-80 hover:opacity-100 z-10">‹</button>
+              <button id="nextBtn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/70 text-white rounded-full px-3 py-1 opacity-80 hover:opacity-100 z-10">›</button>
             </div>
+            <div id="thumbBox" class="flex gap-2 justify-center mt-3"></div>
+          </div>
         </div>
-    </main>
+        <!-- 지도 + 위치 -->
+        <div class="w-full bg-white/90 rounded-xl p-6 text-blue-900 shadow mb-4">
+          <div class="font-semibold mb-2">가게 위치</div>
+          <div id="addressText" class="mb-2 text-base"></div>
+          <div id="map" class="w-full h-48 rounded border"></div>
+        </div>
+      </div>
+    </section>
 
-    <!-- ── (푸터) ─────────────────────────────────────────────────────── -->
-    <div id="footer-placeholder" class="mt-10"></div>
+    <!-- ▣ 2. 중앙 : 가게 정보, 서비스, 이벤트, 연락처 등 -->
+    <section class="flex-1 bg-white rounded-3xl shadow-2xl px-6 py-10 flex flex-col gap-6 min-h-[800px]">
+      <h1 id="businessNameHeader" class="text-3xl md:text-4xl font-extrabold text-center mb-6"></h1>
+      <div class="bg-blue-50 p-4 rounded-xl border text-blue-900">
+        <div id="businessType" class="text-lg"></div>
+        <div id="businessCategory" class="text-lg"></div>
+        <div id="deliveryOption" class="text-lg"></div>
+        <div id="businessHours" class="text-lg"></div>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-xl border">
+        <div class="text-lg font-semibold mb-2">서비스 내용</div>
+        <div id="serviceDetails" class="text-gray-900"></div>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-xl border">
+        <div class="text-lg font-semibold mb-2">이벤트</div>
+        <ul id="eventsList" class="list-disc pl-6 text-lg text-gray-900 leading-relaxed"></ul>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-xl border">
+        <div class="text-lg font-semibold mb-2">기타 정보</div>
+        <ul id="infoEtcList" class="list-disc pl-6 text-lg text-gray-900 leading-relaxed"></ul>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-xl border">
+        <div class="text-lg font-semibold mb-2">추가 정보</div>
+        <ul id="additionalInfoList" class="list-disc pl-6 text-lg text-gray-900 leading-relaxed"></ul>
+      </div>
+      <!-- 연락처 -->
+      <div class="bg-blue-50 p-4 rounded-xl border">
+        <div class="text-lg font-semibold mb-2 border-b pb-1">연락처</div>
+        <div id="contactPhone" class="text-lg"></div>
+        <div id="contactHomepage" class="text-lg"></div>
+        <div id="contactInstagram" class="text-lg"></div>
+        <div id="contactFacebook" class="text-lg"></div>
+      </div>
+    </section>
 
-    <script type="module">
-        /* ────────────────────────── 0. 공통 헬퍼 ───────────────────────── */
-        const $ = (id) => document.getElementById(id);
-        const params = new URLSearchParams(location.search);
-        // storeId를 전역에 올려두고, 모듈 내부에서도 꺼내 씁니다
-        window.storeId = params.get("id") || 1;
-        const storeId = window.storeId;
+    <!-- ▣ 3. 오른쪽 : 메뉴, 장바구니 -->
+    <section class="flex-1 bg-yellow-50 rounded-3xl shadow-2xl px-6 py-10 flex flex-col min-h-[800px]">
+      <div class="flex-1 flex flex-col">
+        <h2 class="text-2xl font-bold text-yellow-900 mb-4 text-center">메뉴</h2>
+        <div id="menuList" class="flex flex-col gap-4 divide-y overflow-y-auto pr-2 mb-8" style="max-height:480px;"></div>
+      </div>
+      <!-- 장바구니 -->
+      <div id="cartBox" class="shrink-0 bg-white rounded-xl shadow p-6 mt-6">
+        <div class="font-bold mb-2">장바구니</div>
+        <ul id="cartItems" class="space-y-2 text-base"></ul>
+        <div class="flex justify-between items-center mt-4">
+          <span class="font-bold text-gray-800">합계:</span>
+          <span id="cartTotal" class="text-2xl font-bold text-blue-700">0원</span>
+        </div>
+        <button class="mt-4 w-full bg-blue-700 text-white py-2 rounded hover:bg-blue-800 font-bold">결제하기</button>
+      </div>
+    </section>
+  </main>
+  <!-- (푸터) -->
+  <div id="footer-placeholder"></div>
 
-        console.log('✅ detail.html storeId:', storeId);
+  <!-- 이미지 모달 -->
+  <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+    <div class="relative">
+      <img id="modalImage" class="w-[600px] h-[400px] object-contain rounded shadow-xl" />
+      <button id="closeModal" class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">
+        ×
+      </button>
+    </div>
+  </div>
 
-        /* ────────────────────────── 1. 헤더 · 푸터 삽입 ────────────────── */
-        window.addEventListener("DOMContentLoaded", () => {
-            fetch("/components/header.html")
-                .then(r => r.text())
-                .then(html => { $("header-placeholder").innerHTML = html; });
+  <script type="module">
+    // 기존 JS와 동일하게 id/class 맞춰서 데이터 자동 매핑!
+    const $ = id => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    window.storeId = params.get("id") || 1;
+    const storeId = window.storeId;
 
-            fetch("/components/footer.html")
-                .then(r => r.text())
-                .then(html => { $("footer-placeholder").innerHTML = html; });
-        });
+    // 헤더/푸터 삽입
+    window.addEventListener("DOMContentLoaded", () => {
+      fetch("/components/header.html")
+        .then(r => r.text())
+        .then(html => { $("header-placeholder").innerHTML = html; });
+      fetch("/components/footer.html")
+        .then(r => r.text())
+        .then(html => { $("footer-placeholder").innerHTML = html; });
+    });
 
-        /* ────────────────────────── 2. Kakao SDK 동적 로드 ─────────────── */
-        function loadKakaoSdk() {
-            console.log("📦 Kakao SDK 로딩 시작");
-            return fetch("/kakao-key")
-                .then(r => r.json())
-                .then(({ key }) => new Promise((resolve, reject) => {
-                    if (!key) {
-                        console.error("❌ Kakao key not found");
-                        return reject("Kakao key not found");
-                    }
+    // Kakao Maps SDK 동적 로드
+    function loadKakaoSdk() {
+      return fetch("/kakao-key")
+        .then(r => r.json())
+        .then(({ key }) => new Promise((resolve, reject) => {
+          if (!key) return reject("Kakao key not found");
+          const s = document.createElement("script");
+          s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
+          s.defer = true;
+          s.onload = () => kakao.maps.load(resolve);
+          s.onerror = () => reject("Kakao SDK load error");
+          document.head.appendChild(s);
+        }));
+    }
 
-                    const s = document.createElement("script");
-                    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
-                    s.defer = true;
-
-                    s.onload = () => {
-                        console.log("✅ Kakao SDK script 로드 완료");
-                        kakao.maps.load(() => {
-                            console.log("✅ kakao.maps.load 실행 완료");
-                            resolve();
-                        });
-                    };
-
-                    s.onerror = () => {
-                        console.error("❌ Kakao SDK script 로딩 실패");
-                        reject("Kakao SDK load error");
-                    };
-
-                    document.head.appendChild(s);
-                }));
-        }
-
-        /* ✅ initMap 함수 추가 ------------------------------ */
-        async function initMap(storeAddress, storeName = "") {
-            try {
-                await loadKakaoSdk();
-
-                const geocoder = new kakao.maps.services.Geocoder();
-                const cleanedAddress = storeAddress.replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
-                geocoder.addressSearch(cleanedAddress, (result, status) => {
-
-                    if (status !== kakao.maps.services.Status.OK) {
-                        console.warn("❌ 주소 검색 실패:", status);
-                        return;
-                    }
-
-                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    const map = new kakao.maps.Map(document.getElementById("map"), {
-                        center: coords,
-                        level: 3
-                    });
-
-                    // 마커 추가
-                    const marker = new kakao.maps.Marker({
-                        map,
-                        position: coords
-                    });
-
-                    // 인포윈도우
-                    if (storeName) {
-                        const ovContent = `
-                          <div style="
-                                padding:4px 8px;
-                                background:#fff;
-                                border:1px solid #666;
-                                border-radius:4px;
-                                font-size:13px;
-                                white-space:nowrap;">${storeName}
-                           </div>`;
-                        const overlay = new kakao.maps.CustomOverlay({
-                            position: marker.getPosition(),
-                            content: ovContent,
-                            yAnchor: 1     // 말풍선 아랫변이 마커 꼭짓점에 닿도록
-                        });
-                        overlay.setMap(map);
-                    }
-                });
-
-            } catch (error) {
-                console.error("🛑 initMap() 오류:", error);
-            }
-        }
-
-
-        const slider = {
-            imgs: [],        // 원본 이미지 URL 배열
-            idx: 0,          // 현재 인덱스
-
-            /* ---------------- init ---------------- */
-            init(arr) {
-                this.imgs = (arr || [])
-                    .filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/")))
-                    .map(src => src.trim());
-
-                // fallback 이미지 경로 통일
-                if (!this.imgs.length) {
-                    this.imgs = ["/no-image.png"];
-                }
-
-                // 메인 슬라이더 이미지 HTML 생성 (+인덱스 보관 & 클릭 활성화)
-                $("sliderImages").innerHTML = this.imgs
-                    .map((u, i) => `
-                    <img 
-                      src="${u}" 
-                      data-index="${i}" 
-                      class="w-full h-full object-cover flex-shrink-0 cursor-pointer"
-                      onclick="showModalImage('${u}')"
-                    />
-                `).join('');
-
-
-                /* 메인 이미지 클릭 시 모달 열기 */
-                $("sliderImages").onclick = (e) => {
-                    if (e.target.tagName === "IMG") {
-                        this.idx = Number(e.target.dataset.index);
-                        this.update();
-                        openModal(this.imgs[this.idx]);
-                    }
-                };
-
-                this.renderThumbs();   // 썸네일 출력
-                this.update();         // 첫 화면 렌더
-
-                // 좌우 버튼
-                $("prevBtn").onclick = () => this.move(-1);
-                $("nextBtn").onclick = () => this.move(1);
-            },
-
-            /* -------------- 썸네일 출력 -------------- */
-            renderThumbs() {
-                const box = $("thumbBox");
-                box.innerHTML = "";
-
-                this.imgs.forEach((src, i) => {
-                    // src 값이 HTML 코드일 경우 무시하거나 필터링
-                    if (!src.startsWith("http") && !src.startsWith("/")) return;
-
-                    const t = document.createElement("img");
-                    t.setAttribute("src", src);
-                    t.setAttribute("alt", `이미지 ${i + 1}`);
-                    t.className = "w-16 h-16 object-cover rounded cursor-pointer border hover:opacity-80";
-                    t.addEventListener("click", () => {
-                        this.idx = i;
-                        this.update();
-                        openModal(src);
-                    });
-                    box.appendChild(t);
-                });
-            },
-
-            /* -------------- 이동 -------------- */
-            move(step) {
-                this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
-                this.update();
-            },
-
-            /* -------------- 화면 업데이트 -------------- */
-            update() {
-                // 메인 슬라이더 위치 이동
-                $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
-
-                // 썸네일 강조
-                [...$("thumbBox").children].forEach((el, i) => {
-                    el.classList.toggle("ring-2", i === this.idx);
-                    el.classList.toggle("ring-blue-500", i === this.idx);
-                });
-            }
-        };
-
-        /* -------- 모달 키보드 / 배경 클릭 핸들러 (한 번만 실행) -------- */
-        (function enableModalKeys() {
-            const modal = $("imageModal");
-
-            // 바깥 클릭 시 닫기
-            modal.addEventListener("click", (e) => {
-                if (e.target === modal) closeModal();
-            });
-
-            // ← / → / ESC
-            window.addEventListener("keydown", (e) => {
-                if (modal.classList.contains("hidden")) return; // 모달 열렸을 때만
-                if (e.key === "ArrowLeft") {
-                    slider.move(-1);
-                    $("modalImage").src = slider.imgs[slider.idx];
-                }
-                if (e.key === "ArrowRight") {
-                    slider.move(1);
-                    $("modalImage").src = slider.imgs[slider.idx];
-                }
-                if (e.key === "Escape") closeModal();
-            });
-
-            document.getElementById('closeModal').addEventListener('click', () => {
-                document.getElementById('imageModal').classList.add('hidden');
-            });
-        })();
-
-
-        // ✅ 전역 함수 정의는 여기!
-        function openModal(src) {
-            document.getElementById("modalImage").src = src;
-            document.getElementById("imageModal").classList.remove("hidden");
-        }
-
-        function closeModal() {
-            document.getElementById("imageModal").classList.add("hidden");
-        }
-
-        /* ────────────────────────── 4. 장바구니 ──────────────────────── */
-        /* ─────────────────── 1) 전역 카트 배열 ─────────────────── */
-        const cart = [];
-
-        /* ─────────────────── 2) 같은 메뉴 합산 로직 ─────────────────── */
-        function addToCart(item) {
-            const found = cart.find(c => c.menuName === item.menuName);
-            if (found) {
-                found.quantity += item.quantity;          // 이미 있으면 수량 증가
-            } else {
-                cart.push({ ...item });                   // 없으면 새 항목
-            }
-            renderCart();
-        }
-
-        /* ─────────────────── 3) 장바구니 렌더 ─────────────────── */
-        function renderCart() {
-            const ul = $("cartItems");
-            if (!ul) return;
-            ul.innerHTML = "";
-
-            let sum = 0;
-
-            cart.forEach((item, index) => {
-                const price = Number(item.menuPrice) || 0;
-                const qty = Number(item.quantity) || 1;
-                const total = price * qty;
-                sum += total;
-
-                const li = document.createElement("li");
-                li.className = "flex justify-between items-center text-lg py-2";
-
-                li.innerHTML = `
-                  <span>${item.menuName} × ${qty}</span>
-                  <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-                  <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2"
-                          data-index="${index}">
-                    삭제
-                  </button>
-                `;
-                ul.appendChild(li);
-            });
-
-            /* 항목 삭제 */
-            ul.querySelectorAll(".removeBtn").forEach(btn => {
-                btn.onclick = () => {
-                    const idx = btn.dataset.index;
-                    cart.splice(idx, 1);
-                    renderCart();
-                };
-            });
-
-            // ✅ 합계 출력 요소
-
-            $("cartTotal").textContent = sum.toLocaleString();
-        }
-
-        /* 리스트 출력 헬퍼 */
-        const setList = (wrapId, arr = []) => {
-            const ul = $(wrapId); ul.innerHTML = "";
-            arr.forEach(t => {
-                const li = document.createElement("li");
-                li.textContent = t;
-                ul.appendChild(li);
-            });
-        };
-
-        /* ────────────────────────── 5. 메인 실행 (async IIFE) ─────────── */
-        /* 5-1 Kakao SDK 먼저 준비 */
+    async function initMap(storeAddress, storeName = "") {
+      try {
         await loadKakaoSdk();
-
-        /* 5-2 가게 데이터 가져오기 */
-        const res = await fetch(`/store/${storeId}`);
-        if (!res.ok) throw new Error("Store API error");
-        const { store, menus = [] } = await res.json();
-        window.menuDebug = menus;
-        window.store = store;
-        slider.init(store.images || []);
-
-        /* 5-3 슬라이더 · 기본 정보 */
-        slider.init(
-            store.images                          // 백엔드가 배열 주면 그대로
-            || [store.image1, store.image2, store.image3].filter(Boolean)  // 없으면 직접 조립
-        );
-        console.log("▶ store", store);
-
-        $("businessNameHeader").innerHTML = `
-                  <div class="flex items-center justify-center gap-10">
-                    <span>${store.businessName ?? "상호명 없음"}</span>
-
-                    <!-- ☆ 새 북마크 버튼 -->
-                    <div id="bookmarkBtn" class="bookmark-container" aria-label="즐겨찾기">
-                      <svg class="bookmark-star" viewBox="0 0 24 24">
-                        <path d="M12 .587l3.668 7.431 8.2 1.193-5.934 5.78
-                                 1.402 8.172L12 18.896l-7.336 3.847L6.066 15
-                                 l-5.934-5.78 8.2-1.193z"/>
-                      </svg>
-                    </div>
-                  </div>
-                `;
-
-
-        // ── 북마크 버튼 세팅 ──────────────────────────────
-        const bookmarkBtn = $("bookmarkBtn");
-        const bId = String(storeId);
-        const bName = store.businessName || "이름없음";
-
-        console.log("✅ 디테일 store.id:", store.id, "store name:", store.businessName);
-
-        // 1️⃣ 페이지 로딩 시 상태 맞추기
-        updateBookmarkUI();
-
-        // 2️⃣ 클릭 시 토글
-        bookmarkBtn.addEventListener("click", () => {
-            let list = JSON.parse(localStorage.getItem("bookmarks") || "[]");
-            const idx = list.findIndex(b => String(b.id) === bId);
-
-            if (idx >= 0) {
-                list.splice(idx, 1); // 제거
-            } else {
-                list.push({ id: String(bId), name: bName });
-            }
-
-            localStorage.setItem("bookmarks", JSON.stringify(list));
-            updateBookmarkUI();
-            window.dispatchEvent(new Event("bookmarkChanged"));
-        });
-
-        // 3️⃣ UI 갱신 함수
-        function updateBookmarkUI() {
-            const list = JSON.parse(localStorage.getItem("bookmarks") || "[]");
-            const on = list.some(b => String(b.id) === bId);
-            bookmarkBtn.classList.toggle("active", on);
-        }
-        const cat = store.businessCategory;  // 여기서 카테고리 값 가져오기
-        $("businessCategory").innerHTML = `<strong>구분:</strong> ${store.category || "선택되지 않음"}`;
-        $("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || "없음"}`;
-        $("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || "없음"}`;
-        $("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || "없음"}`;
-        $("serviceDetails").textContent = store.serviceDetails ?? "없음";
-        $("serviceDetails").classList.add("text-lg", "text-gray-800");
-
-        /* 고객 이벤트 */
-        setList("eventsList", [store.event1, store.event2].filter(Boolean));
-
-        /* ── ‘기타 정보’ ─────────────────── */
-        const infoList = $("infoEtcList");
-        if (infoList) {
-            infoList.innerHTML = `
-      <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
-      <li>반려동물 출입:   ${store.pets ?? "정보 없음"}</li>
-      <li>주차 정보:       ${store.parking ?? "정보 없음"}</li>
-    `;
-        }
-
-        /* ── ‘추가 정보’ ─────────────────── */
-        const addList = $("additionalInfoList");
-        if (addList) {
-            addList.innerHTML = `
-              <li>서비스 내용: ${store.serviceDetails ?? "없음"}</li>
-            `;
-        }
-        /* ── 연락처 · 홈페이지 · SNS · 추가 설명 ─────────────────────────── */
-        if ($("contactPhone")) {
-            $("contactPhone").textContent = store.contactPhone ?? "";
-        }
-
-        // 홈페이지
-        if ($("contactHomepage")) {
-            $("contactHomepage").innerHTML = store.homepage
-                ? `<strong>홈페이지:</strong> <a href="${store.homepage}" class="text-blue-600 underline" target="_blank">${store.homepage}</a>`
-                : "";
-        }
-
-        // 인스타그램
-        if ($("contactInstagram")) {
-            $("contactInstagram").innerHTML = store.instagram
-                ? `<strong>인스타그램:</strong> <a href="${store.instagram}" class="text-blue-600 underline" target="_blank">${store.instagram}</a>`
-                : "";
-        }
-
-        // 페이스북
-        if ($("contactFacebook")) {
-            $("contactFacebook").innerHTML = store.facebook
-                ? `<strong>페이스북:</strong> <a href="${store.facebook}" class="text-blue-600 underline" target="_blank">${store.facebook}</a>`
-                : "";
-        }
-
-        // JS 마지막 부분만 수정
-        const menuList = $("menuList");
-        menuList.innerHTML = "";
-
-        // ❌ 기존에 클래스 추가하던 부분을, 아예 클래스명을 덮어 씌우거나
-        //     양쪽 모두 overflow-y-auto 가 반드시 들어가도록 변경합니다.
-        menuList.className = [
-            "flex", "flex-col",
-            "gap-4",
-            "flex-1", "min-h-0",
-            "overflow-y-auto"
-        ].join(" ");
-
-        // 그룹화
-        const menuByCategory = {};
-        menus.forEach(it => {
-            const raw = it.category ?? it.menu_category ?? it.cat ?? '';
-            const category = raw.replace(/\u3000/g, '').trim() || '기타';
-
-            if (!menuByCategory[category]) menuByCategory[category] = [];
-            menuByCategory[category].push(it);
-        });
-
-        // 출력
-        // 메뉴 그룹화 · 렌더링 부분
-        Object.entries(menuByCategory).forEach(([category, items]) => {
-            // 🔹 그룹 묶음 컨테이너
-            const group = document.createElement("div");
-
-            // 🔹 카테고리 제목
-            const title = document.createElement("h3");
-            title.textContent = "🍱 " + category;
-            title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
-            group.appendChild(title);
-
-            // ▶ items 순회
-            items.forEach(it => {
-                const box = document.createElement("div");
-                box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                box.innerHTML = `
-                  <img
-                    src="${(it.menu_image && it.menu_image.trim())
-                        ? it.menu_image
-                        : '/assets/images/no-thumb.png'
-                    }"
-                    class="w-32 h-32 object-cover rounded-md"
-                  />
-
-                    <div class="flex-1 flex flex-col justify-center">
-                      <div class="text-2xl font-bold mb-1 truncate">${it.menuName}</div>
-                      <div class="text-lg font-medium text-gray-700">
-                        ${Number(it.menuPrice).toLocaleString()}원
-                      </div>
-                    </div>
-
-                    <div class="flex flex-col items-center justify-center gap-1 shrink-0">
-                      <div class="flex items-center gap-1">
-                        <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                        <span class="quantity w-6 text-center">1</span>
-                        <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                      </div>
-                      <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                        담기
-                      </button>
-                    </div>
-                `;
-
-                // 수량 조절 이벤트
-                let qty = 1;
-                const qtySpan = box.querySelector(".quantity");
-                box.querySelector(".decrease").onclick = () => {
-                    if (qty > 1) qtySpan.textContent = --qty;
-                };
-                box.querySelector(".increase").onclick = () => {
-                    qtySpan.textContent = ++qty;
-                };
-                box.querySelector(".addBtn").onclick = () => {
-                    addToCart({ ...it, quantity: qty });
-                };
-
-                // 그룹에 카드 추가
-                group.appendChild(box);
+        const geocoder = new kakao.maps.services.Geocoder();
+        const cleanedAddress = storeAddress.replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
+        geocoder.addressSearch(cleanedAddress, (result, status) => {
+          if (status !== kakao.maps.services.Status.OK) return;
+          const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+          const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+          const marker = new kakao.maps.Marker({ map, position: coords });
+          if (storeName) {
+            const ovContent = `
+              <div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">
+                ${storeName}
+              </div>`;
+            const overlay = new kakao.maps.CustomOverlay({
+              position: marker.getPosition(),
+              content: ovContent,
+              yAnchor: 1
             });
-
-            // 최종적으로 menuList에 그룹 추가
-            menuList.appendChild(group);
+            overlay.setMap(map);
+          }
         });
+      } catch (error) { }
+    }
 
-        /* 5-5 Kakao 지도 표시 (기존 지오코딩 블록) */
-        (() => {
-            try {
-                /* 5-5 Kakao 지도 표시 */
-                const fullAddress = store.address;
-                const cleanedAddress = cleanAddress(fullAddress);
-                $("addressText").textContent = `📍 ${cleanedAddress}`;
-                // 지도엔 fullAddress 그대로 넘깁니다
-                initMap(cleanedAddress, store.businessName);
+    // 이미지 슬라이더
+    const slider = {
+      imgs: [],
+      idx: 0,
+      init(arr) {
+        this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/"))).map(src => src.trim());
+        if (!this.imgs.length) this.imgs = ["/no-image.png"];
+        $("sliderImages").innerHTML = this.imgs.map((u, i) => `
+          <img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" onclick="showModalImage('${u}')"/>
+        `).join('');
+        $("sliderImages").onclick = (e) => {
+          if (e.target.tagName === "IMG") {
+            this.idx = Number(e.target.dataset.index);
+            this.update();
+            openModal(this.imgs[this.idx]);
+          }
+        };
+        this.renderThumbs();
+        this.update();
+        $("prevBtn").onclick = () => this.move(-1);
+        $("nextBtn").onclick = () => this.move(1);
+      },
+      renderThumbs() {
+        const box = $("thumbBox");
+        box.innerHTML = "";
+        this.imgs.forEach((src, i) => {
+          if (!src.startsWith("http") && !src.startsWith("/")) return;
+          const t = document.createElement("img");
+          t.setAttribute("src", src);
+          t.setAttribute("alt", `이미지 ${i + 1}`);
+          t.className = "w-14 h-14 object-cover rounded cursor-pointer border hover:opacity-80";
+          t.addEventListener("click", () => {
+            this.idx = i;
+            this.update();
+            openModal(src);
+          });
+          box.appendChild(t);
+        });
+      },
+      move(step) {
+        this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
+        this.update();
+      },
+      update() {
+        $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
+        [...$("thumbBox").children].forEach((el, i) => {
+          el.classList.toggle("ring-2", i === this.idx);
+          el.classList.toggle("ring-blue-300", i === this.idx);
+        });
+      }
+    };
 
-                // 지도 표시
-                window.kakaoReady = () => {
-                    kakao.maps.load(() => {
-                        initMap(cleanedAddress, store.businessName);
-                    });
-                };
+    // 모달
+    (function enableModalKeys() {
+      const modal = $("imageModal");
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+      window.addEventListener("keydown", (e) => {
+        if (modal.classList.contains("hidden")) return;
+        if (e.key === "ArrowLeft") {
+          slider.move(-1);
+          $("modalImage").src = slider.imgs[slider.idx];
+        }
+        if (e.key === "ArrowRight") {
+          slider.move(1);
+          $("modalImage").src = slider.imgs[slider.idx];
+        }
+        if (e.key === "Escape") closeModal();
+      });
+      $("closeModal").addEventListener('click', closeModal);
+    })();
+    function openModal(src) {
+      $("modalImage").src = src;
+      $("imageModal").classList.remove("hidden");
+    }
+    function closeModal() {
+      $("imageModal").classList.add("hidden");
+    }
 
-                if (window.kakao && window.kakao.maps) {
-                    kakao.maps.load(() => {
-                        initMap(cleanedAddress, store.businessName);
-                    });
-                } else if (window.kakaoReady) {
-                    window.kakaoReady();
-                }
+    // 장바구니
+    const cart = [];
+    function addToCart(item) {
+      const found = cart.find(c => c.menuName === item.menuName);
+      if (found) found.quantity += item.quantity;
+      else cart.push({ ...item });
+      renderCart();
+    }
+    function renderCart() {
+      const ul = $("cartItems");
+      if (!ul) return;
+      ul.innerHTML = "";
+      let sum = 0;
+      cart.forEach((item, index) => {
+        const price = Number(item.menuPrice) || 0;
+        const qty = Number(item.quantity) || 1;
+        const total = price * qty;
+        sum += total;
+        const li = document.createElement("li");
+        li.className = "flex justify-between items-center text-lg py-2";
+        li.innerHTML = `
+          <span>${item.menuName} × ${qty}</span>
+          <span class="text-xl font-bold">${total.toLocaleString()}원</span>
+          <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>
+        `;
+        ul.appendChild(li);
+      });
+      ul.querySelectorAll(".removeBtn").forEach(btn => {
+        btn.onclick = () => {
+          const idx = btn.dataset.index;
+          cart.splice(idx, 1);
+          renderCart();
+        };
+      });
+      $("cartTotal").textContent = sum.toLocaleString();
+    }
+    const setList = (wrapId, arr = []) => {
+      const ul = $(wrapId); ul.innerHTML = "";
+      arr.forEach(t => {
+        const li = document.createElement("li");
+        li.textContent = t;
+        ul.appendChild(li);
+      });
+    };
 
-                // JS에 테스트용
-                const menu = Array.from({ length: 20 }).map((_, i) => ({
-                    menuName: `메뉴${i + 1}`,
-                    menuPrice: 1000 * (i + 1)
-                }));
+    // 데이터 fetch 및 출력
+    await loadKakaoSdk();
+    const res = await fetch(`/store/${storeId}`);
+    if (!res.ok) throw new Error("Store API error");
+    const { store, menus = [] } = await res.json();
+    window.menuDebug = menus;
+    window.store = store;
 
-                // 주소 정제 함수
-                function cleanAddress(fullAddress) {
-                    const parts = fullAddress
-                        .replace(/^\d{5}\s*/, "")
-                        .split(/\s+/);
-                    // [우편번호 제거된, 번지 제거되지 않은] 상태라면
-                    // parts 예시: ['서울특별시', '강남구', '역삼동', '123-45', '빌딩명']
-                    return parts
-                        .filter((_, i) => i < 3)  // 시도, 시군구, 읍면동
-                        .join(" ");
-                }
+    slider.init(store.images || [store.image1, store.image2, store.image3].filter(Boolean));
+    $("businessNameHeader").textContent = store.businessName ?? "상호명 없음";
+    $("businessCategory").innerHTML = `<strong>구분:</strong> ${store.category || "선택되지 않음"}`;
+    $("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || "없음"}`;
+    $("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || "없음"}`;
+    $("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || "없음"}`;
+    $("serviceDetails").textContent = store.serviceDetails ?? "없음";
+    setList("eventsList", [store.event1, store.event2].filter(Boolean));
+    const infoList = $("infoEtcList");
+    if (infoList) {
+      infoList.innerHTML = `
+        <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
+        <li>반려동물 출입:   ${store.pets ?? "정보 없음"}</li>
+        <li>주차 정보:       ${store.parking ?? "정보 없음"}</li>
+      `;
+    }
+    const addList = $("additionalInfoList");
+    if (addList) {
+      addList.innerHTML = `
+        <li>서비스 내용: ${store.serviceDetails ?? "없음"}</li>
+      `;
+    }
+    $("contactPhone").textContent = store.contactPhone ?? "";
+    $("contactHomepage").innerHTML = store.homepage
+      ? `<strong>홈페이지:</strong> <a href="${store.homepage}" class="text-blue-600 underline" target="_blank">${store.homepage}</a>`
+      : "";
+    $("contactInstagram").innerHTML = store.instagram
+      ? `<strong>인스타그램:</strong> <a href="${store.instagram}" class="text-blue-600 underline" target="_blank">${store.instagram}</a>`
+      : "";
+    $("contactFacebook").innerHTML = store.facebook
+      ? `<strong>페이스북:</strong> <a href="${store.facebook}" class="text-blue-600 underline" target="_blank">${store.facebook}</a>`
+      : "";
 
-            } catch (err) {
-                console.error("로드 오류:", err);
-                const sliderImages = $("sliderImages");
-                if (sliderImages) {
-                    sliderImages.innerHTML = `
-  <img
-    src="/images/no-image.png"
-    class="w-full h-64 flex-shrink-0 object-cover"
-  />
-`;
-                }
-            }
-        })();
-    </script>
+    // 메뉴 출력
+    const menuList = $("menuList");
+    menuList.innerHTML = "";
+    menuList.className = [
+      "flex", "flex-col",
+      "gap-4",
+      "flex-1", "min-h-0",
+      "overflow-y-auto"
+    ].join(" ");
+    const menuByCategory = {};
+    menus.forEach(it => {
+      const raw = it.category ?? it.menu_category ?? it.cat ?? '';
+      const category = raw.replace(/\u3000/g, '').trim() || '기타';
+      if (!menuByCategory[category]) menuByCategory[category] = [];
+      menuByCategory[category].push(it);
+    });
+    Object.entries(menuByCategory).forEach(([category, items]) => {
+      const group = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = "🍱 " + category;
+      title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
+      group.appendChild(title);
+      items.forEach(it => {
+        const box = document.createElement("div");
+        box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
+        box.innerHTML = `
+          <img src="${(it.menu_image && it.menu_image.trim()) ? it.menu_image : '/assets/images/no-thumb.png'}"
+            class="w-24 h-24 object-cover rounded-md"/>
+          <div class="flex-1 flex flex-col justify-center">
+            <div class="text-lg font-bold mb-1 truncate">${it.menuName}</div>
+            <div class="text-base font-medium text-gray-700">
+              ${Number(it.menuPrice).toLocaleString()}원
+            </div>
+          </div>
+          <div class="flex flex-col items-center justify-center gap-1 shrink-0">
+            <div class="flex items-center gap-1">
+              <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+              <span class="quantity w-6 text-center">1</span>
+              <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+            </div>
+            <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+          </div>
+        `;
+        let qty = 1;
+        const qtySpan = box.querySelector(".quantity");
+        box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
+        box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
+        box.querySelector(".addBtn").onclick = () => { addToCart({ ...it, quantity: qty }); };
+        group.appendChild(box);
+      });
+      menuList.appendChild(group);
+    });
 
-
+    // 지도
+    (() => {
+      try {
+        const fullAddress = store.address;
+        const cleanedAddress = cleanAddress(fullAddress);
+        $("addressText").textContent = `📍 ${cleanedAddress}`;
+        initMap(cleanedAddress, store.businessName);
+        window.kakaoReady = () => {
+          kakao.maps.load(() => {
+            initMap(cleanedAddress, store.businessName);
+          });
+        };
+        if (window.kakao && window.kakao.maps) {
+          kakao.maps.load(() => {
+            initMap(cleanedAddress, store.businessName);
+          });
+        } else if (window.kakaoReady) {
+          window.kakaoReady();
+        }
+        function cleanAddress(fullAddress) {
+          const parts = fullAddress.replace(/^\d{5}\s*/, "").split(/\s+/);
+          return parts.filter((_, i) => i < 3).join(" ");
+        }
+      } catch (err) {
+        const sliderImages = $("sliderImages");
+        if (sliderImages) {
+          sliderImages.innerHTML = `<img src="/images/no-image.png" class="w-full h-64 flex-shrink-0 object-cover"/>`;
+        }
+      }
+    })();
+  </script>
 </body>
-
 </html>
