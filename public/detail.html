@@ -15,7 +15,8 @@
     <!-- 메인 -->
     <main class="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-stretch min-h-0 flex-1">
         <!-- ▣ 1. 왼쪽 : 이미지, 지도, 위치 -->
-        <section class="flex flex-col flex-1 min-h-0 bg-blue-100 rounded-3xl shadow-2xl px-6 py-10 text-blue-900">
+        <section id="leftCol"
+            class="flex flex-col flex-1 min-h-0 bg-blue-100 rounded-3xl shadow-2xl px-6 py-10 text-blue-900">
             <!-- ← 이 블록(#leftLimit)의 '아래'가 기준선이 됩니다 (슬라이더+지도+광고2까지 포함) -->
             <div id="leftLimit" class="w-full flex flex-col items-center gap-4">
                 <div class="w-full">
@@ -159,25 +160,42 @@
 
         // 왼쪽 '광고 2 끝'을 기준으로 가운데/오른쪽 높이 맞춤
         function syncToAdEnd() {
-            const anchor = $("leftLimit");
-            if (!anchor) return;
-            const h = Math.round(anchor.getBoundingClientRect().height)+4;
+            const anchor = document.getElementById("leftLimit");
+            const leftCol = document.getElementById("leftCol");
+            if (!anchor || !leftCol) return;
+
+            // 왼쪽 섹션의 위·아래 패딩을 합산
+            const cs = getComputedStyle(leftCol);
+            const padTop = parseFloat(cs.paddingTop) || 0;
+            const padBottom = parseFloat(cs.paddingBottom) || 0;
+
+            // anchor(컨텐츠) 높이 + 좌우 동일 패딩을 포함해야 섹션 하단이 정확히 일치
+            const contentH = anchor.getBoundingClientRect().height;
+            const targetH = Math.round(contentH + padTop + padBottom + 2); // +2 미세보정
 
             ["centerCol", "rightCol"].forEach(id => {
-                const col = $(id);
+                const col = document.getElementById(id);
                 if (!col) return;
-                col.style.height = h + "px";
+
+                // 섹션 자체 높이를 왼쪽과 동일하게
+                col.style.height = targetH + "px";
+
+                // 내부 스크롤 영역 높이 = 섹션 전체 - 상하 패딩
                 const inner = col.querySelector(".col-scroll");
                 if (inner) {
-                    inner.style.height = "100%";
+                    const ccs = getComputedStyle(col);
+                    const cPadTop = parseFloat(ccs.paddingTop) || 0;
+                    const cPadBottom = parseFloat(ccs.paddingBottom) || 0;
+                    inner.style.height = (targetH - cPadTop - cPadBottom) + "px";
                     inner.style.overflowY = "auto";
                 }
             });
         }
+
         window.addEventListener("DOMContentLoaded", syncToAdEnd);
         window.addEventListener("resize", syncToAdEnd);
         if ("ResizeObserver" in window) {
-            const anchorEl = $("leftLimit");
+            const anchorEl = document.getElementById("leftLimit");
             if (anchorEl) new ResizeObserver(syncToAdEnd).observe(anchorEl);
         }
 
@@ -193,9 +211,10 @@
                     const marker = new kakao.maps.Marker({ map, position: coords });
                     if (storeName) {
                         const ovContent = `
-              <div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">
-                ${storeName}
-              </div>`;
+    <div
+        style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">
+        ${storeName}
+    </div>`;
                         const overlay = new kakao.maps.CustomOverlay({
                             position: marker.getPosition(),
                             content: ovContent,
@@ -214,11 +233,12 @@
             imgs: [],
             idx: 0,
             init(arr) {
-                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/"))).map(s => s.trim());
+                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") ||
+                    src.startsWith("/"))).map(s => s.trim());
                 if (!this.imgs.length) this.imgs = ["/no-image.png"];
                 $("sliderImages").innerHTML = this.imgs.map((u, i) => `
-          <img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer"/>
-        `).join('');
+    <img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />
+    `).join('');
                 $("sliderImages").onclick = (e) => {
                     if (e.target.tagName === "IMG") {
                         this.idx = Number(e.target.dataset.index);
@@ -297,9 +317,9 @@
                 const li = document.createElement("li");
                 li.className = "flex justify-between items-center text-lg py-2";
                 li.innerHTML = `
-          <span>${item.menuName} × ${qty}</span>
-          <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-          <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
+    <span>${item.menuName} × ${qty}</span>
+    <span class="text-xl font-bold">${total.toLocaleString()}원</span>
+    <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
                 ul.appendChild(li);
             });
             ul.querySelectorAll(".removeBtn").forEach(btn => {
@@ -324,14 +344,17 @@
                 $("serviceDetails").textContent = store.serviceDetails ?? "없음";
                 $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(v => `<li>${v}</li>`).join("");
                 $("infoEtcList").innerHTML = `
-          <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
-          <li>반려동물 출입:   ${store.pets ?? "정보 없음"}</li>
-          <li>주차 정보:       ${store.parking ?? "정보 없음"}</li>`;
+    <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
+    <li>반려동물 출입: ${store.pets ?? "정보 없음"}</li>
+    <li>주차 정보: ${store.parking ?? "정보 없음"}</li>`;
                 $("additionalInfoList").innerHTML = `<li>서비스 내용: ${store.serviceDetails ?? "없음"}</li>`;
                 $("contactPhone").textContent = store.contactPhone ?? "";
-                $("contactHomepage").innerHTML = store.homepage ? `<strong>홈페이지:</strong> <a href="${store.homepage}" class="text-blue-600 underline" target="_blank">${store.homepage}</a>` : "";
-                $("contactInstagram").innerHTML = store.instagram ? `<strong>인스타그램:</strong> <a href="${store.instagram}" class="text-blue-600 underline" target="_blank">${store.instagram}</a>` : "";
-                $("contactFacebook").innerHTML = store.facebook ? `<strong>페이스북:</strong> <a href="${store.facebook}" class="text-blue-600 underline" target="_blank">${store.facebook}</a>` : "";
+                $("contactHomepage").innerHTML = store.homepage ? `<strong>홈페이지:</strong> <a href="${store.homepage}"
+        class="text-blue-600 underline" target="_blank">${store.homepage}</a>` : "";
+                $("contactInstagram").innerHTML = store.instagram ? `<strong>인스타그램:</strong> <a href="${store.instagram}"
+        class="text-blue-600 underline" target="_blank">${store.instagram}</a>` : "";
+                $("contactFacebook").innerHTML = store.facebook ? `<strong>페이스북:</strong> <a href="${store.facebook}"
+        class="text-blue-600 underline" target="_blank">${store.facebook}</a>` : "";
 
                 // 메뉴 렌더
                 const menuList = $("menuList"); menuList.innerHTML = "";
@@ -351,20 +374,20 @@
                         const box = document.createElement("div");
                         box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                         box.innerHTML = `
-              <img src="${(it.menu_image && it.menu_image.trim()) ? it.menu_image : '/assets/images/no-thumb.png'}"
-                   class="w-24 h-24 object-cover rounded-md"/>
-              <div class="flex-1">
-                <div class="text-lg font-bold mb-1 truncate">${it.menuName}</div>
-                <div class="text-base font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
-              </div>
-              <div class="flex flex-col items-center gap-1 shrink-0">
-                <div class="flex items-center gap-1">
-                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                  <span class="quantity w-6 text-center">1</span>
-                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                </div>
-                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-              </div>`;
+    <img src="${(it.menu_image && it.menu_image.trim()) ? it.menu_image : '/assets/images/no-thumb.png'}"
+        class="w-24 h-24 object-cover rounded-md" />
+    <div class="flex-1">
+        <div class="text-lg font-bold mb-1 truncate">${it.menuName}</div>
+        <div class="text-base font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
+    </div>
+    <div class="flex flex-col items-center gap-1 shrink-0">
+        <div class="flex items-center gap-1">
+            <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+            <span class="quantity w-6 text-center">1</span>
+            <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+        </div>
+        <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+    </div>`;
                         let qty = 1;
                         const qtySpan = box.querySelector(".quantity");
                         box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
