@@ -1,287 +1,155 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>통합 정보 등록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>통합 업종 등록/홍보 페이지</title>
   <link rel="stylesheet" href="/assets/css/tailwind.css" />
-  <!-- Daum 우편번호 / Kakao 지도 -->
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <script
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&autoload=false&libraries=services"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 </head>
-
 <body class="bg-gray-100 flex flex-col min-h-screen">
   <div id="header-placeholder"></div>
   <main class="flex-grow container mx-auto px-2 py-8">
-    <div class="bg-white max-w-2xl mx-auto p-4 sm:p-6 rounded-lg shadow-lg border border-gray-200">
-      <h2 class="text-3xl font-bold text-center mb-6">정보 등록</h2>
-      <form id="businessForm" class="space-y-6" enctype="multipart/form-data" autocomplete="off">
-        <input type="hidden" id="storeId" name="storeId">
+    <div class="bg-white max-w-2xl mx-auto p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-200">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6">통합 정보 등록/홍보</h2>
+      <form id="bizForm" class="space-y-5" enctype="multipart/form-data">
 
-        <!-- 1. 사업자 인증 -->
-        <section class="border rounded p-4 bg-yellow-50 mb-4">
-          <h3 class="text-xl font-semibold mb-4">사업자 등록 인증</h3>
-          <div class="flex flex-col md:flex-row gap-4">
-            <label class="w-36 font-medium flex items-center justify-center">사업자 번호</label>
-            <div class="flex flex-nowrap items-center gap-2 w-full">
-              <input id="bizNumber1" name="bizNumber1" maxlength="4" placeholder="123"
-                class="w-[90px] border rounded px-2 py-2" inputmode="numeric" />
-              <span>-</span>
-              <input id="bizNumber2" name="bizNumber2" maxlength="2" placeholder="45"
-                class="w-[60px] border rounded px-2 py-2" inputmode="numeric" />
-              <span>-</span>
-              <input id="bizNumber3" name="bizNumber3" maxlength="5" placeholder="67890"
-                class="w-[100px] border rounded px-2 py-2" inputmode="numeric" />
-              <button type="button" onclick="verifyBizNumber()"
-                class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded">인증</button>
-            </div>
-          </div>
-          <div class="flex flex-col md:flex-row md:items-center gap-2 mt-3">
-            <label class="w-32 font-medium shrink-0" for="businessCertImage">등록증 이미지</label>
-            <input type="file" id="businessCertImage" name="businessCertImage" accept="image/*,application/pdf"
-              class="flex-1 border rounded px-3 py-2">
-          </div>
-          <p class="text-sm text-center mt-2">*사업자 등록증은 <span class="text-red-600">3개월 이내</span> 발급분만 인정</p>
-          <p id="bizVerifyResult" class="text-sm text-center"></p>
-        </section>
-
-        <!-- 2. 대표 정보 -->
-        <section class="border rounded p-4 bg-indigo-50 mb-4">
-          <h3 class="text-xl font-semibold mb-4">대표 정보</h3>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="ownerName">성함</label>
-            <input id="ownerName" name="ownerName" class="flex-1 border rounded px-3 py-2" required>
-          </div>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="birthDate">생년월일</label>
-            <input type="date" id="birthDate" name="birthDate" class="flex-1 border rounded px-3 py-2" required>
-          </div>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="emailId">이메일</label>
-            <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-              <input id="emailId" placeholder="아이디" oninput="updateEmail()"
-                class="flex-1 min-w-0 border rounded px-3 py-2">
-              <span>@</span>
-              <select id="emailDomainSelect" onchange="handleDomainChange(this)"
-                class="flex-1 min-w-0 border rounded px-3 py-2">
-                <option value="">선택</option>
-                <option value="naver.com">naver.com</option>
-                <option value="gmail.com">gmail.com</option>
-                <option value="daum.net">daum.net</option>
-                <option value="custom">직접입력</option>
-              </select>
-              <input id="customDomainInput" placeholder="도메인" oninput="updateEmail()"
-                class="hidden flex-1 min-w-0 border rounded px-3 py-2">
-            </div>
-            <input type="hidden" id="ownerEmail" name="ownerEmail">
-          </div>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="ownerAddress">주소</label>
-            <input id="ownerAddress" name="ownerAddress" class="flex-1 border rounded px-3 py-2">
-          </div>
-          <div class="flex flex-col md:flex-row gap-2">
-            <label class="w-32 font-medium" for="ownerPhone">휴대폰</label>
-            <input id="ownerPhone" name="ownerPhone" class="flex-1 border rounded px-3 py-2" required>
-            <button type="button" id="verifyPhoneButton"
-              class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-4 py-2 rounded">인증번호 요청</button>
-          </div>
-          <div class="flex flex-col md:flex-row gap-2 mt-2">
-            <label class="w-32 font-medium" for="phoneAuth">인증번호</label>
-            <input id="phoneAuth" name="phoneAuth" class="flex-1 border rounded px-3 py-2">
-          </div>
-          <p id="phoneVerifyResult" class="text-sm text-center"></p>
-        </section>
-
-        <!-- 3. 카테고리/서브카테고리 선택 (동적 출력) -->
-        <section class="border rounded p-4 bg-gray-50 mb-4">
-          <h3 class="text-xl font-semibold mb-4">업종(카테고리) 선택</h3>
-          <div class="flex flex-col md:flex-row gap-2 mb-2">
-            <label class="w-32 font-medium">카테고리</label>
-            <select id="mainCategory" name="mainCategory" class="flex-1 border rounded px-3 py-2" required>
-              <option value="">카테고리 선택</option>
-              <option value="restaurant">음식점</option>
-              <option value="hospital">병원</option>
-              <option value="market">전통시장</option>
-              <option value="cafe">카페</option>
-              <option value="academy">학원</option>
-              <option value="beauty">미용/이발</option>
-              <option value="etc">기타</option>
+        <!-- 1. 업종/카테고리/상호 -->
+        <section>
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">업종/분야 선택 <span class="text-red-500">*</span></label>
+            <select name="category" id="category" class="border rounded px-3 py-2" required>
+              <option value="">선택</option>
+              <option value="음식점">음식점/카페</option>
+              <option value="병원">병원/동물병원</option>
+              <option value="약국">약국</option>
+              <option value="미용">미용실/이발/뷰티</option>
+              <option value="학원">학원/스터디</option>
+              <option value="마트">마트/편의점</option>
+              <option value="운동">운동/헬스</option>
+              <option value="기타">기타</option>
             </select>
           </div>
-          <div class="flex flex-col md:flex-row gap-2">
-            <label class="w-32 font-medium">서브카테고리</label>
-            <select id="subCategory" name="subCategory" class="flex-1 border rounded px-3 py-2" required>
-              <option value="">서브카테고리 선택</option>
-              <!-- JS에서 동적으로 출력 -->
+          <div class="flex flex-col gap-2">
+            <label class="font-semibold">상호명 <span class="text-red-500">*</span></label>
+            <input name="businessName" class="border rounded px-3 py-2" required placeholder="예: 홍길동미용실"/>
+          </div>
+        </section>
+
+        <!-- 2. 사업자 등록번호 인증, 자격증 업로드 -->
+        <section class="border rounded p-3 bg-yellow-50">
+          <label class="font-semibold block mb-2">사업자 등록 인증 <span class="text-red-500">*</span></label>
+          <div class="flex items-center gap-2 mb-2">
+            <input id="bizNumber1" maxlength="3" class="w-16 border rounded px-2 py-2" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+            <span>-</span>
+            <input id="bizNumber2" maxlength="2" class="w-12 border rounded px-2 py-2" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+            <span>-</span>
+            <input id="bizNumber3" maxlength="5" class="w-20 border rounded px-2 py-2" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+            <button type="button" onclick="verifyBizNumber()" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-3 py-2 rounded">인증</button>
+          </div>
+          <input type="file" name="businessCertImage" accept="image/*,application/pdf" class="mb-1"/>
+          <span id="bizVerifyResult" class="block text-sm"></span>
+          <div class="flex flex-col gap-2 mt-2">
+            <label class="font-semibold">자격증(선택, jpg/pdf)</label>
+            <input type="file" name="certificateImage" accept="image/*,application/pdf"/>
+          </div>
+        </section>
+
+        <!-- 3. 대표자/연락처/개인정보 -->
+        <section class="border rounded p-3 bg-indigo-50">
+          <label class="font-semibold">대표자 정보</label>
+          <div class="flex flex-col gap-2 mb-2">
+            <input name="ownerName" placeholder="대표자 성함" class="border rounded px-3 py-2"/>
+            <input type="date" name="birthDate" class="border rounded px-3 py-2"/>
+            <input name="ownerPhone" placeholder="휴대폰번호(인증)" class="border rounded px-3 py-2"/>
+            <button type="button" id="verifyPhoneButton" class="bg-indigo-500 text-white rounded px-3 py-2 w-32">휴대폰 인증</button>
+            <input name="ownerEmail" placeholder="이메일" class="border rounded px-3 py-2"/>
+            <input name="ownerAddress" placeholder="대표 주소" class="border rounded px-3 py-2"/>
+            <span id="phoneVerifyResult" class="block text-sm"></span>
+          </div>
+        </section>
+
+        <!-- 4. 운영 정보 -->
+        <section>
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">운영시간</label>
+            <input name="businessHours" placeholder="09:00 ~ 20:00" class="border rounded px-3 py-2"/>
+          </div>
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">예약 가능 여부</label>
+            <select name="reservation" class="border rounded px-3 py-2">
+              <option value="가능">예약 가능</option>
+              <option value="불가능">불가</option>
             </select>
           </div>
         </section>
 
-        <!-- 4. 기본 정보 -->
-        <section class="border rounded p-4 bg-white mb-4">
-          <h3 class="text-xl font-semibold mb-4">기본 정보</h3>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="businessName">상호</label>
-            <input id="businessName" name="businessName" class="flex-1 border rounded px-3 py-2" required>
+        <!-- 5. 포트폴리오/현장 사진 -->
+        <section class="border rounded p-3 bg-gray-50">
+          <label class="font-semibold">포트폴리오(작업·시술·시공 사진 등, 최대 5장)</label>
+          <input type="file" name="portfolioImages[]" multiple accept="image/*" class="mb-2"/>
+          <div id="portfolioPreview" class="flex gap-2"></div>
+        </section>
+
+        <!-- 6. 서비스/설명/이벤트/쿠폰 -->
+        <section>
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">서비스/설명</label>
+            <textarea name="serviceDetails" class="border rounded px-3 py-2" rows="3" placeholder="주요 서비스·이력 등"></textarea>
           </div>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="deliveryOption">배달/테이크아웃</label>
-            <select id="deliveryOption" name="deliveryOption" class="flex-1 border rounded px-3 py-2">
-              <option value="가능">가능</option>
-              <option value="불가능">불가능</option>
-            </select>
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">이벤트</label>
+            <input name="event1" placeholder="이벤트 내용" class="border rounded px-3 py-2"/>
+            <input name="event2" placeholder="이벤트 내용" class="border rounded px-3 py-2"/>
           </div>
-          <div class="flex flex-col md:flex-row gap-2 mb-3">
-            <label class="w-32 font-medium" for="businessHours">영업시간</label>
-            <input id="businessHours" name="businessHours" class="flex-1 border rounded px-3 py-2">
+          <div class="flex flex-col gap-2 mb-2">
+            <label class="font-semibold">쿠폰 (직접설정)</label>
+            <input name="coupon" placeholder="예: 10% 할인, 무료체험" class="border rounded px-3 py-2"/>
           </div>
         </section>
 
-        <!-- 5. 서비스/이벤트/기타/연락처/설명/이미지/주소 등 (생략: 기존 구조 유지) -->
-        <!-- ... 위 코드와 동일. 필요하면 아래 전체 소스에 복붙 ... -->
+        <!-- 7. 메뉴 (필요시) -->
+        <section>
+          <label class="font-semibold">메뉴 등록(음식·미용·레슨 등 해당시)</label>
+          <div class="flex flex-col gap-2">
+            <input name="menu1" placeholder="메뉴1" class="border rounded px-3 py-2"/>
+            <input name="menu2" placeholder="메뉴2" class="border rounded px-3 py-2"/>
+          </div>
+        </section>
 
-        <!-- 6. 등록 버튼 -->
-        <div class="text-center space-x-4">
-          <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2 rounded">입력
-            완료</button>
-          <button type="button" onclick="updateData()"
-            class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-2 rounded">수정</button>
+        <!-- 8. 홈페이지/SNS/기타 -->
+        <section>
+          <label class="font-semibold">홈페이지/SNS</label>
+          <input name="homepage" placeholder="홈페이지(선택)" class="border rounded px-3 py-2"/>
+          <input name="instagram" placeholder="인스타그램(선택)" class="border rounded px-3 py-2"/>
+        </section>
+
+        <!-- 9. 주소/지도 -->
+        <section class="border rounded p-3 bg-blue-50">
+          <label class="font-semibold">주소 입력 <span class="text-red-500">*</span></label>
+          <div class="flex gap-2 mb-2">
+            <input name="postalCode" id="postalCode" placeholder="우편번호" readonly class="border rounded px-2 py-2 flex-1"/>
+            <button type="button" onclick="openDaumPostcode()" class="bg-blue-500 text-white rounded px-3 py-2">주소 찾기</button>
+          </div>
+          <input name="roadAddress" id="roadAddress" placeholder="도로명 주소" readonly class="border rounded px-3 py-2 mb-2"/>
+          <input name="detailAddress" id="detailAddress" placeholder="상세 주소" class="border rounded px-3 py-2"/>
+          <div id="map" class="w-full h-48 border rounded mt-3"></div>
+        </section>
+
+        <!-- 10. 등록 -->
+        <div class="text-center pt-2">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-7 py-2 rounded-xl shadow">등록 완료</button>
         </div>
+
       </form>
     </div>
   </main>
   <div id="footer-placeholder"></div>
-
   <script>
-    // 헤더/푸터 불러오기
-    fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById('header-placeholder').innerHTML = d));
-    fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById('footer-placeholder').innerHTML = d));
+    // 아래 기존 코드에서 필요한 기능만 추가/수정해서 사용하면 됩니다.
 
-    // 이메일 입력 유틸
-    function updateEmail() {
-      const id = document.getElementById('emailId').value.trim();
-      const domainSel = document.getElementById('emailDomainSelect');
-      const custom = document.getElementById('customDomainInput').value.trim();
-      const domain = domainSel.value === 'custom' ? custom : domainSel.value;
-      document.getElementById('ownerEmail').value = domain ? `${id}@${domain}` : '';
-    }
-    function handleDomainChange(sel) {
-      const customInp = document.getElementById('customDomainInput');
-      if (sel.value === 'custom') {
-        customInp.classList.remove('hidden');
-        customInp.focus();
-      } else {
-        customInp.classList.add('hidden');
-        updateEmail();
-      }
-    }
-
-    // 카테고리별 서브카테고리 동적 출력
-    const categoryData = {
-      restaurant: ["한식", "중식", "양식", "일식", "분식", "패스트푸드", "치킨", "기타"],
-      hospital: ["동물병원", "내과", "치과", "정형외과", "한의원", "기타"],
-      market: ["농수산물", "의류", "잡화", "생활", "전통음식", "기타"],
-      cafe: ["일반카페", "디저트카페", "테이크아웃", "기타"],
-      academy: ["영어", "수학", "음악", "미술", "컴퓨터", "입시", "기타"],
-      beauty: ["미용실", "이발소", "네일", "피부관리", "기타"],
-      etc: ["기타"]
-    };
-    document.getElementById("mainCategory").addEventListener("change", function () {
-      const sub = document.getElementById("subCategory");
-      sub.innerHTML = `<option value="">서브카테고리 선택</option>`;
-      const val = this.value;
-      if (categoryData[val]) {
-        categoryData[val].forEach(c =>
-          sub.innerHTML += `<option value="${c}">${c}</option>`
-        );
-      }
-    });
-
-    // 사업자 인증(실서버 연동 시 별도 처리 필요)
-    async function verifyBizNumber() {
-      const n1 = document.getElementById('bizNumber1').value.trim();
-      const n2 = document.getElementById('bizNumber2').value.trim();
-      const n3 = document.getElementById('bizNumber3').value.trim();
-      const biz = n1 + n2 + n3;
-      const resEl = document.getElementById('bizVerifyResult');
-      if (!/^\d{10}$/.test(biz)) {
-        resEl.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
-        resEl.className = 'text-sm text-red-600 text-center';
-        return;
-      }
-      try {
-        const r = await fetch('/verify-biz', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ b_no: [biz] })
-        });
-        const d = await r.json();
-        const i = d?.data?.[0];
-        if (i && i.b_stt_cd === '01') {
-          resEl.textContent = `✅ 인증 완료: ${i.b_no}`;
-          resEl.className = 'text-sm text-green-600 text-center';
-          document.getElementById('businessName').value = i.b_nm || '';
-        } else {
-          resEl.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
-          resEl.className = 'text-sm text-red-600 text-center';
-        }
-      } catch (err) {
-        resEl.textContent = '서버 오류로 인증에 실패했습니다.';
-        resEl.className = 'text-sm text-red-600 text-center';
-      }
-    }
-
-    // 휴대폰 인증(예시: 실제 서비스시 외부 SMS API 연동)
-    document.getElementById('verifyPhoneButton').addEventListener('click', () => {
-      const phone = document.getElementById('ownerPhone').value.trim();
-      const resEl = document.getElementById('phoneVerifyResult');
-      if (!phone) {
-        resEl.textContent = '휴대폰 번호를 입력하세요.';
-        resEl.className = 'text-sm text-red-600';
-        return;
-      }
-      // 실제 인증 API로 요청(이 예시에서는 고정 코드)
-      resEl.textContent = '인증번호가 발송되었습니다. (예시: 123456)';
-      resEl.className = 'text-sm text-green-600';
-    });
-    document.getElementById('phoneAuth').addEventListener('blur', function () {
-      const code = this.value.trim();
-      const resEl = document.getElementById('phoneVerifyResult');
-      if (code === '123456') {
-        resEl.textContent = '휴대전화 인증 성공!';
-        resEl.className = 'text-sm text-green-600';
-      } else if (code) {
-        resEl.textContent = '인증번호가 일치하지 않습니다.';
-        resEl.className = 'text-sm text-red-600';
-      }
-    });
-
-    // 폼 제출/검증 (추가 보완 가능)
-    document.getElementById('businessForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        // 필수값 검증 (예시)
-        const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory", "businessName"];
-        for (const k of required) {
-          const v = document.getElementsByName(k)[0]?.value?.trim();
-          if (!v) {
-            alert("필수 정보를 모두 입력하세요!");
-            return;
-          }
-        }
-        const fd = new FormData(e.target);
-        // 실제 업로드/등록 처리
-        const res = await fetch('/store', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error('서버 에러');
-        alert('등록이 완료되었습니다!');
-        // location.href = ... 상세페이지로 이동 등
-      } catch (err) {
-        alert('에러: ' + err.message);
-      }
-    });
+    // ... (Kakao 지도, 포트폴리오 미리보기, 사업자 인증, 휴대폰 인증 등 기존 combinedregister.html 스크립트 코드 복붙/수정) ...
   </script>
 </body>
-
-</html>ㄴ
+</html>
