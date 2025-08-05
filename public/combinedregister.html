@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>통합 정보 등록</title>
+  <link rel="stylesheet" href="/assets/css/tailwind.css" />
+
+  <!-- 다음 우편번호 / Kakao 지도 -->
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=카카오API키&autoload=false&libraries=services"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <div id="header-placeholder"></div>
+
+  <main class="flex-grow container mx-auto px-4 py-8">
+    <div class="bg-white max-w-3xl mx-auto p-8 rounded-lg shadow-lg border-2 border-gray-200">
+      <h2 class="text-3xl font-bold text-center mb-8">통합 정보 등록</h2>
+      <form id="registerForm" class="space-y-6" enctype="multipart/form-data">
+        <!-- [1] 카테고리/서브카테고리 -->
+        <section class="mb-4">
+          <h3 class="text-xl font-semibold mb-2">업종/카테고리</h3>
+          <div class="flex gap-4 flex-col sm:flex-row">
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="category">카테고리</label>
+              <select id="category" name="category" required class="w-full border rounded px-3 py-2">
+                <option value="">카테고리 선택</option>
+                <option value="식당">식당</option>
+                <option value="병원">병원</option>
+                <option value="약국">약국</option>
+                <option value="어린이집">어린이집</option>
+                <option value="학원">학원</option>
+                <option value="마트">마트</option>
+                <option value="편의점">편의점</option>
+                <option value="운동">운동</option>
+                <option value="미용/이발">미용/이발</option>
+                <option value="스터디/독서실">스터디/독서실</option>
+                <option value="목욕">목욕</option>
+                <option value="세탁/옷수선">세탁/옷수선</option>
+                <option value="숙박">숙박</option>
+                <option value="중고/구제">중고/구제</option>
+                <option value="자동차 정비/수리">자동차 정비/수리</option>
+                <option value="주유소">주유소</option>
+                <option value="반려동물">반려동물</option>
+                <option value="가전제품">가전제품</option>
+                <option value="철물/자재">철물/자재</option>
+                <option value="간판/광고">간판/광고</option>
+                <option value="통신/인터넷/TV">통신/인터넷/TV</option>
+                <option value="안경/사진/꽃집">안경/사진/꽃집</option>
+                <!-- 필요시 추가 -->
+              </select>
+            </div>
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="subcategory">세부 분류</label>
+              <select id="subcategory" name="subcategory" required class="w-full border rounded px-3 py-2">
+                <option value="">세부 분류 선택</option>
+                <!-- JS로 동적 로드 -->
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- [2] 상호/대표/연락처 -->
+        <section class="mb-4">
+          <div class="flex gap-4 flex-col sm:flex-row">
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="businessName">상호명</label>
+              <input id="businessName" name="businessName" required placeholder="상호명" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="ownerName">대표자</label>
+              <input id="ownerName" name="ownerName" required placeholder="대표자" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="phoneNumber">대표전화</label>
+              <input id="phoneNumber" name="phoneNumber" required placeholder="전화번호" class="w-full border rounded px-3 py-2" />
+            </div>
+          </div>
+        </section>
+
+        <!-- [3] 주소 + 지도 -->
+        <section class="mb-4">
+          <label class="block font-bold mb-1">주소</label>
+          <div class="flex gap-2 mb-2">
+            <input id="postalCode" name="postalCode" placeholder="우편번호" readonly class="border rounded px-3 py-2 w-32" />
+            <button type="button" onclick="openDaumPostcode()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded">주소 찾기</button>
+          </div>
+          <input id="roadAddress" name="roadAddress" placeholder="도로명 주소" readonly class="w-full border rounded px-3 py-2 mb-2" />
+          <input id="detailAddress" name="detailAddress" placeholder="상세 주소" class="w-full border rounded px-3 py-2 mb-2" />
+          <div id="map" class="w-full h-56 border border-gray-300 rounded mb-2"></div>
+        </section>
+
+        <!-- [4] 업종별 추가항목(동적 노출) -->
+        <section id="extraFields" class="mb-4">
+          <!-- JS에서 필요시 표시됨 -->
+        </section>
+
+        <!-- [5] 설명 -->
+        <section>
+          <label class="block font-bold mb-1" for="desc">상세 설명</label>
+          <textarea id="desc" name="desc" rows="4" class="w-full border rounded px-3 py-2" placeholder="설명/소개/이벤트 등"></textarea>
+        </section>
+
+        <!-- [6] 이미지 등록 -->
+        <section>
+          <label class="block font-bold mb-1" for="images">대표 이미지 (최대 3장)</label>
+          <input type="file" id="images" name="images[]" multiple accept="image/*" class="mb-2" />
+          <div id="imagesPreview" class="flex gap-3"></div>
+        </section>
+
+        <div class="text-center mt-8">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg">등록하기</button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <div id="footer-placeholder"></div>
+
+  <script>
+    // [1] 헤더/푸터 로드
+    fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById('header-placeholder').innerHTML = d));
+    fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById('footer-placeholder').innerHTML = d));
+
+    // [2] 카테고리별 서브카테고리 목록 정의
+    const SUBCATEGORIES = {
+      "식당": ["한식", "양식", "중식", "일식", "치킨", "카페", "분식", "기타"],
+      "병원": ["내과", "소아청소년과", "정형외과", "치과", "한의원", "기타"],
+      "약국": ["일반약국", "24시약국", "동물약국", "기타"],
+      "학원": ["입시", "음악", "미술", "체육", "IT", "기타"],
+      // ...카테고리별 세부 분류 (필요시 확장)
+    };
+
+    // [3] 카테고리 선택시 서브카테고리 옵션 변경
+    document.getElementById("category").addEventListener("change", function() {
+      const v = this.value;
+      const sub = document.getElementById("subcategory");
+      sub.innerHTML = '<option value="">세부 분류 선택</option>';
+      (SUBCATEGORIES[v] || []).forEach(sc => {
+        sub.innerHTML += `<option value="${sc}">${sc}</option>`;
+      });
+      // [4] 업종별 추가필드 동적 노출 예시
+      showExtraFields(v);
+    });
+
+    // [4] 업종별 추가항목 예시 (필요한 업종만)
+    function showExtraFields(cat) {
+      const extra = document.getElementById("extraFields");
+      extra.innerHTML = "";
+      if (cat === "병원") {
+        extra.innerHTML = `
+          <div class="flex gap-4 flex-col sm:flex-row mb-2">
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="department">진료과목</label>
+              <input id="department" name="department" placeholder="예: 내과, 정형외과" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div class="flex-1">
+              <label class="block font-bold mb-1" for="open24">24시 여부</label>
+              <select id="open24" name="open24" class="w-full border rounded px-3 py-2">
+                <option value="아니오">아니오</option>
+                <option value="예">예</option>
+              </select>
+            </div>
+          </div>
+        `;
+      } else if (cat === "약국") {
+        extra.innerHTML = `
+          <div>
+            <label class="block font-bold mb-1" for="open24">24시 운영</label>
+            <select id="open24" name="open24" class="w-full border rounded px-3 py-2">
+              <option value="아니오">아니오</option>
+              <option value="예">예</option>
+            </select>
+          </div>
+        `;
+      }
+      // 필요시 다른 카테고리별로 추가 가능
+    }
+
+    // [5] 이미지 미리보기
+    document.getElementById('images').addEventListener('change', function() {
+      const preview = document.getElementById('imagesPreview');
+      preview.innerHTML = '';
+      Array.from(this.files).slice(0, 3).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.className = 'w-32 h-20 object-cover border border-gray-300 rounded';
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    // [6] 주소 검색 + Kakao 지도 연동
+    kakao.maps.load(() => { window.kakaoReady = true; });
+    function openDaumPostcode() {
+      new daum.Postcode({
+        oncomplete: (data) => {
+          document.getElementById('postalCode').value = data.zonecode;
+          document.getElementById('roadAddress').value = data.roadAddress;
+          updateMap(data.roadAddress);
+          document.getElementById('detailAddress').focus();
+        }
+      }).open();
+    }
+    let map, marker;
+    function updateMap(addr) {
+      if (!window.kakaoReady) return;
+      const mapEl = document.getElementById('map');
+      if (!map) {
+        map = new kakao.maps.Map(mapEl, {
+          center: new kakao.maps.LatLng(37.5665, 126.978),
+          level: 3
+        });
+      }
+      const geocoder = new kakao.maps.services.Geocoder();
+      geocoder.addressSearch(addr, (res, status) => {
+        if (status === kakao.maps.services.Status.OK) {
+          const coords = new kakao.maps.LatLng(res[0].y, res[0].x);
+          map.setCenter(coords);
+          if (marker) marker.setPosition(coords);
+          else marker = new kakao.maps.Marker({ map, position: coords });
+        }
+      });
+    }
+    document.getElementById('detailAddress').addEventListener('blur', () => {
+      const base = document.getElementById('roadAddress').value.trim();
+      const detail = document.getElementById('detailAddress').value.trim();
+      if (base || detail) updateMap(`${base} ${detail}`);
+    });
+
+    // [7] 폼 제출
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      try {
+        const fd = new FormData(this);
+        // 가격, 이미지, 추가필드 등 전송 처리 필요시 여기서 가공
+        const res = await fetch('/store', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('등록 실패');
+        alert('등록 완료!');
+        location.href = '/index.html';
+      } catch (err) {
+        alert('등록 에러!');
+      }
+    });
+  </script>
+</body>
+</html>
