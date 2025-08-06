@@ -4,364 +4,519 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>통합 정보 상세</title>
+    <title>통합 정보 등록</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Daum 우편번호 / Kakao 지도 -->
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&autoload=false&libraries=services"></script>
+    <style>
+        /* 네오모피즘+글래스+3D 효과 박스 */
+        .neo-glass-3d {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 2rem;
+            box-shadow:
+                8px 8px 32px #e5e8f0,
+                -8px -8px 32px #fff,
+                0 4px 32px 0 rgba(80, 130, 255, 0.07);
+            backdrop-filter: blur(18px) saturate(120%);
+            -webkit-backdrop-filter: blur(18px) saturate(120%);
+            border: 1.5px solid rgba(180, 200, 255, 0.10);
+            transition: box-shadow .23s, border-color .2s;
+        }
+
+        .neo-glass-3d:focus-within,
+        .neo-glass-3d:hover {
+            box-shadow:
+                4px 4px 18px #dae3f6,
+                -4px -4px 18px #fff,
+                0 8px 48px 0 rgba(80, 130, 255, 0.10);
+            border-color: #60a5fa55;
+        }
+
+        /* 3D 버튼 */
+        .btn-3d {
+            background: linear-gradient(90deg, #6dd5fa 0%, #2980b9 100%);
+            box-shadow: 0 4px 0 #2393b3, 0 8px 18px rgba(0, 64, 128, 0.14);
+            color: white;
+            font-weight: 700;
+            border-radius: 1.3rem;
+            padding: .75rem 2.5rem;
+            font-size: 1.1rem;
+            border: none;
+            outline: none;
+            transition: all .15s cubic-bezier(.21, .82, .69, .98);
+        }
+
+        .btn-3d:active {
+            box-shadow: 0 1.5px 0 #2393b3, 0 2px 6px rgba(0, 64, 128, 0.16);
+            transform: translateY(2px) scale(.98);
+        }
+
+        /* 입체 입력 */
+        .input-neo {
+            background: #f6f9fd;
+            border-radius: .8rem;
+            box-shadow:
+                1.5px 1.5px 6px #e4e9f2,
+                -1.5px -1.5px 6px #ffffff;
+            border: 1px solid #d3e4f7;
+            transition: box-shadow .14s, border-color .13s;
+            font-size: 1.06rem;
+        }
+
+        .input-neo:focus {
+            border-color: #60a5fa;
+            box-shadow:
+                0 0 0 1.5px #60a5fa44,
+                1.5px 1.5px 6px #e4e9f2,
+                -1.5px -1.5px 6px #ffffff;
+            outline: none;
+        }
+
+        /* 박스별 section title */
+        .section-label {
+            background: linear-gradient(90deg, #bae6fd 0%, #f0f7ff 100%);
+            color: #2b445c;
+            box-shadow:
+                0 2px 12px 2px #f3f9ff,
+                0 0px 0 #bae6fd;
+            border-radius: 1.2rem 1.2rem 0 0;
+            padding: 1.1rem 2.2rem .9rem 2.2rem;
+            font-size: 1.16rem;
+            font-weight: 800;
+            letter-spacing: .05em;
+            border-bottom: 2px solid #cde3fa;
+            margin-bottom: 2.1rem;
+            text-shadow: 0 1.5px 0 #b2e4ff38;
+        }
+    </style>
 </head>
 
-<body class="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen">
-    <main class="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto p-4">
-        <!-- 1. 왼쪽: 이미지/지도/광고 -->
-        <section class="flex-1 flex flex-col gap-6">
-            <div class="rounded-3xl bg-white shadow-xl p-6 flex flex-col items-center">
-                <div class="w-full relative">
-                    <div id="sliderWrapper" class="relative w-full h-80 rounded-2xl overflow-hidden shadow">
-                        <div id="sliderImages" class="flex transition-transform duration-500 ease-in-out h-full"></div>
-                        <button id="prevBtn"
-                            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/70 text-white rounded-full px-3 py-1 opacity-80 hover:opacity-100 z-10">‹</button>
-                        <button id="nextBtn"
-                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/70 text-white rounded-full px-3 py-1 opacity-80 hover:opacity-100 z-10">›</button>
+<body class="bg-white flex flex-col min-h-screen">
+    <div id="header-placeholder"></div>
+    <main class="flex-grow container mx-auto px-2 py-8">
+        <div class="neo-glass-3d max-w-2xl mx-auto p-5 sm:p-8">
+            <h2 class="text-3xl font-bold text-center mb-8 drop-shadow">정보 등록</h2>
+            <form id="businessForm" class="space-y-7" enctype="multipart/form-data" autocomplete="off">
+                <input type="hidden" id="storeId" name="storeId">
+
+                <!-- 1. 사업자 인증 -->
+                <section class="rounded-2xl p-5 bg-yellow-50/80 mb-5 shadow-inner">
+                    <div class="section-label">사업자 등록 인증</div>
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <label class="w-36 font-medium flex items-center justify-center">사업자 번호</label>
+                        <div class="flex flex-nowrap items-center gap-2 w-full">
+                            <input id="bizNumber1" name="bizNumber1" maxlength="4" placeholder="123"
+                                class="w-[90px] input-neo px-2 py-2" inputmode="numeric" />
+                            <span>-</span>
+                            <input id="bizNumber2" name="bizNumber2" maxlength="2" placeholder="45"
+                                class="w-[60px] input-neo px-2 py-2" inputmode="numeric" />
+                            <span>-</span>
+                            <input id="bizNumber3" name="bizNumber3" maxlength="5" placeholder="67890"
+                                class="w-[100px] input-neo px-2 py-2" inputmode="numeric" />
+                            <button type="button" onclick="verifyBizNumber()" class="btn-3d ml-2">인증</button>
+                        </div>
                     </div>
-                    <div id="thumbBox" class="flex gap-2 justify-center mt-3"></div>
-                </div>
-                <div class="text-center font-bold mt-2">대표 이미지</div>
-            </div>
-            <div class="rounded-3xl bg-white shadow-xl p-6">
-                <div class="text-lg font-bold mb-2">위치/지도</div>
-                <div id="addressText" class="mb-2 text-base"></div>
-                <div id="map" class="w-full h-48 bg-gray-100 rounded-xl"></div>
-            </div>
-            <div class="flex flex-col gap-4">
-                <div class="rounded-3xl bg-white shadow-xl p-3">
-                    <img src="/images/ad-1.jpg" alt="광고1" class="rounded-xl w-full h-28 object-cover" />
-                </div>
-                <div class="rounded-3xl bg-white shadow-xl p-3">
-                    <img src="/images/ad-2.jpg" alt="광고2" class="rounded-xl w-full h-28 object-cover" />
-                </div>
-            </div>
-        </section>
+                    <div class="flex flex-col md:flex-row md:items-center gap-2 mt-3">
+                        <label class="w-32 font-medium shrink-0" for="businessCertImage">등록증 이미지</label>
+                        <input type="file" id="businessCertImage" name="businessCertImage"
+                            accept="image/*,application/pdf" class="flex-1 input-neo px-3 py-2">
+                    </div>
+                    <p class="text-sm text-center mt-2">*사업자 등록증은 <span class="text-red-600">3개월 이내</span> 발급분만 인정</p>
+                    <p id="bizVerifyResult" class="text-sm text-center"></p>
+                </section>
 
-        <!-- 2. 가운데: 모든 가게 상세정보 (모든 필드 출력) -->
-        <section class="flex-[1.1] flex flex-col gap-6">
-            <div class="rounded-3xl bg-white shadow-xl p-6">
-                <h2 id="businessNameHeader" class="text-3xl font-bold text-center mb-2"></h2>
-                <!-- 예약신청 버튼 추가 -->
-                <div class="flex justify-center mt-2">
-                    <button id="reserveBtn"
-                        class="bg-blue-500 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">예약
-                        신청</button>
-                </div>
-                <div class="flex flex-col gap-1 text-center text-base font-semibold">
-                    <div id="businessType"></div>
-                    <div id="businessCategory"></div>
-                    <div id="deliveryOption"></div>
-                    <div id="businessHours"></div>
-                </div>
-            </div>
-            <div class="rounded-2xl bg-blue-50 shadow p-6">
-                <div class="font-semibold mb-1">서비스 내용</div>
-                <div id="serviceDetails"></div>
-            </div>
-            <div class="rounded-2xl bg-yellow-50 shadow p-6">
-                <div class="font-semibold mb-1">이벤트</div>
-                <ul id="eventsList" class="list-disc ml-5"></ul>
-            </div>
-            <div class="rounded-2xl bg-gray-50 shadow p-6">
-                <div class="font-semibold mb-1">기타 정보</div>
-                <ul id="infoEtcList" class="list-disc pl-5"></ul>
-            </div>
-            <div class="rounded-2xl bg-blue-50 shadow p-6">
-                <div class="font-semibold mb-1">추가 설명</div>
-                <div id="additionalDesc"></div>
-            </div>
-            <div class="rounded-2xl bg-gray-50 shadow p-6">
-                <div class="font-semibold mb-1">연락처</div>
-                <!-- 전화번호를 tel: 링크로 감싸기 -->
-                <div id="contactPhone"></div>
-                <div id="contactHomepage"></div>
-                <div id="contactInstagram"></div>
-                <div id="contactFacebook"></div>
-            </div>
-        </section>
+                <!-- 2. 대표 정보 -->
+                <section class="rounded-2xl p-5 bg-indigo-50/80 mb-5 shadow-inner">
+                    <div class="section-label">대표 정보</div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="ownerName">성함</label>
+                        <input id="ownerName" name="ownerName" class="flex-1 input-neo px-3 py-2" required>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="birthDate">생년월일</label>
+                        <input type="date" id="birthDate" name="birthDate" class="flex-1 input-neo px-3 py-2" required>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="emailId">이메일</label>
+                        <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                            <input id="emailId" placeholder="아이디" oninput="updateEmail()"
+                                class="flex-1 min-w-0 input-neo px-3 py-2">
+                            <span>@</span>
+                            <select id="emailDomainSelect" onchange="handleDomainChange(this)"
+                                class="flex-1 min-w-0 input-neo px-3 py-2">
+                                <option value="">선택</option>
+                                <option value="naver.com">naver.com</option>
+                                <option value="gmail.com">gmail.com</option>
+                                <option value="daum.net">daum.net</option>
+                                <option value="custom">직접입력</option>
+                            </select>
+                            <input id="customDomainInput" placeholder="도메인" oninput="updateEmail()"
+                                class="hidden flex-1 min-w-0 input-neo px-3 py-2">
+                        </div>
+                        <input type="hidden" id="ownerEmail" name="ownerEmail">
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="ownerAddress">주소</label>
+                        <input id="ownerAddress" name="ownerAddress" class="flex-1 input-neo px-3 py-2">
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2">
+                        <label class="w-32 font-medium" for="ownerPhone">휴대폰</label>
+                        <input id="ownerPhone" name="ownerPhone" class="flex-1 input-neo px-3 py-2" required>
+                        <button type="button" id="verifyPhoneButton" class="btn-3d">인증번호 요청</button>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mt-2">
+                        <label class="w-32 font-medium" for="phoneAuth">인증번호</label>
+                        <input id="phoneAuth" name="phoneAuth" class="flex-1 input-neo px-3 py-2">
+                    </div>
+                    <p id="phoneVerifyResult" class="text-sm text-center"></p>
+                </section>
 
-        <!-- 3. 오른쪽: 메뉴/장바구니 -->
-        <section id="menuCartSection" class="flex-1 flex flex-col gap-6">
-            <div class="rounded-3xl bg-white shadow-xl p-6">
-                <div class="text-xl font-bold mb-4 text-center">메뉴</div>
-                <div id="menuList" class="flex flex-col gap-3"></div>
-            </div>
-            <div class="rounded-2xl bg-yellow-50 shadow p-6">
-                <div class="font-bold mb-2">장바구니</div>
-                <ul id="cartItems" class="space-y-2 text-base"></ul>
-                <div class="flex justify-between items-center mt-4">
-                    <span class="font-bold text-gray-800">합계:</span>
-                    <span id="cartTotal" class="text-2xl font-bold text-blue-700">0원</span>
-                </div>
-                <button class="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg shadow">결제하기</button>
-            </div>
-        </section>
-    </main>
+                <!-- 3. 카테고리/서브카테고리 선택 (동적 출력) -->
+                <section class="rounded-2xl p-5 bg-gray-50/90 mb-5 shadow-inner">
+                    <div class="section-label">업종(카테고리) 선택</div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-2">
+                        <label class="w-32 font-medium">카테고리</label>
+                        <select id="mainCategory" name="mainCategory" class="flex-1 input-neo px-3 py-2"
+                            required></select>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2">
+                        <label class="w-32 font-medium">서브카테고리</label>
+                        <select id="subCategory" name="subCategory" class="flex-1 input-neo px-3 py-2"
+                            required></select>
+                    </div>
+                </section>
 
-    <!-- 이미지 모달 등 추가 가능 -->
-    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
-        <div class="relative">
-            <img id="modalImage" class="w-[600px] h-[400px] object-contain rounded shadow-xl" />
-            <button id="closeModal"
-                class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">×</button>
+                <!-- 4. 기본 정보 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">기본 정보</div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="businessName">상호</label>
+                        <input id="businessName" name="businessName" class="flex-1 input-neo px-3 py-2" required>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="deliveryOption">배달/테이크아웃</label>
+                        <select id="deliveryOption" name="deliveryOption" class="flex-1 input-neo px-3 py-2">
+                            <option value="가능">가능</option>
+                            <option value="불가능">불가능</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-2 mb-3">
+                        <label class="w-32 font-medium" for="businessHours">영업시간</label>
+                        <input id="businessHours" name="businessHours" class="flex-1 input-neo px-3 py-2">
+                    </div>
+                </section>
+
+                <!-- 메뉴 입력 토글 버튼(처음만 노출) -->
+                <button type="button" id="showMenuSectionBtn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded">
+                    메뉴 입력
+                </button>
+
+                <!-- 메뉴 입력 영역 (초기 숨김) -->
+                <div id="menu-section" class="hidden mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="font-semibold text-lg">메뉴 입력</div>
+                        <div class="flex gap-2">
+                            <button type="button" id="addCategoryBtn" class="bg-blue-500 text-white px-3 py-1 rounded">+
+                                카테고리
+                                추가</button>
+                            <button type="button" id="closeMenuSectionBtn"
+                                class="bg-gray-400 text-white px-3 py-1 rounded">메뉴
+                                닫기</button>
+                        </div>
+                    </div>
+                    <!-- 여기에 카테고리별 메뉴박스가 추가됨 -->
+                    <div id="menuCategoryContainer" class="space-y-5"></div>
+                </div>
+
+
+                <!-- 메뉴 카테고리 (드롭다운) -->
+                <div class="flex flex-col md:flex-row md:items-center gap-2 mb-3 relative hidden">
+                    <label class="w-32 font-medium shrink-0" for="subcategoryDisplay">메뉴 카테고리</label>
+
+                    <!-- 선택된 값 표시 -->
+                    <input id="subcategoryDisplay" readonly placeholder="선택"
+                        class="flex-1 border rounded px-3 py-2 bg-gray-100 cursor-pointer">
+
+                    <!-- 토글 버튼 -->
+                    <button type="button" id="subcategoryToggle"
+                        class="shrink-0 bg-gray-300 px-3 py-2 rounded">▼</button>
+
+                    <!-- 실제 서버로 보낼 값 -->
+                    <input type="hidden" id="businessSubcategory" name="businessSubcategory">
+                </div>
+
+                <!-- 5. 서비스 내용 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">서비스 내용</div>
+                    <textarea id="serviceDetails" name="serviceDetails" class="input-neo w-full min-h-[90px] px-3 py-2"
+                        placeholder="서비스·메뉴·예약 정보 등을 입력하세요."></textarea>
+                </section>
+
+                <!-- 6. 고객 이벤트 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">고객 이벤트</div>
+                    <div class="flex flex-col gap-3">
+                        <input id="event1" name="event1" class="input-neo px-3 py-2"
+                            placeholder="이벤트 내용 1 (예: 신규가입 쿠폰 증정)">
+                        <input id="event2" name="event2" class="input-neo px-3 py-2" placeholder="이벤트 내용 2 (예: 2+1 행사)">
+                    </div>
+                </section>
+
+                <!-- 7. 기타 정보 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">기타 정보</div>
+                    <div class="flex flex-col gap-3">
+                        <input id="facility" name="facility" class="input-neo px-3 py-2"
+                            placeholder="장애인 편의시설 (예: 있음/없음)">
+                        <input id="pets" name="pets" class="input-neo px-3 py-2" placeholder="반려동물 출입 (예: 가능/불가능)">
+                        <input id="parking" name="parking" class="input-neo px-3 py-2" placeholder="주차 정보 (예: 전용/유료)">
+                    </div>
+                </section>
+
+                <!-- 8. 연락처 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">연락처</div>
+                    <div class="flex flex-col gap-3">
+                        <input id="phoneNumber" name="phoneNumber" class="input-neo px-3 py-2"
+                            placeholder="대표전화 (예: 02-123-4567)">
+                        <input id="homepage" name="homepage" class="input-neo px-3 py-2" placeholder="홈페이지 (URL)">
+                        <input id="instagram" name="instagram" class="input-neo px-3 py-2" placeholder="Instagram URL">
+                        <input id="facebook" name="facebook" class="input-neo px-3 py-2" placeholder="Facebook URL">
+                    </div>
+                </section>
+
+                <!-- 9. 추가 설명 -->
+                <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
+                    <div class="section-label">추가 설명</div>
+                    <textarea id="additionalDesc" name="additionalDesc" class="input-neo w-full min-h-[90px] px-3 py-2"
+                        placeholder="추가 설명을 입력하세요."></textarea>
+                </section>
+
+
+                <!-- 5. 등록 버튼 -->
+                <div class="text-center space-x-4 mt-8">
+                    <button type="submit" class="btn-3d">입력 완료</button>
+                    <button type="button" onclick="updateData()"
+                        class="btn-3d bg-gradient-to-r from-green-400 to-green-700 hover:from-green-600 hover:to-green-900 ml-2">수정</button>
+                </div>
+            </form>
         </div>
-    </div>
-    <script type="module">
-        // 유틸 함수
-        const $ = id => document.getElementById(id);
+    </main>
+    <div id="footer-placeholder"></div>
 
-        // 안전하게 storeId 추출 (주소 ?id=1)
-        const storeId = Number(new URLSearchParams(location.search).get("id")) || 1;
+    <script>
+        // 헤더/푸터 불러오기
+        fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById('header-placeholder').innerHTML = d));
+        fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById('footer-placeholder').innerHTML = d));
 
-        // 이미지 모달
-        function openModal(src) { $("modalImage").src = src; $("imageModal").classList.remove("hidden"); }
-        function closeModal() { $("imageModal").classList.add("hidden"); }
-
-        // 슬라이더 객체
-        const slider = {
-            imgs: [], idx: 0,
-            init(arr) {
-                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/"))).map(s => s.trim());
-                if (!this.imgs.length) this.imgs = ["/no-image.png"];
-                $("sliderImages").innerHTML = this.imgs.map((u, i) =>
-                    `<img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`).join('');
-                $("sliderImages").onclick = (e) => {
-                    if (e.target.tagName === "IMG") {
-                        this.idx = Number(e.target.dataset.index);
-                        this.update();
-                        openModal(this.imgs[this.idx]);
-                    }
-                };
-                this.renderThumbs();
-                this.update();
-                $("prevBtn").onclick = () => this.move(-1);
-                $("nextBtn").onclick = () => this.move(1);
-                const firstImg = $("sliderImages").querySelector('img');
-                if (firstImg) {
-                    firstImg.onload = () => syncToAdEnd();
-                    if (firstImg.complete) syncToAdEnd();
-                } else {
-                    syncToAdEnd();
-                }
-            },
-            renderThumbs() {
-                const box = $("thumbBox");
-                box.innerHTML = "";
-                this.imgs.forEach((src, i) => {
-                    if (!src.startsWith("http") && !src.startsWith("/")) return;
-                    const t = document.createElement("img");
-                    t.src = src;
-                    t.alt = `이미지 ${i + 1}`;
-                    t.className = "w-14 h-14 object-cover rounded cursor-pointer border hover:opacity-80";
-                    t.addEventListener("click", () => {
-                        this.idx = i; this.update(); openModal(src);
-                    });
-                    box.appendChild(t);
-                });
-            },
-            move(step) { this.idx = (this.idx + step + this.imgs.length) % this.imgs.length; this.update(); },
-            update() {
-                $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
-                [...$("thumbBox").children].forEach((el, i) => {
-                    el.classList.toggle("ring-2", i === this.idx);
-                    el.classList.toggle("ring-blue-300", i === this.idx);
-                });
+        // 이메일 입력 유틸
+        function updateEmail() {
+            const id = document.getElementById('emailId').value.trim();
+            const domainSel = document.getElementById('emailDomainSelect');
+            const custom = document.getElementById('customDomainInput').value.trim();
+            const domain = domainSel.value === 'custom' ? custom : domainSel.value;
+            document.getElementById('ownerEmail').value = domain ? `${id}@${domain}` : '';
+        }
+        function handleDomainChange(sel) {
+            const customInp = document.getElementById('customDomainInput');
+            if (sel.value === 'custom') {
+                customInp.classList.remove('hidden');
+                customInp.focus();
+            } else {
+                customInp.classList.add('hidden');
+                updateEmail();
             }
+        }
+
+        // 카테고리별 서브카테고리 동적 출력
+        const categoryData = {
+            //"식당": ["한식", "중식", "양식", "일식", "분식", "패스트푸드", "치킨", "족발/보쌈", "피자", "야식", "디저트", "기타"],
+            "병원": ["종합병원", "내과", "치과", "소아과", "정형외과", "산부인과", "한의원", "동물병원", "기타"],
+            "약국": ["일반약국", "24시약국", "한약방", "기타"],
+            "어린이집": ["국공립", "민간", "가정", "직장", "기타"],
+            "학원": ["입시학원", "영어", "수학", "음악", "미술", "컴퓨터", "체육", "독서실", "기타"],
+            "마트": ["대형마트", "중소마트", "슈퍼마켓", "시장", "기타"],
+            "편의점": ["CU", "GS25", "세븐일레븐", "이마트24", "미니스톱", "기타"],
+            "운동": ["헬스장", "필라테스", "요가", "태권도", "스포츠센터", "기타"],
+            "미용/이발": ["미용실", "이발소", "네일", "피부관리", "왁싱", "기타"],
+            "스터디/독서실": ["스터디룸", "독서실", "도서관", "기타"],
+            "목욕": ["대중목욕탕", "사우나", "찜질방", "스파", "기타"],
+            "세탁/옷수선": ["세탁소", "옷수선", "신발수선", "기타"],
+            "숙박": ["호텔", "모텔", "게스트하우스", "펜션", "기타"],
+            "중고/구제": ["중고가전", "중고가구", "중고명품", "리사이클", "기타"],
+            "자동차 정비/수리등": ["카센터", "정비소", "자동차용품", "타이어", "기타"],
+            "주유소": ["직영주유소", "자가주유소", "충전소", "기타"],
+            "반려동물": ["애견미용", "애견호텔", "애견카페", "동물용품", "펫시터", "기타"],
+            "가전제품": ["가전판매", "가전수리", "휴대폰", "PC", "기타"],
+            "철물 / 자재": ["철물점", "건축자재", "인테리어자재", "기타"],
+            "간판 / 광고": ["간판제작", "인쇄", "홍보물", "기타"],
+            "통신 / 인터넷 / TV": ["SK", "KT", "LG", "인터넷", "IPTV", "기타"],
+            "안경 / 사진 / 꽃집": ["안경점", "사진관", "꽃집", "화원", "기타"]
+        };
+        // 빼고 싶은 카테고리
+        const excluded = ["식당", "전통시장", "공연"];
+        const mainCatSel = document.getElementById("mainCategory");
+        mainCatSel.innerHTML = '<option value="">카테고리 선택</option>';
+
+        Object.keys(categoryData).forEach(key => {
+            if (!excluded.includes(key)) {
+                mainCatSel.innerHTML += `<option value="${key}">${key}</option>`;
+            }
+        });
+
+        // [2] 메인 카테고리 선택 시 서브카테고리 변경
+        mainCatSel.addEventListener("change", function () {
+            const subSel = document.getElementById("subCategory");
+            subSel.innerHTML = `<option value="">서브카테고리 선택</option>`;
+            const val = this.value;
+            if (categoryData[val]) {
+                categoryData[val].forEach(c =>
+                    subSel.innerHTML += `<option value="${c}">${c}</option>`
+                );
+            }
+        });
+
+        // --- 1. 사업자 인증만 담당! ---
+        async function verifyBizNumber() {
+            const n1 = document.getElementById('bizNumber1').value.trim();
+            const n2 = document.getElementById('bizNumber2').value.trim();
+            const n3 = document.getElementById('bizNumber3').value.trim();
+            const biz = n1 + n2 + n3;
+            const resEl = document.getElementById('bizVerifyResult');
+            if (!/^\d{10}$/.test(biz)) {
+                resEl.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
+                resEl.className = 'text-sm text-red-600 text-center';
+                return;
+            }
+            try {
+                const r = await fetch('/verify-biz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ b_no: [biz] })
+                });
+                const d = await r.json();
+                const i = d?.data?.[0];
+                if (i && i.b_stt_cd === '01') {
+                    resEl.textContent = `✅ 인증 완료: ${i.b_no}`;
+                    resEl.className = 'text-sm text-green-600 text-center';
+                    document.getElementById('businessName').value = i.b_nm || '';
+                } else {
+                    resEl.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
+                    resEl.className = 'text-sm text-red-600 text-center';
+                }
+            } catch (err) {
+                resEl.textContent = '서버 오류로 인증에 실패했습니다.';
+                resEl.className = 'text-sm text-red-600 text-center';
+            }
+        }
+
+        // --- 2. 휴대폰 인증 (함수 외부에 있어야 함) ---
+        document.getElementById('verifyPhoneButton').addEventListener('click', () => {
+            const phone = document.getElementById('ownerPhone').value.trim();
+            const resEl = document.getElementById('phoneVerifyResult');
+            if (!phone) {
+                resEl.textContent = '휴대폰 번호를 입력하세요.';
+                resEl.className = 'text-sm text-red-600';
+                return;
+            }
+            resEl.textContent = '인증번호가 발송되었습니다. (예시: 123456)';
+            resEl.className = 'text-sm text-green-600';
+        });
+        document.getElementById('phoneAuth').addEventListener('blur', function () {
+            const code = this.value.trim();
+            const resEl = document.getElementById('phoneVerifyResult');
+            if (code === '123456') {
+                resEl.textContent = '휴대전화 인증 성공!';
+                resEl.className = 'text-sm text-green-600';
+            } else if (code) {
+                resEl.textContent = '인증번호가 일치하지 않습니다.';
+                resEl.className = 'text-sm text-red-600';
+            }
+        });
+
+        // --- 3. 메뉴 입력 토글 (함수 외부에 있어야 함) ---
+        document.getElementById('showMenuSectionBtn').onclick = function () {
+            document.getElementById('menu-section').classList.remove('hidden');
+            this.style.display = 'none';
+        };
+        document.getElementById('closeMenuSectionBtn').onclick = function () {
+            document.getElementById('menu-section').classList.add('hidden');
+            document.getElementById('showMenuSectionBtn').style.display = '';
         };
 
-        // 모달 단축키
-        (function enableModalKeys() {
-            const modal = $("imageModal");
-            modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-            window.addEventListener("keydown", (e) => {
-                if (modal.classList.contains("hidden")) return;
-                if (e.key === "ArrowLeft") { slider.move(-1); $("modalImage").src = slider.imgs[slider.idx]; }
-                if (e.key === "ArrowRight") { slider.move(1); $("modalImage").src = slider.imgs[slider.idx]; }
-                if (e.key === "Escape") closeModal();
+        // --- 4. 메뉴/카테고리 기능도 외부에 위치 ---
+        let categoryIdx = 0;
+        function createCategoryBox(idx) {
+            return `
+        <div class="border p-4 rounded-xl mb-4 bg-indigo-50 shadow" data-category-idx="${idx}">
+          <div class="flex items-center mb-3">
+            <input name="categoryName[]" placeholder="카테고리명 (예: 돈가스, 커트)" class="input-neo px-3 py-2 w-56 mr-3" required>
+            <button type="button" class="removeCategoryBtn px-2 py-1 bg-red-400 text-white rounded">카테고리 삭제</button>
+          </div>
+          <div class="menus-in-category"></div>
+          <button type="button" class="addMenuInCategoryBtn bg-green-500 text-white px-2 py-1 rounded mt-2">+ 메뉴 추가</button>
+        </div>
+      `;
+        }
+        document.getElementById('addCategoryBtn').onclick = function () {
+            const container = document.getElementById('menuCategoryContainer');
+            container.insertAdjacentHTML('beforeend', createCategoryBox(categoryIdx++));
+            bindCategoryEvents();
+        };
+
+        function bindCategoryEvents() {
+            document.querySelectorAll('.removeCategoryBtn').forEach(btn => {
+                btn.onclick = function () {
+                    this.closest('[data-category-idx]').remove();
+                };
             });
-            $("closeModal").addEventListener('click', closeModal);
-        })();
-
-        // 장바구니
-        const cart = [];
-        function addToCart(item) {
-            const found = cart.find(c => c.menu_name === item.menu_name);
-            if (found) found.quantity += item.quantity; else cart.push({ ...item });
-            renderCart();
-        }
-        function renderCart() {
-            const ul = $("cartItems"); if (!ul) return;
-            ul.innerHTML = "";
-            let sum = 0;
-            cart.forEach((item, index) => {
-                const price = Number(item.menu_price) || 0;
-                const qty = Number(item.quantity) || 1;
-                const total = price * qty; sum += total;
-                const li = document.createElement("li");
-                li.className = "flex justify-between items-center text-lg py-2";
-                li.innerHTML = `
-        <span>${item.menu_name} × ${qty}</span>
-        <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-        <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
-                ul.appendChild(li);
-            });
-            ul.querySelectorAll(".removeBtn").forEach(btn => {
-                btn.onclick = () => { cart.splice(btn.dataset.index, 1); renderCart(); };
-            });
-            $("cartTotal").textContent = sum.toLocaleString();
-        }
-
-        // 지도 관련(서버에 /kakao-key 라우트 없으면 이 부분 통째로 주석 처리!)
-        async function loadKakaoSdk() {
-            // const r = await fetch("/kakao-key");
-            // const { key } = await r.json();
-            // await new Promise((resolve, reject) => {
-            //   const s = document.createElement("script");
-            //   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
-            //   s.defer = true;
-            //   s.onload = () => kakao.maps.load(resolve);
-            //   s.onerror = () => reject("Kakao SDK load error");
-            //   document.head.appendChild(s);
-            // });
-        }
-        async function initMap(storeAddress, storeName = "") {
-            // 서버에 kakao-key 라우트 없으면 아래 코드 주석!
-            // try {
-            //   await loadKakaoSdk();
-            //   const geocoder = new kakao.maps.services.Geocoder();
-            //   const cleanedAddress = (storeAddress || "").replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
-            //   geocoder.addressSearch(cleanedAddress, (result, status) => {
-            //     if (status !== kakao.maps.services.Status.OK) return;
-            //     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-            //     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-            //     const marker = new kakao.maps.Marker({ map, position: coords });
-            //     if (storeName) {
-            //       const overlay = new kakao.maps.CustomOverlay({
-            //         position: marker.getPosition(),
-            //         content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${storeName}</div>`,
-            //         yAnchor: 1
-            //       });
-            //       overlay.setMap(map);
-            //     }
-            //   });
-            // } catch (e) {}
-        }
-
-        // (1) fetch해서 데이터 바인딩
-        (async () => {
-            try {
-                const res = await fetch(`/store/${storeId}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const { store, menus = [] } = await res.json();
-
-                // 1. 슬라이더
-                slider.init(store.images || [store.image1, store.image2, store.image3].filter(Boolean));
-
-                // 2. 중앙 필드 (snake_case! camelCase 절대 X)
-                $("businessNameHeader").textContent = store.business_name ?? "상호명 없음";
-                $("businessType").textContent = "업종: " + (store.business_type || "-");
-                $("businessCategory").textContent = "카테고리: " + (store.business_category || "-");
-                $("deliveryOption").textContent = "배달: " + (store.delivery_option || "-");
-                $("businessHours").textContent = "영업시간: " + (store.business_hours || "-");
-                $("serviceDetails").textContent = store.service_details || "-";
-                $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(e => `<li>${e}</li>`).join("");
-                $("infoEtcList").innerHTML = `
-        <li>장애인 편의시설: ${store.facility ?? "-"}</li>
-        <li>반려동물 출입: ${store.pets ?? "-"}</li>
-        <li>주차 정보: ${store.parking ?? "-"}</li>`;
-                $("additionalDesc").textContent = store.additional_desc || "-";
-                // 연락처(전화는 tel:)
-                const phoneNum = store.phone_number || "";
-                $("contactPhone").innerHTML = phoneNum
-                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, '')}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
-                    : "-";
-                $("contactHomepage").innerHTML = store.homepage ? `<a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>` : "";
-                $("contactInstagram").innerHTML = store.instagram ? `<a href="${store.instagram}" target="_blank" class="text-blue-600 underline">${store.instagram}</a>` : "";
-                $("contactFacebook").innerHTML = store.facebook ? `<a href="${store.facebook}" target="_blank" class="text-blue-600 underline">${store.facebook}</a>` : "";
-
-                // 3. 지도/주소
-                const addr = store.address || "";
-                const cleaned = addr.replace(/^\d{5}\s*/, "").split(/\s+/).slice(0, 3).join(" ");
-                $("addressText").textContent = `📍 ${cleaned}`;
-                // initMap(cleaned, store.business_name); // /kakao-key 라우트가 있으면 주석 해제
-
-                // 4. 메뉴 렌더
-                if (!menus.length) {
-                    document.getElementById("menuCartSection").style.display = "none";
-                } else {
-                    document.getElementById("menuCartSection").style.display = "";
-                    const menuList = $("menuList"); menuList.innerHTML = "";
-                    const menuByCategory = {};
-                    menus.forEach(it => {
-                        const category = (it.category || "").toString().trim() || "기타";
-                        (menuByCategory[category] ||= []).push(it);
-                    });
-                    Object.entries(menuByCategory).forEach(([cat, items]) => {
-                        const group = document.createElement("div");
-                        const title = document.createElement("h3");
-                        title.textContent = "🍱 " + cat;
-                        title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
-                        group.appendChild(title);
-                        items.forEach(it => {
-                            const box = document.createElement("div");
-                            box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                            const imgSrc = (it.menu_image && it.menu_image.trim()) ? it.menu_image : "/assets/images/no-thumb.png";
-                            box.innerHTML = `
-              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-              <div class="flex-1">
-                <div class="text-lg font-bold mb-1 truncate">${it.menu_name}</div>
-                <div class="text-base font-medium text-gray-700">${Number(it.menu_price).toLocaleString()}원</div>
-              </div>
-              <div class="flex flex-col items-center gap-1 shrink-0">
-                <div class="flex items-center gap-1">
-                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                  <span class="quantity w-6 text-center">1</span>
-                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+            document.querySelectorAll('.addMenuInCategoryBtn').forEach(btn => {
+                btn.onclick = function () {
+                    const menuBox = `
+                <div class="flex gap-2 mt-2">
+                    <input name="menuName[]" placeholder="메뉴명" class="input-neo px-2 py-1 w-32" required>
+                    <input name="menuPrice[]" type="number" placeholder="가격" class="input-neo px-2 py-1 w-24" required>
+                    <input name="menuImage[]" type="file" accept="image/*" class="input-neo px-2 py-1 w-40">
+                    <button type="button" class="removeMenuBtn px-2 py-1 bg-gray-300 rounded">삭제</button>
                 </div>
-                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-              </div>`;
-                            let qty = 1;
-                            const qtySpan = box.querySelector(".quantity");
-                            box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
-                            box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                            box.querySelector(".addBtn").onclick = () => addToCart({ ...it, quantity: qty });
-                            group.appendChild(box);
-                        });
-                        menuList.appendChild(group);
-                    });
+                `;
+                    this.previousElementSibling.insertAdjacentHTML('beforeend', menuBox);
+                    bindMenuEvents();
                 }
-
-                // 5. 예약 버튼
-                const reserveBtn = $("reserveBtn");
-                if (reserveBtn) {
-                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
+            });
+        }
+        function bindMenuEvents() {
+            document.querySelectorAll('.removeMenuBtn').forEach(btn => {
+                btn.onclick = function () {
+                    this.parentElement.remove();
                 }
+            });
+        }
 
-                // 동기화
-                syncToAdEnd();
-
+        // --- 5. 폼 제출 (함수 외부에 있어야 함) ---
+        document.getElementById('businessForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory", "businessName"];
+                for (const k of required) {
+                    const v = document.getElementsByName(k)[0]?.value?.trim();
+                    if (!v) {
+                        alert("필수 정보를 모두 입력하세요!");
+                        return;
+                    }
+                }
+                const fd = new FormData(e.target);
+                const res = await fetch('/store', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('서버 에러');
+                alert('등록이 완료되었습니다!');
             } catch (err) {
-                console.error("상세 로딩 실패:", err);
-                // 실패해도 레이아웃만은 유지
-                syncToAdEnd();
+                alert('에러: ' + err.message);
             }
-        })();
+        });
 
-        // 높이 동기화(필요시 그대로 유지)
-        function syncToAdEnd() {
-            // 광고 기준 맞춤 등 필요하면 구현, 기본은 패스
-        }
-
-        window.addEventListener("DOMContentLoaded", syncToAdEnd);
-        window.addEventListener("resize", syncToAdEnd);
-        if ("ResizeObserver" in window) {
-            // 동적 높이조정 쓰려면 여기에 추가
-        }
     </script>
-
 </body>
 
 </html>
