@@ -40,7 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /* ── 정적 파일 서빙 ─────────────────── */
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
-app.use(express.static(path.join(process.cwd(), "public")));
+app.use(express.static(path.join(process.cwd(), "public2")));
 
 /* HTML charset=UTF-8 강제 */
 app.use((req, res, next) => {
