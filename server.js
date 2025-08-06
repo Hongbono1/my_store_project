@@ -24,21 +24,18 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── 정적 파일 서빙 (항상 라우터보다 먼저, __dirname 기준 절대경로!)
+// ── 정적 파일 서빙 (라우터보다 먼저, __dirname 절대경로)
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/new", express.static(path.join(__dirname, "public2"))); // /new/xxx → public2/xxx
 
-// ── API 라우터
+// ── 라우터 연결
 app.use("/store", storeRouter);
 
 // ── 헬스체크/디버그
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
 app.get("/__debug", (_req, res) => {
-    res.json({
-        cwd: process.cwd(),
-        __dirname
-    });
+    res.json({ cwd: process.cwd(), __dirname });
 });
 
 // ── 서버 실행
