@@ -110,165 +110,24 @@
         </div>
     </div>
     <script type="module">
-        // ... (슬라이더/지도/카트 구현 코드는 생략, 위에서 쓰던 것 동일하게 적용)
-        // 아래 데이터 바인딩만 강조
-
+        // 유틸 함수
         const $ = id => document.getElementById(id);
-        const params = new URLSearchParams(location.search);
-        const storeId = params.get("id") || 1;
 
-        // 왼쪽 대표 이미지(슬라이더) 데이터
-        // ... (슬라이더 init 함수 참고, 최대 3장)
-        // 지도/주소도 map init 함수 참고
+        // 안전하게 storeId 추출 (주소 ?id=1)
+        const storeId = Number(new URLSearchParams(location.search).get("id")) || 1;
 
-        // 중앙 - 모든 필드 출력 (폼에서 저장한 값 그대로)
-        $("businessNameHeader").textContent = store.businessName ?? "상호명 없음";
-        $("businessType").textContent = "업종: " + (store.businessType || "-");
-        $("businessCategory").textContent = "카테고리: " + (store.businessCategory || "-");
-        $("deliveryOption").textContent = "배달: " + (store.deliveryOption || "-");
-        $("businessHours").textContent = "영업시간: " + (store.businessHours || "-");
-        $("serviceDetails").textContent = store.serviceDetails || "-";
-        $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(e => `<li>${e}</li>`).join("");
-        $("infoEtcList").innerHTML = `
-        <li>장애인 편의시설: ${store.facility ?? "-"}</li>
-        <li>반려동물 출입: ${store.pets ?? "-"}</li>
-        <li>주차 정보: ${store.parking ?? "-"}</li>`;
-        $("additionalDesc").textContent = store.additionalDesc || "-";
-        $("contactPhone").textContent = store.phoneNumber || "-";
-        $("contactHomepage").innerHTML = store.homepage ? `<a href="${store.homepage}" target="_blank">${store.homepage}</a>` : "";
-        $("contactInstagram").innerHTML = store.instagram ? `<a href="${store.instagram}" target="_blank">${store.instagram}</a>` : "";
-        $("contactFacebook").innerHTML = store.facebook ? `<a href="${store.facebook}" target="_blank">${store.facebook}</a>` : "";
+        // 이미지 모달
+        function openModal(src) { $("modalImage").src = src; $("imageModal").classList.remove("hidden"); }
+        function closeModal() { $("imageModal").classList.add("hidden"); }
 
-        // 헤더/푸터 로드
-        window.addEventListener("DOMContentLoaded", () => {
-            fetch("/components/header.html").then(r => r.text()).then(html => { $("header-placeholder").innerHTML = html; });
-            fetch("/components/footer.html").then(r => r.text()).then(html => { $("footer-placeholder").innerHTML = html; });
-        });
-
-        // Kakao SDK 로드
-        function loadKakaoSdk() {
-            return fetch("/kakao-key")
-                .then(r => r.json())
-                .then(({ key }) => new Promise((resolve, reject) => {
-                    if (!key) return reject("Kakao key not found");
-                    const s = document.createElement("script");
-                    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
-                    s.defer = true;
-                    s.onload = () => kakao.maps.load(resolve);
-                    s.onerror = () => reject("Kakao SDK load error");
-                    document.head.appendChild(s);
-                }));
-        }
-
-        // 왼쪽 '광고 2 끝'을 기준으로 가운데/오른쪽 높이 맞춤
-        function syncToAdEnd() {
-            const anchor = document.getElementById("leftLimit");
-            const leftCol = document.getElementById("leftCol");
-            if (!anchor || !leftCol) return;
-
-            // 왼쪽 섹션의 위·아래 패딩을 합산
-            const cs = getComputedStyle(leftCol);
-            const padTop = parseFloat(cs.paddingTop) || 0;
-            const padBottom = parseFloat(cs.paddingBottom) || 0;
-
-            // anchor(컨텐츠) 높이 + 좌우 동일 패딩을 포함해야 섹션 하단이 정확히 일치
-            const contentH = anchor.getBoundingClientRect().height;
-            const targetH = Math.round(contentH + padTop + padBottom + 2); // +2 미세보정
-
-            ["centerCol", "rightCol"].forEach(id => {
-                const col = document.getElementById(id);
-                if (!col) return;
-
-                // 섹션 자체 높이를 왼쪽과 동일하게
-                col.style.height = targetH + "px";
-
-                // 내부 스크롤 영역 높이 = 섹션 전체 - 상하 패딩
-                const inner = col.querySelector(".col-scroll");
-                if (inner) {
-                    const ccs = getComputedStyle(col);
-                    const cPadTop = parseFloat(ccs.paddingTop) || 0;
-                    const cPadBottom = parseFloat(ccs.paddingBottom) || 0;
-                    inner.style.height = (targetH - cPadTop - cPadBottom) + "px";
-                    inner.style.overflowY = "auto";
-                }
-            });
-        }
-
-        // 예약 신청 버튼 클릭 이벤트
-        document.addEventListener("DOMContentLoaded", () => {
-            const reserveBtn = document.getElementById("reserveBtn");
-            if (reserveBtn) {
-                reserveBtn.onclick = () => {
-                    alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
-                    // 또는 예약 모달/페이지로 이동
-                };
-            }
-        });
-
-        // 연락처: tel: 링크로 감싸서 바로 전화걸기
-        const phoneNum = store.phoneNumber || store.contactPhone || "";
-        $("contactPhone").innerHTML = phoneNum
-            ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, '')}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
-            : "-";
-
-        // 메뉴 렌더
-        const menuList = $("menuList"); menuList.innerHTML = "";
-        if (!menus.length) {
-            // 메뉴가 없으면 오른쪽 전체 섹션 숨김!
-            document.getElementById("menuCartSection").style.display = "none";
-        } else {
-            document.getElementById("menuCartSection").style.display = "";
-            // ... 이하 메뉴 표시 코드는 동일 ...
-            // (생략)
-        }
-
-        window.addEventListener("DOMContentLoaded", syncToAdEnd);
-        window.addEventListener("resize", syncToAdEnd);
-        if ("ResizeObserver" in window) {
-            const anchorEl = document.getElementById("leftLimit");
-            if (anchorEl) new ResizeObserver(syncToAdEnd).observe(anchorEl);
-        }
-
-        async function initMap(storeAddress, storeName = "") {
-            try {
-                await loadKakaoSdk();
-                const geocoder = new kakao.maps.services.Geocoder();
-                const cleanedAddress = storeAddress.replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
-                geocoder.addressSearch(cleanedAddress, (result, status) => {
-                    if (status !== kakao.maps.services.Status.OK) return;
-                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                    const marker = new kakao.maps.Marker({ map, position: coords });
-                    if (storeName) {
-                        const ovContent = `
-    <div
-        style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">
-        ${storeName}
-    </div>`;
-                        const overlay = new kakao.maps.CustomOverlay({
-                            position: marker.getPosition(),
-                            content: ovContent,
-                            yAnchor: 1
-                        });
-                        overlay.setMap(map);
-                    }
-                    // 지도 렌더 후 높이 재동기화
-                    syncToAdEnd();
-                });
-            } catch (e) { }
-        }
-
-        // 슬라이더
+        // 슬라이더 객체
         const slider = {
-            imgs: [],
-            idx: 0,
+            imgs: [], idx: 0,
             init(arr) {
-                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") ||
-                    src.startsWith("/"))).map(s => s.trim());
+                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/"))).map(s => s.trim());
                 if (!this.imgs.length) this.imgs = ["/no-image.png"];
-                $("sliderImages").innerHTML = this.imgs.map((u, i) => `
-    <img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />
-    `).join('');
+                $("sliderImages").innerHTML = this.imgs.map((u, i) =>
+                    `<img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`).join('');
                 $("sliderImages").onclick = (e) => {
                     if (e.target.tagName === "IMG") {
                         this.idx = Number(e.target.dataset.index);
@@ -280,7 +139,6 @@
                 this.update();
                 $("prevBtn").onclick = () => this.move(-1);
                 $("nextBtn").onclick = () => this.move(1);
-
                 const firstImg = $("sliderImages").querySelector('img');
                 if (firstImg) {
                     firstImg.onload = () => syncToAdEnd();
@@ -314,7 +172,7 @@
             }
         };
 
-        // 모달
+        // 모달 단축키
         (function enableModalKeys() {
             const modal = $("imageModal");
             modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
@@ -326,13 +184,11 @@
             });
             $("closeModal").addEventListener('click', closeModal);
         })();
-        function openModal(src) { $("modalImage").src = src; $("imageModal").classList.remove("hidden"); }
-        function closeModal() { $("imageModal").classList.add("hidden"); }
 
         // 장바구니
         const cart = [];
         function addToCart(item) {
-            const found = cart.find(c => c.menuName === item.menuName);
+            const found = cart.find(c => c.menu_name === item.menu_name);
             if (found) found.quantity += item.quantity; else cart.push({ ...item });
             renderCart();
         }
@@ -341,15 +197,15 @@
             ul.innerHTML = "";
             let sum = 0;
             cart.forEach((item, index) => {
-                const price = Number(item.menuPrice) || 0;
+                const price = Number(item.menu_price) || 0;
                 const qty = Number(item.quantity) || 1;
                 const total = price * qty; sum += total;
                 const li = document.createElement("li");
                 li.className = "flex justify-between items-center text-lg py-2";
                 li.innerHTML = `
-    <span>${item.menuName} × ${qty}</span>
-    <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-    <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
+        <span>${item.menu_name} × ${qty}</span>
+        <span class="text-xl font-bold">${total.toLocaleString()}원</span>
+        <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
                 ul.appendChild(li);
             });
             ul.querySelectorAll(".removeBtn").forEach(btn => {
@@ -358,97 +214,152 @@
             $("cartTotal").textContent = sum.toLocaleString();
         }
 
-        // 데이터 fetch (실서버 연결 시 여기만 바꾸면 됨)
+        // 지도 관련(서버에 /kakao-key 라우트 없으면 이 부분 통째로 주석 처리!)
+        async function loadKakaoSdk() {
+            // const r = await fetch("/kakao-key");
+            // const { key } = await r.json();
+            // await new Promise((resolve, reject) => {
+            //   const s = document.createElement("script");
+            //   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
+            //   s.defer = true;
+            //   s.onload = () => kakao.maps.load(resolve);
+            //   s.onerror = () => reject("Kakao SDK load error");
+            //   document.head.appendChild(s);
+            // });
+        }
+        async function initMap(storeAddress, storeName = "") {
+            // 서버에 kakao-key 라우트 없으면 아래 코드 주석!
+            // try {
+            //   await loadKakaoSdk();
+            //   const geocoder = new kakao.maps.services.Geocoder();
+            //   const cleanedAddress = (storeAddress || "").replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
+            //   geocoder.addressSearch(cleanedAddress, (result, status) => {
+            //     if (status !== kakao.maps.services.Status.OK) return;
+            //     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+            //     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+            //     const marker = new kakao.maps.Marker({ map, position: coords });
+            //     if (storeName) {
+            //       const overlay = new kakao.maps.CustomOverlay({
+            //         position: marker.getPosition(),
+            //         content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${storeName}</div>`,
+            //         yAnchor: 1
+            //       });
+            //       overlay.setMap(map);
+            //     }
+            //   });
+            // } catch (e) {}
+        }
+
+        // (1) fetch해서 데이터 바인딩
         (async () => {
             try {
-                const res = await fetch(`/store/${window.storeId}`);
+                const res = await fetch(`/store/${storeId}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const { store, menus = [] } = await res.json();
 
-                // 슬라이더/텍스트 바인딩
+                // 1. 슬라이더
                 slider.init(store.images || [store.image1, store.image2, store.image3].filter(Boolean));
-                $("businessNameHeader").textContent = store.businessName ?? "상호명 없음";
-                $("businessCategory").innerHTML = `<strong>구분:</strong> ${store.category || "선택되지 않음"}`;
-                $("businessType").innerHTML = `<strong>업종:</strong> ${store.businessType || "없음"}`;
-                $("deliveryOption").innerHTML = `<strong>배달:</strong> ${store.deliveryOption || "없음"}`;
-                $("businessHours").innerHTML = `<strong>영업시간:</strong> ${store.businessHours || "없음"}`;
-                $("serviceDetails").textContent = store.serviceDetails ?? "없음";
-                $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(v => `<li>${v}</li>`).join("");
-                $("infoEtcList").innerHTML = `
-    <li>장애인 편의시설: ${store.facility ?? "정보 없음"}</li>
-    <li>반려동물 출입: ${store.pets ?? "정보 없음"}</li>
-    <li>주차 정보: ${store.parking ?? "정보 없음"}</li>`;
-                $("additionalInfoList").innerHTML = `<li>서비스 내용: ${store.serviceDetails ?? "없음"}</li>`;
-                $("contactPhone").textContent = store.contactPhone ?? "";
-                $("contactHomepage").innerHTML = store.homepage ? `<strong>홈페이지:</strong> <a href="${store.homepage}"
-        class="text-blue-600 underline" target="_blank">${store.homepage}</a>` : "";
-                $("contactInstagram").innerHTML = store.instagram ? `<strong>인스타그램:</strong> <a href="${store.instagram}"
-        class="text-blue-600 underline" target="_blank">${store.instagram}</a>` : "";
-                $("contactFacebook").innerHTML = store.facebook ? `<strong>페이스북:</strong> <a href="${store.facebook}"
-        class="text-blue-600 underline" target="_blank">${store.facebook}</a>` : "";
 
-                // 메뉴가 없으면 오른쪽 섹션 숨김
+                // 2. 중앙 필드 (snake_case! camelCase 절대 X)
+                $("businessNameHeader").textContent = store.business_name ?? "상호명 없음";
+                $("businessType").textContent = "업종: " + (store.business_type || "-");
+                $("businessCategory").textContent = "카테고리: " + (store.business_category || "-");
+                $("deliveryOption").textContent = "배달: " + (store.delivery_option || "-");
+                $("businessHours").textContent = "영업시간: " + (store.business_hours || "-");
+                $("serviceDetails").textContent = store.service_details || "-";
+                $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(e => `<li>${e}</li>`).join("");
+                $("infoEtcList").innerHTML = `
+        <li>장애인 편의시설: ${store.facility ?? "-"}</li>
+        <li>반려동물 출입: ${store.pets ?? "-"}</li>
+        <li>주차 정보: ${store.parking ?? "-"}</li>`;
+                $("additionalDesc").textContent = store.additional_desc || "-";
+                // 연락처(전화는 tel:)
+                const phoneNum = store.phone_number || "";
+                $("contactPhone").innerHTML = phoneNum
+                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, '')}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
+                    : "-";
+                $("contactHomepage").innerHTML = store.homepage ? `<a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>` : "";
+                $("contactInstagram").innerHTML = store.instagram ? `<a href="${store.instagram}" target="_blank" class="text-blue-600 underline">${store.instagram}</a>` : "";
+                $("contactFacebook").innerHTML = store.facebook ? `<a href="${store.facebook}" target="_blank" class="text-blue-600 underline">${store.facebook}</a>` : "";
+
+                // 3. 지도/주소
+                const addr = store.address || "";
+                const cleaned = addr.replace(/^\d{5}\s*/, "").split(/\s+/).slice(0, 3).join(" ");
+                $("addressText").textContent = `📍 ${cleaned}`;
+                // initMap(cleaned, store.business_name); // /kakao-key 라우트가 있으면 주석 해제
+
+                // 4. 메뉴 렌더
                 if (!menus.length) {
                     document.getElementById("menuCartSection").style.display = "none";
                 } else {
                     document.getElementById("menuCartSection").style.display = "";
-                    // 메뉴 렌더링 코드는 그대로
+                    const menuList = $("menuList"); menuList.innerHTML = "";
+                    const menuByCategory = {};
+                    menus.forEach(it => {
+                        const category = (it.category || "").toString().trim() || "기타";
+                        (menuByCategory[category] ||= []).push(it);
+                    });
+                    Object.entries(menuByCategory).forEach(([cat, items]) => {
+                        const group = document.createElement("div");
+                        const title = document.createElement("h3");
+                        title.textContent = "🍱 " + cat;
+                        title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
+                        group.appendChild(title);
+                        items.forEach(it => {
+                            const box = document.createElement("div");
+                            box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
+                            const imgSrc = (it.menu_image && it.menu_image.trim()) ? it.menu_image : "/assets/images/no-thumb.png";
+                            box.innerHTML = `
+              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+              <div class="flex-1">
+                <div class="text-lg font-bold mb-1 truncate">${it.menu_name}</div>
+                <div class="text-base font-medium text-gray-700">${Number(it.menu_price).toLocaleString()}원</div>
+              </div>
+              <div class="flex flex-col items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1">
+                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+                  <span class="quantity w-6 text-center">1</span>
+                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+                </div>
+                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+              </div>`;
+                            let qty = 1;
+                            const qtySpan = box.querySelector(".quantity");
+                            box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
+                            box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
+                            box.querySelector(".addBtn").onclick = () => addToCart({ ...it, quantity: qty });
+                            group.appendChild(box);
+                        });
+                        menuList.appendChild(group);
+                    });
                 }
 
-                // 메뉴 렌더
-                const menuList = $("menuList"); menuList.innerHTML = "";
-                const menuByCategory = {};
-                menus.forEach(it => {
-                    const raw = it.category ?? it.menu_category ?? it.cat ?? "";
-                    const category = raw.replace(/\u3000/g, "").trim() || "기타";
-                    (menuByCategory[category] ||= []).push(it);
-                });
-                Object.entries(menuByCategory).forEach(([category, items]) => {
-                    const group = document.createElement("div");
-                    const title = document.createElement("h3");
-                    title.textContent = "🍱 " + category;
-                    title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
-                    group.appendChild(title);
-                    items.forEach(it => {
-                        const box = document.createElement("div");
-                        box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                        box.innerHTML = `
-    <img src="${(it.menu_image && it.menu_image.trim()) ? it.menu_image : '/assets/images/no-thumb.png'}"
-        class="w-24 h-24 object-cover rounded-md" />
-    <div class="flex-1">
-        <div class="text-lg font-bold mb-1 truncate">${it.menuName}</div>
-        <div class="text-base font-medium text-gray-700">${Number(it.menuPrice).toLocaleString()}원</div>
-    </div>
-    <div class="flex flex-col items-center gap-1 shrink-0">
-        <div class="flex items-center gap-1">
-            <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-            <span class="quantity w-6 text-center">1</span>
-            <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-        </div>
-        <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-    </div>`;
-                        let qty = 1;
-                        const qtySpan = box.querySelector(".quantity");
-                        box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
-                        box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                        box.querySelector(".addBtn").onclick = () => addToCart({ ...it, quantity: qty });
-                        group.appendChild(box);
-                    });
-                    menuList.appendChild(group);
-                });
+                // 5. 예약 버튼
+                const reserveBtn = $("reserveBtn");
+                if (reserveBtn) {
+                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
+                }
 
-                // 주소/지도
-                const fullAddress = store.address || "";
-                const cleaned = fullAddress.replace(/^\d{5}\s*/, "").split(/\s+/).slice(0, 3).join(" ");
-                $("addressText").textContent = `📍 ${cleaned}`;
-                initMap(cleaned, store.businessName);
-
-                // 마지막으로 한 번 더 동기화
+                // 동기화
                 syncToAdEnd();
-            } catch (e) {
+
+            } catch (err) {
+                console.error("상세 로딩 실패:", err);
                 // 실패해도 레이아웃만은 유지
                 syncToAdEnd();
             }
         })();
+
+        // 높이 동기화(필요시 그대로 유지)
+        function syncToAdEnd() {
+            // 광고 기준 맞춤 등 필요하면 구현, 기본은 패스
+        }
+
+        window.addEventListener("DOMContentLoaded", syncToAdEnd);
+        window.addEventListener("resize", syncToAdEnd);
+        if ("ResizeObserver" in window) {
+            // 동적 높이조정 쓰려면 여기에 추가
+        }
     </script>
 
 </body>
