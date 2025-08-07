@@ -1,14 +1,13 @@
 // db.js
-import pkg from 'pg';
-const { Pool } = pkg;
+import { Pool } from "pg";
 import dotenv from "dotenv";
 dotenv.config();
 
+const isNeon = process.env.DATABASE_URL?.includes("neon.tech");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // .env에 반드시 DATABASE_URL 작성!
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: process.env.DATABASE_URL,
+  ssl: isNeon ? { rejectUnauthorized: false } : false,
 });
 
 export default pool;
