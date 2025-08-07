@@ -1,15 +1,13 @@
 import express from "express";
-import {
-  createStore,        // ncombinedregister.html 등록 처리
-  getStoreById as getStoreDetail, // ndetail.html 상세 조회
-} from "../controllers/storeController.js";
+import { createStore } from "../controllers/storeController.js";
+import { getStoreDetail } from "../controllers/ndetailController.js";
 
 const router = express.Router();
 
-// POST /store (등록)
+// POST /store  → 등록 (FormData)
 router.post("/", createStore);
 
-// GET /store/:id (상세 조회)
+// GET /store/:id  → 상세(DB)
 router.get("/:id", getStoreDetail);
 
 export default router;
