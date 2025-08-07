@@ -1,13 +1,12 @@
 import express from "express";
-import { createStore } from "../controllers/ndetailController.js";
-import { createStore }   from "../controllers/ndetailController.js";
+import {
+  createStore,      // 등록 (POST /store)
+  getStoreDetail,   // 상세 (GET /store/:id)
+} from "../controllers/ndetailController.js";
 
 const router = express.Router();
 
-// POST /store  → 등록 (FormData)
-router.post("/", createStore);
-
-// GET /store/:id  → 상세(DB)
-router.get("/:id", getStoreDetail);
+router.post("/", createStore);      // POST /store
+router.get("/:id", getStoreDetail);  // GET  /store/:id
 
 export default router;
