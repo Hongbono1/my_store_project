@@ -6,7 +6,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import storeRouter from "./routes/store.js";
+import storeRouter from "./routes/ndetail.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +29,7 @@ fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "data", "stores"), { recursive: true });
 
 // 라우터
-app.use("/store", storeRouter);
+app.use("/store", ndetailRouter);
 
 // 헬스/디버그
 app.get("/", (_req, res) => res.send("서버 실행 중입니다."));
