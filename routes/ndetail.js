@@ -1,6 +1,6 @@
 import express from "express";
 import { createStore } from "../controllers/storeController.js";
-import { getStoreDetail } from "../controllers/ndetailController.js";
+import { createStore }   from "../controllers/ndetailController.js";
 
 const router = express.Router();
 
