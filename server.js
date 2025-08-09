@@ -45,6 +45,34 @@ app.get("/__debug", (_req, res) => {
   });
 });
 
+// ===== 임시 파일 기반 저장/조회 테스트 (삭제 예정) =====
+app.post("/__save", (req, res) => {
+  const { id, data } = req.body || {};
+  if (!id || typeof id !== "string") return res.status(400).json({ ok: false, msg: "id(string) 필요" });
+  const file = path.join(__dirname, "data", "stores", `${id}.json`);
+  try {
+    fs.writeFileSync(file, JSON.stringify(data ?? {}, null, 2), "utf8");
+    return res.json({ ok: true, saved: file });
+  } catch (e) {
+    console.error("[__save] error:", e);
+    return res.status(500).json({ ok: false, msg: "write fail" });
+  }
+});
+
+app.get("/__load/:id", (req, res) => {
+  const id = String(req.params.id || "");
+  const file = path.join(__dirname, "data", "stores", `${id}.json`);
+  if (!fs.existsSync(file)) return res.status(404).json({ ok: false, msg: "not found" });
+  try {
+    const json = JSON.parse(fs.readFileSync(file, "utf8"));
+    return res.json({ ok: true, data: json });
+  } catch (e) {
+    console.error("[__load] error:", e);
+    return res.status(500).json({ ok: false, msg: "read fail" });
+  }
+});
+
+
 // 404 핸들러
 app.use((_req, res) => res.status(404).json({ ok: false, message: "Not Found" }));
 
