@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정보 입력(네오모피즘)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Daum 우편번호 (주소 검색) -->
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+
+  <style>
+    .neo-glass-3d {
+      background: rgba(255, 255, 255, .85);
+      border-radius: 1.8rem;
+      box-shadow:
+        8px 8px 32px #e5e8f0,
+        -8px -8px 32px #fff,
+        0 4px 32px rgba(80, 130, 255, .07);
+      backdrop-filter: blur(18px) saturate(120%);
+      border: 1.5px solid rgba(180, 200, 255, .12);
+      transition: box-shadow .23s, border-color .2s;
+    }
+
+    .neo-glass-3d:hover {
+      box-shadow:
+        4px 4px 18px #dae3f6,
+        -4px -4px 18px #fff,
+        0 8px 48px rgba(80, 130, 255, .10);
+      border-color: #60a5fa55;
+    }
+
+    .btn-3d {
+      background: linear-gradient(90deg, #6dd5fa 0%, #2980b9 100%);
+      box-shadow: 0 4px 0 #2393b3, 0 8px 18px rgba(0, 64, 128, .14);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 1rem;
+      padding: .7rem 1.6rem;
+      transition: all .15s cubic-bezier(.21, .82, .69, .98);
+    }
+
+    .btn-3d:active {
+      transform: translateY(2px) scale(.98);
+      box-shadow: 0 1.5px 0 #2393b3, 0 2px 6px rgba(0, 64, 128, .16);
+    }
+
+    .input-neo {
+      background: #f6f9fd;
+      border-radius: .8rem;
+      box-shadow: 1.5px 1.5px 6px #e4e9f2, -1.5px -1.5px 6px #fff;
+      border: 1px solid #d3e4f7;
+      transition: box-shadow .14s, border-color .13s;
+      font-size: 1.02rem;
+    }
+
+    .input-neo:focus {
+      border-color: #60a5fa;
+      outline: none;
+      box-shadow: 0 0 0 1.5px #60a5fa44, 1.5px 1.5px 6px #e4e9f2, -1.5px -1.5px 6px #fff;
+    }
+
+    .section-label {
+      background: linear-gradient(90deg, #bae6fd 0%, #f0f7ff 100%);
+      color: #2b445c;
+      border-radius: 1.1rem 1.1rem 0 0;
+      padding: 1rem 1.4rem .8rem;
+      font-weight: 800;
+      border-bottom: 2px solid #cde3fa;
+      letter-spacing: .02em;
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen">
+  <div id="header-placeholder"></div>
+
+  <main class="container mx-auto px-3 py-8">
+    <div class="neo-glass-3d max-w-3xl mx-auto p-6 sm:p-8">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-center mb-8">정보 입력</h1>
+
+      <form id="businessForm" class="space-y-7" enctype="multipart/form-data" autocomplete="off">
+        <input type="hidden" id="storeId" name="storeId">
+        <!-- 백엔드 호환용(화면엔 미노출) -->
+        <input type="hidden" id="deliveryOption" name="deliveryOption" value="불가능">
+
+        <!-- 1) 사업자 등록 인증 -->
+        <section class="rounded-2xl p-5 bg-yellow-50/80 shadow-inner">
+          <div class="section-label">사업자 등록 인증</div>
+          <div class="flex flex-col md:flex-row gap-3 items-center">
+            <label class="w-36 font-medium text-center">사업자 번호</label>
+            <div class="flex items-center gap-2 w-full">
+              <input id="bizNumber1" maxlength="4" class="input-neo px-3 py-2 w-24" placeholder="123"
+                inputmode="numeric">
+              <span>-</span>
+              <input id="bizNumber2" maxlength="2" class="input-neo px-3 py-2 w-16" placeholder="45"
+                inputmode="numeric">
+              <span>-</span>
+              <input id="bizNumber3" maxlength="5" class="input-neo px-3 py-2 w-28" placeholder="67890"
+                inputmode="numeric">
+              <button type="button" class="btn-3d" onclick="verifyBizNumber()">인증</button>
+            </div>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2 mt-3">
+            <label class="w-36 font-medium">등록증 이미지</label>
+            <input type="file" id="businessCertImage" name="businessCertImage" accept="image/*,application/pdf"
+              class="input-neo px-3 py-2 flex-1">
+          </div>
+          <p class="text-sm text-center mt-2">* 3개월 이내 발급본만 인정</p>
+          <p id="bizVerifyResult" class="text-sm text-center"></p>
+        </section>
+
+        <!-- 2) 대표 정보 -->
+        <section class="rounded-2xl p-5 bg-indigo-50/80 shadow-inner">
+          <div class="section-label">대표 정보</div>
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <label class="w-36 font-medium">성함</label>
+            <input id="ownerName" name="ownerName" class="input-neo px-3 py-2 flex-1" required>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <label class="w-36 font-medium">생년월일</label>
+            <input type="date" id="birthDate" name="birthDate" class="input-neo px-3 py-2 flex-1">
+          </div>
+
+          <!-- 이메일 -->
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <label class="w-36 font-medium">이메일</label>
+            <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+              <input id="emailId" placeholder="아이디" oninput="updateEmail()" class="input-neo px-3 py-2 flex-1 min-w-0">
+              <span>@</span>
+              <select id="emailDomainSelect" onchange="handleDomainChange(this)"
+                class="input-neo px-3 py-2 flex-1 min-w-0">
+                <option value="">선택</option>
+                <option value="naver.com">naver.com</option>
+                <option value="gmail.com">gmail.com</option>
+                <option value="daum.net">daum.net</option>
+                <option value="custom">직접입력</option>
+              </select>
+              <input id="customDomainInput" placeholder="도메인" oninput="updateEmail()"
+                class="hidden input-neo px-3 py-2 flex-1 min-w-0">
+            </div>
+            <input type="hidden" id="ownerEmail" name="ownerEmail">
+          </div>
+
+          <!-- 주소 + 상세주소 -->
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <label class="w-36 font-medium">주소</label>
+            <div class="flex flex-1 gap-2">
+              <input id="ownerAddress" name="ownerAddress" class="input-neo px-3 py-2 flex-1" readonly>
+              <button type="button" class="btn-3d" onclick="searchAddress()">주소 검색</button>
+            </div>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2">
+            <label class="w-36 font-medium">상세 주소</label>
+            <input id="ownerAddressDetail" name="ownerAddressDetail" class="input-neo px-3 py-2 flex-1"
+              placeholder="동·호수 / 건물명 등">
+          </div>
+
+          <!-- 휴대폰 인증(더미) -->
+          <div class="flex flex-col md:flex-row gap-2 mt-3">
+            <label class="w-36 font-medium">휴대폰</label>
+            <input id="ownerPhone" name="ownerPhone" class="input-neo px-3 py-2 flex-1" required>
+            <button type="button" id="verifyPhoneButton" class="btn-3d">인증번호 요청</button>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2 mt-2">
+            <label class="w-36 font-medium">인증번호</label>
+            <input id="phoneAuth" class="input-neo px-3 py-2 flex-1">
+          </div>
+          <p id="phoneVerifyResult" class="text-sm text-center"></p>
+        </section>
+
+        <!-- 3) 업종/카테고리 -->
+        <section class="rounded-2xl p-5 bg-gray-50/90 shadow-inner">
+          <div class="section-label">업종(카테고리) 선택</div>
+          <div class="flex flex-col md:flex-row gap-2 mb-2">
+            <label class="w-36 font-medium">카테고리</label>
+            <select id="mainCategory" name="mainCategory" class="input-neo px-3 py-2 flex-1" required></select>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2">
+            <label class="w-36 font-medium">서브카테고리</label>
+            <select id="subCategory" name="subCategory" class="input-neo px-3 py-2 flex-1" required></select>
+          </div>
+        </section>
+
+        <!-- 4) 기본 정보 -->
+        <section class="rounded-2xl p-5 bg-white/90 shadow-inner">
+          <div class="section-label">기본 정보</div>
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <label class="w-36 font-medium">상호</label>
+            <input id="businessName" name="businessName" class="input-neo px-3 py-2 flex-1" required>
+          </div>
+          <div class="flex flex-col md:flex-row gap-2">
+            <label class="w-36 font-medium">영업시간</label>
+            <input id="businessHours" name="businessHours" class="input-neo px-3 py-2 flex-1"
+              placeholder="09:00 ~ 18:00">
+          </div>
+        </section>
+
+        <!-- 5) 서비스/이벤트/기타 -->
+        <section class="rounded-2xl p-5 bg-white/90 shadow-inner">
+          <div class="section-label">서비스 내용</div>
+          <textarea id="serviceDetails" name="serviceDetails" class="input-neo w-full min-h-[90px] px-3 py-2"
+            placeholder="서비스·메뉴·예약 정보 등"></textarea>
+        </section>
+
+        <section class="rounded-2xl p-5 bg-yellow-50/80 shadow-inner">
+          <div class="section-label">고객 이벤트</div>
+          <input id="event1" name="event1" class="input-neo px-3 py-2 mb-2" placeholder="이벤트 내용 1">
+          <input id="event2" name="event2" class="input-neo px-3 py-2" placeholder="이벤트 내용 2">
+        </section>
+
+        <section class="rounded-2xl p-5 bg-gray-50/90 shadow-inner">
+          <div class="section-label">기타 정보</div>
+          <input id="facility" name="facility" class="input-neo px-3 py-2 mb-2" placeholder="장애인 편의시설 (있음/없음)">
+          <input id="pets" name="pets" class="input-neo px-3 py-2 mb-2" placeholder="반려동물 출입 (가능/불가능)">
+          <input id="parking" name="parking" class="input-neo px-3 py-2" placeholder="주차 정보 (전용/유료)">
+        </section>
+
+        <!-- 6) 연락처/링크 -->
+        <section class="rounded-2xl p-5 bg-white/90 shadow-inner">
+          <div class="section-label">연락처</div>
+          <input id="phoneNumber" name="phoneNumber" class="input-neo px-3 py-2 mb-2"
+            placeholder="대표전화 (예: 02-123-4567)">
+          <input id="homepage" name="homepage" class="input-neo px-3 py-2 mb-2" placeholder="홈페이지 (URL)">
+          <input id="instagram" name="instagram" class="input-neo px-3 py-2 mb-2" placeholder="Instagram URL">
+          <input id="facebook" name="facebook" class="input-neo px-3 py-2" placeholder="Facebook URL">
+        </section>
+
+        <!-- 7) 대표 이미지 (최대 3장) -->
+        <section class="rounded-2xl p-5 bg-white/90 shadow-inner">
+          <div class="section-label">이미지 등록 (최대 3장)</div>
+          <input type="file" id="imagesInput" name="images[]" multiple accept="image/*"
+            class="input-neo px-3 py-2 w-full mb-3">
+          <div id="imagesPreview" class="flex gap-3"></div>
+        </section>
+
+        <!-- 8) 등록 버튼 -->
+        <div class="text-center mt-6">
+          <button type="submit" class="btn-3d">입력 완료</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script>
+
+    (() => {
+      const $ = (id) => document.getElementById(id);
+
+      // 이메일 조합(기존과 동일하게 호출됨)
+      window.updateEmail = function updateEmail() {
+        const id = $('emailId').value.trim();
+        const sel = $('emailDomainSelect').value;
+        const custom = $('customDomainInput').value.trim();
+        const domain = (sel === 'custom') ? custom : sel;
+        $('ownerEmail').value = (id && domain) ? `${id}@${domain}` : '';
+      };
+      window.handleDomainChange = function handleDomainChange(el) {
+        $('customDomainInput').classList.toggle('hidden', el.value !== 'custom');
+        updateEmail();
+      };
+
+      // 주소검색(기존과 동일하게 호출됨)
+      window.searchAddress = function searchAddress() {
+        new daum.Postcode({
+          oncomplete: function (data) {
+            $('ownerAddress').value = data.address;
+            $('ownerAddressDetail').focus();
+          }
+        }).open();
+      };
+
+      // 이미지 미리보기(선택)
+      const imagesInput = $('imagesInput');
+      const imagesPreview = $('imagesPreview');
+      if (imagesInput && imagesPreview) {
+        imagesInput.addEventListener('change', () => {
+          imagesPreview.innerHTML = '';
+          const files = Array.from(imagesInput.files || []).slice(0, 3);
+          files.forEach(f => {
+            const url = URL.createObjectURL(f);
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'preview';
+            img.className = 'w-28 h-28 object-cover rounded-xl shadow';
+            imagesPreview.appendChild(img);
+          });
+        });
+      }
+
+      // 사업자 인증(기존 서버의 /verify-biz 사용한다면 그대로)
+      window.verifyBizNumber = async function verifyBizNumber() {
+        const b1 = $('bizNumber1').value.trim();
+        const b2 = $('bizNumber2').value.trim();
+        const b3 = $('bizNumber3').value.trim();
+        const bizNo = `${b1}${b2}${b3}`;
+        const out = $('bizVerifyResult');
+        out.textContent = '인증 중...';
+        try {
+          const res = await fetch('/verify-biz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bizNo })
+          });
+          const data = await res.json();
+          if (data?.result === 'OK' || data?.b_stt_cd === '01') {
+            out.textContent = '인증 완료(계속사업자)';
+            out.className = 'text-sm text-green-600 text-center';
+          } else {
+            out.textContent = '인증 실패';
+            out.className = 'text-sm text-red-600 text-center';
+          }
+        } catch (e) {
+          out.textContent = '인증 오류';
+          out.className = 'text-sm text-red-600 text-center';
+        }
+      };
+
+      // 휴대폰 인증(더미 버튼)
+      const phoneBtn = $('verifyPhoneButton');
+      if (phoneBtn) {
+        phoneBtn.addEventListener('click', () => {
+          $('phoneVerifyResult').textContent = '인증번호가 발송되었다고 가정(더미).';
+          $('phoneVerifyResult').className = 'text-sm text-gray-600 text-center';
+        });
+      }
+
+      // 폼 제출 → /store 저장
+      const form = $('businessForm');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const fd = new FormData(form);
+
+        // 사업자번호 합치기(필요 시)
+        const b1 = $('bizNumber1').value.trim();
+        const b2 = $('bizNumber2').value.trim();
+        const b3 = $('bizNumber3').value.trim();
+        if (b1 || b2 || b3) fd.set('bizNumber', `${b1}-${b2}-${b3}`);
+
+        // 이메일 최종값 반영
+        updateEmail();
+
+        // 이미지 파일(최대3장) — input name="images[]" 로 이미 수집됨
+        // 사업자등록증 이미지(선택)
+        if ($('businessCertImage')?.files?.[0]) {
+          fd.set('businessCertImage', $('businessCertImage').files[0]);
+        }
+
+        // 서버로 전송
+        try {
+          const res = await fetch('/store', { method: 'POST', body: fd });
+          if (!res.ok) throw new Error('서버 오류');
+          const data = await res.json();
+
+          // 서버가 { id: 123 } 형태로 응답한다고 가정(기존 구현과 동일)
+          const newId = data?.id || data?.storeId;
+          if (!newId) throw new Error('ID 응답 누락');
+
+          // 저장 성공 → N디테일로 이동 (ndetail.html?id=...)
+          location.href = `/ndetail.html?id=${encodeURIComponent(newId)}`;
+        } catch (err) {
+          alert('저장 중 오류가 발생했습니다. 콘솔을 확인하세요.');
+          console.error(err);
+        }
+      });
+    })();
+  </script>
+</body>
+
+</html>
