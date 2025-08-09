@@ -208,6 +208,35 @@
                     </div>
                 </section>
 
+                <!-- ───────── 메뉴 입력 박스 (네오+글래스+3D) ───────── -->
+                <section class="max-w-4xl mx-auto">
+                    <div class="neo-glass-3d p-6 md:p-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-2xl font-extrabold text-gray-800">메뉴 입력</h2>
+                            <div class="text-sm text-gray-500"><span id="menuCount">0</span>/50</div>
+                        </div>
+
+                        <!-- 헤더 라인 -->
+                        <div class="hidden md:grid grid-cols-12 gap-3 text-xs font-semibold text-gray-500 mb-2 px-2">
+                            <div class="col-span-3">카테고리</div>
+                            <div class="col-span-6">메뉴명</div>
+                            <div class="col-span-2">가격</div>
+                            <div class="col-span-1 text-center">삭제</div>
+                        </div>
+
+                        <div id="menuList" class="space-y-3"></div>
+
+                        <div class="mt-6 flex items-center justify-between">
+                            <button type="button" id="addMenuBtn"
+                                class="neo-btn px-4 py-2 rounded-xl font-semibold active:scale-[0.98] transition">
+                                + 메뉴 추가
+                            </button>
+                            <p class="text-sm text-gray-500">가격은 숫자만 입력하면 자동으로 <span class="font-medium">콤마</span>가 붙어요.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- 4) 기본 정보 -->
                 <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
                     <div class="section-label">기본 정보</div>
@@ -281,6 +310,55 @@
     <!-- 푸터 -->
     <div id="footer-placeholder"></div>
 
+    <style>
+        /* ── 네오모피즘 + 글래스모피즘 + 3D 베이스 ── */
+
+        .neo-item {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow:
+                8px 8px 24px rgba(0, 0, 0, 0.06),
+                -4px -4px 16px rgba(255, 255, 255, 0.7),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+        }
+
+        .neo-item:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                10px 10px 28px rgba(0, 0, 0, 0.08),
+                -5px -5px 18px rgba(255, 255, 255, 0.75),
+                inset 0 1px 0 rgba(255, 255, 255, 0.65);
+        }
+
+        .neo-item.filled {
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow:
+                10px 10px 28px rgba(0, 0, 0, 0.1),
+                -5px -5px 18px rgba(255, 255, 255, 0.8),
+                inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .neo-btn {
+            background: linear-gradient(180deg, #ffffff, #f4f7ff);
+            border: 1px solid rgba(133, 153, 255, 0.35);
+            box-shadow:
+                6px 6px 16px rgba(0, 61, 255, 0.08),
+                -4px -4px 14px rgba(255, 255, 255, 0.9),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .neo-icon-btn {
+            background: linear-gradient(180deg, #ffffff, #f6f6ff);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow:
+                4px 4px 12px rgba(0, 0, 0, 0.06),
+                -3px -3px 10px rgba(255, 255, 255, 0.85),
+                inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+    </style>
+
     <script>
         /* =============================
            헤더/푸터 (public2는 /new 경로)
@@ -324,142 +402,271 @@
         const subSel = document.getElementById('subCategory');
         subSel.innerHTML = '<option value="">서브카테고리 선택</option>' + foodSubcats.map(s => `<option value="${s}">${s}</option>`).join('');
 
-        /* =============================
-           이미지 미리보기 (최대 3장)
-        ==============================*/
-        const imagesInput = document.getElementById('imagesInput');
-        const imagesPreview = document.getElementById('imagesPreview');
-        if (imagesInput && imagesPreview) {
-            imagesInput.addEventListener('change', () => {
-                imagesPreview.innerHTML = '';
-                const files = Array.from(imagesInput.files || []).slice(0, 3);
-                files.forEach(f => {
-                    const url = URL.createObjectURL(f);
-                    const img = document.createElement('img');
-                    img.src = url; img.alt = 'preview';
-                    img.className = 'w-28 h-28 object-cover rounded-xl shadow';
-                    imagesPreview.appendChild(img);
-                });
-            });
-        }
+        (function () {
+            const MAX_ROWS = 50;
+            const menuList = document.getElementById("menuList");
+            const addBtn = document.getElementById("addMenuBtn");
+            const counter = document.getElementById("menuCount");
+            const form = document.getElementById("businessForm");// ← 폼 ID 확인!
 
-        /* =============================
-           사업자번호 인증 (/verify-biz 연동)
-        ==============================*/
-        async function verifyBizNumber() {
-            const b1 = document.getElementById('bizNumber1').value.trim();
-            const b2 = document.getElementById('bizNumber2').value.trim();
-            const b3 = document.getElementById('bizNumber3').value.trim();
-            const biz = `${b1}${b2}${b3}`;
-            const out = document.getElementById('bizVerifyResult');
-
-            if (!/^\d{10}$/.test(biz)) {
-                out.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
-                out.className = 'text-sm text-red-600 text-center';
-                return;
+            function updateCounter() {
+                counter.textContent = menuList.querySelectorAll(".menu-row").length;
             }
 
-            out.textContent = '인증 중...';
-            out.className = 'text-sm text-gray-600 text-center';
-
-            try {
-                const r = await fetch('/verify-biz', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ b_no: [biz] })
-                });
-                const d = await r.json();
-                const info = d?.data?.[0];
-                if (info && info.b_stt_cd === '01') {
-                    out.textContent = '✅ 인증 완료(계속사업자)';
-                    out.className = 'text-sm text-green-600 text-center';
-                    if (info.b_nm) { document.getElementById('businessName').value = info.b_nm; }
+            function onFilledState(row) {
+                const name = row.querySelector('input[name="menuName[]"]').value.trim();
+                const price = row.querySelector('input[name="menuPrice[]"]').value.trim();
+                // 콤마 제거 후 길이로 판단
+                const priceNumeric = price.replaceAll(",", "").trim();
+                if (name && priceNumeric) {
+                    row.classList.add("filled");
                 } else {
-                    out.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
-                    out.className = 'text-sm text-red-600 text-center';
+                    row.classList.remove("filled");
                 }
-            } catch (e) {
-                out.textContent = '서버 오류로 인증에 실패했습니다.';
-                out.className = 'text-sm text-red-600 text-center';
             }
-        }
 
-        /* =============================
-           휴대폰 인증 (더미)
-        ==============================*/
-        document.getElementById('verifyPhoneButton').addEventListener('click', () => {
-            const phone = document.getElementById('ownerPhone').value.trim();
-            const resEl = document.getElementById('phoneVerifyResult');
-            if (!phone) {
-                resEl.textContent = '휴대폰 번호를 입력하세요.';
-                resEl.className = 'text-sm text-red-600 text-center';
-                return;
-            }
-            resEl.textContent = '인증번호가 발송되었습니다. (예: 123456)';
-            resEl.className = 'text-sm text-green-600 text-center';
-        });
-        document.getElementById('phoneAuth').addEventListener('blur', function () {
-            const code = this.value.trim();
-            const resEl = document.getElementById('phoneVerifyResult');
-            if (code === '123456') {
-                resEl.textContent = '휴대전화 인증 성공!';
-                resEl.className = 'text-sm text-green-600 text-center';
-            } else if (code) {
-                resEl.textContent = '인증번호가 일치하지 않습니다.';
-                resEl.className = 'text-sm text-red-600 text-center';
-            } else {
-                resEl.textContent = '';
-                resEl.className = 'text-sm text-center';
-            }
-        });
-
-        /* =============================
-           폼 제출 → /store 저장 → N디테일 이동
-        ==============================*/
-        document.getElementById('businessForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                // 필수값 간단 체크 (ncombined 스타일 유지)
-                const requiredIds = ['ownerName', 'ownerPhone', 'businessName', 'subCategory'];
-                for (const id of requiredIds) {
-                    const v = document.getElementById(id)?.value?.trim();
-                    if (!v) { alert('필수 정보를 모두 입력하세요.'); return; }
+            function formatPriceInput(input) {
+                let v = input.value.replace(/[^\d]/g, "");
+                // 숫자만 남기기
+                if (v === "") {
+                    input.value = "";
+                    return;
                 }
+                // 콤마 포맷
+                input.value = v.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                // 커서 재배치(간단 처리)
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
 
-                const fd = new FormData(e.target);
+            function createRow() {
+                const row = document.createElement("div");
+                row.className = "menu-row neo-item px-3 py-3 md:px-4 md:py-4";
+                row.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+          <!-- 카테고리 -->
+          <div class="md:col-span-3">
+            <label class="md:hidden text-xs font-semibold text-gray-500 mb-1 block">카테고리</label>
+            <input type="text" name="category[]" placeholder="예) 돈가스 / 우동 / 세트"
+              class="w-full rounded-lg px-3 py-2 bg-white/70 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-300"
+              maxlength="30" />
+          </div>
 
-                // 사업자번호 합쳐 넣기(서버에서 쓰면)
+          <!-- 메뉴명 -->
+          <div class="md:col-span-6">
+            <label class="md:hidden text-xs font-semibold text-gray-500 mb-1 block">메뉴명</label>
+            <input type="text" name="menuName[]" placeholder="예) 왕돈가스, 치즈돈가스"
+              class="w-full rounded-lg px-3 py-2 bg-white/70 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-300"
+              maxlength="60" />
+          </div>
+
+          <!-- 가격 -->
+          <div class="md:col-span-2">
+            <label class="md:hidden text-xs font-semibold text-gray-500 mb-1 block">가격</label>
+            <input type="text" inputmode="numeric" name="menuPrice[]" placeholder="예) 8,500"
+              class="w-full rounded-lg px-3 py-2 bg-white/70 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-300 text-right"
+              maxlength="11" />
+          </div>
+
+          <!-- 삭제 -->
+          <div class="md:col-span-1 flex md:justify-center">
+            <button type="button" class="neo-icon-btn rounded-lg px-3 py-2 text-gray-600 hover:scale-105 active:scale-95 transition"
+              aria-label="행 삭제">
+              ✕
+            </button>
+          </div>
+        </div>
+      `;
+
+                // 이벤트 바인딩
+                const nameInput = row.querySelector('input[name="menuName[]"]');
+                const priceInput = row.querySelector('input[name="menuPrice[]"]');
+                const categoryInput = row.querySelector('input[name="category[]"]');
+                const delBtn = row.querySelector("button");
+
+                priceInput.addEventListener("input", () => {
+                    formatPriceInput(priceInput);
+                    onFilledState(row);
+                });
+                nameInput.addEventListener("input", () => onFilledState(row));
+                categoryInput.addEventListener("input", () => onFilledState(row));
+
+                delBtn.addEventListener("click", () => {
+                    row.remove();
+                    updateCounter();
+                });
+
+                return row;
+            }
+
+            function addRow() {
+                const count = menuList.querySelectorAll(".menu-row").length;
+                if (count >= MAX_ROWS) {
+                    alert("메뉴는 최대 50개까지 추가할 수 있습니다.");
+                    return;
+                }
+                const row = createRow();
+                menuList.appendChild(row);
+                updateCounter();
+            }
+
+            // 초기 1행
+            addRow();
+
+            addBtn.addEventListener("click", addRow);
+
+            // 제출 시 가격 콤마 제거
+            if (form) {
+                form.addEventListener("submit", () => {
+                    const prices = form.querySelectorAll('input[name="menuPrice[]"]');
+                    prices.forEach((inp) => {
+                        inp.value = inp.value.replace(/[^\d]/g, "");
+                    });
+                });
+            }
+
+            /* =============================
+               이미지 미리보기 (최대 3장)
+            ==============================*/
+            const imagesInput = document.getElementById('imagesInput');
+            const imagesPreview = document.getElementById('imagesPreview');
+            if (imagesInput && imagesPreview) {
+                imagesInput.addEventListener('change', () => {
+                    imagesPreview.innerHTML = '';
+                    const files = Array.from(imagesInput.files || []).slice(0, 3);
+                    files.forEach(f => {
+                        const url = URL.createObjectURL(f);
+                        const img = document.createElement('img');
+                        img.src = url; img.alt = 'preview';
+                        img.className = 'w-28 h-28 object-cover rounded-xl shadow';
+                        imagesPreview.appendChild(img);
+                    });
+                });
+            }
+
+            /* =============================
+               사업자번호 인증 (/verify-biz 연동)
+            ==============================*/
+            // ✅ 전역 노출 + 함수 전체 한 블록으로 정리
+            window.verifyBizNumber = async function () {
                 const b1 = document.getElementById('bizNumber1').value.trim();
                 const b2 = document.getElementById('bizNumber2').value.trim();
                 const b3 = document.getElementById('bizNumber3').value.trim();
-                if (b1 || b2 || b3) { fd.set('bizNumber', `${b1}-${b2}-${b3}`); }
+                const biz = `${b1}${b2}${b3}`;
+                const out = document.getElementById('bizVerifyResult');
 
-                // 이메일 최종 반영
-                const emailHidden = document.getElementById('ownerEmail').value;
-                if (!emailHidden) {
-                    // 비워져 있으면 즉시 갱신
-                    const id = document.getElementById('emailId').value.trim();
-                    const sel = document.getElementById('emailDomainSelect').value;
-                    const custom = document.getElementById('customDomainInput').value.trim();
-                    const domain = (sel === 'custom') ? custom : sel;
-                    if (id && domain) fd.set('ownerEmail', `${id}@${domain}`);
+                if (!/^\d{10}$/.test(biz)) {
+                    out.textContent = '올바른 사업자번호를 입력하세요 (총 10자리 숫자)';
+                    out.className = 'text-sm text-red-600 text-center';
+                    return;
                 }
 
-                // 파일들(FormData로 자동 수집) + businessCertImage 포함
+                out.textContent = '인증 중...';
+                out.className = 'text-sm text-gray-600 text-center';
 
-                const res = await fetch('/store', { method: 'POST', body: fd });
-                if (!res.ok) throw new Error('서버 오류');
+                try {
+                    const r = await fetch('/verify-biz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ b_no: [biz] })
+                    });
+                    const d = await r.json();
+                    const info = d?.data?.[0];
+                    if (info && info.b_stt_cd === '01') {
+                        out.textContent = '✅ 인증 완료(계속사업자)';
+                        out.className = 'text-sm text-green-600 text-center';
+                        if (info.b_nm) document.getElementById('businessName').value = info.b_nm;
+                    } else {
+                        out.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
+                        out.className = 'text-sm text-red-600 text-center';
+                    }
+                } catch (e) {
+                    out.textContent = '서버 오류로 인증에 실패했습니다.';
+                    out.className = 'text-sm text-red-600 text-center';
+                }
+            };
 
-                const data = await res.json();
-                const newId = data?.id || data?.storeId;
-                if (!newId) throw new Error('ID 응답 누락');
+            /* =============================
+               휴대폰 인증 (더미)
+            ==============================*/
+            document.getElementById('verifyPhoneButton').addEventListener('click', () => {
+                const phone = document.getElementById('ownerPhone').value.trim();
+                const resEl = document.getElementById('phoneVerifyResult');
+                if (!phone) {
+                    resEl.textContent = '휴대폰 번호를 입력하세요.';
+                    resEl.className = 'text-sm text-red-600 text-center';
+                    return;
+                }
+                resEl.textContent = '인증번호가 발송되었습니다. (예: 123456)';
+                resEl.className = 'text-sm text-green-600 text-center';
+            });
+            document.getElementById('phoneAuth').addEventListener('blur', function () {
+                const code = this.value.trim();
+                const resEl = document.getElementById('phoneVerifyResult');
+                if (code === '123456') {
+                    resEl.textContent = '휴대전화 인증 성공!';
+                    resEl.className = 'text-sm text-green-600 text-center';
+                } else if (code) {
+                    resEl.textContent = '인증번호가 일치하지 않습니다.';
+                    resEl.className = 'text-sm text-red-600 text-center';
+                } else {
+                    resEl.textContent = '';
+                    resEl.className = 'text-sm text-center';
+                }
+            });
 
-                location.href = `/ndetail.html?id=${encodeURIComponent(newId)}`;
-            } catch (err) {
-                console.error(err);
-                alert('저장 중 오류가 발생했습니다.');
-            }
-        });
+            /* =============================
+               폼 제출 → /store 저장 → N디테일 이동
+            ==============================*/
+            document.getElementById('businessForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                // 1) 메뉴 가격 콤마 제거 (숫자만)
+                document.querySelectorAll('input[name="menuPrice[]"]').forEach(inp => {
+                    inp.value = inp.value.replace(/[^\d]/g, '');
+                });
+                try {
+                    // 필수값 간단 체크 (ncombined 스타일 유지)
+                    const requiredIds = ['ownerName', 'ownerPhone', 'businessName', 'subCategory'];
+                    for (const id of requiredIds) {
+                        const v = document.getElementById(id)?.value?.trim();
+                        if (!v) { alert('필수 정보를 모두 입력하세요.'); return; }
+                    }
+
+                    // 2) 그 다음 FormData 생성
+                    const fd = new FormData(e.target);
+
+                    // 사업자번호 합쳐 넣기(서버에서 쓰면)
+                    const b1 = document.getElementById('bizNumber1').value.trim();
+                    const b2 = document.getElementById('bizNumber2').value.trim();
+                    const b3 = document.getElementById('bizNumber3').value.trim();
+                    if (b1 || b2 || b3) { fd.set('bizNumber', `${b1}-${b2}-${b3}`); }
+
+                    // 이메일 최종 반영
+                    const emailHidden = document.getElementById('ownerEmail').value;
+                    if (!emailHidden) {
+                        // 비워져 있으면 즉시 갱신
+                        const id = document.getElementById('emailId').value.trim();
+                        const sel = document.getElementById('emailDomainSelect').value;
+                        const custom = document.getElementById('customDomainInput').value.trim();
+                        const domain = (sel === 'custom') ? custom : sel;
+                        if (id && domain) fd.set('ownerEmail', `${id}@${domain}`);
+                    }
+
+                    // 파일들(FormData로 자동 수집) + businessCertImage 포함
+
+                    const res = await fetch('/store', { method: 'POST', body: fd });
+                    if (!res.ok) throw new Error('서버 오류');
+
+                    const data = await res.json();
+                    const newId = data?.id || data?.storeId;
+                    if (!newId) throw new Error('ID 응답 누락');
+
+                    location.href = `/ndetail.html?id=${encodeURIComponent(newId)}`;
+                } catch (err) {
+                    console.error(err);
+                    alert('저장 중 오류가 발생했습니다.');
+                }
+            });
+        })();
     </script>
 </body>
 
