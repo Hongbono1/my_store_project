@@ -42,6 +42,7 @@ export const createStore = [
         body.deliveryOption,
         body.businessHours,
         body.serviceDetails,
+        combinedAddress,
         body.ownerAddress,
         body.phoneNumber,
       ];
