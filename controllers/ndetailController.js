@@ -1,117 +1,81 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import multer from "multer";
-import { pool } from "../db/pool.js";
+// controllers/storeController.js
+import { pool } from "../db.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// 값 정규화
+function normalizeDeliveryOption(input) {
+  if (typeof input !== "string") return "미입력";
+  const v = input.trim();
+  const allow = new Set(["가능", "불가", "일부 가능"]);
+  if (allow.has(v)) return v;
 
-// ────────────────────── 업로드 디렉터리 설정 ──────────────────────
-const uploadDir = path.join(__dirname, "..", "public", "uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
+  // 느슨한 매핑(혹시 다른 값이 오더라도 안전하게)
+  const low = v.toLowerCase();
+  if (["y", "yes", "true", "delivery", "deliver", "배달가능"].includes(low)) return "가능";
+  if (["n", "no", "false", "pickup only", "픽업", "배달불가"].includes(low)) return "불가";
+  return "미입력";
+}
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "");
-    const base = path.basename(file.originalname || "file", ext).replace(/\s+/g, "_");
-    const uniq = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `${base}-${uniq}${ext}`);
-  },
-});
-export const upload = multer({ storage });
-
-/* ------------------------------------------------------------------
- * POST /store  (등록) — DB INSERT 예시 (store_info / store_menu)
- * ----------------------------------------------------------------*/
-export const createStore = [
-  upload.single("businessCertImage"), // 샘플: 사업자등록증 1장만 사용
-  async (req, res) => {
-    const body = req.body || {};
-    try {
-      // 1) store_info INSERT
-      const insertStoreSQL = `INSERT INTO store_info (
-        business_name, business_type, delivery_option,
-        business_hours, service_details, address, phone_number
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`;
-
-      const storeVals = [
-        body.businessName,
-        body.mainCategory,
-        body.deliveryOption,
-        body.businessHours,
-        body.serviceDetails,
-        combinedAddress,
-        body.ownerAddress,
-        body.phoneNumber,
-      ];
-
-      const sRes = await pool.query(insertStoreSQL, storeVals);
-      const storeId = sRes.rows[0].id;
-
-      // 2) 메뉴 배열 INSERT (있다면)
-      const menuNames  = Array.isArray(body.menuName)  ? body.menuName  : body["menuName[]"]  || [];
-      const menuPrices = Array.isArray(body.menuPrice) ? body.menuPrice : body["menuPrice[]"] || [];
-      for (let i = 0; i < menuNames.length; i++) {
-        const mSQL = `INSERT INTO store_menu (store_id, menu_name, menu_price) VALUES ($1,$2,$3)`;
-        await pool.query(mSQL, [storeId, menuNames[i], menuPrices[i] || 0]);
-      }
-
-      return res.status(201).json({ ok: true, storeId, redirect: `/new/ndetail.html?id=${storeId}` });
-    } catch (err) {
-      console.error("[createStore] DB 오류:", err);
-      return res.status(500).json({ ok: false, message: "DB 오류" });
-    }
-  },
-];
-
-/* ------------------------------------------------------------------
- * GET /store/:id  (상세 조회) — 메뉴 + 가게 정보
- * ----------------------------------------------------------------*/
-export async function getStoreDetail(req, res) {
-  console.log(`[getStoreDetail] 호출, id=${req.params.id}`);
-  const storeId = req.params.id;
-
-  const storeQuery = `
-    SELECT
-      id,
-      owner_id AS "ownerId",
-      business_name AS "businessName",
-      business_type AS "businessType",
-      delivery_option AS "deliveryOption",
-      business_hours AS "businessHours",
-      service_details AS "serviceDetails",
-      event1, event2,
-      facility, pets, parking,
-      phone_number AS "phoneNumber",
-      homepage, instagram, facebook,
-      additional_desc AS "additionalDesc",
-      address,
-      image1, image2, image3,
-      created_at AS "createdAt",
-      business_category AS "businessCategory",
-      business_subcategory AS "businessSubcategory",
-      description,
-      search_count AS "searchCount",
-      view_count AS "viewCount",
-      click_count AS "clickCount"
-    FROM store_info
-    WHERE id = $1`;
-
-  const menuQuery = `SELECT id, store_id, menu_name, menu_price, menu_image, category FROM store_menu WHERE store_id = $1`;
-
+export async function createStore(req, res) {
   try {
-    const storeResult = await pool.query(storeQuery, [storeId]);
-    const store = storeResult.rows[0];
-    if (!store) {
-      return res.status(404).json({ success: false, message: "해당 가게 없음" });
-    }
-    const menuResult = await pool.query(menuQuery, [storeId]);
-    store.images = [store.image1, store.image2, store.image3].filter(Boolean);
-    return res.json({ store, menus: menuResult.rows });
+    const {
+      businessName,
+      businessType,
+      businessCategory,
+      deliveryOption: rawDeliveryOption,
+      // ... 다른 필드들 ...
+    } = req.body;
+
+    const deliveryOption = normalizeDeliveryOption(rawDeliveryOption);
+
+    const sql = `
+      INSERT INTO store_info (
+        business_name,
+        business_type,
+        business_category,
+        delivery_option
+        -- ... 기타 컬럼
+      ) VALUES ($1,$2,$3,$4)
+      RETURNING id
+    `;
+    const params = [
+      businessName ?? null,
+      businessType ?? null,
+      businessCategory ?? null,
+      deliveryOption
+    ];
+
+    const { rows } = await pool.query(sql, params);
+    return res.json({ ok: true, id: rows[0]?.id ?? null });
   } catch (err) {
-    console.error("[getStoreDetail] DB 오류:", err);
-    return res.status(500).json({ success: false, message: "DB 오류" });
+    console.error("[createStore] error:", err);
+    return res.status(500).json({ ok: false, message: "서버 오류" });
+  }
+}
+
+export async function getStoreDetail(req, res) {
+  try {
+    const { id } = req.params;
+    const sql = `
+      SELECT
+        id,
+        business_name       AS "businessName",
+        business_type       AS "businessType",
+        business_category   AS "businessCategory",
+        COALESCE(delivery_option, '미입력') AS "deliveryOption"
+        -- ... 기타 컬럼도 전부 AS로 camelCase 통일 추천
+      FROM store_info
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const { rows } = await pool.query(sql, [id]);
+    if (!rows[0]) return res.status(404).json({ ok: false, message: "not found" });
+
+    // 방어적으로 한 번 더 보정
+    rows[0].deliveryOption = normalizeDeliveryOption(rows[0].deliveryOption);
+
+    return res.json({ ok: true, store: rows[0] });
+  } catch (err) {
+    console.error("[getStoreDetail] error:", err);
+    return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 }
