@@ -1,6 +1,7 @@
+// routes/ndetail.js
 import { Router } from "express";
 import multer from "multer";
-import { createStore, getStoreDetail } from "../controllers/storeController.js";
+import { createStore, getStoreDetail } from "../controllers/ndetailController.js";
 
 const router = Router();
 const upload = multer({ limits: { fileSize: 20 * 1024 * 1024 } });
