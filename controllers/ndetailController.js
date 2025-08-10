@@ -1,18 +1,17 @@
 // controllers/storeController.js
 import { pool } from "../db.js";
 
-// 값 정규화
-function normalizeDeliveryOption(input) {
-  if (typeof input !== "string") return "미입력";
-  const v = input.trim();
-  const allow = new Set(["가능", "불가", "일부 가능"]);
-  if (allow.has(v)) return v;
+const ALLOWED = new Set(["가능", "불가", "일부 가능"]);
 
-  // 느슨한 매핑(혹시 다른 값이 오더라도 안전하게)
+function normalizeDeliveryOption(input) {
+  if (typeof input !== "string") return null;
+  const v = input.trim();
+  if (ALLOWED.has(v)) return v;
+
   const low = v.toLowerCase();
-  if (["y", "yes", "true", "delivery", "deliver", "배달가능"].includes(low)) return "가능";
-  if (["n", "no", "false", "pickup only", "픽업", "배달불가"].includes(low)) return "불가";
-  return "미입력";
+  if (["y","yes","true","delivery","deliver","배달가능"].includes(low)) return "가능";
+  if (["n","no","false","pickup only","픽업","배달불가","불가능"].includes(low)) return "불가";
+  return null; // 필수 정책이므로 허용 외는 null 처리 → 400
 }
 
 export async function createStore(req, res) {
@@ -21,61 +20,63 @@ export async function createStore(req, res) {
       businessName,
       businessType,
       businessCategory,
+      businessSubcategory,
       deliveryOption: rawDeliveryOption,
-      // ... 다른 필드들 ...
     } = req.body;
 
     const deliveryOption = normalizeDeliveryOption(rawDeliveryOption);
+    if (!deliveryOption) {
+      return res.status(400).json({
+        ok: false,
+        message: "배달 여부는 '가능', '불가', '일부 가능' 중 하나를 선택해야 합니다."
+      });
+    }
 
     const sql = `
       INSERT INTO store_info (
         business_name,
         business_type,
         business_category,
+        business_subcategory,
         delivery_option
-        -- ... 기타 컬럼
-      ) VALUES ($1,$2,$3,$4)
+      ) VALUES ($1,$2,$3,$4,$5)
       RETURNING id
     `;
     const params = [
       businessName ?? null,
       businessType ?? null,
       businessCategory ?? null,
+      businessSubcategory ?? null,
       deliveryOption
     ];
 
     const { rows } = await pool.query(sql, params);
-    return res.json({ ok: true, id: rows[0]?.id ?? null });
-  } catch (err) {
-    console.error("[createStore] error:", err);
+    return res.json({ ok: true, storeId: rows[0]?.id ?? null }); // ← 프론트와 맞춤
+  } catch (e) {
+    console.error("[createStore] insert error:", e);
     return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 }
 
 export async function getStoreDetail(req, res) {
   try {
-    const { id } = req.params;
     const sql = `
       SELECT
         id,
-        business_name       AS "businessName",
-        business_type       AS "businessType",
-        business_category   AS "businessCategory",
-        COALESCE(delivery_option, '미입력') AS "deliveryOption"
-        -- ... 기타 컬럼도 전부 AS로 camelCase 통일 추천
+        business_name         AS "businessName",
+        business_type         AS "businessType",
+        business_category     AS "businessCategory",
+        business_subcategory  AS "businessSubcategory",
+        delivery_option       AS "deliveryOption"
       FROM store_info
       WHERE id = $1
       LIMIT 1
     `;
-    const { rows } = await pool.query(sql, [id]);
+    const { rows } = await pool.query(sql, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ ok: false, message: "not found" });
-
-    // 방어적으로 한 번 더 보정
-    rows[0].deliveryOption = normalizeDeliveryOption(rows[0].deliveryOption);
-
     return res.json({ ok: true, store: rows[0] });
-  } catch (err) {
-    console.error("[getStoreDetail] error:", err);
+  } catch (e) {
+    console.error("[getStoreDetail] select error:", e);
     return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 }
