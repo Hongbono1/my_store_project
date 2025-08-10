@@ -120,35 +120,76 @@ export async function createStore(req, res) {
 }
 
 // 상세
-export async function getStoreDetail(req, res) {
+// ...위 생략...
+export async function createStore(req, res) {
   try {
-    const { id } = req.params;
+    const b = req.body;
+
+    const deliveryOption = normalizeDeliveryOption(b.deliveryOption);
+    if (!deliveryOption) {
+      return res.status(400).json({ ok:false, message:"배달 여부는 '가능', '불가', '일부 가능' 중 하나를 선택해야 합니다." });
+    }
+
+    // ✨ NOT NULL 회피: owner 필드 포함
+    const ownerName  = b.ownerName  ?? null;
+    const birthDate  = b.birthDate  ?? null;
+    const ownerEmail = b.ownerEmail ?? null;
+    const ownerPhone = b.ownerPhone ?? null;
+
+    const businessName        = b.businessName ?? null;
+    const businessType        = b.businessType ?? null;
+    const businessSubcategory = b.businessSubcategory ?? b.subCategory ?? null;
+    const businessHours       = b.businessHours ?? null;
+    const serviceDetails      = b.serviceDetails ?? null;
+
+    // 주소(두 폼 호환)
+    const roadAddress   = b.roadAddress ?? b.ownerAddress ?? "";
+    const detailAddress = b.detailAddress ?? b.ownerAddressDetail ?? "";
+    const address       = (roadAddress || detailAddress) ? `${roadAddress} ${detailAddress}`.trim() : null;
+
+    const event1 = b.event1 ?? null;
+    const event2 = b.event2 ?? null;
+    const facility = b.facility ?? null;
+    const pets = b.pets ?? null;
+    const parking = b.parking ?? null;
+    const phoneNumber = b.phoneNumber ?? null;
+    const homepage = b.homepage ?? null;
+    const instagram = b.instagram ?? null;
+    const facebook = b.facebook ?? null;
+    const additionalDesc = b.additionalDesc ?? null;
+
+    const image1 = null, image2 = null, image3 = null;
+    const businessCertPath = null;
+
     const sql = `
-      SELECT
-        id,
-        business_name         AS "businessName",
-        business_type         AS "businessType",
-        business_subcategory  AS "businessSubcategory",
-        business_hours        AS "businessHours",
-        service_details       AS "serviceDetails",
-        address               AS "address",
-        event1, event2,
-        facility, pets, parking,
-        phone_number          AS "phoneNumber",
-        homepage, instagram, facebook,
-        additional_desc       AS "additionalDesc",
-        image1, image2, image3,
-        delivery_option       AS "deliveryOption",
-        created_at            AS "createdAt"
-      FROM store_info
-      WHERE id = $1
-      LIMIT 1
+      INSERT INTO store_info (
+        owner_name, birth_date, owner_email, owner_phone,
+        business_name, business_type, business_subcategory, business_hours,
+        service_details, address, event1, event2, facility, pets, parking,
+        phone_number, homepage, instagram, facebook, additional_desc,
+        image1, image2, image3, business_cert_path, delivery_option
+      ) VALUES (
+        $1,$2,$3,$4,
+        $5,$6,$7,$8,
+        $9,$10,$11,$12,$13,$14,$15,
+        $16,$17,$18,$19,$20,
+        $21,$22,$23,$24,$25
+      )
+      RETURNING id
     `;
-    const { rows } = await pool.query(sql, [id]);
-    if (!rows[0]) return res.status(404).json({ ok: false, message: "not found" });
-    return res.json({ ok: true, store: rows[0] });
+
+    const params = [
+      ownerName, birthDate, ownerEmail, ownerPhone,
+      businessName, businessType, businessSubcategory, businessHours,
+      serviceDetails, address, event1, event2, facility, pets, parking,
+      phoneNumber, homepage, instagram, facebook, additionalDesc,
+      image1, image2, image3, businessCertPath, deliveryOption
+    ];
+
+    const { rows } = await pool.query(sql, params);
+    return res.json({ ok:true, storeId: rows[0]?.id ?? null });
   } catch (e) {
-    console.error("[getStoreDetail] error:", e);
-    return res.status(500).json({ ok: false, message: "서버 오류" });
+    console.error("[createStore] error:", e);
+    return res.status(500).json({ ok:false, message:"서버 오류" });
   }
 }
