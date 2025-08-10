@@ -1,12 +1,15 @@
-import express from "express";
-import {
-  createStore,      // 등록 (POST /store)
-  getStoreDetail,   // 상세 (GET /store/:id)
-} from "../controllers/ndetailController.js";
+// routes/store.js
+import { Router } from "express";
+import multer from "multer";
+import { createStore, getStoreDetail } from "../controllers/storeController.js";
 
-const router = express.Router();
+const router = Router();
+const upload = multer({ limits: { fileSize: 20 * 1024 * 1024 } });
 
-router.post("/", createStore);      // POST /store
-router.get("/:id", getStoreDetail);  // GET  /store/:id
+// 파일도 올릴 수 있으면
+router.post("/", upload.any(), createStore);
+
+// 조회
+router.get("/:id", getStoreDetail);
 
 export default router;
