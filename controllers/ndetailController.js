@@ -9,8 +9,8 @@ function normalizeDeliveryOption(input) {
   if (ALLOWED.has(v)) return v;
 
   const low = v.toLowerCase();
-  if (["y","yes","true","delivery","deliver","배달가능"].includes(low)) return "가능";
-  if (["n","no","false","pickup only","픽업","배달불가","불가능"].includes(low)) return "불가";
+  if (["y", "yes", "true", "delivery", "deliver", "배달가능"].includes(low)) return "가능";
+  if (["n", "no", "false", "pickup only", "픽업", "배달불가", "불가능"].includes(low)) return "불가";
   return null; // 필수 정책이므로 허용 외는 null 처리 → 400
 }
 
@@ -60,23 +60,38 @@ export async function createStore(req, res) {
 
 export async function getStoreDetail(req, res) {
   try {
+    const { id } = req.params;
     const sql = `
       SELECT
         id,
         business_name         AS "businessName",
         business_type         AS "businessType",
-        business_category     AS "businessCategory",
         business_subcategory  AS "businessSubcategory",
-        delivery_option       AS "deliveryOption"
+        business_hours        AS "businessHours",
+        service_details       AS "serviceDetails",
+        address               AS "address",
+        event1,
+        event2,
+        facility,
+        pets,
+        parking,
+        phone_number          AS "phoneNumber",
+        homepage,
+        instagram,
+        facebook,
+        additional_desc       AS "additionalDesc",
+        image1, image2, image3,
+        delivery_option       AS "deliveryOption",
+        created_at            AS "createdAt"
       FROM store_info
       WHERE id = $1
       LIMIT 1
     `;
-    const { rows } = await pool.query(sql, [req.params.id]);
+    const { rows } = await pool.query(sql, [id]);
     if (!rows[0]) return res.status(404).json({ ok: false, message: "not found" });
     return res.json({ ok: true, store: rows[0] });
   } catch (e) {
-    console.error("[getStoreDetail] select error:", e);
+    console.error("[getStoreDetail] error:", e);
     return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 }
