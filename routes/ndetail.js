@@ -14,4 +14,3 @@ router.post("/", createStoreHandler);
 router.get("/:id", getStoreDetailHandler);
 
 export default router;
-EOF
