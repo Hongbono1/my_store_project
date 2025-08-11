@@ -1,4 +1,3 @@
-
 // routes/ndetail.js
 import { Router } from "express";
 import { createStore, getStoreDetail } from "../controllers/ndetailController.js";

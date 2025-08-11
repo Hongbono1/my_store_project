@@ -14,7 +14,7 @@ function normalizeDeliveryOption(input) {
   return null;
 }
 
-// ── 등록 (병합본)
+// ── 등록 (단일 정의: 중복 금지)
 export async function createStore(req, res) {
   try {
     const b = req.body;
@@ -96,7 +96,7 @@ export async function createStore(req, res) {
   }
 }
 
-// ── 상세 조회
+// ── 상세 조회 (반드시 export)
 export async function getStoreDetail(req, res) {
   try {
     const id = Number(req.params.id);
@@ -122,3 +122,5 @@ export async function getStoreDetail(req, res) {
     return res.status(500).json({ ok:false, message:"서버 오류" });
   }
 }
+
+// ✅ 하단에 export default, export 중복 블록, 재-export 등 “추가 export” 넣지 마세요.
