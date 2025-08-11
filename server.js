@@ -20,9 +20,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 정적 경로
+// ✅ 업로드는 기존 경로 유지 (public/uploads)
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/new", express.static(path.join(__dirname, "public2")));
+// ✅ 이제 루트 정적 서빙은 public2만 사용
+app.use(express.static(path.join(__dirname, "public2")));
 
 // 필요 폴더 생성
 fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
@@ -45,64 +46,36 @@ app.get("/__debug", (_req, res) => {
   });
 });
 
-// ===== 임시 파일 기반 저장/조회 테스트 (삭제 예정) =====
-app.post("/__save", (req, res) => {
-  const { id, data } = req.body || {};
-  if (!id || typeof id !== "string") return res.status(400).json({ ok: false, msg: "id(string) 필요" });
-  const file = path.join(__dirname, "data", "stores", `${id}.json`);
-  try {
-    fs.writeFileSync(file, JSON.stringify(data ?? {}, null, 2), "utf8");
-    return res.json({ ok: true, saved: file });
-  } catch (e) {
-    console.error("[__save] error:", e);
-    return res.status(500).json({ ok: false, msg: "write fail" });
-  }
-});
-
-app.get("/__load/:id", (req, res) => {
-  const id = String(req.params.id || "");
-  const file = path.join(__dirname, "data", "stores", `${id}.json`);
-  if (!fs.existsSync(file)) return res.status(404).json({ ok: false, msg: "not found" });
-  try {
-    const json = JSON.parse(fs.readFileSync(file, "utf8"));
-    return res.json({ ok: true, data: json });
-  } catch (e) {
-    console.error("[__load] error:", e);
-    return res.status(500).json({ ok: false, msg: "read fail" });
-  }
-});
-
-// ====================== 예쁜 URL 매핑 추가 ======================
-// /푸드  → public/foodregister.html
-// /ndetail → public/ndetail.html
-// /ncombinedregister → public/ncombinedregister.html
+// ====================== 예쁜 URL 매핑 (public2만) ======================
+// /푸드  → public2/foodregister.html
+// /ndetail → public2/ndetail.html
+// /ncombinedregister → public2/ncombinedregister.html
 const prettyMap = {
   "푸드": "foodregister.html",
   "ndetail": "ndetail.html",
   "ncombinedregister": "ncombinedregister.html",
 };
 
-// 단일 슬러그 매핑 (API/디버그 라우트 뒤에 둔다)
 app.get("/:slug", (req, res, next) => {
   const slug = decodeURIComponent(req.params.slug);
   const mapped = prettyMap[slug];
   if (!mapped) return next();
 
-  const filePath = path.join(__dirname, "public", mapped);
+  const filePath = path.join(__dirname, "public2", mapped);
   if (fs.existsSync(filePath)) return res.sendFile(filePath);
   return next();
 });
 
-// 확장자 생략 지원: /foo → public/foo.html (있으면 서빙)
+// 확장자 생략 지원: /foo → public2/foo.html (있으면 서빙)
 app.use((req, res, next) => {
-  if (path.extname(req.path)) return next();
+  if (path.extname(req.path)) return next(); // 이미 확장자 있으면 패스
   const name = decodeURIComponent(req.path).replace(/^\/+/, "");
   if (!name) return next();
-  const candidate = path.join(__dirname, "public", `${name}.html`);
+  const candidate = path.join(__dirname, "public2", `${name}.html`);
   if (fs.existsSync(candidate)) return res.sendFile(candidate);
   next();
 });
-// ===============================================================
+// =====================================================================
 
 // 404 핸들러
 app.use((_req, res) => res.status(404).json({ ok: false, message: "Not Found" }));
