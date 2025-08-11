@@ -724,7 +724,11 @@
         let selectedCategory = null;
         const MAX_PER_CAT = 50;
 
-        const safeId = (name) => "cat_" + name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+        const safeId = (name) => {
+            let hash = 0;
+            for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+            return 'cat_' + hash.toString(36);
+        };
         const escapeHtml = (str) => String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
 
         function addCategory() {
@@ -777,13 +781,14 @@
             const block = document.createElement('div');
             block.className = 'neo-section p-4';
             block.dataset.catBlock = name;
+            block.id = `${id}_block`;
 
             block.innerHTML = `
     <div class="flex items-center justify-between pb-3 border-b border-blue-50">
       <div class="flex items-center gap-2">
         <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold">${escapeHtml(name).charAt(0)}</span>
         <h5 class="text-blue-900 font-bold text-lg">${escapeHtml(name)}</h5>
-        <span class="text-sm hint ml-2">(<span data-count="${id}">0</span>/50)</span>
+        <span class="text-sm hint ml-2">(<span data-count="${id}">0</span>/50)
       </div>
       <div class="flex items-center gap-2">
         <!-- 이 버튼을 누르면 "항상 자기 카테고리"로 추가 -->
