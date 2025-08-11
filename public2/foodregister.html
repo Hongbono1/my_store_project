@@ -618,23 +618,36 @@
         /* Kakao 지도 */
         kakao.maps.load(() => { window.kakaoReady = true; });
         let map, marker;
-        function updateMap(addr) {
+        function updateMap(addr, detail = '') {
             if (!window.kakaoReady) return;
-            const mapEl = document.getElementById('map');
-            if (!map) {
-                map = new kakao.maps.Map(mapEl, { center: new kakao.maps.LatLng(37.5665, 126.978), level: 3 });
-            }
-            if (!addr) { return; }
             const geocoder = new kakao.maps.services.Geocoder();
+            if (!map) {
+                map = new kakao.maps.Map(document.getElementById('map'), {
+                    center: new kakao.maps.LatLng(37.5665, 126.978), level: 3
+                });
+            }
             geocoder.addressSearch(addr, (res, status) => {
-                if (status === kakao.maps.services.Status.OK) {
-                    const coords = new kakao.maps.LatLng(res[0].y, res[0].x);
-                    map.setCenter(coords);
-                    if (marker) marker.setPosition(coords);
-                    else marker = new kakao.maps.Marker({ map, position: coords });
+                if (status !== kakao.maps.services.Status.OK) return;
+                const coords = new kakao.maps.LatLng(res[0].y, res[0].x);
+                map.setCenter(coords);
+                marker ? marker.setPosition(coords) : marker = new kakao.maps.Marker({ map, position: coords });
+
+                // 상세 주소는 말풍선에 표시
+                if (detail) {
+                    new kakao.maps.InfoWindow({
+                        content: `<div style="padding:6px 8px">${addr}<br>${detail}</div>`
+                    }).open(map, marker);
                 }
             });
         }
+
+        // 상세주소 입력 시 즉시 반영(엔터/디바운스)
+        const detailEl = document.getElementById('detailAddress');
+        const roadEl = document.getElementById('roadAddress');
+        const applyDetail = () => updateMap(`${roadEl.value.trim()} ${detailEl.value.trim()}`.trim(), detailEl.value.trim());
+        detailEl.addEventListener('keydown', e => { if (e.key === 'Enter') applyDetail(); });
+        detailEl.addEventListener('blur', applyDetail);
+
 
         function openDaumPostcode() {
             new daum.Postcode({
