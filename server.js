@@ -28,7 +28,7 @@ app.use("/new", express.static(path.join(__dirname, "public2")));
 fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "data", "stores"), { recursive: true });
 
-// 라우터
+// 라우터 (API)
 app.use("/store", ndetailRouter);
 
 // 헬스/디버그
@@ -72,6 +72,37 @@ app.get("/__load/:id", (req, res) => {
   }
 });
 
+// ====================== 예쁜 URL 매핑 추가 ======================
+// /푸드  → public/foodregister.html
+// /ndetail → public/ndetail.html
+// /ncombinedregister → public/ncombinedregister.html
+const prettyMap = {
+  "푸드": "foodregister.html",
+  "ndetail": "ndetail.html",
+  "ncombinedregister": "ncombinedregister.html",
+};
+
+// 단일 슬러그 매핑 (API/디버그 라우트 뒤에 둔다)
+app.get("/:slug", (req, res, next) => {
+  const slug = decodeURIComponent(req.params.slug);
+  const mapped = prettyMap[slug];
+  if (!mapped) return next();
+
+  const filePath = path.join(__dirname, "public", mapped);
+  if (fs.existsSync(filePath)) return res.sendFile(filePath);
+  return next();
+});
+
+// 확장자 생략 지원: /foo → public/foo.html (있으면 서빙)
+app.use((req, res, next) => {
+  if (path.extname(req.path)) return next();
+  const name = decodeURIComponent(req.path).replace(/^\/+/, "");
+  if (!name) return next();
+  const candidate = path.join(__dirname, "public", `${name}.html`);
+  if (fs.existsSync(candidate)) return res.sendFile(candidate);
+  next();
+});
+// ===============================================================
 
 // 404 핸들러
 app.use((_req, res) => res.status(404).json({ ok: false, message: "Not Found" }));
