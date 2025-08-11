@@ -1,13 +1,17 @@
 // routes/ndetail.js
 import { Router } from "express";
-import { createStore, getStoreDetail } from "../controllers/ndetailController.js";
+import {
+  createStore as createStoreHandler,
+  getStoreDetail as getStoreDetailHandler
+} from "../controllers/ndetailController.js";
 
 const router = Router();
 
 // 등록
-router.post("/", createStore);
+router.post("/", createStoreHandler);
 
 // 상세
-router.get("/:id", getStoreDetail);
+router.get("/:id", getStoreDetailHandler);
 
 export default router;
+EOF
