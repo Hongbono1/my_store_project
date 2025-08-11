@@ -1,8 +1,7 @@
 // controllers/ndetailController.js
 import { pool } from "../db.js";
 
-// ───────────────────────────────────────────────────────────
-// 배달 여부 검증
+// ── 배달 여부 검증
 const ALLOWED_DELIVERY = new Set(["가능", "불가", "일부 가능"]);
 function normalizeDeliveryOption(input) {
   if (typeof input !== "string") return null;
@@ -14,9 +13,8 @@ function normalizeDeliveryOption(input) {
   if (["n","no","false","pickup only","픽업","배달불가","불가능"].includes(low)) return "불가";
   return null;
 }
-// ───────────────────────────────────────────────────────────
 
-// 등록 (병합본: owner_* 포함 + 폼 호환 + 주소/배달 검증)
+// ── 등록 (병합본)
 export async function createStore(req, res) {
   try {
     const b = req.body;
@@ -30,14 +28,13 @@ export async function createStore(req, res) {
       });
     }
 
-    // 2) 소유자/대표자 정보 (DB 제약 대응: owner_name NOT NULL)
-    //    - 폼에 값이 없을 수도 있어서 안전하게 기본값을 둠
+    // 2) 소유자 정보 (NOT NULL 대응)
     const ownerName  = (b.ownerName ?? b.owner_name ?? b.owner ?? "").trim() || "미기입";
     const birthDate  = b.birthDate  ?? b.birth_date ?? null;
     const ownerEmail = b.ownerEmail ?? b.owner_email ?? null;
     const ownerPhone = b.ownerPhone ?? b.owner_phone ?? null;
 
-    // 3) 가게 기본 정보 (서로 다른 폼 키 호환)
+    // 3) 가게 기본 정보 (폼 키 호환)
     const businessName        = b.businessName ?? b.storeName ?? null;
     const businessType        = b.businessType ?? b.storeType ?? null;
     const businessSubcategory = b.businessSubcategory ?? b.subCategory ?? b.businessCategory ?? null;
@@ -65,7 +62,7 @@ export async function createStore(req, res) {
     const image1 = null, image2 = null, image3 = null;
     const businessCertPath = null;
 
-    // 7) INSERT (owner_* 포함 / business_subcategory 사용)
+    // 7) INSERT
     const sql = `
       INSERT INTO store_info (
         owner_name, birth_date, owner_email, owner_phone,
@@ -96,5 +93,32 @@ export async function createStore(req, res) {
   } catch (e) {
     console.error("[createStore] error:", e);
     return res.status(500).json({ ok: false, message: "서버 오류" });
+  }
+}
+
+// ── 상세 조회
+export async function getStoreDetail(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ ok:false, message:"유효하지 않은 id" });
+
+    const { rows } = await pool.query(
+      `SELECT
+         id, owner_name, birth_date, owner_email, owner_phone,
+         business_name, business_type, business_subcategory, business_hours,
+         service_details, address, event1, event2, facility, pets, parking,
+         phone_number, homepage, instagram, facebook, additional_desc,
+         image1, image2, image3, business_cert_path, delivery_option,
+         created_at
+       FROM store_info
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ ok:false, message:"존재하지 않는 가게" });
+    return res.json({ ok:true, store: rows[0] });
+  } catch (e) {
+    console.error("[getStoreDetail] error:", e);
+    return res.status(500).json({ ok:false, message:"서버 오류" });
   }
 }
