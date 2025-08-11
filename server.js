@@ -21,12 +21,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // 정적 경로
 // ✅ 업로드는 기존 경로 유지 (public/uploads)
-app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
 // ✅ 이제 루트 정적 서빙은 public2만 사용
 app.use(express.static(path.join(__dirname, "public2")));
 
 // 필요 폴더 생성
-fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
+fs.mkdirSync(path.join(__dirname, "public2", "uploads"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "data", "stores"), { recursive: true });
 
 // 라우터 (API)
