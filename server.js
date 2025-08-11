@@ -24,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
 // ✅ 이제 루트 정적 서빙은 public2만 사용
 app.use(express.static(path.join(__dirname, "public2")));
+app.use("/new", express.static(path.join(__dirname, "public2")));
 
 // 필요 폴더 생성
 fs.mkdirSync(path.join(__dirname, "public2", "uploads"), { recursive: true });
