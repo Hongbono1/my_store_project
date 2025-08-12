@@ -23,16 +23,14 @@ app.use(express.static(path.join(process.cwd(), "public2")));
 app.use("/uploads", express.static(path.join(process.cwd(), "public2", "uploads")));
 
 // 사업자번호 중계 (/verify-biz)
-// /verify-biz : 국세청(ODCloud) 중계
 app.post("/verify-biz", async (req, res) => {
   try {
-    const key = process.env.BIZ_API_KEY;
+    const key = process.env.ODCLOUD_SERVICE_KEY; // ← .env와 동일한 이름
     if (!key) {
-      console.error("[/verify-biz] BIZ_API_KEY missing");
-      return res.status(500).json({ error: "BIZ_API_KEY is not set" });
+      console.error("[/verify-biz] ODCLOUD_SERVICE_KEY missing");
+      return res.status(500).json({ error: "ODCLOUD_SERVICE_KEY is not set" });
     }
 
-    // 바디 검증: { b_no: ["##########"] }
     const body = req.body?.b_no ? { b_no: req.body.b_no } : req.body;
     if (!body || !Array.isArray(body.b_no) || body.b_no.length === 0) {
       console.error("[/verify-biz] invalid body:", req.body);
@@ -40,13 +38,14 @@ app.post("/verify-biz", async (req, res) => {
     }
 
     const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(key)}`;
+
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json;charset=UTF-8" },
       body: JSON.stringify(body),
     });
 
-    const text = await r.text(); // 성공/실패 모두 원문 확보
+    const text = await r.text();
     if (!r.ok) {
       console.error("[/verify-biz] upstream", r.status, text);
       res.status(r.status);
@@ -64,7 +63,6 @@ app.post("/verify-biz", async (req, res) => {
     return res.status(500).json({ error: "verify-biz failed" });
   }
 });
-
 
 // foodregister 라우터만 사용
 app.use("/foodregister", foodregisterRouter);
