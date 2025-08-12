@@ -23,6 +23,7 @@ app.use(express.static(path.join(process.cwd(), "public2")));
 app.use("/uploads", express.static(path.join(process.cwd(), "public2", "uploads")));
 
 // 사업자번호 중계 (/verify-biz)
+// /verify-biz : 국세청(ODCloud) 중계
 app.post("/verify-biz", async (req, res) => {
   try {
     const key = process.env.BIZ_API_KEY;
@@ -31,8 +32,9 @@ app.post("/verify-biz", async (req, res) => {
       return res.status(500).json({ error: "BIZ_API_KEY is not set" });
     }
 
+    // 바디 검증: { b_no: ["##########"] }
     const body = req.body?.b_no ? { b_no: req.body.b_no } : req.body;
-    if (!body || !Array.isArray(body.b_no)) {
+    if (!body || !Array.isArray(body.b_no) || body.b_no.length === 0) {
       console.error("[/verify-biz] invalid body:", req.body);
       return res.status(400).json({ error: 'invalid body; expected { b_no: ["##########"] }' });
     }
@@ -44,12 +46,14 @@ app.post("/verify-biz", async (req, res) => {
       body: JSON.stringify(body),
     });
 
-    const text = await r.text();
+    const text = await r.text(); // 성공/실패 모두 원문 확보
     if (!r.ok) {
-      console.error("[/verify-biz] upstream non-200:", r.status, text);
+      console.error("[/verify-biz] upstream", r.status, text);
       res.status(r.status);
-      try { return res.json(JSON.parse(text)); } catch { return res.type("text/plain").send(text); }
+      try { return res.json(JSON.parse(text)); }
+      catch { return res.type("text/plain").send(text); }
     }
+
     try { return res.json(JSON.parse(text)); }
     catch (e) {
       console.error("[/verify-biz] JSON parse err:", e, text);
@@ -60,6 +64,7 @@ app.post("/verify-biz", async (req, res) => {
     return res.status(500).json({ error: "verify-biz failed" });
   }
 });
+
 
 // foodregister 라우터만 사용
 app.use("/foodregister", foodregisterRouter);
