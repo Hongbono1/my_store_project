@@ -1,54 +1,42 @@
-// routes/foodregister.js  (foodregister.html 전용)
-import express from "express";
+// routes/foodregister.js
+import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import {
-  createFoodStore,
-  getFoodStoreDetail,
-  getFoodStoreMenus,
+  createFoodRegister,
+  getFoodRegisterDetail,
+  getFoodRegisterMenus,
 } from "../controllers/foodregisterController.js";
 
-const router = express.Router();
+const router = Router();
 
-// 업로드 디렉토리 준비
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.join(process.cwd(), "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// 업로드 디렉토리: public2/uploads (고정)
+const uploadDir = path.join(process.cwd(), "public2", "uploads");
+fs.mkdirSync(uploadDir, { recursive: true });
 
-// Multer 저장 정책
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "");
-    const base = path.basename(file.originalname || "file", ext);
-    const safeBase = base.replace(/[^\w.-]+/g, "_");
-    cb(null, `${Date.now()}_${Math.random().toString(36).slice(2)}_${safeBase}${ext}`);
+    const original = file.originalname || "file";
+    const safe = original.replace(/[^\w.-]/g, "_");
+    cb(null, `${Date.now()}-${safe}`);
   },
 });
 const upload = multer({ storage });
 
-/**
- * foodregister.html 폼 기준
- * - 대표 이미지: name="storeImages" multiple (최대 3)
- * - 메뉴 이미지: name="menuImage[]" multiple
- * - 사업자등록증: name="businessCertImage" (선택)
- * - 텍스트 필드: req.body
- */
+// ✅ 폼 name 고정 (foodregister 기준)
 const uploads = upload.fields([
-  { name: "storeImages", maxCount: 3 },
-  { name: "menuImage[]", maxCount: 200 },
-  { name: "menuImage", maxCount: 200 },         // [] 없이 오는 경우 대비
-  { name: "businessCertImage", maxCount: 1 },   // 선택
+  { name: "storeImages", maxCount: 3 },     // 대표 이미지(여러 장)
+  { name: "menuImage[]", maxCount: 200 },   // 메뉴 이미지(여러 장)
+  { name: "businessCertImage", maxCount: 1 } // 사업자등록증(선택)
 ]);
 
-// 생성 (foodregister.html 전용)
-router.post("/", uploads, createFoodStore);
+// 생성
+router.post("/", uploads, createFoodRegister);
 
-// 상세/메뉴 (ndetail.html에서 재사용)
-router.get("/:id", getFoodStoreDetail);
-router.get("/:id/menus", getFoodStoreMenus);
+// 상세/메뉴
+router.get("/:id", getFoodRegisterDetail);
+router.get("/:id/menus", getFoodRegisterMenus);
 
 export default router;
