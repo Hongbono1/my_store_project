@@ -25,20 +25,36 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public2", "uploads"
 // 사업자번호 중계 (/verify-biz)
 app.post("/verify-biz", async (req, res) => {
   try {
-    const serviceKey = process.env.BIZ_API_KEY;
-    if (!serviceKey) return res.status(500).json({ error: "BIZ_API_KEY is not set" });
+    const key = process.env.BIZ_API_KEY;
+    if (!key) {
+      console.error("[/verify-biz] BIZ_API_KEY missing");
+      return res.status(500).json({ error: "BIZ_API_KEY is not set" });
+    }
 
-    // 클라이언트에서 { b_no: ["1234567890"] } 형식 권장
     const body = req.body?.b_no ? { b_no: req.body.b_no } : req.body;
+    if (!body || !Array.isArray(body.b_no)) {
+      console.error("[/verify-biz] invalid body:", req.body);
+      return res.status(400).json({ error: 'invalid body; expected { b_no: ["##########"] }' });
+    }
 
-    const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
+    const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(key)}`;
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json;charset=UTF-8" },
       body: JSON.stringify(body),
     });
-    const data = await r.json();
-    return res.status(r.ok ? 200 : r.status).json(data);
+
+    const text = await r.text();
+    if (!r.ok) {
+      console.error("[/verify-biz] upstream non-200:", r.status, text);
+      res.status(r.status);
+      try { return res.json(JSON.parse(text)); } catch { return res.type("text/plain").send(text); }
+    }
+    try { return res.json(JSON.parse(text)); }
+    catch (e) {
+      console.error("[/verify-biz] JSON parse err:", e, text);
+      return res.status(502).type("text/plain").send("Bad upstream JSON");
+    }
   } catch (err) {
     console.error("[/verify-biz] error:", err);
     return res.status(500).json({ error: "verify-biz failed" });
