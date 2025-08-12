@@ -967,17 +967,19 @@
             else { resEl.textContent = '인증번호가 일치하지 않습니다.'; resEl.className = 'text-sm text-red-600 text-center'; }
         });
 
-        /* 사업자번호 인증 (Neon 서버 라우팅에 맞춤: /verify-biz) */
+        /* 사업자번호 인증 (Neon 서버 라우팅: /verify-biz) */
         async function verifyBizNumber() {
-            const n1 = document.getElementById('biz1').value.trim();
-            const n2 = document.getElementById('biz2').value.trim();
-            const n3 = document.getElementById('biz3').value.trim();
+            // 1) 입력값 정규화 (숫자만 10자리)
+            const onlyNum = id => (document.getElementById(id)?.value || '').replace(/\D/g, '');
+            const n1 = onlyNum('biz1');
+            const n2 = onlyNum('biz2');
+            const n3 = onlyNum('biz3');
             const biz = n1 + n2 + n3;
 
             const resEl = document.getElementById('bizVerifyResult');
-            const nameInp = document.getElementById('businessName');
+            const nameEl = document.getElementById('businessName');
 
-            if (!/^\d{10}$/.test(biz)) {
+            if (biz.length !== 10) {
                 resEl.textContent = '올바른 사업자번호(10자리)를 입력하세요.';
                 resEl.className = 'text-sm text-red-600 text-center';
                 return;
@@ -990,22 +992,37 @@
                     body: JSON.stringify({ b_no: [biz] })
                 });
                 const d = await r.json();
-                const i = d?.data?.[0];
+                const i = d?.data?.[0] || {};     // API 응답 첫 항목
 
-                if (i && i.b_stt_cd === '01') {
-                    resEl.textContent = `✅ 인증 완료: ${i.b_no}`;
-                    resEl.className = 'text-sm text-green-600 text-center';
-                    nameInp.value = i.b_nm || nameInp.value;
-                } else {
-                    resEl.textContent = '❌ 등록되지 않았거나 폐업된 사업자입니다.';
-                    resEl.className = 'text-sm text-red-600 text-center';
-                }
+                // 2) 코드/텍스트 모두로 판정 (공백/타입 이슈 방지)
+                const code = String(i?.b_stt_cd ?? '').trim(); // '01','02','03'
+                const text = String(i?.b_stt ?? '').trim(); // '계속사업자','휴업자','폐업자' 등
+
+                const isActive = (code === '01') || /계속|영업/.test(text);
+                const isStop = (code === '02') || /휴업/.test(text);
+                const isClosed = (code === '03') || /폐업/.test(text);
+
+                let label = '미확인';
+                if (isActive) label = '계속사업자(영업 중)';
+                else if (isStop) label = '휴업자';
+                else if (isClosed) label = '폐업자';
+                else if (text) label = text;
+
+                // 3) 표시 + 상호 자동 채우기
+                resEl.textContent = `조회 결과: ${label}${i?.b_no ? ` (${i.b_no})` : ''}`;
+                resEl.className = 'text-sm text-center ' + (isActive ? 'text-green-600' : 'text-red-600');
+                if (isActive && i?.b_nm) nameEl.value = i.b_nm;
+
+                // 디버그 확인용 (원하면 주석 처리)
+                console.log('verify-biz raw:', d);
             } catch (err) {
                 console.error(err);
                 resEl.textContent = '서버 오류로 인증 실패';
                 resEl.className = 'text-sm text-red-600 text-center';
             }
         }
+
+        document.getElementById('btnVerifyBiz')?.addEventListener('click', verifyBizNumber);
 
         /* 폼 제출: /store (Neon/Express) */
         const form = document.getElementById('businessForm');
@@ -1045,7 +1062,7 @@
             }
         });
 
-        document.getElementById('btnVerifyBiz')?.addEventListener('click', verifyBizNumber);
+
 
         document.getElementById('fabAddItem')?.addEventListener('click', () => {
             const cat = document.getElementById('fabAddItem').dataset.cat;
