@@ -1,4 +1,35 @@
 // controllers/foodregisterController.js
+// 맨 위 유틸
+const SLOW_MS = 20000; // 20s 넘기면 실패로 끊자 (임시)
+const withTimeout = (p, ms = SLOW_MS) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("TIMEOUT")), ms))]);
+
+// createFoodRegister 맨 처음에
+console.time("[foodregister] total");
+console.log("[foodregister] start",
+  {
+    storeImgs: (req.files?.["storeImages"] || []).length,
+    menuImgs: (req.files?.["menuImage[]"] || []).length,
+    bodyKeys: Object.keys(req.body || {}).length
+  });
+
+// DB 연결 직전에 (Pool은 그대로)
+const client = await withTimeout(pool.connect(), 8000); // 8s 제한
+console.log("[foodregister] db connected");
+
+// COMMIT 직후
+console.timeEnd("[foodregister] total");
+
+// catch 블록에서
+if (e && e.message === "TIMEOUT") {
+  console.error("[foodregister] timeout");
+  return res.status(504).json({ error: "upstream timeout" });
+}
+
+
+
+
+
 import { Pool } from "pg";
 import path from "path";
 
@@ -121,11 +152,11 @@ export async function createFoodRegister(req, res) {
       businessCertImage: toUploadsPath(bizCert) // 필요 시 별도 테이블에 저장 고려
     });
   } catch (e) {
-    await pool.query("ROLLBACK");
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodRegister] error:", e);
     return res.status(500).json({ error: "create failed" });
   } finally {
-    client.release();
+    try { client.release(); } catch { }
   }
 }
 
@@ -180,29 +211,3 @@ export async function getFoodRegisterMenus(req, res) {
   }
 }
 
-// 맨 위 유틸
-const SLOW_MS = 20000; // 20s 넘기면 실패로 끊자 (임시)
-const withTimeout = (p, ms = SLOW_MS) =>
-  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("TIMEOUT")), ms))]);
-
-// createFoodRegister 맨 처음에
-console.time("[foodregister] total");
-console.log("[foodregister] start",
-  {
-    storeImgs: (req.files?.["storeImages"] || []).length,
-    menuImgs: (req.files?.["menuImage[]"] || []).length,
-    bodyKeys: Object.keys(req.body || {}).length
-  });
-
-// DB 연결 직전에 (Pool은 그대로)
-const client = await withTimeout(pool.connect(), 8000); // 8s 제한
-console.log("[foodregister] db connected");
-
-// COMMIT 직후
-console.timeEnd("[foodregister] total");
-
-// catch 블록에서
-if (e && e.message === "TIMEOUT") {
-  console.error("[foodregister] timeout");
-  return res.status(504).json({ error: "upstream timeout" });
-}
