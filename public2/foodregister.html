@@ -551,6 +551,36 @@
             </form>
         </div>
 
+        <!-- Prev / Next FAB -->
+        <div id="page-nav-fab" class="fixed inset-0 pointer-events-none z-40">
+            <!-- Prev -->
+            <button id="fab-prev" class="hidden md:flex items-center justify-center pointer-events-auto
+           w-12 h-12 md:w-14 md:h-14 rounded-full
+           bg-white/80 backdrop-blur border border-white/60 shadow-lg
+           text-gray-700 hover:shadow-xl hover:bg-white
+           absolute left-2 md:left-6 top-1/2 -translate-y-1/2" aria-label="이전 페이지">
+                <span class="text-2xl md:text-3xl leading-none">←</span>
+            </button>
+
+            <!-- Next -->
+            <button id="fab-next" class="hidden md:flex items-center justify-center pointer-events-auto
+           w-12 h-12 md:w-14 md:h-14 rounded-full
+           bg-white/80 backdrop-blur border border-white/60 shadow-lg
+           text-gray-700 hover:shadow-xl hover:bg-white
+           absolute right-2 md:right-6 top-1/2 -translate-y-1/2" aria-label="다음 페이지">
+                <span class="text-2xl md:text-3xl leading-none">→</span>
+            </button>
+
+            <!-- 모바일(≤md)에서는 하단에 작게 뜨도록 -->
+            <div id="page-nav-mobile"
+                class="fixed bottom-5 left-0 right-0 flex justify-between px-4 md:hidden pointer-events-auto">
+                <button id="fab-prev-sm"
+                    class="w-11 h-11 rounded-full bg-white/90 backdrop-blur border border-white/60 shadow-lg text-gray-700">←</button>
+                <button id="fab-next-sm"
+                    class="w-11 h-11 rounded-full bg-white/90 backdrop-blur border border-white/60 shadow-lg text-gray-700">→</button>
+            </div>
+        </div>
+
     </main>
 
     <button id="fabAddItem" type="button" title="품목 추가 (Ctrl+Enter)" class="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-xl text-2xl leading-none
@@ -586,7 +616,7 @@
             /* ===========================
              * 헤더/푸터 로드
              * =========================== */
-    
+
             fetch("/components/header.html")
                 .then(res => res.text())
                 .then(html => {
@@ -1109,6 +1139,41 @@
                         alert('데이터 수정 중 에러가 발생했습니다!');
                     }
                 };
+            });
+
+            // === 설정 (원하면 URL로 지정, 아니면 history.back())
+            const PREV_ACTION = () => history.back();                // 이전
+            const NEXT_ACTION = () => location.href = "/ndetail.html"; // 다음 페이지 URL로 교체
+
+            const $ = s => document.querySelector(s);
+            const prevs = ["#fab-prev", "#fab-prev-sm"].map($);
+            const nexts = ["#fab-next", "#fab-next-sm"].map($);
+
+            prevs.forEach(el => el && el.addEventListener("click", PREV_ACTION));
+            nexts.forEach(el => el && el.addEventListener("click", NEXT_ACTION));
+
+            // 스크롤 200px 이후에만 보이게 (시야 방해 최소화)
+            const showAfter = 200;
+            const toggleFAB = () => {
+                const show = window.scrollY > showAfter;
+                ["#fab-prev", "#fab-next", "#page-nav-mobile"].forEach(sel => {
+                    const el = $(sel);
+                    if (!el) return;
+                    if (show) el.classList.remove("opacity-0", "pointer-events-none", "hidden");
+                    else el.classList.add("opacity-0", "pointer-events-none");
+                });
+            };
+            // 초기 상태는 숨김
+            ["#fab-prev", "#fab-next", "#page-nav-mobile"].forEach(sel => {
+                const el = $(sel); if (el) el.classList.add("opacity-0", "pointer-events-none", "transition", "duration-300");
+            });
+            window.addEventListener("scroll", toggleFAB, { passive: true });
+            window.addEventListener("load", toggleFAB);
+
+            // 키보드 좌/우 화살표로도 이동
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "ArrowLeft") PREV_ACTION();
+                if (e.key === "ArrowRight") NEXT_ACTION();
             });
         })();
     </script>
