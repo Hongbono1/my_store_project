@@ -39,4 +39,13 @@ router.post("/", uploads, createFoodRegister);
 router.get("/:id", getFoodRegisterDetail);
 router.get("/:id/menus", getFoodRegisterMenus);
 
+router.post("/",
+  upload.any(), // 임시
+  (req, res, next) => {
+    console.log("FILES FIELDS:", [...new Set((req.files||[]).map(f=>f.fieldname))]);
+    next();
+  },
+  createFoodRegister
+);
+
 export default router;
