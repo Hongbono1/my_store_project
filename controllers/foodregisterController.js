@@ -34,17 +34,17 @@ export async function createFoodRegister(req, res) {
   try {
     const form = req.body || {};
     const storeImages = req.files?.["storeImages"] || [];
-    const menuFiles  = req.files?.["menuImage[]"] || [];
-    const bizCert    = (req.files?.["businessCertImage"] || [])[0] || null;
+    const menuFiles = req.files?.["menuImage[]"] || [];
+    const bizCert = (req.files?.["businessCertImage"] || [])[0] || null;
 
     // 텍스트 필드들(폼 name은 foodregister.html과 1:1)
-    const businessName     = form.businessName?.trim();
-    const businessType     = form.businessType?.trim() || null;
+    const businessName = form.businessName?.trim();
+    const businessType = form.businessType?.trim() || null;
     const businessCategory = form.businessCategory?.trim() || null;
-    const deliveryOption   = form.deliveryOption?.trim() || null; // 가능/불가 등
-    const businessHours    = form.businessHours?.trim() || null;
-    const address          = form.address?.trim() || null;
-    const phone            = form.phone?.trim() || null;
+    const deliveryOption = form.deliveryOption?.trim() || null; // 가능/불가 등
+    const businessHours = form.businessHours?.trim() || null;
+    const address = form.address?.trim() || null;
+    const phone = form.phone?.trim() || null;
 
     if (!businessName) {
       return res.status(400).json({ error: "businessName is required" });
@@ -178,4 +178,31 @@ export async function getFoodRegisterMenus(req, res) {
     console.error("[getFoodRegisterMenus] error:", e);
     return res.status(500).json({ error: "menus failed" });
   }
+}
+
+// 맨 위 유틸
+const SLOW_MS = 20000; // 20s 넘기면 실패로 끊자 (임시)
+const withTimeout = (p, ms = SLOW_MS) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("TIMEOUT")), ms))]);
+
+// createFoodRegister 맨 처음에
+console.time("[foodregister] total");
+console.log("[foodregister] start",
+  {
+    storeImgs: (req.files?.["storeImages"] || []).length,
+    menuImgs: (req.files?.["menuImage[]"] || []).length,
+    bodyKeys: Object.keys(req.body || {}).length
+  });
+
+// DB 연결 직전에 (Pool은 그대로)
+const client = await withTimeout(pool.connect(), 8000); // 8s 제한
+console.log("[foodregister] db connected");
+
+// COMMIT 직후
+console.timeEnd("[foodregister] total");
+
+// catch 블록에서
+if (e && e.message === "TIMEOUT") {
+  console.error("[foodregister] timeout");
+  return res.status(504).json({ error: "upstream timeout" });
 }
