@@ -389,7 +389,8 @@
                     <div id="deliveryRow" class="flex flex-col md:flex-row md:items-center gap-3">
                         <label class="w-36 font-medium text-blue-900 text-center shrink-0 leading-tight">배달 여부</label>
                         <div class="flex-1">
-                           <select id="deliveryOption" name="deliveryOption" class="neo-input w-full px-3 py-2 h-12" required>
+                            <select id="deliveryOption" name="deliveryOption" class="neo-input w-full px-3 py-2 h-12"
+                                required>
                                 <option value="" disabled selected>선택하세요</option>
                                 <option value="가능">가능</option>
                                 <option value="불가">불가</option>
@@ -550,6 +551,19 @@
                 </div>
             </form>
         </div>
+
+        <!-- 등록 완료 모달 -->
+        <div id="successModal" class="fixed inset-0 hidden z-[9999]">
+            <div class="absolute inset-0 bg-black/40"></div>
+            <div class="absolute inset-0 flex items-center justify-center p-4">
+                <div class="neo-section w-full max-w-md p-6 text-center">
+                    <h4 class="text-xl font-bold text-blue-900 mb-2">등록이 완료되었습니다</h4>
+                    <p id="successText" class="text-slate-600 mb-5">잠시 후 상세 페이지로 이동합니다.</p>
+                    <button id="successOk" type="button" class="neo-btn px-6 py-2">확인</button>
+                </div>
+            </div>
+        </div>
+
 
         <!-- Prev / Next FAB -->
         <div id="page-nav-fab" class="fixed inset-0 pointer-events-none z-40">
@@ -1111,8 +1125,9 @@
                         const result = await res.json();
 
                         const id = result.id ?? result.storeId;
-                        if (!id) return alert('등록은 되었으나 ID를 받지 못했습니다.');
-                        location.href = `ndetail.html?id=${id}`;
+                        if (!id) { alert('등록은 되었으나 ID를 받지 못했습니다.'); return; }
+                        alert(`등록이 완료되었습니다.\nID: ${id}`);
+                        location.assign(`/ndetail.html?id=${encodeURIComponent(id)}`);
                     } catch (err) {
                         console.error(err);
                         alert('데이터 전송 중 에러가 발생했습니다!');
@@ -1140,6 +1155,27 @@
                     }
                 };
             });
+
+            function openSuccessModal(storeId) {
+                const m = document.getElementById('successModal');
+                const t = document.getElementById('successText');
+                const ok = document.getElementById('successOk');
+                if (!m || !ok) return;
+
+                // 안내 문구 업데이트 (원하면 가게명도 넣을 수 있음)
+                if (t) t.textContent = `ID: ${storeId}`;
+
+                // 열기
+                m.classList.remove('hidden');
+
+                // 확인 누르면 상세로 이동
+                ok.onclick = () => {
+                    m.classList.add('hidden');
+                    // ndetail.html 위치가 /new/ndetail.html이면 아래 경로만 바꿔주세요.
+                    location.assign(`/ndetail.html?id=${encodeURIComponent(storeId)}`);
+                };
+            }
+
 
             // === 설정 (원하면 URL로 지정, 아니면 history.back())
             const PREV_ACTION = () => history.back();                // 이전
