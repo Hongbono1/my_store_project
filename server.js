@@ -18,7 +18,10 @@ console.log("[BOOT] DATABASE_URL len =", (process.env.DATABASE_URL || "").length
 console.log("[BOOT] ODCLOUD_SERVICE_KEY len =", (process.env.ODCLOUD_SERVICE_KEY || "").length);
 
 // CORS (필요 시)
-const origins = (process.env.CORS_ORIGINS || "").split(",").filter(Boolean);
+const origins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 if (origins.length) {
   app.use(cors({ origin: origins, credentials: true }));
 }
@@ -28,7 +31,11 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // 정적 파일: public2가 루트
-app.use(express.static(path.join(process.cwd(), "public2"), { index: false }));
+const PUBLIC2 = path.join(process.cwd(), "public2");
+app.use(express.static(PUBLIC2, { index: false, extensions: ["html", "htm"] }));
+
+// 업로드 파일 접근: /uploads/파일명  → public2/uploads/파일명
+app.use("/uploads", express.static(path.join(PUBLIC2, "uploads")));
 
 /** ---------------- /verify-biz (ODCloud 프록시) ---------------- */
 app.post("/verify-biz", async (req, res) => {
