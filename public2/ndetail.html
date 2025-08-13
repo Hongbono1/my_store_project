@@ -188,7 +188,7 @@
         // 장바구니
         const cart = [];
         function addToCart(item) {
-            const found = cart.find(c => c.menu_name === item.menu_name);
+            const found = cart.find(c => c.name === item.name);
             if (found) found.quantity += item.quantity; else cart.push({ ...item });
             renderCart();
         }
@@ -197,13 +197,13 @@
             ul.innerHTML = "";
             let sum = 0;
             cart.forEach((item, index) => {
-                const price = Number(item.menu_price) || 0;
+                const price = Number(item.price) || 0;
                 const qty = Number(item.quantity) || 1;
                 const total = price * qty; sum += total;
                 const li = document.createElement("li");
                 li.className = "flex justify-between items-center text-lg py-2";
                 li.innerHTML = `
-        <span>${item.menu_name} × ${qty}</span>
+        <span>${item.name} × ${qty}</span>
         <span class="text-xl font-bold">${total.toLocaleString()}원</span>
         <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
                 ul.appendChild(li);
@@ -211,7 +211,7 @@
             ul.querySelectorAll(".removeBtn").forEach(btn => {
                 btn.onclick = () => { cart.splice(btn.dataset.index, 1); renderCart(); };
             });
-            $("cartTotal").textContent = sum.toLocaleString();
+            $("cartTotal").textContent = sum.toLocaleString(); + "원";
         }
 
         // 지도 관련(서버에 /kakao-key 라우트 없으면 이 부분 통째로 주석 처리!)
@@ -253,48 +253,46 @@
         // (1) fetch해서 데이터 바인딩
         (async () => {
             try {
-                const res = await fetch(`/store/${storeId}`);
+                const res = await fetch(`/foodregister/${encodeURIComponent(storeId)}/full`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const { store, menus = [] } = await res.json();
+                const { store, images = [], menus = [] } = await res.json();
 
                 // 1. 슬라이더
-                slider.init(store.images || [store.image1, store.image2, store.image3].filter(Boolean));
+                slider.init(images);
 
                 // 2. 중앙 필드 (snake_case! camelCase 절대 X)
-                $("businessNameHeader").textContent = store.business_name ?? "상호명 없음";
-                $("businessType").textContent = "업종: " + (store.business_type || "-");
-                $("businessCategory").textContent = "카테고리: " + (store.business_category || "-");
-                $("deliveryOption").textContent = "배달: " + (store.delivery_option || "-");
-                $("businessHours").textContent = "영업시간: " + (store.business_hours || "-");
-                $("serviceDetails").textContent = store.service_details || "-";
-                $("eventsList").innerHTML = [store.event1, store.event2].filter(Boolean).map(e => `<li>${e}</li>`).join("");
+                // 2. 중앙 필드 (DB 스키마 기준 - snake_case)
+                $("businessNameHeader").textContent = store.business_name || "상호명 없음";
+                $("businessType").textContent = "업종: " + (store.business_type ?? "-");
+                $("businessCategory").textContent = "카테고리: " + (store.business_category ?? "-");
+                $("deliveryOption").textContent = "배달: " + (store.delivery_option ?? "-");
+                $("businessHours").textContent = "영업시간: " + (store.business_hours ?? "-");
+
+                // 현재 스키마에 없는 필드들은 그냥 '-'로 표시
+                $("serviceDetails").textContent = "-";
+
+                // 이벤트 영역은 UL이라 한 줄짜리 아이템으로 '-' 표시
+                $("eventsList").innerHTML = `<li>-</li>`;
+
+                // 기타 정보(현 스키마엔 없음)도 '-' 고정 출력
                 $("infoEtcList").innerHTML = `
-        <li>장애인 편의시설: ${store.facility ?? "-"}</li>
-        <li>반려동물 출입: ${store.pets ?? "-"}</li>
-        <li>주차 정보: ${store.parking ?? "-"}</li>`;
+  <li>장애인 편의시설: -</li>
+  <li>반려동물 출입: -</li>
+  <li>주차 정보: -</li>
+`;
+
                 $("additionalDesc").textContent = store.additional_desc || "-";
                 // 연락처(전화는 tel:)
-                const phoneNum = store.phone_number || "";
+                const phoneNum = store.phone || "";
                 $("contactPhone").innerHTML = phoneNum
-                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, '')}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
+                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
                     : "-";
-                $("contactHomepage").innerHTML = store.homepage ? `<a href="${store.homepage}" target="_blank" class="text-blue-600 underline">${store.homepage}</a>` : "";
-                $("contactInstagram").innerHTML = store.instagram ? `<a href="${store.instagram}" target="_blank" class="text-blue-600 underline">${store.instagram}</a>` : "";
-                $("contactFacebook").innerHTML = store.facebook ? `<a href="${store.facebook}" target="_blank" class="text-blue-600 underline">${store.facebook}</a>` : "";
-
+                $("contactHomepage").textContent = "-";
+                $("contactInstagram").textContent = "-";
+                $("contactFacebook").textContent = "-";
                 // 3. 지도/주소
-                const addr = store.address || "";
-                const cleaned = addr.replace(/^\d{5}\s*/, "").split(/\s+/).slice(0, 3).join(" ");
-                $("addressText").textContent = `📍 ${cleaned}`;
-                // initMap(cleaned, store.business_name); // /kakao-key 라우트가 있으면 주석 해제
+                $("addressText").textContent = store.address ? `📍 ${store.address}` : "📍 -";
 
-                const delivery = store.deliveryOption || "미입력";
-                const row = document.getElementById("deliveryRow"); // 배달 행 wrapper
-                if (delivery === "미입력") {
-                    row.classList.add("hidden");
-                } else {
-                    document.getElementById("deliveryOptionView").textContent = `배달: ${delivery}`;
-                }
                 // 4. 메뉴 렌더
                 if (!menus.length) {
                     document.getElementById("menuCartSection").style.display = "none";
@@ -315,12 +313,12 @@
                         items.forEach(it => {
                             const box = document.createElement("div");
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                            const imgSrc = (it.menu_image && it.menu_image.trim()) ? it.menu_image : "/assets/images/no-thumb.png";
+                            const imgSrc = it.image_url ? it.image_url : "/assets/images/no-thumb.png";
                             box.innerHTML = `
               <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
               <div class="flex-1">
-                <div class="text-lg font-bold mb-1 truncate">${it.menu_name}</div>
-                <div class="text-base font-medium text-gray-700">${Number(it.menu_price).toLocaleString()}원</div>
+                <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+                <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
               </div>
               <div class="flex flex-col items-center gap-1 shrink-0">
                 <div class="flex items-center gap-1">
@@ -334,7 +332,8 @@
                             const qtySpan = box.querySelector(".quantity");
                             box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
                             box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                            box.querySelector(".addBtn").onclick = () => addToCart({ ...it, quantity: qty });
+                            box.querySelector(".addBtn").onclick = () =>
+                                addToCart({ name: it.name, price: it.price, quantity: qty });
                             group.appendChild(box);
                         });
                         menuList.appendChild(group);
