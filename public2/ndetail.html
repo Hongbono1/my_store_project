@@ -125,12 +125,13 @@
             imgs: [], idx: 0,
             init(arr) {
                 this.imgs = (arr || [])
-                    .filter(src => typeof src === "string" && src.trim() !== "")
+                    .filter(s => typeof s === "string" && s.trim() !== "")
                     .map(s => normalizeSrc(s.trim()));
                 $("sliderImages").innerHTML = this.imgs.map((u, i) => {
                     const n = normalizeSrc(u);
                     return `<img src="${n}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`;
                 }).join('');
+
                 $("sliderImages").onclick = (e) => {
                     if (e.target.tagName === "IMG") {
                         this.idx = Number(e.target.dataset.index);
@@ -258,12 +259,11 @@
             //   });
             // } catch (e) {}
         }
-
-        // ➕ 추가: 업로드/절대경로/HTTP 모두 안전하게 처리
+        // 업로드/절대/외부 URL 모두 안전 처리
         function normalizeSrc(src) {
-            if (!src) return "";                 // 없음
-            if (src.startsWith("http") || src.startsWith("/")) return src; // 절대/외부
-            return `/uploads/${src}`;            // 파일명만 오면 업로드 경로로
+            if (!src) return "";
+            if (src.startsWith("http") || src.startsWith("/")) return src;
+            return `/uploads/${src}`;
         }
 
         // (1) fetch해서 데이터 바인딩
@@ -276,13 +276,13 @@
                 // 1. 슬라이더
                 slider.init(images);
 
-                // 2. 중앙 필드 (snake_case! camelCase 절대 X)
                 // 2. 중앙 필드 (DB 스키마 기준 - snake_case)
                 $("businessNameHeader").textContent = store.business_name || "상호명 없음";
                 $("businessType").textContent = "업종: " + (store.business_type ?? "-");
                 $("businessCategory").textContent = "카테고리: " + (store.business_category ?? "-");
                 $("deliveryOption").textContent = "배달: " + (store.delivery_option ?? "-");
                 $("businessHours").textContent = "영업시간: " + (store.business_hours ?? "-");
+                $("addressText").textContent = store.address ? `📍 ${store.address}` : "📍 -";
 
                 // 현재 스키마에 없는 필드들은 그냥 '-'로 표시
                 $("serviceDetails").textContent = "-";
@@ -303,6 +303,7 @@
                 $("contactPhone").innerHTML = phoneNum
                     ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
                     : "-";
+
                 $("contactHomepage").textContent = "-";
                 $("contactInstagram").textContent = "-";
                 $("contactFacebook").textContent = "-";

@@ -54,32 +54,50 @@ export async function createFoodRegister(req, res) {
 
     const form = req.body || {};
     const storeImages = req.files?.["storeImages"] || [];
-    const menuFiles   = req.files?.["menuImage[]"] || [];
-    const bizCert     = (req.files?.["businessCertImage"] || [])[0] || null;
+    const menuFiles = req.files?.["menuImage[]"] || [];
+    const bizCert = (req.files?.["businessCertImage"] || [])[0] || null;
 
-    // 필수 필드
-    const businessName     = form.businessName?.trim();
-    const businessType     = form.businessType?.trim() || null;
+    // 필수/기존 필드
+    const businessName = form.businessName?.trim();
+    const businessType = form.businessType?.trim() || null;
     const businessCategory = form.businessCategory?.trim() || null;
-    const deliveryOption   = form.deliveryOption?.trim() || null;
-    const businessHours    = form.businessHours?.trim() || null;
-    const address          = form.address?.trim() || null;
-    const phone            = form.phone?.trim() || null;
+    const deliveryOption = form.deliveryOption?.trim() || null;
+    const businessHours = form.businessHours?.trim() || null;
+    const address = form.address?.trim() || null;
+    const phone = form.phone?.trim() || null;
+
+    // 🔸 [추가] 표시 필드들 읽기 (문자열/배열 모두 처리)
+    const serviceDetails = form.serviceDetails?.trim() || null;
+
+    const eventsRaw = Array.isArray(form["events[]"])
+      ? form["events[]"].map(s => String(s).trim()).filter(Boolean).join("\n") || null
+      : (form.events?.trim() || null);
+
+    const infoEtcRaw = Array.isArray(form["infoEtc[]"])
+      ? form["infoEtc[]"].map(s => String(s).trim()).filter(Boolean).join("\n") || null
+      : (form.infoEtc?.trim() || null);
+
+    const additionalDesc = form.additionalDesc?.trim() || null;
+    const homepage = form.homepage?.trim() || null;
+    const instagram = form.instagram?.trim() || null;
+    const facebook = form.facebook?.trim() || null;
 
     if (!businessName) {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "businessName is required" });
     }
 
-    // 1) 가게 저장
+    // 🔸 [교체] INSERT에 새 컬럼 포함
     const insertStoreSQL = `
       INSERT INTO food_stores
-        (business_name, business_type, business_category, delivery_option, business_hours, address, phone)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
+         service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
+      VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
       RETURNING id
     `;
     const storeParams = [
-      businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone
+      businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone,
+      serviceDetails, eventsRaw, infoEtcRaw, additionalDesc, homepage, instagram, facebook
     ];
     const { rows } = await client.query(insertStoreSQL, storeParams);
     const storeId = rows[0].id;
@@ -94,9 +112,9 @@ export async function createFoodRegister(req, res) {
     }
 
     // 3) 메뉴들
-    const menuNames       = arr(form["menuName[]"]);
-    const menuPrices      = arr(form["menuPrice[]"]);
-    const menuCategories  = arr(form["menuCategory[]"]);
+    const menuNames = arr(form["menuName[]"]);
+    const menuPrices = arr(form["menuPrice[]"]);
+    const menuCategories = arr(form["menuCategory[]"]);
     const maxLen = Math.max(menuNames.length, menuPrices.length, menuCategories.length, menuFiles.length);
 
     const menuRows = [];
@@ -127,7 +145,7 @@ export async function createFoodRegister(req, res) {
       businessCertImage: toUploadsPath(bizCert) || null
     });
   } catch (e) {
-    try { if (client) await client.query("ROLLBACK"); } catch {}
+    try { if (client) await client.query("ROLLBACK"); } catch { }
     if (e?.message === "TIMEOUT") {
       console.error("[foodregister] timeout");
       return res.status(504).json({ error: "upstream timeout" });
@@ -135,18 +153,20 @@ export async function createFoodRegister(req, res) {
     console.error("[createFoodRegister] error:", e);
     return res.status(500).json({ error: "create failed" });
   } finally {
-    try { if (client) client.release(); } catch {}
+    try { if (client) client.release(); } catch { }
   }
 }
 
-/** GET /foodregister/:id  */
 export async function getFoodRegisterDetail(req, res) {
   const { id } = req.params;
   try {
     const { rows: storeRows } = await pool.query(
       `SELECT id, business_name, business_type, business_category,
-              delivery_option, business_hours, address, phone, created_at
-       FROM food_stores WHERE id = $1`,
+              delivery_option, business_hours, address, phone, created_at,
+              -- 🔸 [추가]
+              service_details, events, info_etc, additional_desc, homepage, instagram, facebook
+       FROM food_stores
+       WHERE id = $1`,
       [id]
     );
     if (storeRows.length === 0) {
@@ -165,6 +185,7 @@ export async function getFoodRegisterDetail(req, res) {
     return res.status(500).json({ error: "detail failed" });
   }
 }
+
 
 /** GET /foodregister/:id/menus */
 export async function getFoodRegisterMenus(req, res) {
