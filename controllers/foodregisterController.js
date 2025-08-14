@@ -183,3 +183,51 @@ export async function getFoodRegisterMenus(req, res) {
     return res.status(500).json({ error: "menus failed" });
   }
 }
+// === appended: full detail handler ===
+export async function getFoodRegisterFull(req, res) {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT
+        s.*,
+        COALESCE(
+          ARRAY_AGG(si.image_url ORDER BY si.sort_order, si.id)
+          FILTER (WHERE si.id IS NOT NULL),
+          '{}'
+        ) AS images,
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id', m.id,
+              'category', m.category,
+              'name', m.name,
+              'price', m.price,
+              'image_url', m.image_url
+            )
+            ORDER BY m.id
+          )
+          FILTER (WHERE m.id IS NOT NULL),
+          '[]'
+        ) AS menus
+      FROM food_stores s
+      LEFT JOIN food_store_images si ON si.store_id = s.id
+      LEFT JOIN food_menu_items  m  ON m.store_id  = s.id
+      WHERE s.id = $1
+      GROUP BY s.id
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ error: "not found" });
+
+    const { images, menus, ...store } = rows[0];
+    return res.json({ ok: true, store, images, menus });
+  } catch (e) {
+    console.error("[getFoodRegisterFull] error:", e);
+    return res.status(500).json({ error: "full failed" });
+  }
+}
+
+// 과거 명칭 호환
+export const getFoodStoreFull = getFoodRegisterFull;
