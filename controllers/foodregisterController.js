@@ -66,7 +66,7 @@ export async function createFoodRegister(req, res) {
     const address = form.address?.trim() || null;
     const phone = form.phone?.trim() || null;
 
-    // 🔸 [추가] 표시 필드들 읽기 (문자열/배열 모두 처리)
+    // 🔸 새 텍스트 필드들
     const serviceDetails = form.serviceDetails?.trim() || null;
 
     const eventsRaw = Array.isArray(form["events[]"])
@@ -78,7 +78,7 @@ export async function createFoodRegister(req, res) {
       : (form.infoEtc?.trim() || null);
 
     const additionalDesc = form.additionalDesc?.trim() || null;
-    const homepage = form.homepage?.trim() || null;
+    const homepage = (form.homepage || form.website || "").trim() || null; // website도 허용
     const instagram = form.instagram?.trim() || null;
     const facebook = form.facebook?.trim() || null;
 
