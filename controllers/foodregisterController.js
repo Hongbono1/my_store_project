@@ -170,17 +170,18 @@ export async function createFoodRegister(req, res) {
 }
 
 export async function getFoodRegisterDetail(req, res) {
-  const { id } = req.params;
+  const idNum = parseInt(req.params.id, 10);
+  if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
   try {
     const { rows: storeRows } = await pool.query(
       `SELECT id, business_name, business_type, business_category,
               delivery_option, business_hours, address, phone, created_at,
-              -- 🔸 [추가]
               service_details, events, info_etc, additional_desc, homepage, instagram, facebook
        FROM food_stores
        WHERE id = $1`,
-      [id]
+      [idNum]   // ← 숫자로 바인딩
     );
+
     if (storeRows.length === 0) {
       return res.status(404).json({ error: "not found" });
     }
@@ -201,15 +202,17 @@ export async function getFoodRegisterDetail(req, res) {
 
 /** GET /foodregister/:id/menus */
 export async function getFoodRegisterMenus(req, res) {
-  const { id } = req.params;
+  const idNum = parseInt(req.params.id, 10);
+  if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
   try {
     const { rows } = await pool.query(
       `SELECT id, category, name, price, image_url, created_at
        FROM food_menu_items
        WHERE store_id = $1
        ORDER BY id ASC`,
-      [id]
+      [idNum]
     );
+
     return res.json({ ok: true, menus: rows });
   } catch (e) {
     console.error("[getFoodRegisterMenus] error:", e);
@@ -250,7 +253,7 @@ export async function getFoodRegisterFull(req, res) {
       WHERE s.id = $1
       GROUP BY s.id
       `,
-      [id]
+        [idNum]
     );
 
     if (rows.length === 0) return res.status(404).json({ error: "not found" });
