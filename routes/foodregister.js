@@ -42,24 +42,25 @@ const uploadFields = upload.fields([
 router.post("/", uploadFields, ctrl.createFoodRegister);
 
 // 단건 요약
-router.get("/:id(\\d+)", ctrl.getFoodRegisterDetail);
+router.get("/:id", ctrl.getFoodRegisterDetail);
 
 // 풀데이터 (호환 네이밍 지원)
 const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
-router.get("/:id(\\d+)/full", async (req, res, next) => {
-  try {
-    if (!getFull) {
-      console.error("[foodregister] full handler missing");
-      return res.status(500).json({ error: "full handler missing" });
-    }
-    console.log("[foodregister] using full handler:", getFull.name);
-    return await getFull(req, res);
-  } catch (e) {
-    next(e);
-  }
-});
+ router.get("/:id/full", async (req, res, next) => {
+   try {
+     const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
+     if (!getFull) {
+       console.error("[foodregister] full handler missing");
+       return res.status(500).json({ error: "full handler missing" });
+     }
+     console.log("[foodregister] using full handler:", getFull.name);
+     return await getFull(req, res);
+   } catch (e) {
+     next(e);
+   }
+ });
 
-// 숫자 id 파라미터 검증/정규화 (문자열 → 숫자)
+// 숫자 id 파라미터 검증/정규화
 router.param("id", (req, res, next, val) => {
   const idNum = Number(val);
   if (!Number.isInteger(idNum) || idNum <= 0) {
