@@ -47,6 +47,18 @@ export async function createFoodRegister(req, res) {
     bodyKeys: Object.keys(req.body || {}).length
   });
 
+  console.log("[create] BODY KEYS:", Object.keys(req.body || {}));
+  console.log("[create] SAMPLE FIELDS:", {
+    serviceDetails: req.body?.serviceDetails,
+    events: req.body?.events,
+    infoEtc: req.body?.infoEtc,
+    additionalDesc: req.body?.additionalDesc,
+    homepage: req.body?.homepage,
+    instagram: req.body?.instagram,
+    facebook: req.body?.facebook,
+  });
+  console.log("[create] FILES KEYS:", Object.keys(req.files || {}));
+
   try {
     client = await withTimeout(pool.connect(), 8000);
     console.log("[foodregister] db connected");
@@ -89,12 +101,12 @@ export async function createFoodRegister(req, res) {
 
     // 🔸 [교체] INSERT에 새 컬럼 포함
     const insertStoreSQL = `
-      INSERT INTO food_stores
-        (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
-         service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
-      VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
-      RETURNING id
-    `;
+  INSERT INTO food_stores
+    (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
+     service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
+  VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
+  RETURNING id
+`;
     const storeParams = [
       businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone,
       serviceDetails, eventsRaw, infoEtcRaw, additionalDesc, homepage, instagram, facebook
