@@ -8,15 +8,24 @@ import * as ctrl from "../controllers/foodregisterController.js";
 
 const router = express.Router();
 
-// ── 경로 계산
+/* ───────────────────────── 숫자 id 가드 (라우트보다 위) ───────────────────────── */
+router.param("id", (req, res, next, val) => {
+  const idNum = Number(val);
+  if (!Number.isInteger(idNum) || idNum <= 0) {
+    return res.status(400).json({ error: "invalid id parameter" });
+  }
+  req.idNum = idNum; // 컨트롤러에서 사용
+  next();
+});
+
+/* ───────────────────────── 경로 계산 ───────────────────────── */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// server.js: app.use("/uploads", express.static(path.join(PUBLIC2, "uploads")))
-// 와 동일한 실제 경로로 맞춥니다.
+// server.js: app.use("/uploads", express.static(path.join(PUBLIC2, "uploads"))) 과 동일한 실제 경로로 맞춤
 const uploadDir = path.join(process.cwd(), "public2", "uploads");
 fs.mkdirSync(uploadDir, { recursive: true });
 
-// ── Multer 설정
+/* ───────────────────────── Multer 설정 ───────────────────────── */
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
@@ -36,38 +45,27 @@ const uploadFields = upload.fields([
   { name: "businessCertImage", maxCount: 1 },
 ]);
 
-// ── 라우트
+/* ───────────────────────── 라우트 ───────────────────────── */
 
 // 등록
 router.post("/", uploadFields, ctrl.createFoodRegister);
 
-// 단건 요약
+// 단건 요약 (req.idNum 사용)
 router.get("/:id", ctrl.getFoodRegisterDetail);
 
 // 풀데이터 (호환 네이밍 지원)
-const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
- router.get("/:id/full", async (req, res, next) => {
-   try {
-     const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
-     if (!getFull) {
-       console.error("[foodregister] full handler missing");
-       return res.status(500).json({ error: "full handler missing" });
-     }
-     console.log("[foodregister] using full handler:", getFull.name);
-     return await getFull(req, res);
-   } catch (e) {
-     next(e);
-   }
- });
-
-// 숫자 id 파라미터 검증/정규화
-router.param("id", (req, res, next, val) => {
-  const idNum = Number(val);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
-    return res.status(400).json({ error: "invalid id parameter" });
+router.get("/:id/full", async (req, res, next) => {
+  try {
+    const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
+    if (!getFull) {
+      console.error("[foodregister] full handler missing");
+      return res.status(500).json({ error: "full handler missing" });
+    }
+    console.log("[foodregister] using full handler:", getFull.name);
+    return await getFull(req, res);
+  } catch (e) {
+    next(e);
   }
-  req.idNum = idNum; // 컨트롤러에서 사용
-  next();
 });
 
 export default router;

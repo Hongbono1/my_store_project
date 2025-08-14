@@ -37,6 +37,7 @@ function arr(v) {
 }
 
 /** ───────── CONTROLLERS ───────── **/
+
 /** POST /foodregister  */
 export async function createFoodRegister(req, res) {
   let client;
@@ -99,14 +100,14 @@ export async function createFoodRegister(req, res) {
       return res.status(400).json({ error: "businessName is required" });
     }
 
-    // 🔸 [교체] INSERT에 새 컬럼 포함
+    // 🔸 INSERT에 새 컬럼 포함
     const insertStoreSQL = `
-  INSERT INTO food_stores
-    (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
-     service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
-  VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
-  RETURNING id
-`;
+      INSERT INTO food_stores
+        (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
+         service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
+      VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
+      RETURNING id
+    `;
     const storeParams = [
       businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone,
       serviceDetails, eventsRaw, infoEtcRaw, additionalDesc, homepage, instagram, facebook
@@ -170,7 +171,7 @@ export async function createFoodRegister(req, res) {
 }
 
 export async function getFoodRegisterDetail(req, res) {
-  const idNum = parseInt(req.params.id, 10);
+  const idNum = typeof req.idNum === "number" ? req.idNum : parseInt(req.params.id, 10);
   if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
   try {
     const { rows: storeRows } = await pool.query(
@@ -185,13 +186,15 @@ export async function getFoodRegisterDetail(req, res) {
     if (storeRows.length === 0) {
       return res.status(404).json({ error: "not found" });
     }
+
     const { rows: imgRows } = await pool.query(
       `SELECT image_url, sort_order
        FROM food_store_images
        WHERE store_id = $1
        ORDER BY sort_order ASC, id ASC`,
-      [id]
+      [idNum]   // ← 여기 중요: idNum 사용
     );
+
     return res.json({ ok: true, store: storeRows[0], images: imgRows.map(r => r.image_url) });
   } catch (e) {
     console.error("[getFoodRegisterDetail] error:", e);
@@ -202,7 +205,7 @@ export async function getFoodRegisterDetail(req, res) {
 
 /** GET /foodregister/:id/menus */
 export async function getFoodRegisterMenus(req, res) {
-  const idNum = parseInt(req.params.id, 10);
+  const idNum = typeof req.idNum === "number" ? req.idNum : parseInt(req.params.id, 10);
   if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
   try {
     const { rows } = await pool.query(
@@ -221,9 +224,8 @@ export async function getFoodRegisterMenus(req, res) {
 }
 
 // === 풀 상세 ===
-// === 풀 상세 ===
 export async function getFoodRegisterFull(req, res) {
-  const idNum = req.idNum ?? Number(req.params?.id);
+  const idNum = typeof req.idNum === "number" ? req.idNum : Number(req.params?.id);
   if (!Number.isInteger(idNum) || idNum <= 0) {
     return res.status(400).json({ error: "invalid id" });
   }
@@ -258,7 +260,7 @@ export async function getFoodRegisterFull(req, res) {
       WHERE s.id = $1
       GROUP BY s.id
       `,
-      [idNum] // 여기서 항상 숫자 사용
+      [idNum] // ← 항상 숫자 바인딩
     );
 
     if (rows.length === 0) return res.status(404).json({ error: "not found" });
