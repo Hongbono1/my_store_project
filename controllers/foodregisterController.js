@@ -4,8 +4,7 @@ import path from "path";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // 필요 시 주석 해제 (Neon SSL 이슈 있을 때)
-  // ssl: { rejectUnauthorized: false }
+  // ssl: { rejectUnauthorized: false } // URL에 sslmode=require 없으면 주석 해제
 });
 
 /** ───────── UTILS ───────── **/
@@ -16,10 +15,11 @@ const withTimeout = (p, ms = SLOW_MS) =>
 /** 업로드된 파일 경로에서 '/uploads/파일명'만 추출 */
 function toUploadsPath(file) {
   if (!file) return null;
-  const p = file.path || path.join(file.destination || "", file.filename || "");
-  const norm = String(p).replace(/\\/g, "/");
-  const idx = norm.lastIndexOf("/uploads/");
-  if (idx >= 0) return norm.slice(idx); // '/uploads/...' 그대로
+  const idx = file.path?.lastIndexOf("uploads") ?? -1;
+  if (idx >= 0) {
+    const rel = file.path.slice(idx + "uploads/".length);
+    return `/uploads/${rel}`;
+  }
   return `/uploads/${file.filename}`;
 }
 
@@ -39,25 +39,13 @@ function arr(v) {
 /** ───────── CONTROLLERS ───────── **/
 /** POST /foodregister  */
 export async function createFoodRegister(req, res) {
-  let client;
+  let client; // finally/rollback에서 가드
   console.time("[foodregister] total");
   console.log("[foodregister] start", {
     storeImgs: (req.files?.["storeImages"] || []).length,
     menuImgs: (req.files?.["menuImage[]"] || []).length,
     bodyKeys: Object.keys(req.body || {}).length
   });
-
-  console.log("[create] BODY KEYS:", Object.keys(req.body || {}));
-  console.log("[create] SAMPLE FIELDS:", {
-    serviceDetails: req.body?.serviceDetails,
-    events: req.body?.events,
-    infoEtc: req.body?.infoEtc,
-    additionalDesc: req.body?.additionalDesc,
-    homepage: req.body?.homepage,
-    instagram: req.body?.instagram,
-    facebook: req.body?.facebook,
-  });
-  console.log("[create] FILES KEYS:", Object.keys(req.files || {}));
 
   try {
     client = await withTimeout(pool.connect(), 8000);
@@ -66,50 +54,32 @@ export async function createFoodRegister(req, res) {
 
     const form = req.body || {};
     const storeImages = req.files?.["storeImages"] || [];
-    const menuFiles = req.files?.["menuImage[]"] || [];
-    const bizCert = (req.files?.["businessCertImage"] || [])[0] || null;
+    const menuFiles   = req.files?.["menuImage[]"] || [];
+    const bizCert     = (req.files?.["businessCertImage"] || [])[0] || null;
 
-    // 필수/기존 필드
-    const businessName = form.businessName?.trim();
-    const businessType = form.businessType?.trim() || null;
+    // 필수 필드
+    const businessName     = form.businessName?.trim();
+    const businessType     = form.businessType?.trim() || null;
     const businessCategory = form.businessCategory?.trim() || null;
-    const deliveryOption = form.deliveryOption?.trim() || null;
-    const businessHours = form.businessHours?.trim() || null;
-    const address = form.address?.trim() || null;
-    const phone = form.phone?.trim() || null;
-
-    // 🔸 새 텍스트 필드들
-    const serviceDetails = form.serviceDetails?.trim() || null;
-
-    const eventsRaw = Array.isArray(form["events[]"])
-      ? form["events[]"].map(s => String(s).trim()).filter(Boolean).join("\n") || null
-      : (form.events?.trim() || null);
-
-    const infoEtcRaw = Array.isArray(form["infoEtc[]"])
-      ? form["infoEtc[]"].map(s => String(s).trim()).filter(Boolean).join("\n") || null
-      : (form.infoEtc?.trim() || null);
-
-    const additionalDesc = form.additionalDesc?.trim() || null;
-    const homepage = (form.homepage || form.website || "").trim() || null; // website도 허용
-    const instagram = form.instagram?.trim() || null;
-    const facebook = form.facebook?.trim() || null;
+    const deliveryOption   = form.deliveryOption?.trim() || null;
+    const businessHours    = form.businessHours?.trim() || null;
+    const address          = form.address?.trim() || null;
+    const phone            = form.phone?.trim() || null;
 
     if (!businessName) {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "businessName is required" });
     }
 
-    // 🔸 [교체] INSERT에 새 컬럼 포함
+    // 1) 가게 저장
     const insertStoreSQL = `
-  INSERT INTO food_stores
-    (business_name, business_type, business_category, delivery_option, business_hours, address, phone,
-     service_details, events, info_etc, additional_desc, homepage, instagram, facebook)
-  VALUES ($1,$2,$3,$4,$5,$6,$7, $8,$9,$10,$11,$12,$13,$14)
-  RETURNING id
-`;
+      INSERT INTO food_stores
+        (business_name, business_type, business_category, delivery_option, business_hours, address, phone)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      RETURNING id
+    `;
     const storeParams = [
-      businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone,
-      serviceDetails, eventsRaw, infoEtcRaw, additionalDesc, homepage, instagram, facebook
+      businessName, businessType, businessCategory, deliveryOption, businessHours, address, phone
     ];
     const { rows } = await client.query(insertStoreSQL, storeParams);
     const storeId = rows[0].id;
@@ -123,10 +93,10 @@ export async function createFoodRegister(req, res) {
       await client.query(insertImgSQL, imgParams);
     }
 
-    // 3) 메뉴들
-    const menuNames = arr(form["menuName[]"]);
-    const menuPrices = arr(form["menuPrice[]"]);
-    const menuCategories = arr(form["menuCategory[]"]);
+    // 3) 메뉴들 (텍스트 & 이미지 인덱스 매칭)
+    const menuNames       = arr(form["menuName[]"]);
+    const menuPrices      = arr(form["menuPrice[]"]);
+    const menuCategories  = arr(form["menuCategory[]"]);
     const maxLen = Math.max(menuNames.length, menuPrices.length, menuCategories.length, menuFiles.length);
 
     const menuRows = [];
@@ -157,7 +127,7 @@ export async function createFoodRegister(req, res) {
       businessCertImage: toUploadsPath(bizCert) || null
     });
   } catch (e) {
-    try { if (client) await client.query("ROLLBACK"); } catch { }
+    try { if (client) await client.query("ROLLBACK"); } catch {}
     if (e?.message === "TIMEOUT") {
       console.error("[foodregister] timeout");
       return res.status(504).json({ error: "upstream timeout" });
@@ -165,23 +135,20 @@ export async function createFoodRegister(req, res) {
     console.error("[createFoodRegister] error:", e);
     return res.status(500).json({ error: "create failed" });
   } finally {
-    try { if (client) client.release(); } catch { }
+    try { if (client) client.release(); } catch {}
   }
 }
 
+/** GET /foodregister/:id  */
 export async function getFoodRegisterDetail(req, res) {
-  const idNum = parseInt(req.params.id, 10);
-  if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
+  const { id } = req.params;
   try {
     const { rows: storeRows } = await pool.query(
       `SELECT id, business_name, business_type, business_category,
-              delivery_option, business_hours, address, phone, created_at,
-              service_details, events, info_etc, additional_desc, homepage, instagram, facebook
-       FROM food_stores
-       WHERE id = $1`,
-      [idNum]   // ← 숫자로 바인딩
+              delivery_option, business_hours, address, phone, created_at
+       FROM food_stores WHERE id = $1`,
+      [id]
     );
-
     if (storeRows.length === 0) {
       return res.status(404).json({ error: "not found" });
     }
@@ -199,28 +166,24 @@ export async function getFoodRegisterDetail(req, res) {
   }
 }
 
-
 /** GET /foodregister/:id/menus */
 export async function getFoodRegisterMenus(req, res) {
-  const idNum = parseInt(req.params.id, 10);
-  if (!Number.isFinite(idNum)) return res.status(400).json({ error: "invalid id" });
+  const { id } = req.params;
   try {
     const { rows } = await pool.query(
       `SELECT id, category, name, price, image_url, created_at
        FROM food_menu_items
        WHERE store_id = $1
        ORDER BY id ASC`,
-      [idNum]
+      [id]
     );
-
     return res.json({ ok: true, menus: rows });
   } catch (e) {
     console.error("[getFoodRegisterMenus] error:", e);
     return res.status(500).json({ error: "menus failed" });
   }
 }
-
-// === 풀 상세 ===
+// === appended: full detail handler ===
 export async function getFoodRegisterFull(req, res) {
   const { id } = req.params;
   try {
@@ -253,7 +216,7 @@ export async function getFoodRegisterFull(req, res) {
       WHERE s.id = $1
       GROUP BY s.id
       `,
-        [idNum]
+      [id]
     );
 
     if (rows.length === 0) return res.status(404).json({ error: "not found" });
