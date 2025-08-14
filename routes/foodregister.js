@@ -11,10 +11,9 @@ const router = express.Router();
 // ── 경로 계산
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const ROOT_DIR = path.resolve(__dirname, "..");
-
-// ✅ server.js와 동일한 물리경로: <프로젝트루트>/uploads
-const uploadDir = path.join(ROOT_DIR, "uploads");
+// server.js: app.use("/uploads", express.static(path.join(PUBLIC2, "uploads")))
+ // 와 동일한 실제 경로로 맞춥니다.
+ const uploadDir = path.join(process.cwd(), "public2", "uploads");
 fs.mkdirSync(uploadDir, { recursive: true });
 
 // ── Multer 설정
@@ -43,11 +42,11 @@ const uploadFields = upload.fields([
 router.post("/", uploadFields, ctrl.createFoodRegister);
 
 // 단건 요약
-router.get("/:id", ctrl.getFoodRegisterDetail);
+router.get("/:id(\\d+)", ctrl.getFoodRegisterDetail);
 
 // 풀데이터 (호환 네이밍 지원)
 const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
-router.get("/:id/full", async (req, res, next) => {
+router.get("/:id(\\d+)/full", async (req, res, next) => {
   try {
     if (!getFull) {
       console.error("[foodregister] full handler missing");
