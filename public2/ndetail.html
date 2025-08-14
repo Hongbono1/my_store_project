@@ -124,10 +124,13 @@
         const slider = {
             imgs: [], idx: 0,
             init(arr) {
-                this.imgs = (arr || []).filter(src => typeof src === "string" && (src.startsWith("http") || src.startsWith("/"))).map(s => s.trim());
-                if (!this.imgs.length) this.imgs = ["/no-image.png"];
-                $("sliderImages").innerHTML = this.imgs.map((u, i) =>
-                    `<img src="${u}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`).join('');
+                this.imgs = (arr || [])
+                    .filter(src => typeof src === "string" && src.trim() !== "")
+                    .map(s => normalizeSrc(s.trim()));
+                $("sliderImages").innerHTML = this.imgs.map((u, i) => {
+                    const n = normalizeSrc(u);
+                    return `<img src="${n}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`;
+                }).join('');
                 $("sliderImages").onclick = (e) => {
                     if (e.target.tagName === "IMG") {
                         this.idx = Number(e.target.dataset.index);
@@ -169,6 +172,12 @@
                     el.classList.toggle("ring-2", i === this.idx);
                     el.classList.toggle("ring-blue-300", i === this.idx);
                 });
+
+                // ➕ 추가: 이미지 없으면 네비게이션/썸네일 숨김
+                const hasImg = this.imgs.length > 0;
+                $("prevBtn").classList.toggle("hidden", !hasImg);
+                $("nextBtn").classList.toggle("hidden", !hasImg);
+                $("thumbBox").classList.toggle("hidden", !hasImg);
             }
         };
 
@@ -211,7 +220,7 @@
             ul.querySelectorAll(".removeBtn").forEach(btn => {
                 btn.onclick = () => { cart.splice(btn.dataset.index, 1); renderCart(); };
             });
-            $("cartTotal").textContent = sum.toLocaleString(); + "원";
+            $("cartTotal").textContent = sum.toLocaleString() + "원";
         }
 
         // 지도 관련(서버에 /kakao-key 라우트 없으면 이 부분 통째로 주석 처리!)
@@ -248,6 +257,13 @@
             //     }
             //   });
             // } catch (e) {}
+        }
+
+        // ➕ 추가: 업로드/절대경로/HTTP 모두 안전하게 처리
+        function normalizeSrc(src) {
+            if (!src) return "";                 // 없음
+            if (src.startsWith("http") || src.startsWith("/")) return src; // 절대/외부
+            return `/uploads/${src}`;            // 파일명만 오면 업로드 경로로
         }
 
         // (1) fetch해서 데이터 바인딩
@@ -313,7 +329,7 @@
                         items.forEach(it => {
                             const box = document.createElement("div");
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                            const imgSrc = it.image_url ? it.image_url : "/assets/images/no-thumb.png";
+                            const imgSrc = normalizeSrc(it.image_url);
                             box.innerHTML = `
               <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
               <div class="flex-1">

@@ -4,7 +4,8 @@ import path from "path";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // ssl: { rejectUnauthorized: false } // URL에 sslmode=require 없으면 주석 해제
+  // 필요 시 주석 해제 (Neon SSL 이슈 있을 때)
+  // ssl: { rejectUnauthorized: false }
 });
 
 /** ───────── UTILS ───────── **/
@@ -15,11 +16,10 @@ const withTimeout = (p, ms = SLOW_MS) =>
 /** 업로드된 파일 경로에서 '/uploads/파일명'만 추출 */
 function toUploadsPath(file) {
   if (!file) return null;
-  const idx = file.path?.lastIndexOf("uploads") ?? -1;
-  if (idx >= 0) {
-    const rel = file.path.slice(idx + "uploads/".length);
-    return `/uploads/${rel}`;
-  }
+  const p = file.path || path.join(file.destination || "", file.filename || "");
+  const norm = String(p).replace(/\\/g, "/");
+  const idx = norm.lastIndexOf("/uploads/");
+  if (idx >= 0) return norm.slice(idx); // '/uploads/...' 그대로
   return `/uploads/${file.filename}`;
 }
 
@@ -39,7 +39,7 @@ function arr(v) {
 /** ───────── CONTROLLERS ───────── **/
 /** POST /foodregister  */
 export async function createFoodRegister(req, res) {
-  let client; // finally/rollback에서 가드
+  let client;
   console.time("[foodregister] total");
   console.log("[foodregister] start", {
     storeImgs: (req.files?.["storeImages"] || []).length,
@@ -93,7 +93,7 @@ export async function createFoodRegister(req, res) {
       await client.query(insertImgSQL, imgParams);
     }
 
-    // 3) 메뉴들 (텍스트 & 이미지 인덱스 매칭)
+    // 3) 메뉴들
     const menuNames       = arr(form["menuName[]"]);
     const menuPrices      = arr(form["menuPrice[]"]);
     const menuCategories  = arr(form["menuCategory[]"]);
@@ -183,7 +183,8 @@ export async function getFoodRegisterMenus(req, res) {
     return res.status(500).json({ error: "menus failed" });
   }
 }
-// === appended: full detail handler ===
+
+// === 풀 상세 ===
 export async function getFoodRegisterFull(req, res) {
   const { id } = req.params;
   try {

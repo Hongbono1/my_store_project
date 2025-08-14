@@ -1,23 +1,23 @@
 // server.js
-import "dotenv/config";                  // ← .env를 항상 로드 (PM2에서도 보장)
+import "dotenv/config";                  // .env 로드
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 
-import foodregisterRouter from "./routes/foodregister.js"; // ← 라우터 경로 확인!
+import foodregisterRouter from "./routes/foodregister.js"; // 라우터
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// 부팅 로그 (진단용)
+// ───── 부팅 로그 (진단용)
 console.log("[BOOT] PORT=", process.env.PORT || 3000);
 console.log("[BOOT] DATABASE_URL len =", (process.env.DATABASE_URL || "").length);
-console.log("[BOOT] ODCLOUD_SERVICE_KEY len =", (process.env.ODCLOUD_SERVICE_KEY || "").length);
+console.log("[BOOT] ODCLOUD_SERVICE_KEY len =", (process.env.ODCLOUD_SERVICE_KEY || process.env.BIZ_API_KEY || "").length);
 
-// CORS (필요 시)
+// ───── CORS (필요 시)
 const origins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map(s => s.trim())
@@ -26,16 +26,22 @@ if (origins.length) {
   app.use(cors({ origin: origins, credentials: true }));
 }
 
-// JSON/URLENCODED 파서 (멀티파트는 multer가 처리하므로 OK)
+// ───── JSON/URLENCODED 파서
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// 정적 파일: public2가 루트
+// ───── 정적 파일: public2가 문서 루트
 const PUBLIC2 = path.join(process.cwd(), "public2");
 app.use(express.static(PUBLIC2, { index: false, extensions: ["html", "htm"] }));
 
-// 업로드 파일 접근: /uploads/파일명  → public2/uploads/파일명
-app.use("/uploads", express.static(path.join(PUBLIC2, "uploads")));
+// ───── 업로드 정적 서빙: ✅ 루트 uploads 디렉토리에서 서빙
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ───── 요청 로깅(진단)
+app.use((req, _res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  next();
+});
 
 /** ---------------- /verify-biz (ODCloud 프록시) ---------------- */
 app.post("/verify-biz", async (req, res) => {
@@ -48,7 +54,6 @@ app.post("/verify-biz", async (req, res) => {
       return res.status(400).json({ error: 'invalid body; expected { b_no: ["##########"] }' });
     }
 
-    // 키가 이미 인코딩되어 있으면 그대로, 아니면 인코딩
     const keyParam = /%[0-9A-Fa-f]{2}/.test(key) ? key : encodeURIComponent(key);
     const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${keyParam}`;
 
