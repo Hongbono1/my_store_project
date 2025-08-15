@@ -123,8 +123,8 @@
 
     <script type="module">
         // grow-card 두 박스의 최소/최대 높이 (내용 가독성 보장용)
-        const MIN_GROW_PX = 160;
-        const MAX_GROW_PX = 520;  // 필요하면 숫자만 조정
+        const MIN_GROW_PX = 80;
+        const MAX_GROW_PX = 9999;  // 필요하면 숫자만 조정
 
         let layoutFrozen = false;
         let rafA = 0, rafB = 0;
@@ -143,6 +143,10 @@
         // 더 이상 자동 흔들림이 없도록 잠금
         function freezeLayout() {
             layoutFrozen = true;
+            cancelAnimationFrame(rafA);
+            cancelAnimationFrame(rafB);
+            rafA = 0;
+            rafB = 0;
         }
 
         // ========== 유틸 ==========
@@ -205,6 +209,22 @@
                 origFreeze();
             };
         })();
+
+        // root 안의 <img>들이 로드/에러로 상태가 "안정화"될 때까지 대기
+        function whenImagesSettled(root) {
+            if (!root) return Promise.resolve();
+            const imgs = Array.from(root.querySelectorAll('img'));
+            if (!imgs.length) return Promise.resolve();
+            const tasks = imgs.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(res => {
+                    const done = () => res();
+                    img.addEventListener('load', done, { once: true });
+                    img.addEventListener('error', done, { once: true });
+                });
+            });
+            return Promise.all(tasks);
+        }
 
         // ========== 슬라이더 ==========
         const slider = {
@@ -598,18 +618,25 @@
                     });
                 }
 
+                // ★ 모든 이미지 로딩이 끝날 때까지 대기 (좌/중/우 전부)
+                await whenImagesSettled(document.getElementById('leftCol'));
+                await whenImagesSettled(document.getElementById('middleCol'));
+                await whenImagesSettled(document.getElementById('rightCol'));
+
+                // ★ 최종 1회 정렬 + 잠금
+                scheduleLayout(true);
+                freezeLayout();
+
                 // 예약 버튼
                 const reserveBtn = $("reserveBtn");
                 if (reserveBtn) reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
 
-                // ★ 모든 DOM이 안정된 다음 프레임에 1회 정렬 + 잠금
-                scheduleLayout(true);
-                freezeLayout();
 
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
                 $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
                 scheduleLayout(true);
+                freezeLayout();
             }
         })();
 
@@ -618,6 +645,7 @@
         window.addEventListener("resize", () => {
             layoutFrozen = false;   // 창 크기 바뀌면 다시 계산 허용
             scheduleLayout(true);
+            freezeLayout();
         });
     </script>
 </body>
