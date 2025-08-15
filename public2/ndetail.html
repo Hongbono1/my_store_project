@@ -122,6 +122,10 @@
     </div>
 
     <script type="module">
+        // grow-card 두 박스의 최소/최대 높이 (내용 가독성 보장용)
+        const MIN_GROW_PX = 160;
+        const MAX_GROW_PX = 520;  // 필요하면 숫자만 조정
+        
         // ========== 유틸 ==========
         const $ = id => document.getElementById(id);
 
@@ -260,18 +264,20 @@
             const right = document.getElementById('rightCol');
             if (!left || !mid) return;
 
-            const leftH = left.getBoundingClientRect().height;
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches; // lg 이상
+            const leftH = left.getBoundingClientRect().height;                  // 기준(검정선) 높이
 
-            // 우측: 좌측과 동일 높이 + 내부 스크롤
+            // 우측: 좌측과 동일 높이 + 내부 스크롤 (항상 보이게)
             if (right) {
-                right.style.height = `${leftH}px`;
-                right.style.maxHeight = `${leftH}px`;
-                right.style.overflow = 'auto';
+                right.style.height = isDesktop ? `${leftH}px` : '';
+                right.style.maxHeight = isDesktop ? `${leftH}px` : '';
+                right.style.overflow = isDesktop ? 'auto' : '';
             }
 
-            // 가운데: 남는 높이를 grow-card 들에게 균등 배분
+            // 가운데: grow-card(서비스/추가 설명) 두 개에 남은 높이를 "동일하게" 배분
             const kids = Array.from(mid.children);
-            const gapPx = _getGapPx(mid);
+            const cs = getComputedStyle(mid);
+            const gapPx = parseFloat(cs.rowGap || cs.gap || '0') || 0;
             const gaps = Math.max(0, kids.length - 1);
 
             const growTargets = kids.filter(el => el.classList.contains('grow-card'));
@@ -280,12 +286,28 @@
             // 리셋
             growTargets.forEach(el => { el.style.height = ''; el.style.maxHeight = ''; });
 
-            const used = _sumHeights(staticEls) + gaps * gapPx;
+            if (!isDesktop || growTargets.length === 0) {
+                // 모바일/좁은 화면: 자동 높이로 풀어 빈공간/잘림 방지
+                growTargets.forEach(el => {
+                    const sc = el.querySelector('.scroll-area');
+                    if (sc) { sc.style.maxHeight = ''; sc.style.overflow = ''; }
+                });
+                return;
+            }
+
+            // 가운데 컬럼에서 grow-card 외 요소(=헤더/이벤트/기타/연락처 등) 총 높이 + 갭
+            const usedStatic = staticEls.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+            const used = usedStatic + gaps * gapPx;
+
+            // 좌측(=기준선) 높이에 맞추기 위해 grow-card들이 채워야 할 남은 높이
             let remain = leftH - used;
             if (remain < 0) remain = 0;
 
-            const share = growTargets.length ? (remain / growTargets.length) : 0;
+            // 두 박스를 동일하게 줄여 배분 (최소/최대 높이로 클램프)
+            let share = growTargets.length ? Math.floor(remain / growTargets.length) : 0;
+            share = Math.max(MIN_GROW_PX, Math.min(MAX_GROW_PX, share));
 
+            // 적용 + 내부 스크롤
             growTargets.forEach(el => {
                 el.style.height = `${share}px`;
                 el.style.maxHeight = `${share}px`;
@@ -293,6 +315,7 @@
                 if (sc) { sc.style.maxHeight = '100%'; sc.style.overflow = 'auto'; }
             });
         }
+
 
         // 기존 syncToAdEnd 교체
         function syncToAdEnd() {
