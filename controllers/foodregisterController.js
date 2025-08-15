@@ -9,8 +9,8 @@ import pool from "../db.js";
 export async function createFoodStore(req, res) {
   try {
     const businessName = (req.body.businessName || "").trim();
-    const roadAddress  = (req.body.roadAddress  || "").trim();
-    const phone        = (req.body.phone        || "").trim();
+    const roadAddress = (req.body.roadAddress || "").trim();
+    const phone = (req.body.phone || "").trim();
 
     if (!businessName || !roadAddress) {
       return res.status(400).json({ ok: false, error: "businessName, roadAddress는 필수" });
@@ -53,6 +53,44 @@ export async function getFoodStoreById(req, res) {
     return res.json({ ok: true, store: rows[0] });
   } catch (err) {
     console.error("[getFoodStoreById] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  }
+}
+
+export async function getFoodRegisterFull(req, res) {
+  try {
+    // id 가드 (22P02 예방)
+    const raw = req.params.id;
+    const idNum = Number.parseInt(raw, 10);
+    if (!Number.isSafeInteger(idNum)) {
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+    }
+
+    // 기본 정보 (address=road_address 로 매핑)
+    const q = `
+      SELECT
+        id,
+        business_name,
+        road_address AS address,
+        phone,
+        created_at
+      FROM food_stores
+      WHERE id = $1
+    `;
+    const { rows } = await pool.query(q, [idNum]);
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "not_found" });
+    }
+
+    // ndetail은 images/menus 배열을 기대 → 일단 빈 배열
+    return res.json({
+      ok: true,
+      store: rows[0],
+      images: [],
+      menus: []
+    });
+  } catch (err) {
+    console.error("[getFoodRegisterFull] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   }
 }
