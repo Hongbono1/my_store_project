@@ -124,10 +124,21 @@
     <script type="module">
         // ========== 유틸 ==========
         const $ = id => document.getElementById(id);
+
         function normalizeSrc(src) {
             if (!src) return "";
             if (src.startsWith("http") || src.startsWith("/")) return src;
             return `/uploads/${src}`;
+        }
+
+        function escapeHtml(s = "") {
+            return s.replace(/[&<>"']/g, m => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+            }[m]));
         }
 
         // 안전한 storeId 추출
@@ -371,22 +382,35 @@
                 $("deliveryOption").textContent = "배달: " + (store.delivery_option ?? "-");
                 $("businessHours").textContent = "영업시간: " + (store.business_hours ?? "-");
 
+                // 서비스/이벤트
                 $("serviceDetails").textContent = store.service_details || "-";
-                $("eventsList").innerHTML = `<li>-</li>`;
-                $("infoEtcList").innerHTML = `
-          <li>장애인 편의시설: -</li>
-          <li>반려동물 출입: -</li>
-          <li>주차 정보: -</li>
-        `;
-                $("additionalDesc").textContent = store.additional_desc || "-";
+                const events = (json.events || []).map(escapeHtml);
+                $("eventsList").innerHTML = events.length
+                    ? events.map(e => `<li>${e}</li>`).join("")
+                    : `<li>-</li>`;
 
+                // 기타 정보
+                $("infoEtcList").innerHTML = `
+  <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
+  <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
+  <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
+`;
+
+                // 연락처(클릭 가능 링크)
                 const phoneNum = store.phone || "";
                 $("contactPhone").innerHTML = phoneNum
-                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
+                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${escapeHtml(phoneNum)}</a>`
                     : "-";
-                $("contactHomepage").textContent = store.homepage || "-";
-                $("contactInstagram").textContent = store.instagram || "-";
-                $("contactFacebook").textContent = store.facebook || "-";
+
+                function linkOrDash(url, label) {
+                    if (!url) return "-";
+                    const u = /^https?:\/\//i.test(url) ? url : ("http://" + url);
+                    return `<a href="${u}" target="_blank" rel="noopener" class="text-blue-600 underline">${escapeHtml(label || url)}</a>`;
+                }
+                $("contactHomepage").innerHTML = linkOrDash(store.homepage, "홈페이지 열기");
+                $("contactInstagram").innerHTML = linkOrDash(store.instagram, "인스타그램");
+                $("contactFacebook").innerHTML = linkOrDash(store.facebook, "페이스북");
+
 
                 // 3) 지도
                 await initMap(store.address || "", store.business_name || store.name || "");
