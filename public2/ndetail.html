@@ -89,11 +89,8 @@
 
             <div class="rounded-2xl bg-gray-50 shadow p-6">
                 <div class="font-semibold mb-1">연락처</div>
-                <div id="contactPhone"></div>
-                <div id="contactHomepage"></div>
-                <div id="contactInstagram"></div>
-                <div id="contactFacebook"></div>
-            </div>
+                <div id="contactGrid" class="grid grid-cols-2 gap-3">
+                </div>
         </section>
 
         <!-- 3. 오른쪽: 메뉴/장바구니 -->
@@ -395,19 +392,47 @@
       `;
 
                 // 연락처(클릭 링크)
+                // 연락처(2열 그리드로 렌더링)
                 const phoneNum = store.phone || "";
-                $("contactPhone").innerHTML = phoneNum
-                    ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${escapeHtml(phoneNum)}</a>`
-                    : "-";
 
-                function linkOrDash(url, label) {
-                    if (!url) return "-";
+                // URL을 앵커로(없으면 null 반환)
+                function linkOrNull(url, label) {
+                    if (!url) return null;
                     const u = /^https?:\/\//i.test(url) ? url : ("http://" + url);
-                    return `<a href="${u}" target="_blank" rel="noopener" class="text-blue-600 underline">${escapeHtml(label || url)}</a>`;
+                    return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label || url)}</a>`;
                 }
-                $("contactHomepage").innerHTML = linkOrDash(store.homepage, "홈페이지 열기");
-                $("contactInstagram").innerHTML = linkOrDash(store.instagram, "인스타그램");
-                $("contactFacebook").innerHTML = linkOrDash(store.facebook, "페이스북");
+
+                const items = [];
+
+                // 1) 전화번호
+                if (phoneNum) {
+                    const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
+                    items.push(
+                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`
+                    );
+                }
+
+                // 2) 홈페이지 / 3) 인스타 / 4) 페이스북 (있는 것만)
+                const home = linkOrNull(store.homepage, "홈페이지");
+                if (home) items.push(home);
+
+                const insta = linkOrNull(store.instagram, "인스타그램");
+                if (insta) items.push(insta);
+
+                const face = linkOrNull(store.facebook, "페이스북");
+                if (face) items.push(face);
+
+                const grid = document.getElementById("contactGrid");
+                if (!items.length) {
+                    grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
+                } else if (items.length === 1) {
+                    // 하나만 있으면 가운데 꽉 차게
+                    grid.innerHTML = `<div class="col-span-2">${items[0]}</div>`;
+                } else {
+                    // 2개 이상이면 2열로 좌→우, 상→하 채움 (빈칸 없이 자동 당겨짐)
+                    grid.innerHTML = items.map(html => `<div>${html}</div>`).join("");
+                }
+
 
                 // 3) 지도
                 await initMap(store.address || "", store.business_name || store.name || "");
