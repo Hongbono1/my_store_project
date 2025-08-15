@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>통합 정보 상세</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 카카오 앱키를 여기에 넣으세요 -->
+    <meta name="kakao-appkey" content="여기에_키_입력">
 </head>
 
 <body class="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen">
@@ -25,11 +28,13 @@
                 </div>
                 <div class="text-center font-bold mt-2">대표 이미지</div>
             </div>
+
             <div class="rounded-3xl bg-white shadow-xl p-6">
                 <div class="text-lg font-bold mb-2">위치/지도</div>
                 <div id="addressText" class="mb-2 text-base"></div>
                 <div id="map" class="w-full h-48 bg-gray-100 rounded-xl"></div>
             </div>
+
             <div class="flex flex-col gap-4">
                 <div class="rounded-3xl bg-white shadow-xl p-3">
                     <img src="/images/ad-1.jpg" alt="광고1" class="rounded-xl w-full h-28 object-cover" />
@@ -44,7 +49,6 @@
         <section class="flex-[1.1] flex flex-col gap-6">
             <div class="rounded-3xl bg-white shadow-xl p-6">
                 <h2 id="businessNameHeader" class="text-3xl font-bold text-center mb-2"></h2>
-                <!-- 예약신청 버튼 추가 -->
                 <div class="flex justify-center mt-2">
                     <button id="reserveBtn"
                         class="bg-blue-500 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">예약
@@ -57,25 +61,29 @@
                     <div id="businessHours"></div>
                 </div>
             </div>
+
             <div class="rounded-2xl bg-blue-50 shadow p-6">
                 <div class="font-semibold mb-1">서비스 내용</div>
                 <div id="serviceDetails"></div>
             </div>
+
             <div class="rounded-2xl bg-yellow-50 shadow p-6">
                 <div class="font-semibold mb-1">이벤트</div>
                 <ul id="eventsList" class="list-disc ml-5"></ul>
             </div>
+
             <div class="rounded-2xl bg-gray-50 shadow p-6">
                 <div class="font-semibold mb-1">기타 정보</div>
                 <ul id="infoEtcList" class="list-disc pl-5"></ul>
             </div>
+
             <div class="rounded-2xl bg-blue-50 shadow p-6">
                 <div class="font-semibold mb-1">추가 설명</div>
                 <div id="additionalDesc"></div>
             </div>
+
             <div class="rounded-2xl bg-gray-50 shadow p-6">
                 <div class="font-semibold mb-1">연락처</div>
-                <!-- 전화번호를 tel: 링크로 감싸기 -->
                 <div id="contactPhone"></div>
                 <div id="contactHomepage"></div>
                 <div id="contactInstagram"></div>
@@ -101,7 +109,7 @@
         </section>
     </main>
 
-    <!-- 이미지 모달 등 추가 가능 -->
+    <!-- 이미지 모달 -->
     <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
         <div class="relative">
             <img id="modalImage" class="w-[600px] h-[400px] object-contain rounded shadow-xl" />
@@ -109,40 +117,73 @@
                 class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">×</button>
         </div>
     </div>
+
     <script type="module">
-        // 유틸 함수
+        // ========== 유틸 ==========
         const $ = id => document.getElementById(id);
+        function normalizeSrc(src) {
+            if (!src) return "";
+            if (src.startsWith("http") || src.startsWith("/")) return src;
+            return `/uploads/${src}`;
+        }
 
-        // 안전하게 storeId 추출 (주소 ?id=1)
-        const storeId = Number(new URLSearchParams(location.search).get("id")) || 1;
+        // 안전한 storeId 추출
+        const q = new URLSearchParams(location.search);
+        const storeId = Number(q.get("id"));
+        if (!Number.isSafeInteger(storeId)) {
+            alert("잘못된 접근입니다. (id 필요)");
+            // 필요시 메인으로 이동
+            // location.replace('/');
+        }
 
-        // 이미지 모달
+        // ========== 이미지 모달 ==========
         function openModal(src) { $("modalImage").src = src; $("imageModal").classList.remove("hidden"); }
         function closeModal() { $("imageModal").classList.add("hidden"); }
+        (function enableModalKeys() {
+            const modal = $("imageModal");
+            modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+            window.addEventListener("keydown", (e) => {
+                if (modal.classList.contains("hidden")) return;
+                if (e.key === "Escape") closeModal();
+                if (e.key === "ArrowLeft") { slider.move(-1); $("modalImage").src = slider.imgs[slider.idx]; }
+                if (e.key === "ArrowRight") { slider.move(1); $("modalImage").src = slider.imgs[slider.idx]; }
+            });
+            $("closeModal").addEventListener('click', closeModal);
+        })();
 
-        // 슬라이더 객체
+        // ========== 슬라이더 ==========
         const slider = {
-            imgs: [], idx: 0,
+            imgs: [],
+            idx: 0,
             init(arr) {
                 this.imgs = (arr || [])
                     .filter(s => typeof s === "string" && s.trim() !== "")
                     .map(s => normalizeSrc(s.trim()));
+
+                // 각 슬라이드가 가로 100% 폭을 갖도록 min-w-full 래퍼 사용
                 $("sliderImages").innerHTML = this.imgs.map((u, i) => {
                     const n = normalizeSrc(u);
-                    return `<img src="${n}" data-index="${i}" class="w-full h-full object-cover flex-shrink-0 cursor-pointer" />`;
+                    return `
+            <div class="min-w-full h-full">
+              <img src="${n}" data-index="${i}" class="w-full h-full object-cover cursor-pointer select-none" />
+            </div>`;
                 }).join('');
 
                 $("sliderImages").onclick = (e) => {
-                    if (e.target.tagName === "IMG") {
-                        this.idx = Number(e.target.dataset.index);
+                    const img = e.target.closest("img[data-index]");
+                    if (img) {
+                        this.idx = Number(img.dataset.index);
                         this.update();
                         openModal(this.imgs[this.idx]);
                     }
                 };
+
                 this.renderThumbs();
                 this.update();
+
                 $("prevBtn").onclick = () => this.move(-1);
                 $("nextBtn").onclick = () => this.move(1);
+
                 const firstImg = $("sliderImages").querySelector('img');
                 if (firstImg) {
                     firstImg.onload = () => syncToAdEnd();
@@ -155,7 +196,6 @@
                 const box = $("thumbBox");
                 box.innerHTML = "";
                 this.imgs.forEach((src, i) => {
-                    if (!src.startsWith("http") && !src.startsWith("/")) return;
                     const t = document.createElement("img");
                     t.src = src;
                     t.alt = `이미지 ${i + 1}`;
@@ -166,36 +206,25 @@
                     box.appendChild(t);
                 });
             },
-            move(step) { this.idx = (this.idx + step + this.imgs.length) % this.imgs.length; this.update(); },
+            move(step) {
+                if (!this.imgs.length) return;
+                this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
+                this.update();
+            },
             update() {
+                const hasImg = this.imgs.length > 0;
                 $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
                 [...$("thumbBox").children].forEach((el, i) => {
                     el.classList.toggle("ring-2", i === this.idx);
                     el.classList.toggle("ring-blue-300", i === this.idx);
                 });
-
-                // ➕ 추가: 이미지 없으면 네비게이션/썸네일 숨김
-                const hasImg = this.imgs.length > 0;
                 $("prevBtn").classList.toggle("hidden", !hasImg);
                 $("nextBtn").classList.toggle("hidden", !hasImg);
                 $("thumbBox").classList.toggle("hidden", !hasImg);
             }
         };
 
-        // 모달 단축키
-        (function enableModalKeys() {
-            const modal = $("imageModal");
-            modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-            window.addEventListener("keydown", (e) => {
-                if (modal.classList.contains("hidden")) return;
-                if (e.key === "ArrowLeft") { slider.move(-1); $("modalImage").src = slider.imgs[slider.idx]; }
-                if (e.key === "ArrowRight") { slider.move(1); $("modalImage").src = slider.imgs[slider.idx]; }
-                if (e.key === "Escape") closeModal();
-            });
-            $("closeModal").addEventListener('click', closeModal);
-        })();
-
-        // 장바구니
+        // ========== 장바구니 ==========
         const cart = [];
         function addToCart(item) {
             const found = cart.find(c => c.name === item.name);
@@ -213,9 +242,9 @@
                 const li = document.createElement("li");
                 li.className = "flex justify-between items-center text-lg py-2";
                 li.innerHTML = `
-        <span>${item.name} × ${qty}</span>
-        <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-        <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
+          <span>${item.name} × ${qty}</span>
+          <span class="text-xl font-bold">${total.toLocaleString()}원</span>
+          <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
                 ul.appendChild(li);
             });
             ul.querySelectorAll(".removeBtn").forEach(btn => {
@@ -224,127 +253,142 @@
             $("cartTotal").textContent = sum.toLocaleString() + "원";
         }
 
-        // 지도 관련(서버에 /kakao-key 라우트 없으면 이 부분 통째로 주석 처리!)
+        // ========== Kakao 지도 ==========
         async function loadKakaoSdk() {
-            // const r = await fetch("/kakao-key");
-            // const { key } = await r.json();
-            // await new Promise((resolve, reject) => {
-            //   const s = document.createElement("script");
-            //   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services,clusterer`;
-            //   s.defer = true;
-            //   s.onload = () => kakao.maps.load(resolve);
-            //   s.onerror = () => reject("Kakao SDK load error");
-            //   document.head.appendChild(s);
-            // });
-        }
-        async function initMap(storeAddress, storeName = "") {
-            // 서버에 kakao-key 라우트 없으면 아래 코드 주석!
-            // try {
-            //   await loadKakaoSdk();
-            //   const geocoder = new kakao.maps.services.Geocoder();
-            //   const cleanedAddress = (storeAddress || "").replace(/^\d{5}\s*/, "").replace(/\s+\d+$/, "").trim();
-            //   geocoder.addressSearch(cleanedAddress, (result, status) => {
-            //     if (status !== kakao.maps.services.Status.OK) return;
-            //     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-            //     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-            //     const marker = new kakao.maps.Marker({ map, position: coords });
-            //     if (storeName) {
-            //       const overlay = new kakao.maps.CustomOverlay({
-            //         position: marker.getPosition(),
-            //         content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${storeName}</div>`,
-            //         yAnchor: 1
-            //       });
-            //       overlay.setMap(map);
-            //     }
-            //   });
-            // } catch (e) {}
-        }
-        // 업로드/절대/외부 URL 모두 안전 처리
-        function normalizeSrc(src) {
-            if (!src) return "";
-            if (src.startsWith("http") || src.startsWith("/")) return src;
-            return `/uploads/${src}`;
+            // meta에서 앱키 읽기
+            const meta = document.querySelector('meta[name="kakao-appkey"]');
+            const key = meta?.content?.trim();
+            if (!key) throw new Error("Kakao appkey not found (meta[name='kakao-appkey'])");
+
+            await new Promise((resolve, reject) => {
+                // autoload=false로 로드 후 kakao.maps.load 사용
+                const s = document.createElement("script");
+                s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false&libraries=services`;
+                s.defer = true;
+                s.onload = () => {
+                    if (!window.kakao || !window.kakao.maps) return reject("Kakao SDK load failed");
+                    kakao.maps.load(resolve);
+                };
+                s.onerror = () => reject("Kakao SDK network error");
+                document.head.appendChild(s);
+            });
         }
 
-        // (1) fetch해서 데이터 바인딩
+        async function initMap(address, name = "") {
+            if (!address) {
+                $("addressText").textContent = "📍 -";
+                $("map").innerHTML = "";
+                return;
+            }
+            $("addressText").textContent = `📍 ${address}`;
+
+            try {
+                if (!(window.kakao && window.kakao.maps)) {
+                    await loadKakaoSdk();
+                }
+                const geocoder = new kakao.maps.services.Geocoder();
+                const cleaned = address.replace(/^\d{5}\s*/, "").trim();
+
+                geocoder.addressSearch(cleaned, (result, status) => {
+                    if (status !== kakao.maps.services.Status.OK || !result?.length) return;
+
+                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+                    const marker = new kakao.maps.Marker({ map, position: coords });
+
+                    if (name) {
+                        const overlay = new kakao.maps.CustomOverlay({
+                            position: marker.getPosition(),
+                            content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${name}</div>`,
+                            yAnchor: 1
+                        });
+                        overlay.setMap(map);
+                    }
+                });
+            } catch (e) {
+                console.error("Kakao map init error:", e);
+            }
+        }
+
+        // ========== 상세 데이터 로딩 ==========
         (async () => {
             try {
                 const res = await fetch(`/foodregister/${encodeURIComponent(storeId)}/full`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const { store, images = [], menus = [] } = await res.json();
+                const json = await res.json();
 
-                // 1. 슬라이더
+                const store = json.store || {};
+                const images = json.images?.map(i => i.url || i.image_url || "") || [];
+                const menus = json.menus || [];
+
+                // 1) 슬라이더
                 slider.init(images);
 
-                // 2. 중앙 필드 (DB 스키마 기준 - snake_case)
-                $("businessNameHeader").textContent = store.business_name || "상호명 없음";
+                // 2) 중앙 필드
+                $("businessNameHeader").textContent = store.business_name || store.name || "상호명 없음";
                 $("businessType").textContent = "업종: " + (store.business_type ?? "-");
-                $("businessCategory").textContent = "카테고리: " + (store.business_category ?? "-");
+                $("businessCategory").textContent = "카테고리: " + (store.business_category ?? store.category ?? "-");
                 $("deliveryOption").textContent = "배달: " + (store.delivery_option ?? "-");
                 $("businessHours").textContent = "영업시간: " + (store.business_hours ?? "-");
-                $("addressText").textContent = store.address ? `📍 ${store.address}` : "📍 -";
 
-                // 현재 스키마에 없는 필드들은 그냥 '-'로 표시
-                $("serviceDetails").textContent = "-";
-
-                // 이벤트 영역은 UL이라 한 줄짜리 아이템으로 '-' 표시
+                $("serviceDetails").textContent = store.service_details || "-";
                 $("eventsList").innerHTML = `<li>-</li>`;
-
-                // 기타 정보(현 스키마엔 없음)도 '-' 고정 출력
                 $("infoEtcList").innerHTML = `
-  <li>장애인 편의시설: -</li>
-  <li>반려동물 출입: -</li>
-  <li>주차 정보: -</li>
-`;
-
+          <li>장애인 편의시설: -</li>
+          <li>반려동물 출입: -</li>
+          <li>주차 정보: -</li>
+        `;
                 $("additionalDesc").textContent = store.additional_desc || "-";
-                // 연락처(전화는 tel:)
+
                 const phoneNum = store.phone || "";
                 $("contactPhone").innerHTML = phoneNum
                     ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${phoneNum}</a>`
                     : "-";
+                $("contactHomepage").textContent = store.homepage || "-";
+                $("contactInstagram").textContent = store.instagram || "-";
+                $("contactFacebook").textContent = store.facebook || "-";
 
-                $("contactHomepage").textContent = "-";
-                $("contactInstagram").textContent = "-";
-                $("contactFacebook").textContent = "-";
-                // 3. 지도/주소
-                $("addressText").textContent = store.address ? `📍 ${store.address}` : "📍 -";
+                // 3) 지도
+                await initMap(store.address || "", store.business_name || store.name || "");
 
-                // 4. 메뉴 렌더
+                // 4) 메뉴
+                const section = $("menuCartSection");
                 if (!menus.length) {
-                    document.getElementById("menuCartSection").style.display = "none";
+                    section.style.display = "none";
                 } else {
-                    document.getElementById("menuCartSection").style.display = "";
+                    section.style.display = "";
                     const menuList = $("menuList"); menuList.innerHTML = "";
                     const menuByCategory = {};
                     menus.forEach(it => {
-                        const category = (it.category || "").toString().trim() || "기타";
-                        (menuByCategory[category] ||= []).push(it);
+                        const cat = (it.category || "").toString().trim() || "기타";
+                        (menuByCategory[cat] ||= []).push(it);
                     });
+
                     Object.entries(menuByCategory).forEach(([cat, items]) => {
                         const group = document.createElement("div");
                         const title = document.createElement("h3");
                         title.textContent = "🍱 " + cat;
                         title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
                         group.appendChild(title);
+
                         items.forEach(it => {
                             const box = document.createElement("div");
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                            const imgSrc = normalizeSrc(it.image_url);
+                            const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
                             box.innerHTML = `
-              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-              <div class="flex-1">
-                <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-                <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
-              </div>
-              <div class="flex flex-col items-center gap-1 shrink-0">
-                <div class="flex items-center gap-1">
-                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                  <span class="quantity w-6 text-center">1</span>
-                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+                <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+                <div class="flex-1">
+                  <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+                  <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
                 </div>
-                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-              </div>`;
+                <div class="flex flex-col items-center gap-1 shrink-0">
+                  <div class="flex items-center gap-1">
+                    <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+                    <span class="quantity w-6 text-center">1</span>
+                    <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+                  </div>
+                  <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+                </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
                             box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
@@ -353,38 +397,28 @@
                                 addToCart({ name: it.name, price: it.price, quantity: qty });
                             group.appendChild(box);
                         });
+
                         menuList.appendChild(group);
                     });
                 }
 
-                // 5. 예약 버튼
+                // 예약 버튼
                 const reserveBtn = $("reserveBtn");
-                if (reserveBtn) {
-                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
-                }
+                if (reserveBtn) reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
 
-                // 동기화
                 syncToAdEnd();
-
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
-                // 실패해도 레이아웃만은 유지
+                $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
                 syncToAdEnd();
             }
         })();
 
-        // 높이 동기화(필요시 그대로 유지)
-        function syncToAdEnd() {
-            // 광고 기준 맞춤 등 필요하면 구현, 기본은 패스
-        }
-
+        // 필요시 레이아웃 동기화 훅
+        function syncToAdEnd() { /* no-op for now */ }
         window.addEventListener("DOMContentLoaded", syncToAdEnd);
         window.addEventListener("resize", syncToAdEnd);
-        if ("ResizeObserver" in window) {
-            // 동적 높이조정 쓰려면 여기에 추가
-        }
     </script>
-
 </body>
 
 </html>
