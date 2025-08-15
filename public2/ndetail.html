@@ -17,7 +17,7 @@
 <body class="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen">
     <main class="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto p-4">
         <!-- 1. 왼쪽: 이미지/지도/광고 -->
-        <section class="flex-1 flex flex-col gap-6">
+        <section id="leftCol" class="flex-1 flex flex-col gap-6">
             <div class="rounded-3xl bg-white shadow-xl p-6 flex flex-col items-center">
                 <div class="w-full relative">
                     <div id="sliderWrapper" class="relative w-full h-80 rounded-2xl overflow-hidden shadow">
@@ -49,7 +49,7 @@
         </section>
 
         <!-- 2. 가운데: 모든 가게 상세정보 (모든 필드 출력) -->
-        <section class="flex-[1.1] flex flex-col gap-6">
+        <section id="middleCol" class="flex-[1.1] flex flex-col gap-6">
             <div class="rounded-3xl bg-white shadow-xl p-6">
                 <h2 id="businessNameHeader" class="text-3xl font-bold text-center mb-2"></h2>
                 <div class="flex justify-center mt-2">
@@ -65,9 +65,9 @@
                 </div>
             </div>
 
-            <div class="rounded-2xl bg-blue-50 shadow p-6">
+            <div class="rounded-2xl bg-blue-50 shadow p-6 grow-card h-full flex flex-col">
                 <div class="font-semibold mb-1">서비스 내용</div>
-                <div id="serviceDetails"></div>
+                <div id="serviceDetails" class="scroll-area flex-1"></div>
             </div>
 
             <div class="rounded-2xl bg-yellow-50 shadow p-6">
@@ -80,9 +80,9 @@
                 <ul id="infoEtcList" class="list-disc pl-5"></ul>
             </div>
 
-            <div class="rounded-2xl bg-blue-50 shadow p-6">
+            <div class="rounded-2xl bg-blue-50 shadow p-6 grow-card h-full flex flex-col">
                 <div class="font-semibold mb-1">추가 설명</div>
-                <div id="additionalDesc"></div>
+                <div id="additionalDesc" class="scroll-area flex-1"></div>
             </div>
 
             <div class="rounded-2xl bg-gray-50 shadow p-6">
@@ -95,7 +95,7 @@
         </section>
 
         <!-- 3. 오른쪽: 메뉴/장바구니 -->
-        <section id="menuCartSection" class="flex-1 flex flex-col gap-6">
+        <section id="rightCol" id="menuCartSection" class="flex-1 flex flex-col gap-6">
             <div class="rounded-3xl bg-white shadow-xl p-6">
                 <div class="text-xl font-bold mb-4 text-center">메뉴</div>
                 <div id="menuList" class="flex flex-col gap-3"></div>
@@ -238,6 +238,67 @@
                 $("thumbBox").classList.toggle("hidden", !hasImg);
             }
         };
+
+        function _getGapPx(sec) {
+            const cs = getComputedStyle(sec);
+            const g = parseFloat(cs.rowGap || cs.gap || '0');
+            return isNaN(g) ? 0 : g;
+        }
+        function _sumHeights(els) {
+            return els.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+        }
+
+        /**
+         * 좌측(#leftCol) 높이를 기준으로:
+         * - 우측(#rightCol) = 같은 높이 고정 + 내부 스크롤
+         * - 가운데의 .grow-card 2개가 남는 높이를 1:1로 "고정 높이" 배분
+         *   내용이 많으면 각 카드 내부(.scroll-area)에서만 스크롤
+         */
+        function syncLockToLeft() {
+            const left = document.getElementById('leftCol');
+            const mid = document.getElementById('middleCol');
+            const right = document.getElementById('rightCol');
+            if (!left || !mid) return;
+
+            const leftH = left.getBoundingClientRect().height;
+
+            // 우측: 좌측과 동일 높이 + 내부 스크롤
+            if (right) {
+                right.style.height = `${leftH}px`;
+                right.style.maxHeight = `${leftH}px`;
+                right.style.overflow = 'auto';
+            }
+
+            // 가운데: 남는 높이를 grow-card 들에게 균등 배분
+            const kids = Array.from(mid.children);
+            const gapPx = _getGapPx(mid);
+            const gaps = Math.max(0, kids.length - 1);
+
+            const growTargets = kids.filter(el => el.classList.contains('grow-card'));
+            const staticEls = kids.filter(el => !el.classList.contains('grow-card'));
+
+            // 리셋
+            growTargets.forEach(el => { el.style.height = ''; el.style.maxHeight = ''; });
+
+            const used = _sumHeights(staticEls) + gaps * gapPx;
+            let remain = leftH - used;
+            if (remain < 0) remain = 0;
+
+            const share = growTargets.length ? (remain / growTargets.length) : 0;
+
+            growTargets.forEach(el => {
+                el.style.height = `${share}px`;
+                el.style.maxHeight = `${share}px`;
+                const sc = el.querySelector('.scroll-area');
+                if (sc) { sc.style.maxHeight = '100%'; sc.style.overflow = 'auto'; }
+            });
+        }
+
+        // 기존 syncToAdEnd 교체
+        function syncToAdEnd() {
+            // 이미지/지도/데이터 반영 후 레이아웃 잠금
+            syncLockToLeft();
+        }
 
         // ========== 장바구니 ==========
         const cart = [];
