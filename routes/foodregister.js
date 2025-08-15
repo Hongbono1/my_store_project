@@ -7,6 +7,7 @@ import {
   createFoodStore,
   getFoodStoreById,
   getFoodRegisterFull,
+  updateFoodStore, 
 } from "../controllers/foodregisterController.js";
 
 const router = Router();
@@ -37,6 +38,8 @@ const upload = multer({
  * 공통: :id 파라미터 가드
  * - bigint 변환 오류(22P02) 예방
  * ----------------------------------------------------- */
+
+router.put("/:id", upload.array("storeImages", 10), updateFoodStore);
 router.param("id", (req, res, next, id) => {
   const n = Number.parseInt(id, 10);
   if (!Number.isSafeInteger(n)) {

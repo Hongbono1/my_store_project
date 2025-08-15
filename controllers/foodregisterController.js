@@ -26,7 +26,7 @@ export async function createFoodStore(req, res) {
       return res.status(400).json({ ok: false, error: "businessName, roadAddress는 필수" });
     }
 
-    // 확장 필드들 (폼 name과 1:1)
+    // 확장 필드들
     const businessType     = (req.body.businessType     || "").trim();
     const businessCategory = (req.body.businessCategory || "").trim();
     const businessHours    = (req.body.businessHours    || "").trim();
@@ -67,9 +67,7 @@ export async function createFoodStore(req, res) {
     ]);
     const storeId = rows[0].id;
 
-    // 2) 이미지 저장 (multer.diskStorage 기준)
-    //   라우터가 upload.array("storeImages", 10) 이면 req.files가 배열임
-    //   any()를 쓴 경우도 대비해서 둘 다 처리
+    // 2) 이미지 저장
     const files = Array.isArray(req.files) ? req.files : (req.files?.storeImages || []);
     if (files && files.length) {
       const urls = files
@@ -85,7 +83,7 @@ export async function createFoodStore(req, res) {
       }
     }
 
-    // 3) 메뉴 저장 (FormData 평탄화: storeMenus[i][j][category|name|price])
+    // 3) 메뉴 저장
     const menuBuckets = {};
     for (const [k, v] of Object.entries(req.body)) {
       const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price)\]$/);
@@ -112,7 +110,7 @@ export async function createFoodStore(req, res) {
       );
     }
 
-    // 4) 이벤트 저장 (event1, event2 … 같은 단건 필드들 수집)
+    // 4) 이벤트 저장
     const events = Object.entries(req.body)
       .filter(([k]) => /^event\d+$/.test(k))
       .map(([, v]) => String(v || "").trim())
@@ -128,7 +126,7 @@ export async function createFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await pool.query("ROLLBACK"); } catch {}
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
@@ -138,7 +136,6 @@ export async function createFoodStore(req, res) {
 
 /**
  * 기본 조회: /foodregister/:id
- * 응답: { ok:true, store:{...} } | 404
  */
 export async function getFoodStoreById(req, res) {
   try {
@@ -167,14 +164,14 @@ export async function getFoodStoreById(req, res) {
 
 /**
  * 풀 상세: /foodregister/:id/full
- * - ndetail.html이 기대하는 구조(store, images[], menus[], events[])로 응답
+ * - ndetail.html에서 기대하는 구조(store, images[], menus[], events[])
  */
 export async function getFoodRegisterFull(req, res) {
   try {
     const idNum = parseId(req.params.id);
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 1) 가게(road_address → address 별칭으로)
+    // 1) 가게
     const { rows: s } = await pool.query(
       `SELECT
          id,
@@ -230,5 +227,132 @@ export async function getFoodRegisterFull(req, res) {
   } catch (err) {
     console.error("[getFoodRegisterFull] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
+  }
+}
+
+/**
+ * 수정: PUT /foodregister/:id
+ * - 보낸 필드만 업데이트(빈 문자열은 NULL)
+ * - event1..n 오면 이벤트 전량 교체
+ * - storeImages 오면 이미지 추가
+ * - storeMenus[*] 오면 메뉴 전량 교체
+ */
+export async function updateFoodStore(req, res) {
+  const client = await pool.connect();
+  try {
+    const idNum = parseId(req.params.id);
+    if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    // 요청값 정리(보낸 것만 반영)
+    const raw = req.body;
+    const mapBool = v =>
+      v === true || v === "true" ? true
+      : v === false || v === "false" ? false
+      : null;
+
+    const candidate = {
+      business_name: raw.businessName?.trim(),
+      road_address: raw.roadAddress?.trim(),
+      phone: raw.phone?.trim(),
+      business_type: raw.businessType?.trim(),
+      business_category: raw.businessCategory?.trim(),
+      business_hours: raw.businessHours?.trim(),
+      delivery_option: raw.deliveryOption?.trim(),
+      service_details: raw.serviceDetails?.trim(),
+      additional_desc: raw.additionalDesc?.trim(),
+      homepage: raw.homepage?.trim(),
+      instagram: raw.instagram?.trim(),
+      facebook: raw.facebook?.trim(),
+      facilities: raw.facilities?.trim(),
+      pets_allowed: raw.petsAllowed !== undefined ? mapBool(raw.petsAllowed) : undefined,
+      parking: raw.parking?.trim(),
+    };
+
+    const set = [];
+    const params = [];
+    Object.entries(candidate).forEach(([col, val]) => {
+      if (val !== undefined) {                // undefined면 업데이트 안 함
+        set.push(`${col} = $${set.length + 1}`);
+        params.push(val === "" ? null : val); // 빈문자면 NULL
+      }
+    });
+
+    await client.query("BEGIN");
+
+    if (set.length) {
+      params.push(idNum);
+      await client.query(
+        `UPDATE food_stores SET ${set.join(", ")} WHERE id = $${params.length}`,
+        params
+      );
+    }
+
+    // 이벤트 갱신
+    const events = Object.entries(raw)
+      .filter(([k]) => /^event\d+$/.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
+
+    if (events.length) {
+      await client.query(`DELETE FROM store_events WHERE store_id=$1`, [idNum]);
+      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+      await client.query(
+        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
+        [idNum, ...events]
+      );
+    }
+
+    // 새 이미지 추가(기존 유지)
+    const files = Array.isArray(req.files) ? req.files : (req.files?.storeImages || []);
+    if (files && files.length) {
+      const urls = files
+        .map(f => (f.path ? `/uploads/${path.basename(f.path)}`
+          : f.filename ? `/uploads/${f.filename}` : null))
+        .filter(Boolean);
+      if (urls.length) {
+        const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
+        await client.query(
+          `INSERT INTO store_images (store_id, url) VALUES ${values}`,
+          [idNum, ...urls]
+        );
+      }
+    }
+
+    // 메뉴 전량 교체(보내온 경우에만)
+    const menuBuckets = {};
+    let hasMenu = false;
+    for (const [k, v] of Object.entries(raw)) {
+      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price)\]$/);
+      if (!m) continue;
+      hasMenu = true;
+      const [, ci, mi, key] = m;
+      const idx = `${ci}:${mi}`;
+      menuBuckets[idx] ??= { category: null, name: "", price: 0 };
+      if (key === "price") menuBuckets[idx].price = parseInt(String(v).replace(/[^\d]/g, ""), 10) || 0;
+      if (key === "name") menuBuckets[idx].name = String(v).trim();
+      if (key === "category") menuBuckets[idx].category = String(v).trim() || null;
+    }
+    if (hasMenu) {
+      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
+      const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
+      if (menus.length) {
+        const vals = menus.map((_, i) => `($1,$${i * 3 + 2},$${i * 3 + 3},$${i * 3 + 4})`).join(",");
+        const p = [idNum];
+        menus.forEach(m => { p.push(m.name, m.price, m.category); });
+        await client.query(
+          `INSERT INTO menu_items (store_id, name, price, category) VALUES ${vals}`,
+          p
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    return res.json({ ok: true, id: idNum });
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch {}
+    console.error("[updateFoodStore] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  } finally {
+    client.release();
   }
 }
