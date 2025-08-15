@@ -605,633 +605,476 @@
 
     <!-- SCRIPT -->
     <script>
-        (() => {
-            'use strict';
+        /* =========================================================
+           기본 상수 / 상태
+        ========================================================= */
+        const API = {
+            REGISTER: "/foodregister",         // POST: 등록 → { ok:true, id }
+            VERIFY_BIZ: "/verify-biz"          // POST: {b_no:["0000000000"]} → (있으면 사용, 없으면 안전하게 실패 처리)
+        };
 
-            /* ===========================
-             * 유틸(전역에서 호출되는 것들은 window에 노출)
-             * =========================== */
-            function escapeHtml(str) {
-                return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+        const state = {
+            categories: [],              // [{ name, items:[{name, price}] }]
+            selectedCategory: null,      // 현재 선택된 카테고리명
+            map: null,
+            mapMarker: null,
+            mapGeocoder: null
+        };
+
+        /* =========================================================
+           유틸
+        ========================================================= */
+        const qs = (sel, el = document) => el.querySelector(sel);
+        const qsa = (sel, el = document) => Array.from(el.querySelectorAll(sel));
+
+        function toast(msg) {
+            // 간단 안내
+            console.log(msg);
+        }
+
+        function onlyDigits(str) {
+            return (str || "").replace(/[^\d]/g, "");
+        }
+
+        function formatPriceView(v) {
+            if (!v) return "";
+            const digits = onlyDigits(v);
+            return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        /* =========================================================
+           헤더/푸터 포함
+        ========================================================= */
+        async function includePartials() {
+            try {
+                const header = await fetch("/components/header.html").then(r => r.ok ? r.text() : "");
+                const footer = await fetch("/components/footer.html").then(r => r.ok ? r.text() : "");
+                qs("#header-placeholder").innerHTML = header || "";
+                qs("#footer-placeholder").innerHTML = footer || "";
+            } catch {
+                // 조용히 패스
             }
-            function cryptoRandom() {
-                if (window.crypto?.getRandomValues) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36); }
-                return Math.random().toString(36).slice(2);
+        }
+
+        /* =========================================================
+           사업자번호 인증 (있으면 사용, 없으면 안내)
+        ========================================================= */
+        async function verifyBiz() {
+            const b1 = onlyDigits(qs("#biz1").value);
+            const b2 = onlyDigits(qs("#biz2").value);
+            const b3 = onlyDigits(qs("#biz3").value);
+            const full = b1 + b2 + b3;
+
+            const out = qs("#bizVerifyResult");
+            out.textContent = "";
+            if (b1.length !== 3 || b2.length !== 2 || b3.length !== 5) {
+                out.textContent = "사업자번호 형식이 올바르지 않습니다.";
+                out.className = "text-sm text-red-600 text-center";
+                return;
             }
-            function safeId(name) {
-                let h = 0; for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
-                return 'cat_' + h.toString(36);
-            }
-            window.formatCurrency = function formatCurrency(inp) {
-                let v = (inp.value || '').replace(/[^0-9]/g, '');
-                inp.value = v ? v.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
-            };
 
-            /* ===========================
-             * 헤더/푸터 로드
-             * =========================== */
-
-            fetch("/components/header.html")
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById("header-placeholder").innerHTML = html;
+            try {
+                const res = await fetch(API.VERIFY_BIZ, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ b_no: [full] })
                 });
+                if (!res.ok) throw new Error("응답 오류");
+                const data = await res.json();
 
-            // 푸터 로드
-            fetch("/components/footer.html")
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById("footer-placeholder").innerHTML = html;
-                });
-
-            /* ===========================
-             * 이메일 조합
-             * =========================== */
-            window.updateEmail = function updateEmail() {
-                const id = document.getElementById('emailId')?.value.trim() || '';
-                const sel = document.getElementById('emailDomainSelect');
-                const custom = document.getElementById('customDomainInput')?.value.trim() || '';
-                const domain = sel?.value === 'custom' ? custom : sel?.value || '';
-                const out = document.getElementById('ownerEmail');
-                if (out) out.value = domain ? `${id}@${domain}` : '';
-            };
-            window.handleDomainChange = function handleDomainChange(sel) {
-                const customInp = document.getElementById('customDomainInput');
-                if (!customInp) return;
-                if (sel.value === 'custom') { customInp.classList.remove('hidden'); customInp.focus(); }
-                else { customInp.classList.add('hidden'); window.updateEmail(); }
-            };
-
-            /* ===========================
-             * 입력 하이라이트
-             * =========================== */
-            document.addEventListener('DOMContentLoaded', () => {
-                const inputs = document.querySelectorAll("input[type='text'], input[type='email'], input[type='date'], input[type='tel'], select, textarea");
-                inputs.forEach((input) => {
-                    const apply = () => input.classList.toggle('bg-blue-50/40', !!input.value.trim());
-                    input.addEventListener('input', apply);
-                    apply();
-                });
-            });
-
-            /* ===========================
-             * 이미지 미리보기 (최대 3)
-             * =========================== */
-            document.addEventListener('DOMContentLoaded', () => {
-                const imagesInput = document.getElementById('imagesInput');   // name="storeImages" 인풋
-                const imagesPreview = document.getElementById('imagesPreview');
-                if (imagesInput && imagesPreview) {
-                    imagesInput.addEventListener('change', () => {
-                        imagesPreview.innerHTML = '';
-                        Array.from(imagesInput.files).slice(0, 3).forEach((file) => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                                const img = document.createElement('img');
-                                img.src = e.target.result;
-                                img.className = 'w-32 h-20 object-cover border border-blue-100 rounded-xl neo-section';
-                                imagesPreview.appendChild(img);
-                            };
-                            reader.readAsDataURL(file);
-                        });
-                    });
+                // 서버 구현에 따라 구조 다를 수 있음 → 보수적 처리
+                const ok = data?.status_code === "OK" || data?.ok === true;
+                if (ok) {
+                    out.textContent = "사업자번호 인증 요청 성공 (상세 상태는 서버 응답 기준)";
+                    out.className = "text-sm text-green-700 text-center";
+                } else {
+                    out.textContent = "인증 실패 또는 상태 확인 불가 (서버 응답 포맷 확인 필요)";
+                    out.className = "text-sm text-red-600 text-center";
                 }
+            } catch {
+                out.textContent = "인증 API 미연동 또는 응답 실패 (나중에 연동)";
+                out.className = "text-sm text-orange-600 text-center";
+            }
+        }
+
+        /* =========================================================
+           이메일 도메인 처리
+        ========================================================= */
+        function updateEmail() {
+            const idPart = qs("#emailId").value.trim();
+            const sel = qs("#emailDomainSelect").value;
+            const custom = qs("#customDomainInput");
+            const dom = sel === "custom" ? custom.value.trim() : sel;
+            const full = idPart && dom ? `${idPart}@${dom}` : "";
+            qs("#ownerEmail").value = full;
+        }
+
+        function handleDomainChange(el) {
+            const custom = qs("#customDomainInput");
+            if (el.value === "custom") {
+                custom.classList.remove("hidden");
+                custom.focus();
+            } else {
+                custom.classList.add("hidden");
+                custom.value = "";
+            }
+            updateEmail();
+        }
+
+        /* =========================================================
+           카테고리 / 메뉴 입력
+        ========================================================= */
+        function addCategory() {
+            const inp = qs("#categoryInput");
+            const name = inp.value.trim();
+            if (!name) return;
+
+            if (state.categories.some(c => c.name === name)) {
+                toast("이미 존재하는 카테고리입니다.");
+                return;
+            }
+
+            state.categories.push({ name, items: [] });
+            inp.value = "";
+            renderCategoryChips();
+            selectCategory(name);
+            renderMenuContainer();
+        }
+
+        function selectCategory(name) {
+            state.selectedCategory = name;
+            qsa("#categoryChips .chip").forEach(chip => {
+                chip.classList.remove("neo-chip-selected");
+                if (chip.dataset.name === name) chip.classList.add("neo-chip-selected");
             });
+        }
 
-            /* ===========================
-             * Kakao 지도
-             * =========================== */
-            let map, marker;
-            window.kakaoReady = false;
-            if (window.kakao?.maps?.load) {
-                kakao.maps.load(() => { window.kakaoReady = true; });
-            }
-
-            function updateMap(addr, detail = '') {
-                if (!window.kakaoReady) return;
-                const geocoder = new kakao.maps.services.Geocoder();
-                if (!map) {
-                    map = new kakao.maps.Map(document.getElementById('map'), {
-                        center: new kakao.maps.LatLng(37.5665, 126.978), level: 3
-                    });
-                }
-                geocoder.addressSearch(addr, (res, status) => {
-                    if (status !== kakao.maps.services.Status.OK) return;
-                    const coords = new kakao.maps.LatLng(res[0].y, res[0].x);
-                    map.setCenter(coords);
-                    marker ? marker.setPosition(coords) : marker = new kakao.maps.Marker({ map, position: coords });
-                    if (detail) {
-                        new kakao.maps.InfoWindow({ content: `<div style="padding:6px 8px">${addr}<br>${detail}</div>` }).open(map, marker);
-                    }
-                });
-            }
-            window.openDaumPostcode = function openDaumPostcode() {
-                new daum.Postcode({
-                    oncomplete: (data) => {
-                        const pc = document.getElementById('postalCode');
-                        const ra = document.getElementById('roadAddress');
-                        const da = document.getElementById('detailAddress');
-                        if (pc) pc.value = data.zonecode;
-                        if (ra) ra.value = data.roadAddress;
-                        updateMap(data.roadAddress);
-                        da?.focus();
-                    }
-                }).open({
-                    autoClose: true, usePopup: true,
-                    left: Math.ceil((window.screen.width - 500) / 2),
-                    top: Math.ceil((window.screen.height - 600) / 2)
-                });
-            };
-            window.clearAddress = function clearAddress() {
-                ['postalCode', 'roadAddress', 'detailAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-            };
-            document.addEventListener('DOMContentLoaded', () => {
-                const detailEl = document.getElementById('detailAddress');
-                const roadEl = document.getElementById('roadAddress');
-                if (detailEl && roadEl) {
-                    const applyDetail = () => updateMap(`${roadEl.value.trim()} ${detailEl.value.trim()}`.trim(), detailEl.value.trim());
-                    detailEl.addEventListener('keydown', e => { if (e.key === 'Enter') applyDetail(); });
-                    detailEl.addEventListener('blur', applyDetail);
-                    detailEl.addEventListener('blur', () => {
-                        const base = roadEl.value.trim();
-                        const detail = detailEl.value.trim();
-                        if (base || detail) updateMap(`${base} ${detail}`.trim());
-                    });
-                }
+        function renderCategoryChips() {
+            const wrap = qs("#categoryChips");
+            wrap.innerHTML = "";
+            state.categories.forEach(cat => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "chip neo-tag px-3 py-1";
+                b.dataset.name = cat.name;
+                b.textContent = cat.name;
+                b.onclick = () => { selectCategory(cat.name); renderMenuContainer(); };
+                wrap.appendChild(b);
             });
+        }
 
-            /* ===========================
-             * 카테고리/서브카테고리 드롭다운
-             * =========================== */
-            document.addEventListener('DOMContentLoaded', () => {
-                const toggleSets = [
-                    { toggleId: 'categoryToggle', listId: 'categoryList', displayId: 'businessCategoryDisplay', inputId: 'businessCategory' },
-                    { toggleId: 'subcategoryToggle', listId: 'subcategoryList', displayId: 'subcategoryDisplay', inputId: 'businessSubcategory' },
-                ];
-                toggleSets.forEach(({ toggleId, listId, displayId, inputId }) => {
-                    const toggleBtn = document.getElementById(toggleId);
-                    const list = document.getElementById(listId);
-                    const display = document.getElementById(displayId);
-                    const hiddenInp = document.getElementById(inputId);
+        function renderMenuContainer() {
+            const container = qs("#menuContainer");
+            container.innerHTML = "";
+            state.categories.forEach(cat => {
+                const sec = document.createElement("div");
+                sec.className = "neo-section p-4";
+                const title = document.createElement("h5");
+                title.className = "font-semibold text-blue-900 mb-3";
+                title.textContent = `카테고리: ${cat.name} (품목 ${cat.items.length}개)`;
+                sec.appendChild(title);
 
-                    toggleBtn?.addEventListener('click', () => list?.classList.toggle('hidden'));
-                    display?.addEventListener('click', () => list?.classList.toggle('hidden'));
+                const list = document.createElement("div");
+                list.className = "space-y-3";
+                cat.items.forEach((item, idx) => {
+                    const row = document.createElement("div");
+                    row.className = "grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-2 items-center";
+                    row.innerHTML = `
+        <input class="neo-input px-3 py-2" placeholder="품목명" value="${item.name}">
+        <input class="neo-input px-3 py-2" placeholder="가격" value="${formatPriceView(item.price)}">
+        <button type="button" class="neo-btn px-3 py-2">삭제</button>
+      `;
+                    const [nameEl, priceEl, delBtn] = row.children;
 
-                    list?.querySelectorAll('li').forEach(li => {
-                        li.addEventListener('click', () => {
-                            if (display) display.value = li.textContent.trim();
-                            if (hiddenInp) hiddenInp.value = li.dataset.value || '';
-                            list.classList.add('hidden');
-
-                            if (inputId === 'businessCategory') {
-                                const subDisp = document.getElementById('subcategoryDisplay');
-                                const subRow = subDisp?.closest('div.relative');
-                                if (li.dataset.value === '한식') { subRow?.classList.remove('hidden'); }
-                                else {
-                                    subRow?.classList.add('hidden');
-                                    if (subDisp) subDisp.value = '';
-                                    const subHidden = document.getElementById('businessSubcategory');
-                                    if (subHidden) subHidden.value = '';
-                                }
-                            }
-                        });
+                    nameEl.addEventListener("input", e => { cat.items[idx].name = e.target.value; });
+                    priceEl.addEventListener("input", e => { e.target.value = formatPriceView(e.target.value); cat.items[idx].price = onlyDigits(e.target.value); });
+                    delBtn.addEventListener("click", () => {
+                        cat.items.splice(idx, 1);
+                        renderMenuContainer();
                     });
 
-                    document.addEventListener('click', (e) => {
-                        if (list && !list.contains(e.target) && e.target !== toggleBtn && e.target !== display) {
-                            list.classList.add('hidden');
-                        }
-                    });
+                    list.appendChild(row);
                 });
+
+                sec.appendChild(list);
+                container.appendChild(sec);
             });
+        }
 
-            /* ===========================
-             * 도움말 툴팁
-             * =========================== */
-            window.toggleTip = function toggleTip(e) {
-                const tip = document.getElementById('tipBox');
-                if (!tip) return;
-                tip.style.left = (e.clientX + 10) + 'px';
-                tip.style.top = (e.clientY + 10) + 'px';
-                tip.classList.toggle('hidden');
-            };
-            document.addEventListener('click', (e) => {
-                const tip = document.getElementById('tipBox');
-                const btn = document.getElementById('helpBtn');
-                if (tip && btn && !tip.contains(e.target) && !btn.contains(e.target)) tip.classList.add('hidden');
+        function addMenuItem() {
+            const name = state.selectedCategory;
+            if (!name) {
+                alert("먼저 카테고리를 선택하세요.");
+                return;
+            }
+            const cat = state.categories.find(c => c.name === name);
+            if (!cat) return;
+            if (cat.items.length >= 50) return alert("카테고리별 최대 50개까지 가능합니다.");
+            cat.items.push({ name: "", price: "" });
+            renderMenuContainer();
+        }
+
+        /* =========================================================
+           카테고리/서브카테고리 드롭다운 (간단 토글/선택)
+        ========================================================= */
+        function initCategoryDropdowns() {
+            const display = qs("#businessCategoryDisplay");
+            const list = qs("#categoryList");
+            const hidden = qs("#businessCategory");
+            const btn = qs("#categoryToggle");
+
+            btn.addEventListener("click", () => {
+                list.classList.toggle("hidden");
             });
-
-            /* ===========================
-             * 메뉴/카테고리
-             * =========================== */
-            const categories = new Map(); // key(lower)->{count,label}
-            let selectedCategory = null;
-            const MAX_PER_CAT = 50;
-
-            function updateCount(categoryName) {
-                const id = safeId(categoryName);
-                const el = document.querySelector(`[data-count="${id}"]`);
-                const st = categories.get(categoryName.toLowerCase());
-                if (el && st) el.textContent = st.count;
-            }
-            function createCategoryChip(name) {
-                const chips = document.getElementById('categoryChips');
-                if (!chips) return;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'neo-tag px-3 py-1 text-sm hover:bg-white transition';
-                btn.textContent = name;
-                btn.dataset.category = name;
-                btn.addEventListener('click', () => selectCategory(name));
-                chips.appendChild(btn);
-            }
-            function createCategoryBlock(name) {
-                const wrapper = document.getElementById('menuContainer');
-                if (!wrapper) return;
-                const id = safeId(name);
-                const block = document.createElement('div');
-                block.className = 'neo-section p-4';
-                block.dataset.catBlock = name;
-                block.id = `${id}_block`;
-                block.innerHTML = `
-      <div class="flex items-center justify-between pb-3 border-b border-blue-50">
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold">${escapeHtml(name).charAt(0)}</span>
-          <h5 class="text-blue-900 font-bold text-lg">${escapeHtml(name)}</h5>
-          <span class="text-sm hint ml-2">(<span data-count="${id}">0</span>/50)</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="button" class="neo-btn px-3 py-2" data-cat="${escapeHtml(name)}" onclick="addMenuRow(this.dataset.cat)">품목 추가</button>
-          <button type="button" class="neo-btn neo-danger px-3 py-2" onclick="removeCategoryBlock('${escapeHtml(name)}')">카테고리 삭제</button>
-        </div>
-      </div>
-      <div id="${id}_list" class="pt-4 space-y-3"></div>
-      <div class="pt-4">
-        <button type="button" class="neo-btn w-full sm:w-auto px-4 py-2" data-cat="${escapeHtml(name)}" onclick="addMenuRow(this.dataset.cat)">＋ 품목 추가</button>
-      </div>
-    `;
-                wrapper.appendChild(block);
-            }
-            function selectCategory(name) {
-                selectedCategory = name;
-                document.querySelectorAll('#categoryChips button').forEach(b => {
-                    b.classList.toggle('neo-chip-selected', b.dataset.category === name);
-                });
-                document.querySelectorAll('[data-cat-block]').forEach(b => {
-                    b.classList.toggle('outline', b.dataset.catBlock === name);
-                    b.classList.toggle('outline-2', b.dataset.catBlock === name);
-                    b.classList.toggle('outline-blue-200', b.dataset.catBlock === name);
-                });
-                const fab = document.getElementById('fabAddItem');
-                if (fab) {
-                    if (name) { fab.classList.remove('hidden'); fab.dataset.cat = name; }
-                    else { fab.classList.add('hidden'); fab.dataset.cat = ''; }
-                }
-            }
-            window.addCategory = function addCategory() {
-                const input = document.getElementById('categoryInput');
-                const name = (input?.value || '').trim();
-                if (!name) return alert('카테고리명을 입력하세요.');
-                const key = name.toLowerCase();
-                if (categories.has(key)) return alert('이미 존재하는 카테고리입니다.');
-                categories.set(key, { count: 0, label: name });
-                createCategoryChip(name);
-                createCategoryBlock(name);
-                selectCategory(name);
-                if (input) input.value = '';
-                const id = safeId(name);
-                document.getElementById(`${id}_block`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                addMenuRow(name);
-            };
-            function addMenuRow(categoryName) {
-                const st = categories.get(categoryName.toLowerCase());
-                if (!st) return;
-                if (st.count >= MAX_PER_CAT) return alert('이 카테고리는 최대 50개까지 입력할 수 있습니다.');
-                st.count += 1; updateCount(categoryName);
-
-                const idBase = safeId(categoryName);
-                const list = document.getElementById(`${idBase}_list`);
-                if (!list) return;
-
-                const row = document.createElement('div');
-                row.className = 'neo-section p-3';
-                row.dataset.category = categoryName;
-
-                const rowId = cryptoRandom();
-                row.innerHTML = `
-        <input type="hidden" name="menuCategory[]" value="${escapeHtml(categoryName)}">
-      <div class="grid grid-cols-12 gap-2 items-center">
-        <div class="col-span-12 md:col-span-4">
-          <input type="file" name="menuImage[]" accept="image/*" class="neo-input w-full px-3 py-2">
-        </div>
-        <div class="col-span-12 md:col-span-3">
-          <input type="text" name="menuName[]" placeholder="메뉴명" class="neo-input w-full h-12 px-4" required>
-        </div>
-        <div class="col-span-9 md:col-span-3 flex items-center gap-2">
-          <input type="text" name="menuPrice[]" placeholder="가격" class="neo-input w-full h-12 px-4 text-right" id="price_${rowId}" oninput="formatCurrency(this)">
-          <span class="hint">원</span>
-        </div>
-        <div class="col-span-3 md:col-span-2 flex justify-end">
-          <button type="button" class="neo-btn px-3 py-2 neo-danger" onclick="removeMenuRow(this, '${escapeHtml(categoryName)}')">삭제</button>
-        </div>
-        <div class="col-span-12">
-          <input type="text" name="menuDesc[]" placeholder="메뉴 설명을 입력하세요" class="neo-input w-full px-3 py-2">
-        </div>
-      </div>
-    `;
-                list.appendChild(row);
-
-                const nameInput = row.querySelector("input[name='menuName[]']");
-                const priceInput = row.querySelector("input[name='menuPrice[]']");
-                const updateBG = () => {
-                    row.classList.toggle('bg-blue-50/40', !!nameInput.value.trim() && !!priceInput.value.trim());
-                };
-                nameInput.addEventListener('input', updateBG);
-                priceInput.addEventListener('input', updateBG);
-                updateBG();
-                return row;
-            }
-            function removeMenuRow(btn, categoryName) {
-                const row = btn.closest('[data-category]');
-                if (!row) return;
-                row.remove();
-                const key = categoryName.toLowerCase();
-                const st = categories.get(key);
-                if (st) { st.count = Math.max(0, st.count - 1); updateCount(categoryName); }
-            }
-            function removeCategoryBlock(name) {
-                if (!confirm(`"${name}" 카테고리를 삭제할까요? (해당 카테고리의 품목도 모두 삭제됩니다)`)) return;
-                document.querySelectorAll('[data-cat-block]').forEach(b => { if (b.dataset.catBlock === name) b.remove(); });
-                document.querySelectorAll('#categoryChips button').forEach(b => { if (b.dataset.category === name) b.remove(); });
-                categories.delete(name.toLowerCase());
-                if (selectedCategory === name) selectedCategory = null;
-            }
-            window.addMenuRow = addMenuRow;
-            window.removeMenuRow = removeMenuRow;
-            window.removeCategoryBlock = removeCategoryBlock;
-
-            document.addEventListener('DOMContentLoaded', () => {
-                const fabBtn = document.getElementById('fabAddItem');
-                if (fabBtn) {
-                    fabBtn.addEventListener('click', () => {
-                        const cat = fabBtn.dataset.cat;
-                        if (!cat) return;
-                        const row = addMenuRow(cat);
-                        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    });
-                }
-                document.addEventListener('keydown', (e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && selectedCategory) {
-                        e.preventDefault();
-                        const row = addMenuRow(selectedCategory);
-                        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            list.querySelectorAll("li").forEach(li => {
+                li.addEventListener("click", () => {
+                    hidden.value = li.dataset.value;
+                    display.value = li.dataset.value;
+                    list.classList.add("hidden");
+                    // 한식 선택 시 서브카테고리 보이게 (단순 예)
+                    const subWrap = display.closest("section").querySelectorAll(".relative.hidden")[0];
+                    if (li.dataset.value === "한식") {
+                        subWrap?.classList.remove("hidden");
+                    } else {
+                        subWrap?.classList.add("hidden");
                     }
                 });
             });
 
-            /* ===========================
-             * 휴대전화 인증(테스트)
-             * =========================== */
-            document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('verifyPhoneButton');
-                const phoneInp = document.getElementById('ownerPhone');
-                const resEl = document.getElementById('phoneVerifyResult');
-                const codeInp = document.getElementById('phoneAuth');
-                if (btn && phoneInp && resEl) {
-                    btn.addEventListener('click', () => {
-                        const phone = phoneInp.value.trim();
-                        if (!phone) { resEl.textContent = '핸드폰 번호를 입력해주세요.'; resEl.className = 'text-sm text-red-600 text-center'; return; }
-                        resEl.textContent = '인증번호가 발송되었습니다. (테스트 코드: 123456)';
-                        resEl.className = 'text-sm text-green-600 text-center';
+            // 서브카테고리 (한식용)
+            const subDisplay = qs("#subcategoryDisplay");
+            const subList = qs("#subcategoryList");
+            const subHidden = qs("#businessSubcategory");
+            const subBtn = qs("#subcategoryToggle");
+            if (subBtn) {
+                subBtn.addEventListener("click", () => subList.classList.toggle("hidden"));
+                subList?.querySelectorAll("li").forEach(li => {
+                    li.addEventListener("click", () => {
+                        subHidden.value = li.dataset.value;
+                        subDisplay.value = li.dataset.value;
+                        subList.classList.add("hidden");
                     });
-                }
-                if (codeInp && resEl) {
-                    codeInp.addEventListener('blur', function () {
-                        const code = this.value.trim();
-                        if (code === '123456') { resEl.textContent = '휴대전화 인증 성공.'; resEl.className = 'text-sm text-green-600 text-center'; }
-                        else { resEl.textContent = '인증번호가 일치하지 않습니다.'; resEl.className = 'text-sm text-red-600 text-center'; }
-                    });
-                }
-            });
-
-            /* ===========================
-             * 사업자번호 인증 (/verify-biz)
-             * =========================== */
-            async function verifyBizNumber() {
-                const onlyNum = id => (document.getElementById(id)?.value || '').replace(/\D/g, '');
-                const biz = onlyNum('biz1') + onlyNum('biz2') + onlyNum('biz3');
-                const resEl = document.getElementById('bizVerifyResult');
-                const nameEl = document.getElementById('businessName');
-
-                if (!resEl) return;
-                if (biz.length !== 10) {
-                    resEl.textContent = '올바른 사업자번호(10자리)를 입력하세요.';
-                    resEl.className = 'text-sm text-red-600 text-center';
-                    return;
-                }
-
-                try {
-                    const r = await fetch('/verify-biz', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ b_no: [biz] })
-                    });
-                    const raw = await r.text();
-                    let d; try { d = JSON.parse(raw); } catch {
-                        resEl.innerHTML = '서버가 JSON이 아닌 응답을 보냈습니다.<br><small>' + (raw?.slice(0, 200) || '빈 응답') + '</small>';
-                        resEl.className = 'text-sm text-red-600 text-center';
-                        return;
-                    }
-                    const rec = Array.isArray(d?.data) ? d.data[0] : (d?.result || d || {});
-                    if (!rec || Object.keys(rec).length === 0) {
-                        resEl.textContent = '응답은 왔지만 data가 비어있습니다.';
-                        resEl.className = 'text-sm text-red-600 text-center';
-                        return;
-                    }
-                    const codeRaw = (rec.b_stt_cd ?? rec.status ?? rec.status_code ?? rec.bStatusCd ?? '').toString().trim();
-                    const textRaw = (rec.b_stt ?? rec.status_msg ?? rec.bStatus ?? rec.tax_type ?? '').toString().trim();
-                    const codeNum = codeRaw.replace(/\D/g, '').replace(/^0+/, '');
-                    let flag = '';
-                    if (codeNum === '1' || /계속|영업|정상|등록/.test(textRaw)) flag = 'active';
-                    else if (codeNum === '2' || /휴업/.test(textRaw)) flag = 'stop';
-                    else if (codeNum === '3' || /폐업|말소/.test(textRaw)) flag = 'closed';
-                    let label = flag === 'active' ? '계속사업자(영업 중)' : flag === 'stop' ? '휴업자' : flag === 'closed' ? '폐업자' : '미확인';
-
-                    resEl.innerHTML = `조회 결과: <b>${label}</b> <small>(code: ${codeRaw || '-'}, text: ${textRaw || '-'})</small>`;
-                    resEl.className = 'text-sm text-center ' + (flag === 'active' ? 'text-green-600' : 'text-red-600');
-                    if (flag === 'active' && rec?.b_nm && nameEl) nameEl.value = rec.b_nm;
-                } catch (err) {
-                    console.error(err);
-                    resEl.textContent = '서버 오류로 인증 실패';
-                    resEl.className = 'text-sm text-red-600 text-center';
-                }
-            }
-            window.verifyBizNumber = verifyBizNumber;
-            document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('btnVerifyBiz');
-                btn?.addEventListener('click', verifyBizNumber);
-            });
-
-            /* ===========================
-             * 폼 제출 (/store) 및 수정 (/store/:id)
-             * =========================== */
-            document.addEventListener('DOMContentLoaded', () => {
-                const form = document.getElementById('storeForm');
-                if (!form) return;
-
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    try {
-                        const businessTypeEl = form.querySelector('[name="businessType"]');
-                        const businessType = (businessTypeEl?.value || '').trim();
-                        if (!businessType) { alert('업종(구분)을 입력해주세요.'); return; }
-
-                        const fd = new FormData(form);
-
-                        // 사업자번호 합치기
-                        const b1 = (document.getElementById('biz1')?.value || '').replace(/\D/g, '');
-                        const b2 = (document.getElementById('biz2')?.value || '').replace(/\D/g, '');
-                        const b3 = (document.getElementById('biz3')?.value || '').replace(/\D/g, '');
-                        const biz = `${b1}${b2}${b3}`;
-                        if (biz) { fd.delete('bizNumber'); fd.append('bizNumber', biz); }
-
-                        // 가격 콤마 제거
-                        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
-                        if (priceInputs.length) {
-                            fd.delete('menuPrice[]');
-                            priceInputs.forEach(i => {
-                                const cleaned = (i.value || '').replace(/,/g, '').trim();
-                                if (cleaned !== '') fd.append('menuPrice[]', cleaned);
-                            });
-                        }
-
-                        // 이메일 확정
-                        const email = document.getElementById('ownerEmail')?.value || '';
-                        fd.set('ownerEmail', email);
-
-                        // 주소 합치기
-                        const road = (document.getElementById('roadAddress')?.value || '').trim();
-                        const detail = (document.getElementById('detailAddress')?.value || '').trim();
-                        const address = [road, detail].filter(Boolean).join(' ');
-                        if (address) fd.set('address', address);
-
-                        // 이벤트 합치기
-                        const ev1 = (document.getElementById('event1')?.value || '').trim();
-                        const ev2 = (document.getElementById('event2')?.value || '').trim();
-                        const events = [ev1, ev2].filter(Boolean).join('\n');
-                        if (events) fd.set('events', events);
-
-                        // ★ (선택) 홈페이지 name이 아직 website이면 homepage로 매핑
-                        const rawWebsite = form.querySelector('[name="website"]')?.value?.trim();
-                        if (rawWebsite) { fd.set('homepage', rawWebsite); }
-
-                        // ★ 기타 정보 → infoEtc 로 합치기
-                        const facilities = form.querySelector('[name="facilities"]')?.value.trim() || '';
-                        const petsRaw = form.querySelector('[name="petsAllowed"]')?.value || '';
-                        const parking = form.querySelector('[name="parking"]')?.value.trim() || '';
-
-                        const pets = petsRaw === 'true' ? '가능'
-                            : petsRaw === 'false' ? '불가'
-                                : (petsRaw || '');
-
-                        const infoParts = [];
-                        if (facilities) infoParts.push(`장애인 편의시설: ${facilities}`);
-                        if (pets) infoParts.push(`반려동물 출입: ${pets}`);
-                        if (parking) infoParts.push(`주차 정보: ${parking}`);
-
-                        if (infoParts.length) fd.set('infoEtc', infoParts.join('\n'));
-
-                        const res = await fetch('/foodregister', { method: 'POST', body: fd });
-                        if (!res.ok) throw new Error('서버 응답 에러');
-                        const result = await res.json();
-
-                        const id = result.id ?? result.storeId;
-                        if (!id) { alert('등록은 되었으나 ID를 받지 못했습니다.'); return; }
-                        alert(`등록이 완료되었습니다.\nID: ${id}`);
-                        location.assign(`/ndetail.html?id=${encodeURIComponent(id)}`);
-                    } catch (err) {
-                        console.error(err);
-                        alert('데이터 전송 중 에러가 발생했습니다!');
-                    }
                 });
+            }
+        }
 
-                // 수정(전역 노출해 onclick="updateData()" 대응)
-                window.updateData = async function updateData() {
-                    const storeId = document.getElementById('storeId')?.value;
-                    if (!storeId) return alert('수정할 데이터가 없습니다. 먼저 등록을 진행하세요.');
-                    try {
-                        const fd = new FormData(form);
-                        const priceInputs = form.querySelectorAll('input[name="menuPrice[]"]');
-                        if (priceInputs.length) {
-                            fd.delete('menuPrice[]');
-                            priceInputs.forEach(i => fd.append('menuPrice[]', (i.value || '').replace(/,/g, '')));
-                        }
-                        const res = await fetch(`/foodregister/${storeId}`, { method: 'PUT', body: fd });
-                        if (!res.ok) throw new Error('서버 응답 에러(수정)');
-                        alert('수정이 완료되었습니다!');
-                        location.href = `ndetail.html?id=${storeId}`;
-                    } catch (err) {
-                        console.error(err);
-                        alert('데이터 수정 중 에러가 발생했습니다!');
-                    }
-                };
+        /* =========================================================
+           우편번호/카카오 지도
+        ========================================================= */
+        function openDaumPostcode() {
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    qs("#postalCode").value = data.zonecode || "";
+                    qs("#roadAddress").value = data.roadAddress || data.address || "";
+                    // 지도 업데이트
+                    updateMapByAddress(qs("#roadAddress").value);
+                }
+            }).open();
+        }
+        window.openDaumPostcode = openDaumPostcode;
+
+        function clearAddress() {
+            qs("#postalCode").value = "";
+            qs("#roadAddress").value = "";
+            qs("#detailAddress").value = "";
+            if (state.map && state.mapMarker) {
+                state.mapMarker.setMap(null);
+                state.mapMarker = null;
+            }
+        }
+        window.clearAddress = clearAddress;
+
+        function initKakaoMap() {
+            if (!window.kakao || !window.kakao.maps) return;
+            window.kakao.maps.load(function () {
+                const container = qs("#map");
+                const center = new kakao.maps.LatLng(37.5665, 126.9780); // 서울시청 근처
+                state.map = new kakao.maps.Map(container, { center, level: 5 });
+                state.mapGeocoder = new kakao.maps.services.Geocoder();
             });
+        }
 
-            function openSuccessModal(storeId) {
-                const m = document.getElementById('successModal');
-                const t = document.getElementById('successText');
-                const ok = document.getElementById('successOk');
-                if (!m || !ok) return;
+        function updateMapByAddress(addr) {
+            if (!addr || !state.mapGeocoder) return;
+            state.mapGeocoder.addressSearch(addr, function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                    state.map.setCenter(coords);
+                    if (state.mapMarker) state.mapMarker.setMap(null);
+                    state.mapMarker = new kakao.maps.Marker({ map: state.map, position: coords });
+                }
+            });
+        }
 
-                // 안내 문구 업데이트 (원하면 가게명도 넣을 수 있음)
-                if (t) t.textContent = `ID: ${storeId}`;
+        /* =========================================================
+           이미지 미리보기 (최대 3장 가이드만, 실제 제한은 서버에서)
+        ========================================================= */
+        function initImagePreview() {
+            const input = qs("#imagesInput");
+            const preview = qs("#imagesPreview");
+            input.addEventListener("change", () => {
+                preview.innerHTML = "";
+                const files = Array.from(input.files || []).slice(0, 3);
+                files.forEach(file => {
+                    const url = URL.createObjectURL(file);
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.className = "w-24 h-24 object-cover rounded-lg border";
+                    preview.appendChild(img);
+                });
+            });
+        }
 
-                // 열기
-                m.classList.remove('hidden');
+        /* =========================================================
+           도움말 토글 (업종 예시)
+        ========================================================= */
+        function toggleTip(ev) {
+            const tip = qs("#tipBox");
+            if (tip.classList.contains("hidden")) {
+                // 버튼 근처 위치
+                const rect = ev.currentTarget.getBoundingClientRect();
+                tip.style.left = `${rect.left}px`;
+                tip.style.top = `${rect.bottom + 6 + window.scrollY}px`;
+                tip.classList.remove("hidden");
+            } else {
+                tip.classList.add("hidden");
+            }
+        }
+        window.toggleTip = toggleTip;
 
-                // 확인 누르면 상세로 이동
-                ok.onclick = () => {
-                    m.classList.add('hidden');
-                    // ndetail.html 위치가 /new/ndetail.html이면 아래 경로만 바꿔주세요.
-                    location.assign(`/ndetail.html?id=${encodeURIComponent(storeId)}`);
-                };
+        /* =========================================================
+           폼 전송: DB가 만든 id로 ndetail 이동 (SSOT)
+        ========================================================= */
+        async function onSubmit(e) {
+            e.preventDefault();
+
+            // 필수 최소값 점검 (상호/주소 정도)
+            const businessName = qs("#businessName").value.trim();
+            const roadAddress = qs("#roadAddress").value.trim();
+            if (!businessName || !roadAddress) {
+                return alert("상호와 주소(도로명)는 필수입니다.");
             }
 
+            // 메뉴를 FormData에 평탄화 저장
+            // storeMenus[0].category, storeMenus[0].name, storeMenus[0].price ...
+            const fd = new FormData(qs("#storeForm"));
 
-            // === 설정 (원하면 URL로 지정, 아니면 history.back())
-            const PREV_ACTION = () => history.back();                // 이전
-            const NEXT_ACTION = () => location.href = "/ndetail.html"; // 다음 페이지 URL로 교체
-
-            const $ = s => document.querySelector(s);
-            const prevs = ["#fab-prev", "#fab-prev-sm"].map($);
-            const nexts = ["#fab-next", "#fab-next-sm"].map($);
-
-            prevs.forEach(el => el && el.addEventListener("click", PREV_ACTION));
-            nexts.forEach(el => el && el.addEventListener("click", NEXT_ACTION));
-
-            // 스크롤 200px 이후에만 보이게 (시야 방해 최소화)
-            const showAfter = 200;
-            const toggleFAB = () => {
-                const show = window.scrollY > showAfter;
-                ["#fab-prev", "#fab-next", "#page-nav-mobile"].forEach(sel => {
-                    const el = $(sel);
-                    if (!el) return;
-                    if (show) el.classList.remove("opacity-0", "pointer-events-none", "hidden");
-                    else el.classList.add("opacity-0", "pointer-events-none");
+            // 카테고리/품목
+            state.categories.forEach((cat, ci) => {
+                cat.items.forEach((item, mi) => {
+                    fd.append(`storeMenus[${ci}][${mi}][category]`, cat.name);
+                    fd.append(`storeMenus[${ci}][${mi}][name]`, (item.name || "").trim());
+                    fd.append(`storeMenus[${ci}][${mi}][price]`, onlyDigits(item.price));
                 });
-            };
-            // 초기 상태는 숨김
-            ["#fab-prev", "#fab-next", "#page-nav-mobile"].forEach(sel => {
-                const el = $(sel); if (el) el.classList.add("opacity-0", "pointer-events-none", "transition", "duration-300");
             });
-            window.addEventListener("scroll", toggleFAB, { passive: true });
-            window.addEventListener("load", toggleFAB);
 
-            // 키보드 좌/우 화살표로도 이동
-            window.addEventListener("keydown", (e) => {
-                if (e.key === "ArrowLeft") PREV_ACTION();
-                if (e.key === "ArrowRight") NEXT_ACTION();
+            // 가격 콤마 제거 등 기타 정제는 서버에서도 한 번 더
+            try {
+                const res = await fetch(API.REGISTER, { method: "POST", body: fd });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data?.ok || !data?.id) {
+                    throw new Error("등록 응답에 id가 없습니다. (컨트롤러 확인)");
+                }
+
+                // 성공 모달 → 확인/자동 이동
+                const modal = qs("#successModal");
+                const okBtn = qs("#successOk");
+                const goDetail = () => location.href = `ndetail.html?id=${encodeURIComponent(data.id)}`;
+
+                modal.classList.remove("hidden");
+                okBtn.onclick = goDetail;
+                // 1.5초 뒤 자동 이동 (원치 않으면 주석)
+                setTimeout(goDetail, 1500);
+            } catch (err) {
+                alert("등록 실패: " + (err?.message || "unknown"));
+            }
+        }
+
+        /* =========================================================
+           수정 (update 버튼 클릭 시) - 자리만 잡아둠
+        ========================================================= */
+        function updateData() {
+            alert("수정 기능은 추후 구현 예정입니다.");
+        }
+        window.updateData = updateData;
+
+        /* =========================================================
+           전화 인증 (목업)
+        ========================================================= */
+        function initPhoneAuth() {
+            const btn = qs("#verifyPhoneButton");
+            const out = qs("#phoneVerifyResult");
+            btn.addEventListener("click", () => {
+                out.textContent = "인증요청 전송(목업) - 실제 연동은 추후 적용";
+                out.className = "text-sm text-blue-700 text-center";
             });
-        })();
+        }
+
+        /* =========================================================
+           FAB(품목 추가) / Prev-Next(자리만) 
+        ========================================================= */
+        function initFABS() {
+            qs("#fabAddItem").addEventListener("click", addMenuItem);
+            // Prev/Next는 페이지 이동용 자리 → 필요 시 구현
+            const prev = qs("#fab-prev"); const next = qs("#fab-next");
+            const prevSm = qs("#fab-prev-sm"); const nextSm = qs("#fab-next-sm");
+            [prev, prevSm].forEach(b => b && (b.onclick = () => window.history.back()));
+            [next, nextSm].forEach(b => b && (b.onclick = () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })));
+        }
+
+        /* =========================================================
+           이벤트 바인딩
+        ========================================================= */
+        function bindEvents() {
+            // 사업자 인증
+            qs("#btnVerifyBiz").addEventListener("click", verifyBiz);
+
+            // 이메일 조합
+            qs("#emailId").addEventListener("input", updateEmail);
+            qs("#customDomainInput").addEventListener("input", updateEmail);
+            qs("#emailDomainSelect").addEventListener("change", (e) => handleDomainChange(e.target));
+
+            // 카테고리
+            qs("#categoryInput").addEventListener("keydown", (e) => {
+                if (e.key === "Enter") { e.preventDefault(); addCategory(); }
+            });
+
+            // 폼 제출
+            qs("#storeForm").addEventListener("submit", onSubmit);
+        }
+
+        /* =========================================================
+           초기화
+        ========================================================= */
+        function init() {
+            includePartials();
+            bindEvents();
+            initCategoryDropdowns();
+            initImagePreview();
+            initPhoneAuth();
+            initFABS();
+
+            // Kakao Maps autoload=false → 수동 로드
+            if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
+                initKakaoMap();
+            } else {
+                // 혹시 늦게 로드되면 약간 지연 후 재시도
+                const iv = setInterval(() => {
+                    if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
+                        clearInterval(iv);
+                        initKakaoMap();
+                    }
+                }, 200);
+                setTimeout(() => clearInterval(iv), 5000);
+            }
+        }
+        document.addEventListener("DOMContentLoaded", init);
+
+        /* =========================================================
+           전역 노출(HTML에서 참조하는 함수)
+        ========================================================= */
+        window.addCategory = addCategory;
     </script>
 
 </body>

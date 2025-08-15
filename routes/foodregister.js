@@ -1,71 +1,20 @@
 // routes/foodregister.js
-import express from "express";
+import { Router } from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import * as ctrl from "../controllers/foodregisterController.js";
+import { createFoodStore, getFoodStoreById } from "../controllers/foodregisterController.js";
 
-const router = express.Router();
+const router = Router();
 
-/* ───────────────────────── 숫자 id 가드 (라우트보다 위) ───────────────────────── */
-router.param("id", (req, res, next, val) => {
-  const idNum = Number(val);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
-    return res.status(400).json({ error: "invalid id parameter" });
-  }
-  req.idNum = idNum; // 컨트롤러에서 사용
-  next();
-});
+/**
+ * 업로드는 “있어도” 동작하도록 최소 처리(파일 저장은 추후 확장).
+ * 프론트에서 FormData에 파일이 포함돼도 여기선 무시/통과 가능.
+ */
+const upload = multer({ storage: multer.memoryStorage() });
 
-/* ───────────────────────── 경로 계산 ───────────────────────── */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// server.js: app.use("/uploads", express.static(path.join(PUBLIC2, "uploads"))) 과 동일한 실제 경로로 맞춤
-const uploadDir = path.join(process.cwd(), "public2", "uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
+// 등록 (multipart/form-data 수신)
+router.post("/", upload.any(), createFoodStore);
 
-/* ───────────────────────── Multer 설정 ───────────────────────── */
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const base = path
-      .basename(file.originalname, ext)
-      .replace(/[^\w.-]+/g, "_");
-    cb(null, `${Date.now()}_${base}${ext}`);
-  },
-});
-const upload = multer({ storage });
-
-// name="menuImage[]" 같은 브래킷 표기 허용
-const uploadFields = upload.fields([
-  { name: "storeImages", maxCount: 10 },
-  { name: "menuImage[]", maxCount: 50 },
-  { name: "businessCertImage", maxCount: 1 },
-]);
-
-/* ───────────────────────── 라우트 ───────────────────────── */
-
-// 등록
-router.post("/", uploadFields, ctrl.createFoodRegister);
-
-// 단건 요약 (req.idNum 사용)
-router.get("/:id", ctrl.getFoodRegisterDetail);
-
-// 풀데이터 (호환 네이밍 지원)
-router.get("/:id/full", async (req, res, next) => {
-  try {
-    const getFull = ctrl.getFoodRegisterFull ?? ctrl.getFoodStoreFull;
-    if (!getFull) {
-      console.error("[foodregister] full handler missing");
-      return res.status(500).json({ error: "full handler missing" });
-    }
-    console.log("[foodregister] using full handler:", getFull.name);
-    return await getFull(req, res);
-  } catch (e) {
-    next(e);
-  }
-});
+// 상세 조회
+router.get("/:id", getFoodStoreById);
 
 export default router;
