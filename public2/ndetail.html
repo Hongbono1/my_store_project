@@ -124,32 +124,6 @@
     </div>
 
     <script type="module">
-        // grow-card 두 박스의 최소/최대 높이 (내용 가독성 보장용)
-        const MIN_GROW_PX = 100;
-        const MAX_GROW_PX = 320;  // 필요하면 숫자만 조정
-
-        let layoutFrozen = false;
-        let rafA = 0, rafB = 0;
-
-        // DOM 업데이트가 다 끝난 다음 프레임에서 레이아웃 계산
-        function scheduleLayout(force = false) {
-            if (layoutFrozen && !force) return;
-            cancelAnimationFrame(rafA); cancelAnimationFrame(rafB);
-            rafA = requestAnimationFrame(() => {
-                rafB = requestAnimationFrame(() => {
-                    syncLockToLeft();
-                });
-            });
-        }
-
-        // 더 이상 자동 흔들림이 없도록 잠금
-        function freezeLayout() {
-            layoutFrozen = true;
-            cancelAnimationFrame(rafA);
-            cancelAnimationFrame(rafB);
-            rafA = 0;
-            rafB = 0;
-        }
 
         // ========== 유틸 ==========
         const $ = id => document.getElementById(id);
@@ -176,21 +150,7 @@
         const storeId = Number(q.get("id"));
         if (!Number.isSafeInteger(storeId)) {
             alert("잘못된 접근입니다. (id 필요)");
-            // 필요시 메인으로 이동
             // location.replace('/');
-        }
-
-        function scheduleLayoutOnce() {
-            return new Promise((resolve) => {
-                if (layoutFrozen) return resolve(false);
-                cancelAnimationFrame(rafA); cancelAnimationFrame(rafB);
-                rafA = requestAnimationFrame(() => {
-                    rafB = requestAnimationFrame(() => {
-                        syncLockToLeft();
-                        resolve(true);
-                    });
-                });
-            });
         }
 
         // ========== 이미지 모달 ==========
@@ -208,39 +168,6 @@
             $("closeModal").addEventListener('click', closeModal);
         })();
 
-        // #leftCol 높이가 바뀌면 한 번만 재계산하고 바로 해제
-        (function observeLeftOnce() {
-            const left = document.getElementById('leftCol');
-            if (!left || !('ResizeObserver' in window)) return;
-            const ro = new ResizeObserver(() => {
-                if (layoutFrozen) return;        // 이미 고정이면 건너뜀
-                scheduleLayout(true);            // 한 번 재계산
-            });
-            ro.observe(left);
-            // freezeLayout() 호출 후엔 더 볼 필요 없음(선택)
-            const origFreeze = freezeLayout;
-            window.freezeLayout = function () {
-                try { ro.disconnect(); } catch (e) { }
-                origFreeze();
-            };
-        })();
-
-        // root 안의 <img>들이 로드/에러로 상태가 "안정화"될 때까지 대기
-        function whenImagesSettled(root) {
-            if (!root) return Promise.resolve();
-            const imgs = Array.from(root.querySelectorAll('img'));
-            if (!imgs.length) return Promise.resolve();
-            const tasks = imgs.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(res => {
-                    const done = () => res();
-                    img.addEventListener('load', done, { once: true });
-                    img.addEventListener('error', done, { once: true });
-                });
-            });
-            return Promise.all(tasks);
-        }
-
         // ========== 슬라이더 ==========
         const slider = {
             imgs: [],
@@ -250,13 +177,12 @@
                     .filter(s => typeof s === "string" && s.trim() !== "")
                     .map(s => normalizeSrc(s.trim()));
 
-                // 각 슬라이드가 가로 100% 폭을 갖도록 min-w-full 래퍼 사용
                 $("sliderImages").innerHTML = this.imgs.map((u, i) => {
                     const n = normalizeSrc(u);
                     return `
-            <div class="min-w-full h-full">
-              <img src="${n}" data-index="${i}" class="w-full h-full object-cover cursor-pointer select-none" />
-            </div>`;
+          <div class="min-w-full h-full">
+            <img src="${n}" data-index="${i}" class="w-full h-full object-cover cursor-pointer select-none" />
+          </div>`;
                 }).join('');
 
                 $("sliderImages").onclick = (e) => {
@@ -273,14 +199,6 @@
 
                 $("prevBtn").onclick = () => this.move(-1);
                 $("nextBtn").onclick = () => this.move(1);
-
-                const firstImg = $("sliderImages").querySelector('img');
-                if (firstImg) {
-                    firstImg.onload = () => scheduleLayout();
-                    if (firstImg.complete) scheduleLayout();
-                } else {
-                    scheduleLayout();
-                }
             },
             renderThumbs() {
                 const box = $("thumbBox");
@@ -314,86 +232,6 @@
             }
         };
 
-        function _getGapPx(sec) {
-            const cs = getComputedStyle(sec);
-            const g = parseFloat(cs.rowGap || cs.gap || '0');
-            return isNaN(g) ? 0 : g;
-        }
-        function _sumHeights(els) {
-            return els.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
-        }
-
-        /**
-         * 좌측(#leftCol) 높이를 기준으로:
-         * - 우측(#rightCol) = 같은 높이 고정 + 내부 스크롤
-         * - 가운데의 .grow-card 2개가 남는 높이를 1:1로 "고정 높이" 배분
-         *   내용이 많으면 각 카드 내부(.scroll-area)에서만 스크롤
-         */
-        function syncLockToLeft() {
-            const left = document.getElementById('leftCol');
-            const mid = document.getElementById('middleCol');
-            const right = document.getElementById('rightCol');
-            if (!left || !mid) return;
-
-            const isDesktop = window.matchMedia('(min-width: 1024px)').matches; // lg 이상
-            const leftH = left.getBoundingClientRect().height;                  // 기준(검정선) 높이
-
-            // 우측: 좌측과 동일 높이 + 내부 스크롤 (항상 보이게)
-            if (right) {
-                right.style.height = isDesktop ? `${leftH}px` : '';
-                right.style.maxHeight = isDesktop ? `${leftH}px` : '';
-                right.style.overflow = isDesktop ? 'auto' : '';
-            }
-
-            // 가운데: grow-card(서비스/추가 설명) 두 개에 남은 높이를 "동일하게" 배분
-            const kids = Array.from(mid.children);
-            const cs = getComputedStyle(mid);
-            const gapPx = parseFloat(cs.rowGap || cs.gap || '0') || 0;
-            const gaps = Math.max(0, kids.length - 1);
-
-            const growTargets = kids.filter(el => el.classList.contains('grow-card'));
-            const staticEls = kids.filter(el => !el.classList.contains('grow-card'));
-
-            // 리셋
-            growTargets.forEach(el => { el.style.height = ''; el.style.maxHeight = ''; });
-
-            if (!isDesktop || growTargets.length === 0) {
-                // 모바일/좁은 화면: 자동 높이로 풀어 빈공간/잘림 방지
-                growTargets.forEach(el => {
-                    const sc = el.querySelector('.scroll-area');
-                    if (sc) { sc.style.maxHeight = ''; sc.style.overflow = ''; }
-                });
-                return;
-            }
-
-            // 가운데 컬럼에서 grow-card 외 요소(=헤더/이벤트/기타/연락처 등) 총 높이 + 갭
-            const usedStatic = staticEls.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
-            const used = usedStatic + gaps * gapPx;
-
-            // 좌측(=기준선) 높이에 맞추기 위해 grow-card들이 채워야 할 남은 높이
-            let remain = leftH - used;
-            if (remain < 0) remain = 0;
-
-            // 두 박스를 동일하게 줄여 배분 (최소/최대 높이로 클램프)
-            let share = growTargets.length ? Math.floor(remain / growTargets.length) : 0;
-            share = Math.max(MIN_GROW_PX, Math.min(MAX_GROW_PX, share));
-
-            // 적용 + 내부 스크롤
-            growTargets.forEach(el => {
-                el.style.height = `${share}px`;
-                el.style.maxHeight = `${share}px`;
-                const sc = el.querySelector('.scroll-area');
-                if (sc) { sc.style.maxHeight = '100%'; sc.style.overflow = 'auto'; }
-            });
-        }
-
-
-        // 기존 syncToAdEnd 교체
-        function syncToAdEnd() {
-            // 이미지/지도/데이터 반영 후 레이아웃 잠금
-            syncLockToLeft();
-        }
-
         // ========== 장바구니 ==========
         const cart = [];
         function addToCart(item) {
@@ -412,9 +250,9 @@
                 const li = document.createElement("li");
                 li.className = "flex justify-between items-center text-lg py-2";
                 li.innerHTML = `
-          <span>${item.name} × ${qty}</span>
-          <span class="text-xl font-bold">${total.toLocaleString()}원</span>
-          <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
+        <span>${item.name} × ${qty}</span>
+        <span class="text-xl font-bold">${total.toLocaleString()}원</span>
+        <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
                 ul.appendChild(li);
             });
             ul.querySelectorAll(".removeBtn").forEach(btn => {
@@ -424,8 +262,6 @@
         }
 
         // ========== Kakao 지도 ==========
-
-        // 지도 액션 버튼(카카오맵 열기 / 길찾기)
         function renderMapActions(lat, lng, name, address) {
             const parent = $("map").parentElement;
             let box = document.getElementById("mapActions");
@@ -463,8 +299,7 @@
             box.append(openBtn, dirBtn);
         }
 
-        // ★ 이 initMap 하나만 남기세요 (중복 선언 금지)
-        // ★ initMap: 성공/실패 모두에서 resolve 호출해 '완료 시점'을 보장
+        // ★ initMap: 성공/실패 모두에서 resolve
         async function initMap(address, name = "") {
             return new Promise(async (resolve) => {
                 if (!address) {
@@ -488,14 +323,13 @@
                 const cleaned = address.replace(/^\d{5}\s*/, "").trim();
 
                 geocoder.addressSearch(cleaned, (result, status) => {
-                    // 실패: 검색 링크로 대체
                     if (status !== kakao.maps.services.Status.OK || !result?.length) {
                         const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
                         $("map").style.cursor = "pointer";
                         $("map").title = "카카오맵에서 열기";
                         $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
                         renderMapActions(null, null, name, address);
-                        resolve();   // ← 여기서 반드시 resolve
+                        resolve();
                         return;
                     }
 
@@ -518,7 +352,6 @@
 
                     renderMapActions(lat, lng, place, address);
 
-                    // 지도 타일 그려지고 DOM 높이가 안정된 다음 프레임에 완료 처리
                     requestAnimationFrame(() => requestAnimationFrame(resolve));
                 });
             });
@@ -556,12 +389,12 @@
 
                 // 기타 정보
                 $("infoEtcList").innerHTML = `
-  <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
-  <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
-  <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
-`;
+        <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
+        <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
+        <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
+      `;
 
-                // 연락처(클릭 가능 링크)
+                // 연락처(클릭 링크)
                 const phoneNum = store.phone || "";
                 $("contactPhone").innerHTML = phoneNum
                     ? `<a href="tel:${phoneNum.replace(/[^0-9]/g, "")}" class="text-blue-600 underline text-lg">${escapeHtml(phoneNum)}</a>`
@@ -575,7 +408,6 @@
                 $("contactHomepage").innerHTML = linkOrDash(store.homepage, "홈페이지 열기");
                 $("contactInstagram").innerHTML = linkOrDash(store.instagram, "인스타그램");
                 $("contactFacebook").innerHTML = linkOrDash(store.facebook, "페이스북");
-
 
                 // 3) 지도
                 await initMap(store.address || "", store.business_name || store.name || "");
@@ -607,19 +439,19 @@
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                             const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
                             box.innerHTML = `
-                <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-                <div class="flex-1">
-                  <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-                  <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+              <div class="flex-1">
+                <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+                <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+              </div>
+              <div class="flex flex-col items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1">
+                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+                  <span class="quantity w-6 text-center">1</span>
+                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
                 </div>
-                <div class="flex flex-col items-center gap-1 shrink-0">
-                  <div class="flex items-center gap-1">
-                    <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                    <span class="quantity w-6 text-center">1</span>
-                    <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                  </div>
-                  <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-                </div>`;
+                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+              </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
                             box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
@@ -633,34 +465,17 @@
                     });
                 }
 
-                // ★ 모든 이미지 로딩이 끝날 때까지 대기 (좌/중/우 전부)
-                await whenImagesSettled(document.getElementById('leftCol'));
-                await whenImagesSettled(document.getElementById('middleCol'));
-                await whenImagesSettled(document.getElementById('rightCol'));
-
-                // ★ 최종 1회 정렬 + 잠금
-                scheduleLayout(true);
-                freezeLayout();
-
                 // 예약 버튼
                 const reserveBtn = $("reserveBtn");
                 if (reserveBtn) reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
 
-
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
                 $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
-                scheduleLayout(true);
             }
         })();
-
-        // 필요시 레이아웃 동기화 훅
-        window.addEventListener("DOMContentLoaded", () => scheduleLayout());
-        window.addEventListener("resize", () => {
-            layoutFrozen = false;   // 창 크기 바뀌면 다시 계산 허용
-            scheduleLayout(true);
-        });
     </script>
+
 </body>
 
 </html>
