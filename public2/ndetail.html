@@ -260,7 +260,7 @@
 
         // 지도 액션 버튼(카카오맵 열기 / 길찾기)
         function renderMapActions(lat, lng, name, address) {
-            const parent = $("map").parentElement; // 지도 카드 박스
+            const parent = $("map").parentElement;
             let box = document.getElementById("mapActions");
             if (!box) {
                 box = document.createElement("div");
@@ -296,7 +296,7 @@
             box.append(openBtn, dirBtn);
         }
 
-        // ★ 기존 initMap을 이것으로 '교체'
+        // ★ 이 initMap 하나만 남기세요 (중복 선언 금지)
         async function initMap(address, name = "") {
             if (!address) {
                 $("addressText").textContent = "📍 -";
@@ -306,7 +306,7 @@
             }
             $("addressText").textContent = `📍 ${address}`;
 
-            // SDK 준비 (정적 로드 + autoload=false)
+            // SDK 준비 (정적 태그 + autoload=false)
             if (!window.kakao || !window.kakao.maps) {
                 console.error("Kakao SDK tag missing");
                 renderMapActions(null, null, name, address);
@@ -318,10 +318,11 @@
             const cleaned = address.replace(/^\d{5}\s*/, "").trim();
 
             geocoder.addressSearch(cleaned, (result, status) => {
-                // 지오코딩 실패 → 검색 링크로 대체
+                // 지오코딩 실패 시: 검색 링크로 대체
                 if (status !== kakao.maps.services.Status.OK || !result?.length) {
                     const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
                     $("map").style.cursor = "pointer";
+                    $("map").title = "카카오맵에서 열기";
                     $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
                     renderMapActions(null, null, name, address);
                     return;
@@ -340,42 +341,12 @@
                     window.open(url, "_blank", "noopener");
                 };
                 $("map").style.cursor = "pointer";
+                $("map").title = "카카오맵에서 열기";
                 $("map").onclick = openKakaoMap;
                 kakao.maps.event.addListener(map, "click", openKakaoMap);
                 kakao.maps.event.addListener(marker, "click", openKakaoMap);
 
-                // 버튼 렌더
                 renderMapActions(lat, lng, place, address);
-            });
-        }
-
-        async function initMap(address, name = "") {
-            if (!address) { $("addressText").textContent = "📍 -"; $("map").innerHTML = ""; return; }
-            $("addressText").textContent = `📍 ${address}`;
-
-            // SDK 준비 대기 (autoload=false)
-            if (!window.kakao || !window.kakao.maps) {
-                console.error("Kakao SDK tag missing");
-                return;
-            }
-            await new Promise((resolve) => kakao.maps.load(resolve));
-
-            // === 기존 지오코딩/마커 로직 그대로 ===
-            const geocoder = new kakao.maps.services.Geocoder();
-            const cleaned = address.replace(/^\d{5}\s*/, "").trim();
-            geocoder.addressSearch(cleaned, (result, status) => {
-                if (status !== kakao.maps.services.Status.OK || !result?.length) return;
-                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                const marker = new kakao.maps.Marker({ map, position: coords });
-                if (name) {
-                    const overlay = new kakao.maps.CustomOverlay({
-                        position: marker.getPosition(),
-                        content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${name}</div>`,
-                        yAnchor: 1
-                    });
-                    overlay.setMap(map);
-                }
             });
         }
 
