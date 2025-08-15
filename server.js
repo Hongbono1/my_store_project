@@ -15,6 +15,7 @@ const app = express();
 // 정적 파일 (ndetail.html 포함)
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/public2", express.static(path.join(__dirname, "public2")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(cors());
 
 // API: 푸드레지스터
