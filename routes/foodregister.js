@@ -3,12 +3,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import {
-  createFoodStore,
-  getFoodStoreById,
-  getFoodRegisterFull,
-  updateFoodStore,
-} from "../controllers/foodregisterController.js";
+import * as ctrl from "../controllers/foodregisterController.js";
 
 const router = Router();
 
@@ -57,22 +52,9 @@ router.param("id", (req, res, next, id) => {
  * - 이미지: storeImages[*]
  * - 메뉴: storeMenus[i][j][category|name|price]
  * ----------------------------------------------------- */
-router.post("/", upload.array("storeImages", 10), createFoodStore);
-
-/* -------------------------------------------------------
- * 기본 상세 (store만)
- * ----------------------------------------------------- */
-router.get("/:id", getFoodStoreById);
-
-/* -------------------------------------------------------
- * 풀 상세 (store + images + menus + events)
- * - ndetail.html에서 사용
- * ----------------------------------------------------- */
-router.get("/:id/full", getFoodRegisterFull);
-
-/* -------------------------------------------------------
- * 수정 (보낸 필드만 업데이트 / 이미지 추가 / 메뉴 재등록 옵션)
- * ----------------------------------------------------- */
-router.put("/:id", upload.array("storeImages", 10), updateFoodStore);
+router.post("/", upload.array("storeImages", 10), ctrl.createFoodStore);
+router.get("/:id", ctrl.getFoodStoreById);
+router.get("/:id/full", ctrl.getFoodRegisterFull);
+router.put("/:id", upload.array("storeImages", 10), ctrl.updateFoodStore);
 
 export default router;
