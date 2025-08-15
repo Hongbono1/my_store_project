@@ -189,6 +189,23 @@
             $("closeModal").addEventListener('click', closeModal);
         })();
 
+        // #leftCol 높이가 바뀌면 한 번만 재계산하고 바로 해제
+        (function observeLeftOnce() {
+            const left = document.getElementById('leftCol');
+            if (!left || !('ResizeObserver' in window)) return;
+            const ro = new ResizeObserver(() => {
+                if (layoutFrozen) return;        // 이미 고정이면 건너뜀
+                scheduleLayout(true);            // 한 번 재계산
+            });
+            ro.observe(left);
+            // freezeLayout() 호출 후엔 더 볼 필요 없음(선택)
+            const origFreeze = freezeLayout;
+            window.freezeLayout = function () {
+                try { ro.disconnect(); } catch (e) { }
+                origFreeze();
+            };
+        })();
+
         // ========== 슬라이더 ==========
         const slider = {
             imgs: [],
@@ -412,56 +429,63 @@
         }
 
         // ★ 이 initMap 하나만 남기세요 (중복 선언 금지)
+        // ★ initMap: 성공/실패 모두에서 resolve 호출해 '완료 시점'을 보장
         async function initMap(address, name = "") {
-            if (!address) {
-                $("addressText").textContent = "📍 -";
-                $("map").innerHTML = "";
-                renderMapActions(null, null, name, address);
-                return;
-            }
-            $("addressText").textContent = `📍 ${address}`;
-
-            // SDK 준비 (정적 태그 + autoload=false)
-            if (!window.kakao || !window.kakao.maps) {
-                console.error("Kakao SDK tag missing");
-                renderMapActions(null, null, name, address);
-                return;
-            }
-            await new Promise((resolve) => kakao.maps.load(resolve));
-
-            const geocoder = new kakao.maps.services.Geocoder();
-            const cleaned = address.replace(/^\d{5}\s*/, "").trim();
-
-            geocoder.addressSearch(cleaned, (result, status) => {
-                // 지오코딩 실패 시: 검색 링크로 대체
-                if (status !== kakao.maps.services.Status.OK || !result?.length) {
-                    const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
-                    $("map").style.cursor = "pointer";
-                    $("map").title = "카카오맵에서 열기";
-                    $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
+            return new Promise(async (resolve) => {
+                if (!address) {
+                    $("addressText").textContent = "📍 -";
+                    $("map").innerHTML = "";
                     renderMapActions(null, null, name, address);
+                    resolve();
                     return;
                 }
+                $("addressText").textContent = `📍 ${address}`;
 
-                const lat = Number(result[0].y);
-                const lng = Number(result[0].x);
-                const coords = new kakao.maps.LatLng(lat, lng);
-                const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                const marker = new kakao.maps.Marker({ map, position: coords });
+                if (!window.kakao || !window.kakao.maps) {
+                    console.error("Kakao SDK tag missing");
+                    renderMapActions(null, null, name, address);
+                    resolve();
+                    return;
+                }
+                await new Promise((r) => kakao.maps.load(r));
 
-                // 지도/마커 클릭 시 카카오맵 열기
-                const place = name || "목적지";
-                const openKakaoMap = () => {
-                    const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
-                    window.open(url, "_blank", "noopener");
-                };
-                $("map").style.cursor = "pointer";
-                $("map").title = "카카오맵에서 열기";
-                $("map").onclick = openKakaoMap;
-                kakao.maps.event.addListener(map, "click", openKakaoMap);
-                kakao.maps.event.addListener(marker, "click", openKakaoMap);
+                const geocoder = new kakao.maps.services.Geocoder();
+                const cleaned = address.replace(/^\d{5}\s*/, "").trim();
 
-                renderMapActions(lat, lng, place, address);
+                geocoder.addressSearch(cleaned, (result, status) => {
+                    // 실패: 검색 링크로 대체
+                    if (status !== kakao.maps.services.Status.OK || !result?.length) {
+                        const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
+                        $("map").style.cursor = "pointer";
+                        $("map").title = "카카오맵에서 열기";
+                        $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
+                        renderMapActions(null, null, name, address);
+                        resolve();   // ← 여기서 반드시 resolve
+                        return;
+                    }
+
+                    const lat = Number(result[0].y);
+                    const lng = Number(result[0].x);
+                    const coords = new kakao.maps.LatLng(lat, lng);
+                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+                    const marker = new kakao.maps.Marker({ map, position: coords });
+
+                    const place = name || "목적지";
+                    const openKakaoMap = () => {
+                        const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
+                        window.open(url, "_blank", "noopener");
+                    };
+                    $("map").style.cursor = "pointer";
+                    $("map").title = "카카오맵에서 열기";
+                    $("map").onclick = openKakaoMap;
+                    kakao.maps.event.addListener(map, "click", openKakaoMap);
+                    kakao.maps.event.addListener(marker, "click", openKakaoMap);
+
+                    renderMapActions(lat, lng, place, address);
+
+                    // 지도 타일 그려지고 DOM 높이가 안정된 다음 프레임에 완료 처리
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                });
             });
         }
 
@@ -578,9 +602,10 @@
                 const reserveBtn = $("reserveBtn");
                 if (reserveBtn) reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
 
-                scheduleLayout(true);  // 최종 정렬 1회
-                freezeLayout();        // 이후 덮어쓰기 방지
-                
+                // ★ 모든 DOM이 안정된 다음 프레임에 1회 정렬 + 잠금
+                scheduleLayout(true);
+                freezeLayout();
+
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
                 $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
