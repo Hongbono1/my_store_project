@@ -7,66 +7,72 @@ import {
   createFoodStore,
   getFoodStoreById,
   getFoodRegisterFull,
-  updateFoodStore, 
+  updateFoodStore,
 } from "../controllers/foodregisterController.js";
 
 const router = Router();
 
 /* -------------------------------------------------------
- * 업로드 설정 (선택 사항)
- * - 파일이 없어도 동작하도록 구성
- * - 저장 위치: ./uploads  (없으면 생성)
+ * 업로드 저장소 설정
+ * - 저장 경로: ./uploads (없으면 생성)
+ * - 파일명: <timestamp>_<원본파일명 공백→_>
  * ----------------------------------------------------- */
 const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
     const ts = Date.now();
-    const safeName = (file.originalname || "file").replace(/\s+/g, "_");
-    cb(null, `${ts}_${safeName}`);
+    const safe = (file.originalname || "file").replace(/\s+/g, "_");
+    cb(null, `${ts}_${safe}`);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024, files: 10 }, // 10MB, 최대 10개
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 파일당 10MB
+    files: 10,                  // 최대 10개
+  },
 });
 
 /* -------------------------------------------------------
- * 공통: :id 파라미터 가드
- * - bigint 변환 오류(22P02) 예방
+ * 공통: :id 파라미터 가드 (모든 /:id 라우트에서 실행)
  * ----------------------------------------------------- */
-
-router.put("/:id", upload.array("storeImages", 10), updateFoodStore);
 router.param("id", (req, res, next, id) => {
   const n = Number.parseInt(id, 10);
   if (!Number.isSafeInteger(n)) {
     return res.status(400).json({ ok: false, error: "Invalid id" });
   }
-  // 컨트롤러에서 필요시 req.storeId 사용 가능
-  req.storeId = n;
+  req.storeId = n; // 필요하면 컨트롤러에서 사용
   next();
 });
 
 /* -------------------------------------------------------
  * 등록 (multipart/form-data)
- * - 프론트에서 FormData로 보낸 필드 + 이미지 수신
- * - 이미지 필드명: storeImages[*]
- *   (필드명이 다르면 .any()로 바꿔 사용 가능)
+ * - 필드: businessName, roadAddress, phone(선택)
+ * - 이미지: storeImages[*]
+ * - 메뉴: storeMenus[i][j][category|name|price]
  * ----------------------------------------------------- */
 router.post("/", upload.array("storeImages", 10), createFoodStore);
 
 /* -------------------------------------------------------
- * 상세 조회
+ * 기본 상세 (store만)
  * ----------------------------------------------------- */
 router.get("/:id", getFoodStoreById);
 
 /* -------------------------------------------------------
- * 풀 상세 조회 (가게 + 이미지 + 메뉴)
- * - ndetail.html이 호출하는 엔드포인트
+ * 풀 상세 (store + images + menus + events)
+ * - ndetail.html에서 사용
  * ----------------------------------------------------- */
 router.get("/:id/full", getFoodRegisterFull);
+
+/* -------------------------------------------------------
+ * 수정 (보낸 필드만 업데이트 / 이미지 추가 / 메뉴 재등록 옵션)
+ * ----------------------------------------------------- */
+router.put("/:id", upload.array("storeImages", 10), updateFoodStore);
 
 export default router;

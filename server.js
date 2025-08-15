@@ -4,7 +4,6 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
-
 import foodregisterRouter from "./routes/foodregister.js";
 
 const __filename = fileURLToPath(import.meta.url);
