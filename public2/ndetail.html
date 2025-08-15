@@ -9,6 +9,9 @@
 
     <!-- 카카오 앱키를 여기에 넣으세요 -->
     <meta name="kakao-appkey" content="6286d4d9bc1d503495b03f46622b5dc8">
+    <script id="kakao-sdk"
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"
+        defer></script>
 </head>
 
 <body class="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen">
@@ -254,60 +257,35 @@
         }
 
         // ========== Kakao 지도 ==========
-        async function loadKakaoSdk() {
-            // meta에서 앱키 읽기
-            const meta = document.querySelector('meta[name="kakao-appkey"]');
-            const key = meta?.content?.trim();
-            if (!key) throw new Error("Kakao appkey not found (meta[name='kakao-appkey'])");
-
-            await new Promise((resolve, reject) => {
-                // autoload=false로 로드 후 kakao.maps.load 사용
-                const s = document.createElement("script");
-                s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false&libraries=services`;
-                s.defer = true;
-                s.onload = () => {
-                    if (!window.kakao || !window.kakao.maps) return reject("Kakao SDK load failed");
-                    kakao.maps.load(resolve);
-                };
-                s.onerror = () => reject("Kakao SDK network error");
-                document.head.appendChild(s);
-            });
-        }
 
         async function initMap(address, name = "") {
-            if (!address) {
-                $("addressText").textContent = "📍 -";
-                $("map").innerHTML = "";
-                return;
-            }
+            if (!address) { $("addressText").textContent = "📍 -"; $("map").innerHTML = ""; return; }
             $("addressText").textContent = `📍 ${address}`;
 
-            try {
-                if (!(window.kakao && window.kakao.maps)) {
-                    await loadKakaoSdk();
-                }
-                const geocoder = new kakao.maps.services.Geocoder();
-                const cleaned = address.replace(/^\d{5}\s*/, "").trim();
-
-                geocoder.addressSearch(cleaned, (result, status) => {
-                    if (status !== kakao.maps.services.Status.OK || !result?.length) return;
-
-                    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                    const marker = new kakao.maps.Marker({ map, position: coords });
-
-                    if (name) {
-                        const overlay = new kakao.maps.CustomOverlay({
-                            position: marker.getPosition(),
-                            content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${name}</div>`,
-                            yAnchor: 1
-                        });
-                        overlay.setMap(map);
-                    }
-                });
-            } catch (e) {
-                console.error("Kakao map init error:", e);
+            // SDK 준비 대기 (autoload=false)
+            if (!window.kakao || !window.kakao.maps) {
+                console.error("Kakao SDK tag missing");
+                return;
             }
+            await new Promise((resolve) => kakao.maps.load(resolve));
+
+            // === 기존 지오코딩/마커 로직 그대로 ===
+            const geocoder = new kakao.maps.services.Geocoder();
+            const cleaned = address.replace(/^\d{5}\s*/, "").trim();
+            geocoder.addressSearch(cleaned, (result, status) => {
+                if (status !== kakao.maps.services.Status.OK || !result?.length) return;
+                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+                const marker = new kakao.maps.Marker({ map, position: coords });
+                if (name) {
+                    const overlay = new kakao.maps.CustomOverlay({
+                        position: marker.getPosition(),
+                        content: `<div style="padding:4px 8px;background:#fff;border:1px solid #666;border-radius:4px;font-size:13px;white-space:nowrap;">${name}</div>`,
+                        yAnchor: 1
+                    });
+                    overlay.setMap(map);
+                }
+            });
         }
 
         // ========== 상세 데이터 로딩 ==========
