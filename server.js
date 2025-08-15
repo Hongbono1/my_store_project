@@ -12,8 +12,8 @@ const __dirname  = path.dirname(__filename);
 const app = express();
 
 // 정적 파일 (ndetail.html 포함)
-app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
+app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(cors());
 
