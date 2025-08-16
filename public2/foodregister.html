@@ -355,7 +355,7 @@
                     </div>
 
                     <!-- 한식 세부 카테고리 -->
-                    <div class="flex flex-col md:flex-row md:items-center gap-3 mb-3 relative hidden">
+                    <div id="subcatRow" class="flex flex-col md:flex-row md:items-center gap-3 mb-3 relative hidden">
                         <label class="w-36 font-medium text-blue-900 text-center shrink-0" for="subcategoryDisplay">한식
                             카테고리</label>
 
@@ -483,17 +483,6 @@
                     </div>
 
                 </section>
-
-                <!-- 기존 플로팅 버튼(+)은 유지 -->
-                <button id="mnu-fab" type="button"
-                    class="neo-btn fixed right-6 bottom-6 w-14 h-14 rounded-full text-2xl leading-none shadow-lg"
-                    aria-label="품목 추가">+</button>
-
-
-                <!-- 우측 하단 플로팅 + 버튼 (선택) -->
-                <button id="mnu-fab" type="button"
-                    class="neo-btn fixed right-6 bottom-6 w-14 h-14 rounded-full text-2xl leading-none shadow-lg"
-                    aria-label="품목 추가">+</button>
 
                 <!-- 9) 연락처 -->
                 <section class="neo-section p-5">
@@ -858,13 +847,28 @@
         }
 
         /* =========================================================
-   구분 품목 팝오버
-========================================================= */
-        function buildCategoryPicker() {
-            const box = qs("#mnu-categoryPicker");
-            if (!box) return;
-            box.innerHTML = "";
+            구분 품목 팝오버
+           ========================================================= */
+        function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
+        function ensurePickerToBody() {
+            const pick = qs("#mnu-categoryPicker");
+            if (!pick) return null;
+            if (pick.parentElement !== document.body) {
+                pick.classList.remove("absolute");
+                pick.classList.add("fixed");
+                pick.style.position = "fixed";
+                pick.style.maxHeight = "60vh";
+                pick.style.overflowY = "auto";
+                pick.style.zIndex = "2147483000";
+                document.body.appendChild(pick);
+            }
+            return pick;
+        }
+
+        function buildCategoryPicker() {
+            const box = ensurePickerToBody(); if (!box) return;
+            box.innerHTML = "";
             if (!state.categories.length) {
                 box.innerHTML = `<div class="text-sm text-slate-600 p-3">카테고리를 먼저 추가하세요.</div>`;
                 return;
@@ -875,35 +879,56 @@
                 const li = document.createElement("li");
                 li.className = "px-3 py-2 rounded cursor-pointer hover:bg-blue-50";
                 li.textContent = c.name;
-                li.addEventListener("click", () => {
-                    selectCategory(c.name);
-                    box.classList.add("hidden");
-                });
+                li.addEventListener("click", () => { selectCategory(c.name); closeCategoryPicker(); });
                 ul.appendChild(li);
             });
             box.appendChild(ul);
         }
 
-        function toggleCategoryPicker() {
-            const box = qs("#mnu-categoryPicker");
-            if (!box) return;
-            buildCategoryPicker();
-            box.classList.toggle("hidden");
+        function placePickerByTrigger(triggerEl) {
+            const box = ensurePickerToBody(); if (!box) return;
+            box.classList.remove("hidden");
+            box.style.visibility = "hidden";
+            box.style.display = "block";
+
+            const r = triggerEl.getBoundingClientRect();
+            const margin = 8;
+            const bw = box.offsetWidth || 224;
+            const bh = box.offsetHeight || 200;
+
+            let top = r.bottom + margin;
+            let left = r.right - bw;
+
+            if (top + bh > window.innerHeight) top = r.top - bh - margin;
+            if (top < margin) top = margin;
+            left = clamp(left, margin, window.innerWidth - bw - margin);
+
+            box.style.top = `${Math.round(top)}px`;
+            box.style.left = `${Math.round(left)}px`;
+            box.style.visibility = "visible";
         }
 
-        // 팝오버 외부 클릭 시 닫기
+        function openCategoryPickerAt(triggerEl) { buildCategoryPicker(); placePickerByTrigger(triggerEl); }
+        function closeCategoryPicker() { const box = qs("#mnu-categoryPicker"); if (box) { box.classList.add("hidden"); box.style.display = ""; } }
+        function toggleCategoryPickerFor(triggerEl) {
+            const val = qs("#mnu-categoryInput")?.value.trim();
+            if (val) { addCategory(); closeCategoryPicker(); return; }
+            const box = qs("#mnu-categoryPicker");
+            if (box?.classList.contains("hidden")) openCategoryPickerAt(triggerEl);
+            else closeCategoryPicker();
+        }
+
+        // 바깥 클릭/ESC로 닫기
         document.addEventListener("click", (e) => {
             const box = qs("#mnu-categoryPicker");
-            const topBtn = qs("#mnu-addCategoryBtn");
-            const bottomBtn = qs("#mnu-addCategoryBtn-bottom");
-            if (!box) return;
-            const clickedInside = box.contains(e.target) || e.target === topBtn || e.target === bottomBtn;
-            if (!clickedInside) box.classList.add("hidden");
+            const isTrigger = e.target.closest("#mnu-addCategoryBtn, #mnu-addCategoryBtn-bottom");
+            if (box && !isTrigger && !box.contains(e.target)) closeCategoryPicker();
         });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCategoryPicker(); });
 
         /* =========================================================
-   카테고리/서브카테고리 드롭다운 (기본)
-========================================================= */
+             카테고리/서브카테고리 드롭다운 (기본)
+           ========================================================= */
         function initCategoryDropdowns() {
             const display = qs("#businessCategoryDisplay");
             const list = qs("#categoryList");
@@ -1088,8 +1113,8 @@
         }
 
         /* =========================================================
-   수정 자리
-========================================================= */
+             수정 자리
+           ========================================================= */
         function updateData() { alert("수정 기능은 추후 구현 예정입니다."); }
         window.updateData = updateData;
 
@@ -1110,21 +1135,12 @@
            FAB/버튼 (품목 추가) / Prev-Next
         ========================================================= */
         function initFABS() {
-            // 파란 원형 +FAB만 유지
-            (qs("#fabAddItem"))?.addEventListener("click", addMenuItem);
-            qs("#mnu-addItemBtn-bottom")?.addEventListener("click", addMenuItem);
-
-            // 하단 구분 품목(같은 동작)
-            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", () => {
-                const val = qs("#mnu-categoryInput")?.value.trim();
-                if (val) addCategory(); else toggleCategoryPicker();
-            });
-
-            // Prev / Next
             const prev = qs("#fab-prev"), next = qs("#fab-next");
             const prevSm = qs("#fab-prev-sm"), nextSm = qs("#fab-next-sm");
             [prev, prevSm].forEach(b => b && (b.onclick = () => window.history.back()));
-            [next, nextSm].forEach(b => b && (b.onclick = () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })));
+            [next, nextSm].forEach(b => b && (b.onclick = () => window.scrollTo({
+                top: document.body.scrollHeight, behavior: "smooth"
+            })));
         }
 
         /* =========================================================
@@ -1138,18 +1154,20 @@
             qs("#customDomainInput")?.addEventListener("input", updateEmail);
             qs("#emailDomainSelect")?.addEventListener("change", (e) => handleDomainChange(e.target));
 
-            // 구분 품목: 입력 있으면 추가, 없으면 팝오버
-            const addCatBtnTop = qs("#mnu-addCategoryBtn");
-            addCatBtnTop?.addEventListener("click", () => {
-                const val = qs("#mnu-categoryInput")?.value.trim();
-                if (val) addCategory(); else toggleCategoryPicker();
-            });
+            /// 구분 품목(상단/하단) — 트리거 기준 팝오버
+            qs("#mnu-addCategoryBtn")?.addEventListener("click", (e) =>
+                toggleCategoryPickerFor(e.currentTarget)
+            );
+            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", (e) =>
+                toggleCategoryPickerFor(e.currentTarget)
+            );
 
-            qs("#mnu-categoryInput")?.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") { e.preventDefault(); addCategory(); }
-            });
+            // 품목 추가(상단/하단/FAB)
+            qs("#mnu-addItemBtn")?.addEventListener("click", addMenuItem);
+            qs("#mnu-addItemBtn-bottom")?.addEventListener("click", addMenuItem);
+            qs("#fabAddItem")?.addEventListener("click", addMenuItem);
 
-            // 폼 제출
+            // 제출
             qs("#storeForm")?.addEventListener("submit", onSubmit);
         }
 
