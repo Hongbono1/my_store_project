@@ -633,7 +633,7 @@
         };
 
         const state = {
-            categories: [],                 // [{ name, items:[{imageUrl, name, price, description}] }]
+            categories: [],                 // [{ name, items:[{imageUrl, name, price, description, imageFile?}] }]
             selectedCategory: null,
             map: null,
             mapMarker: null,
@@ -661,8 +661,10 @@
             try {
                 const header = await fetch("/components/header.html").then(r => r.ok ? r.text() : "");
                 const footer = await fetch("/components/footer.html").then(r => r.ok ? r.text() : "");
-                qs("#header-placeholder").innerHTML = header || "";
-                qs("#footer-placeholder").innerHTML = footer || "";
+                const h = qs("#header-placeholder");
+                const f = qs("#footer-placeholder");
+                if (h) h.innerHTML = header || "";
+                if (f) f.innerHTML = footer || "";
             } catch { }
         }
 
@@ -756,7 +758,7 @@
                 chip.classList.remove("neo-chip-selected");
                 if (chip.dataset.name === name) chip.classList.add("neo-chip-selected");
             });
-            // 선택된 블록 시각표시(선택)
+            // 선택된 블록 시각표시
             qsa("[data-mnu-block]").forEach(b => {
                 if (b.dataset.mnuBlock === name) b.classList.add("outline", "outline-2", "outline-blue-200");
                 else b.classList.remove("outline", "outline-2", "outline-blue-200");
@@ -777,18 +779,20 @@
                 wrap.appendChild(b);
             });
         }
+
         function renderMenuContainer() {
             const container = qs("#mnu-container");
+            if (!container) return;
             container.innerHTML = "";
 
             state.categories.forEach((cat) => {
                 const sec = document.createElement("div");
                 sec.className = "neo-section p-4";
+                sec.dataset.mnuBlock = cat.name; // selectCategory()에서 외곽선 토글 용
 
                 const title = document.createElement("h5");
                 title.className = "font-semibold text-blue-900 mb-3";
                 title.textContent = `카테고리: ${cat.name} (품목 ${cat.items.length}개)`;
-                sec.appendChild(title);
 
                 const list = document.createElement("div");
                 list.className = "space-y-4";
@@ -798,37 +802,45 @@
                     row.className = "space-y-2 border p-3 rounded-lg bg-white shadow-sm";
 
                     row.innerHTML = `
-              <div class="grid grid-cols-[2fr_2fr_1fr_auto] gap-2 items-center">
-                <input class="neo-input w-full px-2 py-1" placeholder="이미지 URL (https://…)" value="${item.imageUrl || ""}">
-                <input class="neo-input w-full px-2 py-1" placeholder="품목명" value="${item.name || ""}">
-                <input class="neo-input w-full px-2 py-1 text-right" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
-                <button type="button" class="neo-btn px-3 py-1">삭제</button>
-              </div>
-              <div>
-                <textarea class="neo-input w-full px-2 py-1" rows="2" placeholder="설명(선택)">${item.description || ""}</textarea>
-              </div>
-              <div class="flex justify-start">
-                <img src="${item.imageUrl ? item.imageUrl : ""}" 
-                     class="w-20 h-20 object-cover rounded border bg-white" 
-                     onerror="this.src='';">
-              </div>
-            `;
+          <div class="grid grid-cols-1 md:grid-cols-[2fr_2fr_1fr_auto] gap-3 items-center">
+            <input type="file" accept="image/*" class="neo-input w-full px-3 py-2">
+            <input class="neo-input w-full px-3 py-2" placeholder="품목명" value="${item.name || ""}">
+            <input class="neo-input w-full px-3 py-2 text-right" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
+            <button type="button" class="neo-btn px-3 py-2">삭제</button>
+          </div>
+          <textarea class="neo-input w-full px-3 py-2" rows="3" placeholder="설명(선택)">${item.description || ""}</textarea>
+        `;
 
-                    const [imgUrlEl, nameEl, priceEl] = row.children[0].querySelectorAll("input");
-                    const descEl = row.children[1].querySelector("textarea");
-                    const previewImg = row.children[2].querySelector("img");
-                    const delBtn = row.children[0].querySelector("button");
+                    // 요소 바인딩
+                    const inputs = row.querySelectorAll("input");
+                    const fileEl = inputs[0];
+                    const nameEl = inputs[1];
+                    const priceEl = inputs[2];
+                    const descEl = row.querySelector("textarea");
+                    const delBtn = row.querySelector("button");
 
-                    imgUrlEl.addEventListener("input", (e) => {
-                        cat.items[idx].imageUrl = e.target.value.trim();
-                        previewImg.src = cat.items[idx].imageUrl || "";
+                    // 파일 선택(업로드할 파일을 메모리에 보관)
+                    fileEl.addEventListener("change", (e) => {
+                        cat.items[idx].imageFile = e.target.files?.[0] || null;
                     });
-                    nameEl.addEventListener("input", (e) => { cat.items[idx].name = e.target.value; });
+
+                    // 품목명
+                    nameEl.addEventListener("input", (e) => {
+                        cat.items[idx].name = e.target.value;
+                    });
+
+                    // 가격(콤마 표시 + 숫자만 보관)
                     priceEl.addEventListener("input", (e) => {
                         e.target.value = formatPriceView(e.target.value);
                         cat.items[idx].price = onlyDigits(e.target.value);
                     });
-                    descEl.addEventListener("input", (e) => { cat.items[idx].description = e.target.value; });
+
+                    // 설명
+                    descEl.addEventListener("input", (e) => {
+                        cat.items[idx].description = e.target.value;
+                    });
+
+                    // 삭제
                     delBtn.addEventListener("click", () => {
                         cat.items.splice(idx, 1);
                         renderMenuContainer();
@@ -837,6 +849,7 @@
                     list.appendChild(row);
                 });
 
+                sec.appendChild(title);
                 sec.appendChild(list);
                 container.appendChild(sec);
             });
@@ -1012,7 +1025,7 @@
 
             const fd = new FormData(qs("#storeForm"));
 
-            // 메뉴 평탄화 (선택: mnu-* 모듈을 별도 필드로 보낼 경우)
+            // 메뉴 평탄화
             state.categories.forEach((cat, ci) => {
                 cat.items.forEach((item, mi) => {
                     fd.append(`storeMenus[${ci}][${mi}][category]`, cat.name);
@@ -1020,6 +1033,8 @@
                     fd.append(`storeMenus[${ci}][${mi}][price]`, onlyDigits(item.price));
                     fd.append(`storeMenus[${ci}][${mi}][image_url]`, (item.imageUrl || "").trim());
                     fd.append(`storeMenus[${ci}][${mi}][description]`, (item.description || "").trim());
+                    // 필요시 파일도 추가:
+                    // if (item.imageFile) fd.append(`storeMenus[${ci}][${mi}][image_file]`, item.imageFile);
                 });
             });
 
@@ -1072,7 +1087,11 @@
             // 섹션 안 "품목 추가" 버튼 (새/예전 둘 다 대응)
             (qs("#mnu-addItemBtn") || qs("#addItemBtn"))?.addEventListener("click", addMenuItem);
 
-            // Prev / Next (자리)
+            // 하단 버튼
+            qs("#mnu-addItemBtn-bottom")?.addEventListener("click", addMenuItem);
+            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", addCategory);
+
+            // Prev / Next
             const prev = qs("#fab-prev"), next = qs("#fab-next");
             const prevSm = qs("#fab-prev-sm"), nextSm = qs("#fab-next-sm");
             [prev, prevSm].forEach(b => b && (b.onclick = () => window.history.back()));
@@ -1096,11 +1115,6 @@
             qs("#mnu-categoryInput")?.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") { e.preventDefault(); addCategory(); }
             });
-
-            // ⬇⬇ 하단 버튼 이벤트 추가
-            qs("#mnu-addItemBtn-bottom")?.addEventListener("click", addMenuItem);
-            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", addCategory);
-
 
             // 폼 제출
             qs("#storeForm")?.addEventListener("submit", onSubmit);
@@ -1137,6 +1151,7 @@
         ========================================================= */
         window.addCategory = addCategory;
     </script>
+
 
 </body>
 
