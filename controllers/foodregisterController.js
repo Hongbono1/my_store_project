@@ -19,31 +19,31 @@ export async function createFoodStore(req, res) {
   const client = await pool.connect();
   try {
     const businessName = (req.body.businessName || "").trim();
-    const roadAddress = (req.body.roadAddress || "").trim();
-    const phone = (req.body.phone || "").trim();
+    const roadAddress  = (req.body.roadAddress  || "").trim();
+    const phone        = (req.body.phone        || "").trim();
 
     if (!businessName || !roadAddress) {
       return res.status(400).json({ ok: false, error: "businessName, roadAddress는 필수" });
     }
 
     // 확장 필드들
-    const businessType = (req.body.businessType || "").trim();
+    const businessType     = (req.body.businessType     || "").trim();
     const businessCategory = (req.body.businessCategory || "").trim();
-    const businessHours = (req.body.businessHours || "").trim();
-    const deliveryOption = (req.body.deliveryOption || "").trim();
+    const businessHours    = (req.body.businessHours    || "").trim();
+    const deliveryOption   = (req.body.deliveryOption   || "").trim();
 
-    const serviceDetails = (req.body.serviceDetails || "").trim();
-    const additionalDesc = (req.body.additionalDesc || "").trim();
+    const serviceDetails   = (req.body.serviceDetails   || "").trim();
+    const additionalDesc   = (req.body.additionalDesc   || "").trim();
 
-    const homepage = (req.body.homepage || "").trim();
-    const instagram = (req.body.instagram || "").trim();
-    const facebook = (req.body.facebook || "").trim();
+    const homepage         = (req.body.homepage         || "").trim();
+    const instagram        = (req.body.instagram        || "").trim();
+    const facebook         = (req.body.facebook         || "").trim();
 
-    const facilities = (req.body.facilities || "").trim();
+    const facilities       = (req.body.facilities       || "").trim();
     const petsAllowed =
       req.body.petsAllowed === "true" ? true :
-        req.body.petsAllowed === "false" ? false : null;
-    const parking = (req.body.parking || "").trim();
+      req.body.petsAllowed === "false" ? false : null;
+    const parking          = (req.body.parking          || "").trim();
 
     await client.query("BEGIN");
 
@@ -72,7 +72,7 @@ export async function createFoodStore(req, res) {
     if (files && files.length) {
       const urls = files
         .map(f => (f.path ? `/uploads/${path.basename(f.path)}`
-          : f.filename ? `/uploads/${f.filename}` : null))
+                          : f.filename ? `/uploads/${f.filename}` : null))
         .filter(Boolean);
       if (urls.length) {
         const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
@@ -83,7 +83,7 @@ export async function createFoodStore(req, res) {
       }
     }
 
-    // 3) 메뉴 저장 (일괄)
+    // 3) 메뉴 저장
     const menuBuckets = {};
     for (const [k, v] of Object.entries(req.body)) {
       const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price)\]$/);
@@ -101,7 +101,7 @@ export async function createFoodStore(req, res) {
     }
     const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
     if (menus.length) {
-      const vals = menus.map((_, i) => `($1,$${i * 3 + 2},$${i * 3 + 3},$${i * 3 + 4})`).join(",");
+      const vals = menus.map((_, i) => `($1,$${i*3+2},$${i*3+3},$${i*3+4})`).join(",");
       const params = [storeId];
       menus.forEach(m => { params.push(m.name, m.price, m.category); });
       await client.query(
@@ -116,7 +116,7 @@ export async function createFoodStore(req, res) {
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
     if (events.length) {
-      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+      const values = events.map((_, i) => `($1,$${i+2},${i})`).join(",");
       await client.query(
         `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
         [storeId, ...events]
@@ -126,7 +126,7 @@ export async function createFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try { await pool.query("ROLLBACK"); } catch {}
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
@@ -164,7 +164,7 @@ export async function getFoodStoreById(req, res) {
 
 /**
  * 풀 상세: /foodregister/:id/full
- * - detail 페이지에서 기대하는 구조(store, images[], menus[], events[])
+ * - ndetail.html에서 기대하는 구조(store, images[], menus[], events[])
  */
 export async function getFoodRegisterFull(req, res) {
   try {
@@ -197,16 +197,14 @@ export async function getFoodRegisterFull(req, res) {
       [idNum]
     );
 
-    // 3) 메뉴 (✅ 최신이 배열의 마지막이 되도록 오름차순 고정)
+    // 3) 메뉴
     const { rows: menus } = await pool.query(
       `SELECT id, name, price,
               COALESCE(category,'기타') AS category,
-              image_url,
-              description,
-              created_at
-       FROM menu_items
-       WHERE store_id = $1
-       ORDER BY created_at ASC, id ASC;`,
+              image_url
+         FROM menu_items
+        WHERE store_id = $1
+        ORDER BY id ASC`,
       [idNum]
     );
 
@@ -249,8 +247,8 @@ export async function updateFoodStore(req, res) {
     const raw = req.body;
     const mapBool = v =>
       v === true || v === "true" ? true
-        : v === false || v === "false" ? false
-          : null;
+      : v === false || v === "false" ? false
+      : null;
 
     const candidate = {
       business_name: raw.businessName?.trim(),
@@ -351,45 +349,8 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: idNum });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("[updateFoodStore] error:", err);
-    return res.status(500).json({ ok: false, error: "server_error" });
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * (선택) 단건 메뉴 추가: POST /foodregister/:id/menu
- * body: { name, price, category?, imageUrl?, description? }
- * resp: { ok:true, menu: {...} }
- */
-export async function createMenuItem(req, res) {
-  const client = await pool.connect();
-  try {
-    const storeId = parseId(req.params.id);
-    if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
-
-    const name = String(req.body.name || "").trim();
-    const priceNum = parseInt(String(req.body.price || "").replace(/[^\d]/g, ""), 10) || 0;
-    const category = (req.body.category ?? "").toString().trim() || null;
-    const imageUrl = (req.body.imageUrl ?? "").toString().trim() || null;
-    const description = (req.body.description ?? "").toString().trim() || null;
-
-    if (!name || priceNum <= 0) {
-      return res.status(400).json({ ok: false, error: "name, price는 필수" });
-    }
-
-    const { rows } = await client.query(
-      `INSERT INTO menu_items (store_id, name, price, category, image_url, description)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       RETURNING id, store_id, name, price, category, image_url, description, created_at`,
-      [storeId, name, priceNum, category, imageUrl, description]
-    );
-
-    return res.json({ ok: true, menu: rows[0] });
-  } catch (err) {
-    console.error("[createMenuItem] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
     client.release();
