@@ -869,8 +869,40 @@
         function buildCategoryPicker() {
             const box = ensurePickerToBody(); if (!box) return;
             box.innerHTML = "";
+
+            // 헤더: 상단 입력란 복제
+            const topVal = qs("#mnu-categoryInput")?.value || "";
+            const header = document.createElement("div");
+            header.className = "p-2 border-b";
+            header.innerHTML = `
+    <input id="mnu-categoryInputFloating"
+      class="neo-input w-full px-3 py-2"
+      placeholder="카테고리명 (Enter로 추가)"
+      value="${topVal}">
+  `;
+            box.appendChild(header);
+
+            const floatInp = header.querySelector("#mnu-categoryInputFloating");
+            // 동기화: 하단에서 타이핑하면 상단 입력값도 함께 갱신
+            floatInp.addEventListener("input", (e) => {
+                const topInp = qs("#mnu-categoryInput");
+                if (topInp) topInp.value = e.target.value;
+            });
+            // Enter 로 바로 추가
+            floatInp.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCategory();
+                    closeCategoryPicker();
+                }
+            });
+
+            // 목록(기존 카테고리들)
             if (!state.categories.length) {
-                box.innerHTML = `<div class="text-sm text-slate-600 p-3">카테고리를 먼저 추가하세요.</div>`;
+                const empty = document.createElement("div");
+                empty.className = "text-sm text-slate-600 p-3";
+                empty.textContent = "카테고리를 먼저 입력하고 Enter를 눌러 추가하세요.";
+                box.appendChild(empty);
                 return;
             }
             const ul = document.createElement("ul");
@@ -911,18 +943,21 @@
         function openCategoryPickerAt(triggerEl) { buildCategoryPicker(); placePickerByTrigger(triggerEl); }
         function closeCategoryPicker() { const box = qs("#mnu-categoryPicker"); if (box) { box.classList.add("hidden"); box.style.display = ""; } }
         function toggleCategoryPickerFor(triggerEl) {
-            const val = qs("#mnu-categoryInput")?.value.trim();
-            if (val) { addCategory(); closeCategoryPicker(); return; }
             const box = qs("#mnu-categoryPicker");
-            if (box?.classList.contains("hidden")) openCategoryPickerAt(triggerEl);
-            else closeCategoryPicker();
+            if (box?.classList.contains("hidden")) {
+                openCategoryPickerAt(triggerEl);
+                // 열리자마자 하단 입력란에 포커스
+                requestAnimationFrame(() => qs("#mnu-categoryInputFloating")?.focus());
+            } else {
+                closeCategoryPicker();
+            }
         }
 
-        // 바깥 클릭/ESC로 닫기
         document.addEventListener("click", (e) => {
             const box = qs("#mnu-categoryPicker");
-            const isTrigger = e.target.closest("#mnu-addCategoryBtn, #mnu-addCategoryBtn-bottom");
-            if (box && !isTrigger && !box.contains(e.target)) closeCategoryPicker();
+            const el = (e.target instanceof Element) ? e.target : null;
+            const isTrigger = el?.closest?.("#mnu-addCategoryBtn, #mnu-addCategoryBtn-bottom");
+            if (box && !isTrigger && !box.contains(el)) closeCategoryPicker();
         });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCategoryPicker(); });
 
@@ -1154,13 +1189,15 @@
             qs("#customDomainInput")?.addEventListener("input", updateEmail);
             qs("#emailDomainSelect")?.addEventListener("change", (e) => handleDomainChange(e.target));
 
-            /// 구분 품목(상단/하단) — 트리거 기준 팝오버
-            qs("#mnu-addCategoryBtn")?.addEventListener("click", (e) =>
-                toggleCategoryPickerFor(e.currentTarget)
-            );
-            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", (e) =>
-                toggleCategoryPickerFor(e.currentTarget)
-            );
+            // bindEvents() 안의 구분 품목 바인딩 부분을 이렇게 바꿔줘
+            qs("#mnu-addCategoryBtn")?.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleCategoryPickerFor(e.currentTarget);
+            });
+            qs("#mnu-addCategoryBtn-bottom")?.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleCategoryPickerFor(e.currentTarget);
+            });
 
             // 품목 추가(상단/하단/FAB)
             qs("#mnu-addItemBtn")?.addEventListener("click", addMenuItem);
