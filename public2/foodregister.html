@@ -447,29 +447,77 @@
                 </section>
 
                 <!-- 8) 메뉴 등록 (카테고리 → 품목) -->
-                <section class="neo-section p-5">
-                    <h3 class="text-xl font-bold text-blue-900 mb-4">⑧ 메뉴 등록 (카테고리 → 품목)</h3>
+                <!-- ▶▶ 메뉴 입력 (카테고리 기반, 이미지 미리보기 포함) ◀◀ -->
+                <section id="menuSection" class="neo-glass-3d p-6 space-y-5">
+                    <h2 class="text-xl font-bold text-gray-800 drop-shadow">🍽 메뉴 입력</h2>
 
-                    <!-- 카테고리 입력 -->
-                    <div class="flex items-center gap-2 mb-4">
-                        <input id="categoryInput" placeholder="카테고리명 (예: 돈가스)" class="neo-input flex-1 px-3 py-2">
-                        <button type="button" onclick="addCategory()" class="neo-btn px-4 py-2">카테고리추가</button>
+                    <!-- 1) 카테고리 입력 -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">카테고리</label>
+                            <input id="menuCategoryInput" type="text" placeholder="예) 돈가스, 우동, 사이드 등"
+                                class="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white/70 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                        </div>
+                        <button type="button" id="confirmCategoryBtn"
+                            class="px-4 py-2 rounded-2xl bg-gradient-to-r from-primary to-accent text-white font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition hidden">
+                            + 메뉴 추가
+                        </button>
                     </div>
 
-                    <!-- 카테고리 칩 (선택 표시) -->
-                    <div id="categoryChips" class="flex flex-wrap gap-2 mb-3"></div>
-
-                    <!-- 🔽🔽 여기에 품목추가 버튼 한 줄 추가 -->
-                    <div class="mb-3">
-                        <button type="button" id="addItemBtn" class="neo-btn px-4 py-2">품목 추가</button>
+                    <!-- 2) 카테고리 표시 + 개수 -->
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-600">현재 카테고리: <span id="currentCategory"
+                                class="font-semibold">-</span></div>
+                        <div class="text-sm text-gray-500"><span id="menuCount">0</span> / 50</div>
                     </div>
 
-                    <!-- 품목 입력 안내 -->
-                    <div class="neo-section p-4">
-                        <h4 class="text-lg font-semibold text-blue-900 mb-4">품목 입력 (카테고리별 최대 50개)</h4>
-                        <div id="menuContainer" class="space-y-6 max-h-[1000px] overflow-y-auto"></div>
-                    </div>
+                    <!-- 3) 메뉴 리스트 -->
+                    <div id="menuList" class="space-y-4"></div>
                 </section>
+
+                <!-- 행 템플릿 -->
+                <template id="menuRowTpl">
+                    <div
+                        class="menu-row grid grid-cols-12 gap-3 items-center p-4 rounded-2xl bg-white/40 backdrop-blur-md shadow-lg border border-white/30 transition">
+                        <!-- 이미지 미리보기 -->
+                        <div class="col-span-2">
+                            <div
+                                class="aspect-square w-full rounded-xl border border-gray-200 bg-white/60 overflow-hidden flex items-center justify-center">
+                                <img class="menu-thumb max-w-full max-h-full hidden" alt="미리보기" />
+                                <span class="thumb-placeholder text-xs text-gray-400">미리보기</span>
+                            </div>
+                            <input type="file" name="menuImage[]" accept="image/*"
+                                class="mt-2 block w-full text-xs text-gray-600 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer" />
+                        </div>
+
+                        <!-- 메뉴명 -->
+                        <div class="col-span-3">
+                            <input type="text" name="menuName[]" placeholder="메뉴명"
+                                class="menu-name w-full px-3 py-2 rounded-xl border border-gray-200 bg-white/70 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                        </div>
+
+                        <!-- 가격 -->
+                        <div class="col-span-2">
+                            <input type="text" name="menuPrice[]" inputmode="numeric" placeholder="가격"
+                                class="menu-price w-full px-3 py-2 rounded-xl border border-gray-200 bg-white/70 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                        </div>
+
+                        <!-- 설명 -->
+                        <div class="col-span-4">
+                            <input type="text" name="menuDesc[]" placeholder="메뉴 설명 (선택)"
+                                class="menu-desc w-full px-3 py-2 rounded-xl border border-gray-200 bg-white/70 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                            <!-- 카테고리는 숨김 배열로 함께 전송 -->
+                            <input type="hidden" name="category[]" class="menu-category-hidden" />
+                        </div>
+
+                        <!-- 삭제 -->
+                        <div class="col-span-1 flex justify-end">
+                            <button type="button"
+                                class="menu-remove w-9 h-9 rounded-xl border border-gray-200 bg-white/70 shadow hover:bg-white"
+                                aria-label="행 삭제">✕</button>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- 9) 연락처 -->
                 <section class="neo-section p-5">
@@ -619,7 +667,7 @@
         };
 
         const state = {
-            categories: [],              // [{ name, items:[{name, price}] }]
+            categories: [],              // [{ name, items:[{imageUrl, name, price, description}] }]
             selectedCategory: null,      // 현재 선택된 카테고리명
             map: null,
             mapMarker: null,
@@ -633,7 +681,6 @@
         const qsa = (sel, el = document) => Array.from(el.querySelectorAll(sel));
 
         function toast(msg) {
-            // 간단 안내
             console.log(msg);
         }
 
@@ -648,7 +695,7 @@
         }
 
         /* =========================================================
-           헤더푸터 포함
+           헤더/푸터 포함
         ========================================================= */
         async function includePartials() {
             try {
@@ -656,9 +703,7 @@
                 const footer = await fetch("/components/footer.html").then(r => r.ok ? r.text() : "");
                 qs("#header-placeholder").innerHTML = header || "";
                 qs("#footer-placeholder").innerHTML = footer || "";
-            } catch {
-                // 조용히 패스
-            }
+            } catch { }
         }
 
         /* =========================================================
@@ -687,7 +732,6 @@
                 if (!res.ok) throw new Error("응답 오류");
                 const data = await res.json();
 
-                // 서버 구현에 따라 구조 다를 수 있음 → 보수적 처리
                 const ok = data?.status_code === "OK" || data?.ok === true;
                 if (ok) {
                     out.textContent = "사업자번호 인증 요청 성공 (상세 상태는 서버 응답 기준)";
@@ -790,25 +834,25 @@
                     row.className = "grid grid-cols-1 gap-2 md:grid-cols-[2fr_1.2fr_1fr_auto] md:items-start";
 
                     row.innerHTML = `
-        <div class="space-y-2">
-          <input class="neo-input w-full px-3 py-2" placeholder="이미지 URL (https://…)" value="${item.imageUrl || ""}">
-          <input class="neo-input w-full px-3 py-2" placeholder="품목명" value="${item.name || ""}">
-        </div>
+          <div class="space-y-2">
+            <input class="neo-input w-full px-3 py-2" placeholder="이미지 URL (https://…)" value="${item.imageUrl || ""}">
+            <input class="neo-input w-full px-3 py-2" placeholder="품목명" value="${item.name || ""}">
+          </div>
 
-        <div class="space-y-2">
-          <input class="neo-input w-full px-3 py-2" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
-          <textarea class="neo-input w-full px-3 py-2" rows="2" placeholder="설명(선택)">${item.description || ""}</textarea>
-        </div>
+          <div class="space-y-2">
+            <input class="neo-input w-full px-3 py-2" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
+            <textarea class="neo-input w-full px-3 py-2" rows="2" placeholder="설명(선택)">${item.description || ""}</textarea>
+          </div>
 
-        <div class="space-y-2 md:col-auto">
-          <div class="text-sm text-gray-500">미리보기</div>
-          <img src="${item.imageUrl ? item.imageUrl : ""}" class="w-24 h-24 object-cover rounded border bg-white" onerror="this.src='';">
-        </div>
+          <div class="space-y-2 md:col-auto">
+            <div class="text-sm text-gray-500">미리보기</div>
+            <img src="${item.imageUrl ? item.imageUrl : ""}" class="w-24 h-24 object-cover rounded border bg-white" onerror="this.src='';">
+          </div>
 
-        <div class="space-y-2 md:col-auto">
-          <button type="button" class="neo-btn px-3 py-2 w-full md:w-auto">삭제</button>
-        </div>
-      `;
+          <div class="space-y-2 md:col-auto">
+            <button type="button" class="neo-btn px-3 py-2 w-full md:w-auto">삭제</button>
+          </div>
+        `;
 
                     const [imgUrlEl, nameEl] = row.children[0].querySelectorAll("input");
                     const [priceEl, descEl] = row.children[1].querySelectorAll("input,textarea");
@@ -901,7 +945,6 @@
                 oncomplete: function (data) {
                     qs("#postalCode").value = data.zonecode || "";
                     qs("#roadAddress").value = data.roadAddress || data.address || "";
-                    // 지도 업데이트
                     updateMapByAddress(qs("#roadAddress").value);
                 }
             }).open();
@@ -966,7 +1009,6 @@
         function toggleTip(ev) {
             const tip = qs("#tipBox");
             if (tip.classList.contains("hidden")) {
-                // 버튼 근처 위치
                 const rect = ev.currentTarget.getBoundingClientRect();
                 tip.style.left = `${rect.left}px`;
                 tip.style.top = `${rect.bottom + 6 + window.scrollY}px`;
@@ -990,22 +1032,20 @@
                 return alert("상호와 주소(도로명)는 필수입니다.");
             }
 
-            // 메뉴를 FormData에 평탄화 저장
-            // storeMenus[0].category, storeMenus[0].name, storeMenus[0].price ...
+            // FormData
             const fd = new FormData(qs("#storeForm"));
 
-            // 카테고리/품목
+            // 카테고리/품목 평탄화 (image_url/description 포함)
             state.categories.forEach((cat, ci) => {
                 cat.items.forEach((item, mi) => {
                     fd.append(`storeMenus[${ci}][${mi}][category]`, cat.name);
                     fd.append(`storeMenus[${ci}][${mi}][name]`, (item.name || "").trim());
                     fd.append(`storeMenus[${ci}][${mi}][price]`, onlyDigits(item.price));
-                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, (item.imageUrl || "").trim()); // 추가
-                    fd.append(`storeMenus[${ci}][${mi}][description]`, (item.description || "").trim()); // 추가
+                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, (item.imageUrl || "").trim());
+                    fd.append(`storeMenus[${ci}][${mi}][description]`, (item.description || "").trim());
                 });
             });
 
-            // 가격 콤마 제거 등 기타 정제는 서버에서도 한 번 더
             try {
                 const res = await fetch(API.REGISTER, { method: "POST", body: fd });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1014,14 +1054,12 @@
                     throw new Error("등록 응답에 id가 없습니다. (컨트롤러 확인)");
                 }
 
-                // 성공 모달 → 확인/자동 이동
                 const modal = qs("#successModal");
                 const okBtn = qs("#successOk");
                 const goDetail = () => location.href = `/ndetail.html?id=${encodeURIComponent(data.id)}`;
 
                 modal.classList.remove("hidden");
                 okBtn.onclick = goDetail;
-                // 1.5초 뒤 자동 이동 (원치 않으면 주석)
                 setTimeout(goDetail, 1500);
             } catch (err) {
                 alert("등록 실패: " + (err?.message || "unknown"));
@@ -1029,7 +1067,7 @@
         }
 
         /* =========================================================
-           수정 (update 버튼 클릭 시) - 자리만 잡아둠
+           수정 (자리만)
         ========================================================= */
         function updateData() {
             alert("수정 기능은 추후 구현 예정입니다.");
@@ -1049,10 +1087,15 @@
         }
 
         /* =========================================================
-           FAB(품목 추가) / Prev-Next(자리만) 
+           FAB/버튼 (품목 추가) / Prev-Next(자리만)
         ========================================================= */
         function initFABS() {
+            // 오른쪽 아래 동그라미 +
             qs("#fabAddItem").addEventListener("click", addMenuItem);
+            // 섹션 안 "품목 추가" 버튼
+            const addItemBtn = qs("#addItemBtn");
+            if (addItemBtn) addItemBtn.addEventListener("click", addMenuItem);
+
             // Prev/Next는 페이지 이동용 자리 → 필요 시 구현
             const prev = qs("#fab-prev"); const next = qs("#fab-next");
             const prevSm = qs("#fab-prev-sm"); const nextSm = qs("#fab-next-sm");
@@ -1072,7 +1115,7 @@
             qs("#customDomainInput").addEventListener("input", updateEmail);
             qs("#emailDomainSelect").addEventListener("change", (e) => handleDomainChange(e.target));
 
-            // 카테고리
+            // 카테고리 입력 엔터
             qs("#categoryInput").addEventListener("keydown", (e) => {
                 if (e.key === "Enter") { e.preventDefault(); addCategory(); }
             });
@@ -1096,7 +1139,6 @@
             if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
                 initKakaoMap();
             } else {
-                // 혹시 늦게 로드되면 약간 지연 후 재시도
                 const iv = setInterval(() => {
                     if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
                         clearInterval(iv);
@@ -1109,7 +1151,7 @@
         document.addEventListener("DOMContentLoaded", init);
 
         /* =========================================================
-           전역 노출(HTML에서 참조하는 함수)
+           전역 노출(HTML에서 참조)
         ========================================================= */
         window.addCategory = addCategory;
     </script>
