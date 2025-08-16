@@ -166,6 +166,8 @@
         #bizRow .neo-btn {
             margin-top: .5rem;
         }
+
+        .mnu-file { width: 9rem; padding: .4rem .5rem; font-size: .875rem; }
     </style>
 </head>
 
@@ -803,14 +805,14 @@
                     row.className = "space-y-2 border p-3 rounded-lg bg-white shadow-sm";
 
                     row.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr_auto] gap-3 items-center">
-          <input type="file" accept="image/*" class="neo-input w-full px-3 py-2">
-          <input class="neo-input w-full px-3 py-2" placeholder="품목명" value="${item.name || ""}">
-          <input class="neo-input w-full px-3 py-2 text-right" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
-          <button type="button" class="neo-btn px-3 py-2">삭제</button>
-        </div>
-        <textarea class="neo-input w-full px-3 py-2" rows="3" placeholder="설명(선택)">${item.description || ""}</textarea>
-      `;
+        <div class="grid grid-cols-1 md:grid-cols-[auto_2fr_1fr_auto] gap-3 items-center">
+    <input type="file" accept="image/*" class="neo-input mnu-file">
+    <input class="neo-input w-full px-3 py-2" placeholder="품목명" value="${item.name || ""}">
+    <input class="neo-input w-full px-3 py-2 text-right" placeholder="가격(숫자)" value="${formatPriceView(item.price || "")}">
+    <button type="button" class="neo-btn px-3 py-2">삭제</button>
+  </div>
+  <textarea class="neo-input w-full px-3 py-2" rows="3" placeholder="설명(선택)">${item.description || ""}</textarea>
+`;
 
                     const inputs = row.querySelectorAll("input");
                     const fileEl = inputs[0];
@@ -855,13 +857,16 @@
             const pick = qs("#mnu-categoryPicker");
             if (!pick) return null;
             if (pick.parentElement !== document.body) {
-                pick.classList.remove("absolute");
-                pick.classList.add("fixed");
-                pick.style.position = "fixed";
+                // body로 옮기되 absolute로
+                pick.classList.remove("fixed");
+                pick.classList.add("absolute");
+                pick.style.position = "absolute";
                 pick.style.maxHeight = "60vh";
                 pick.style.overflowY = "auto";
                 pick.style.zIndex = "2147483000";
                 document.body.appendChild(pick);
+            } else {
+                pick.style.position = "absolute";
             }
             return pick;
         }
@@ -928,17 +933,22 @@
             const bw = box.offsetWidth || 224;
             const bh = box.offsetHeight || 200;
 
-            let top = r.bottom + margin;
-            let left = r.right - bw;
+            // 문서 좌표(스크롤 보정)
+            let top = r.bottom + window.scrollY + margin;
+            let left = r.right + window.scrollX - bw;
 
-            if (top + bh > window.innerHeight) top = r.top - bh - margin;
-            if (top < margin) top = margin;
-            left = clamp(left, margin, window.innerWidth - bw - margin);
+            // 아래 공간 부족하면 위로
+            if (top + bh > window.scrollY + window.innerHeight) {
+                top = r.top + window.scrollY - bh - margin;
+            }
+            // 좌우 범위 클램프
+            left = Math.max(8 + window.scrollX, Math.min(left, document.documentElement.scrollWidth - bw - 8));
 
             box.style.top = `${Math.round(top)}px`;
             box.style.left = `${Math.round(left)}px`;
             box.style.visibility = "visible";
         }
+
 
         function openCategoryPickerAt(triggerEl) { buildCategoryPicker(); placePickerByTrigger(triggerEl); }
         function closeCategoryPicker() { const box = qs("#mnu-categoryPicker"); if (box) { box.classList.add("hidden"); box.style.display = ""; } }
