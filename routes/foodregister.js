@@ -56,5 +56,6 @@ router.post("/", upload.array("storeImages", 10), ctrl.createFoodStore);
 router.get("/:id", ctrl.getFoodStoreById);
 router.get("/:id/full", ctrl.getFoodRegisterFull);
 router.put("/:id", upload.array("storeImages", 10), ctrl.updateFoodStore);
+router.post("/:id/menu", upload.none(), ctrl.createMenuItem)
 
 export default router;
