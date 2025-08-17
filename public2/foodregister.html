@@ -492,8 +492,12 @@
 
                     <!-- 섹션 헤더 툴바 -->
                     <div class="flex items-center justify-between mb-3">
-                        <div class="text-sm text-gray-600">카테고리를 선택한 뒤 품목을 추가하세요.</div>
-                        <button id="mnu-addItemBtn" type="button" class="neo-btn px-4 py-2">품목 추가</button>
+                        <div class="text-sm text-gray-600">카테고리를 선택한 뒤 품목을 추가/삭제할 수 있습니다.</div>
+                        <div class="flex items-center gap-2">
+                            <button id="mnu-deleteCategoryBtn" type="button" class="neo-btn px-4 py-2">카테고리
+                                삭제</button>
+                            <button id="mnu-addItemBtn" type="button" class="neo-btn px-4 py-2">품목 추가</button>
+                        </div>
                     </div>
 
                     <!-- 카테고리 칩 -->
@@ -905,6 +909,25 @@
                 renderCategoryChips();
                 renderMenuContainer();
             }
+
+            function deleteSelectedCategory() {
+                const name = state.selectedCategory;
+                if (!name) return alert("삭제할 카테고리를 먼저 선택하세요.");
+
+                const idx = state.categories.findIndex(c => c.name === name);
+                if (idx === -1) return;
+
+                const count = state.categories[idx].items.length;
+                const ok = confirm(`"${name}" 카테고리를 삭제할까요? (품목 ${count}개)`);
+                if (!ok) return;
+
+                state.categories.splice(idx, 1);
+                state.selectedCategory = state.categories[0]?.name || null;
+
+                renderCategoryChips();
+                renderMenuContainer();
+            }
+
         }
 
         function renderCategoryChips() {
@@ -1051,6 +1074,7 @@
   `;
 
             // 기존 카테고리 목록
+            // 기존 목록 생성 부분만 교체
             const ul = document.createElement("ul");
             ul.className = "p-2 max-h-56 overflow-y-auto";
             if (!state.categories.length) {
@@ -1058,9 +1082,27 @@
             } else {
                 state.categories.forEach(c => {
                     const li = document.createElement("li");
-                    li.className = "px-3 py-2 rounded cursor-pointer hover:bg-blue-50";
-                    li.textContent = c.name;
-                    li.addEventListener("click", () => { selectCategory(c.name); closeCategoryPicker(); });
+                    li.className = "px-3 py-2 rounded cursor-pointer hover:bg-blue-50 flex items-center justify-between";
+
+                    const nameBtn = document.createElement("button");
+                    nameBtn.type = "button";
+                    nameBtn.className = "text-left flex-1";
+                    nameBtn.textContent = c.name;
+                    nameBtn.addEventListener("click", () => { selectCategory(c.name); closeCategoryPicker(); });
+
+                    const del = document.createElement("button");
+                    del.type = "button";
+                    del.className = "ml-3 text-sm text-slate-500 hover:text-red-600";
+                    del.textContent = "삭제";
+                    del.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        deleteCategory(c.name);
+                        // 리스트 즉시 갱신(팝오버는 열린 채로 유지)
+                        buildCategoryPicker();
+                    });
+
+                    li.appendChild(nameBtn);
+                    li.appendChild(del);
                     ul.appendChild(li);
                 });
             }
@@ -1387,6 +1429,7 @@
             qs("#mnu-addItemBtn")?.addEventListener("click", addMenuItem);
             qs("#mnu-addItemBtn-bottom")?.addEventListener("click", addMenuItem);
             qs("#fabAddItem")?.addEventListener("click", addMenuItem);
+            qs("#mnu-deleteCategoryBtn")?.addEventListener("click", deleteSelectedCategory);
 
             // 제출
             qs("#storeForm")?.addEventListener("submit", onSubmit);
