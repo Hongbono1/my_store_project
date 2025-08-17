@@ -402,22 +402,51 @@
             });
         }
 
-        // ========== 상세 데이터 로딩 ==========
+        // 2) 데이터 표준화 (이 블록으로 교체)
         (async () => {
             try {
+                const q = new URLSearchParams(location.search);
+                const storeId = Number(q.get("id"));
+                if (!Number.isSafeInteger(storeId)) {
+                    alert("잘못된 접근입니다. (id 필요)");
+                    throw new Error("Invalid storeId");
+                }
+
                 const res = await fetch(`/foodregister/${encodeURIComponent(storeId)}/full`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const json = await res.json();
 
+                // 2) 데이터 표준화
                 const store = json.store || {};
-                const images = json.images?.map((i) => i.url || i.image_url || "") || [];
-                const rawMenus =
-                    json.menus ?? json.storeMenus ?? json.menuList ?? json.menu ?? [];
-                const menus = rawMenus.map(m => ({
-                    category: m.category ?? m.category_name ?? '기타',
-                    name: m.name ?? m.menu_name ?? '',
-                    price: Number(m.price ?? m.menu_price ?? 0),
-                    image_url: m.image_url ?? m.imageUrl ?? m.image ?? ''
+
+                const images = Array.isArray(json.images)
+                    ? json.images.map(i => i.url || i.image_url || "")
+                    : [];
+
+                const rawMenusCandidate =
+                    json.menus ??
+                    json.storeMenus ??
+                    json.menuList ??
+                    json.menu ??
+                    (json.data && (json.data.menus ?? json.data.storeMenus)) ??
+                    [];
+
+                const rawList = Array.isArray(rawMenusCandidate)
+                    ? rawMenusCandidate
+                    : (rawMenusCandidate && typeof rawMenusCandidate === "object")
+                        ? Object.values(rawMenusCandidate).flatMap(v =>
+                            Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : [])
+                        )
+                        : [];
+
+                const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
+
+                const menus = rawList.map(m => ({
+                    category: m.category ?? m.category_name ?? m.cat ?? "기타",
+                    name: m.name ?? m.menu_name ?? m.title ?? "",
+                    price: toNumber(m.price ?? m.menu_price ?? m.cost),
+                    image_url: m.image_url ?? m.imageUrl ?? m.image ?? "",
+                    description: m.description ?? m.desc ?? ""
                 }));
 
                 // 1) 슬라이더
@@ -436,48 +465,43 @@
 
                 const events = (json.events || []).map(escapeHtml);
                 $("eventsList").innerHTML = events.length
-                    ? events.map((e) => `<li>${e}</li>`).join("")
+                    ? events.map(e => `<li>${e}</li>`).join("")
                     : `<li>-</li>`;
 
                 $("infoEtcList").innerHTML = `
-          <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
-          <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"
-                    }</li>
-          <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
-        `;
+        <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
+        <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
+        <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
+      `;
 
                 // 4) 연락처
                 const phoneNum = store.phone || "";
                 function linkOrNull(url, label) {
                     if (!url) return null;
                     const u = /^https?:\/\//i.test(url) ? url : "http://" + url;
-                    return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(
-                        label || url
-                    )}</a>`;
+                    return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label || url)}</a>`;
                 }
-                const items = [];
+                const contactLinks = []; // ← 이름 변경(중복 피하기)
                 if (phoneNum) {
                     const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
-                    items.push(
-                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(
-                            phoneNum
-                        )}</a>`
+                    contactLinks.push(
+                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`
                     );
                 }
                 const home = linkOrNull(store.homepage, "홈페이지");
-                if (home) items.push(home);
+                if (home) contactLinks.push(home);
                 const insta = linkOrNull(store.instagram, "인스타그램");
-                if (insta) items.push(insta);
+                if (insta) contactLinks.push(insta);
                 const face = linkOrNull(store.facebook, "페이스북");
-                if (face) items.push(face);
+                if (face) contactLinks.push(face);
 
                 const grid = $("contactGrid");
-                if (!items.length) {
+                if (!contactLinks.length) {
                     grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
-                } else if (items.length === 1) {
-                    grid.innerHTML = `<div class="col-span-2">${items[0]}</div>`;
+                } else if (contactLinks.length === 1) {
+                    grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
                 } else {
-                    grid.innerHTML = items.map((html) => `<div>${html}</div>`).join("");
+                    grid.innerHTML = contactLinks.map(html => `<div>${html}</div>`).join("");
                 }
 
                 // 5) 지도
@@ -490,43 +514,40 @@
                     menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
                 } else {
                     const byCat = {};
-                    menus.forEach((it) => {
+                    menus.forEach(it => {
                         const cat = (it.category || "").toString().trim() || "기타";
                         (byCat[cat] ||= []).push(it);
                     });
-                    Object.entries(byCat).forEach(([cat, items]) => {
+
+                    Object.entries(byCat).forEach(([cat, groupItems]) => { // ← 매개변수도 이름 변경
                         const group = document.createElement("div");
                         const title = document.createElement("h3");
                         title.textContent = "🍱 " + cat;
                         title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
                         group.appendChild(title);
 
-                        items.forEach((it) => {
+                        groupItems.forEach(it => {
                             const box = document.createElement("div");
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                             const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
                             box.innerHTML = `
-                <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-                <div class="flex-1">
-                  <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-                  <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+              <div class="flex-1">
+                <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+                <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+              </div>
+              <div class="flex flex-col items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1">
+                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+                  <span class="quantity w-6 text-center">1</span>
+                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
                 </div>
-                <div class="flex flex-col items-center gap-1 shrink-0">
-                  <div class="flex items-center gap-1">
-                    <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                    <span class="quantity w-6 text-center">1</span>
-                    <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                  </div>
-                  <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-                </div>`;
+                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+              </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
-                            box.querySelector(".decrease").onclick = () => {
-                                if (qty > 1) qtySpan.textContent = --qty;
-                            };
-                            box.querySelector(".increase").onclick = () => {
-                                qtySpan.textContent = ++qty;
-                            };
+                            box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
+                            box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
                             box.querySelector(".addBtn").onclick = () =>
                                 addToCart({ name: it.name, price: it.price, quantity: qty });
                             group.appendChild(box);
@@ -538,7 +559,9 @@
 
                 // 예약 버튼
                 const reserveBtn = $("reserveBtn");
-                if (reserveBtn) reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
+                if (reserveBtn) {
+                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
+                }
 
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
