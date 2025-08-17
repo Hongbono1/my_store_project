@@ -38,12 +38,25 @@ function toWebPath(f) {
 export async function createFoodStore(req, res) {
   const client = await pool.connect();
   try {
+    console.log("[createFoodStore] ct:", req.headers["content-type"]);
+    console.log("[createFoodStore] body keys:", Object.keys(req.body || {}));
+    if (Array.isArray(req.files)) {
+      console.log("[createFoodStore] files:", req.files.map(f => `${f.fieldname}:${f.originalname}`));
+    } else if (req.files && typeof req.files === "object") {
+      console.log("[createFoodStore] files(fields):", Object.entries(req.files).flatMap(([k, arr]) => arr.map(f => `${k}:${f.originalname}`)));
+    }
+
     const businessName = (req.body.businessName || "").trim();
     const roadAddress = (req.body.roadAddress || "").trim();
     const phone = (req.body.phone || "").trim();
 
+    // ⚠️ 일단 200으로 내려 프론트 catch 방지 + 어떤 필드가 비었는지 바로 확인
     if (!businessName || !roadAddress) {
-      return res.status(400).json({ ok: false, error: "businessName, roadAddress는 필수" });
+      return res.status(200).json({
+        ok: false,
+        error: "missing_required",
+        fields: { businessName: !!businessName, roadAddress: !!roadAddress }
+      });
     }
 
     // 확장 필드들
