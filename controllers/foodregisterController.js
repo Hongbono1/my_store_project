@@ -127,26 +127,27 @@ export async function createFoodStore(req, res) {
     // 3) 메뉴 저장
     const menuBuckets = {};
     for (const [k, v] of Object.entries(req.body)) {
-      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price)\]$/);
+      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description)\]$/);
       if (!m) continue;
       const [, ci, mi, key] = m;
       const idx = `${ci}:${mi}`;
-      menuBuckets[idx] ??= { category: null, name: "", price: 0 };
+      menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "" };
       if (key === "price") {
         menuBuckets[idx].price = parseInt(String(v).replace(/[^\d]/g, ""), 10) || 0;
-      } else if (key === "name") {
-        menuBuckets[idx].name = String(v).trim();
       } else if (key === "category") {
-        menuBuckets[idx].category = String(v).trim() || null;
+        menuBuckets[idx].name = String(v).trim();
+      } else if (key === "description") {
+        menuBuckets[idx].description = String(v).trim();
       }
     }
     const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
     if (menus.length) {
-      const vals = menus.map((_, i) => `($1,$${i * 3 + 2},$${i * 3 + 3},$${i * 3 + 4})`).join(",");
+      // name, price, category, description → 4개 필드
+      const vals = menus.map((_, i) => `($1,$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4},$${i * 4 + 5})`).join(",");
       const params = [storeId];
-      menus.forEach(m => { params.push(m.name, m.price, m.category); });
+      menus.forEach(m => { params.push(m.name, m.price, m.category, m.description || null); });
       await client.query(
-        `INSERT INTO menu_items (store_id, name, price, category) VALUES ${vals}`,
+        `INSERT INTO menu_items (store_id, name, price, category, description) VALUES ${vals}`,
         params
       );
     }
@@ -253,11 +254,12 @@ export async function getFoodRegisterFull(req, res) {
     // 3) 메뉴
     const { rows: menus } = await pool.query(
       `SELECT id, name, price,
-              COALESCE(category,'기타') AS category,
-              image_url
-         FROM menu_items
-        WHERE store_id = $1
-        ORDER BY id ASC`,
+          COALESCE(category,'기타') AS category,
+          image_url,
+          description
+     FROM menu_items
+    WHERE store_id = $1
+    ORDER BY id ASC`,
       [idNum]
     );
 
@@ -371,25 +373,26 @@ export async function updateFoodStore(req, res) {
     const menuBuckets = {};
     let hasMenu = false;
     for (const [k, v] of Object.entries(raw)) {
-      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price)\]$/);
+      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description)\]$/);
       if (!m) continue;
       hasMenu = true;
       const [, ci, mi, key] = m;
       const idx = `${ci}:${mi}`;
-      menuBuckets[idx] ??= { category: null, name: "", price: 0 };
+      menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "" };
       if (key === "price") menuBuckets[idx].price = parseInt(String(v).replace(/[^\d]/g, ""), 10) || 0;
       if (key === "name") menuBuckets[idx].name = String(v).trim();
       if (key === "category") menuBuckets[idx].category = String(v).trim() || null;
+      if (key === "description") menuBuckets[idx].description = String(v).trim();
     }
     if (hasMenu) {
       await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
       const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
       if (menus.length) {
-        const vals = menus.map((_, i) => `($1,$${i * 3 + 2},$${i * 3 + 3},$${i * 3 + 4})`).join(",");
+        const vals = menus.map((_, i) => `($1,$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4},$${i * 4 + 5})`).join(",");
         const p = [idNum];
-        menus.forEach(m => { p.push(m.name, m.price, m.category); });
+        menus.forEach(m => { p.push(m.name, m.price, m.category, m.description || null); });
         await client.query(
-          `INSERT INTO menu_items (store_id, name, price, category) VALUES ${vals}`,
+          `INSERT INTO menu_items (store_id, name, price, category, description) VALUES ${vals}`,
           p
         );
       }
