@@ -1323,6 +1323,34 @@
             } catch (err) {
                 alert("등록 실패: " + (err?.message || "unknown"));
             }
+
+            // --- 메뉴 평탄화 + JSON 동시 전송 (서버 호환성 ↑) ---
+            const menusFlat = [];
+            state.categories.forEach((cat, ci) => {
+                (cat.items || []).forEach((item, mi) => {
+                    const obj = {
+                        category: cat.name,
+                        name: (item.name || "").trim(),
+                        price: Number((item.price || "").toString().replace(/[^\d]/g, "")) || 0,
+                        image_url: (item.imageUrl || "").trim(),
+                        description: (item.description || "").trim()
+                    };
+                    menusFlat.push(obj);
+
+                    // 기존 bracket 방식은 그대로 유지(혹시 서버가 이걸 읽도록 구현돼 있을 수 있으므로)
+                    fd.append(`storeMenus[${ci}][${mi}][category]`, obj.category);
+                    fd.append(`storeMenus[${ci}][${mi}][name]`, obj.name);
+                    fd.append(`storeMenus[${ci}][${mi}][price]`, String(obj.price));
+                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, obj.image_url);
+                    fd.append(`storeMenus[${ci}][${mi}][description]`, obj.description);
+                });
+            });
+
+            // ✅ 서버가 가장 읽기 쉬운 형태: menus 를 JSON 문자열로도 함께 전송
+            fd.append("menus", JSON.stringify(menusFlat));
+            // (혹시 키 이름이 다를 수도 있어 대비용으로 추가 — 필요 없으면 주석 처리해도 됨)
+            fd.append("menusJson", JSON.stringify(menusFlat));
+            fd.append("menuList", JSON.stringify(menusFlat));
         }
 
         /* =========================================================
