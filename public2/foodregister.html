@@ -495,7 +495,7 @@
                         <div class="text-sm text-gray-600">카테고리를 선택한 뒤 품목을 추가/삭제할 수 있습니다.</div>
                         <div class="flex items-center gap-2">
                             <button id="mnu-deleteCategoryBtn" type="button"
-                                class="neo-btn px-3 py-1.5 text-sm whitespace-nowrap">카테고리 삭제</button>
+                                class="neo-btn neo-danger px-3 py-1.5 text-sm whitespace-nowrap">카테고리 삭제</button>
                             <button id="mnu-addItemBtn" type="button"
                                 class="neo-btn px-3 py-1.5 text-sm whitespace-nowrap">품목 추가</button>
                         </div>
@@ -926,30 +926,6 @@
 
             // 선택 표시 유지
             if (state.selectedCategory) selectCategory(state.selectedCategory);
-            function deleteCategory(name) {
-                const idx = state.categories.findIndex(c => c.name === name);
-                if (idx === -1) return;
-
-                const count = state.categories[idx].items.length;
-                if (!confirm(`카테고리 "${name}"를 삭제할까요? (품목 ${count}개)`)) return;
-
-                state.categories.splice(idx, 1);
-
-                // 선택된 카테고리가 삭제되면 다른 카테고리로 재선택
-                if (state.selectedCategory === name) {
-                    state.selectedCategory = state.categories[0]?.name || null;
-                }
-
-                renderCategoryChips();
-                renderMenuContainer();
-            }
-
-            // ✅ 현재 선택된 카테고리 삭제 (툴바 버튼용)
-            function deleteSelectedCategory() {
-                const name = state.selectedCategory;
-                if (!name) return alert("삭제할 카테고리를 먼저 선택하세요.");
-                deleteCategory(name);
-            }
         }
 
         function renderMenuContainer() {
@@ -983,7 +959,7 @@
     </div>
     <input class="neo-input w-full px-3 py-2 text-center" placeholder="품목명" value="${item.name || ""}">
     <input class="neo-input w-full px-3 py-2 text-center" placeholder="가격" value="${formatPriceView(item.price || "")}">
-    <button type="button" class="neo-btn px-3 py-2">삭제</button>
+    <button type="button" class="neo-btn neo-danger px-3 py-2">삭제</button>
   </div>
 
   <!-- 설명(선택) -->
@@ -1380,9 +1356,43 @@
             })));
         }
 
+
+        // === 카테고리 삭제(전역) ===
+        function deleteCategory(name) {
+            const idx = state.categories.findIndex(c => c.name === name);
+            if (idx === -1) return;
+
+            const count = state.categories[idx].items.length;
+            if (!confirm(`카테고리 "${name}"를 삭제할까요? (품목 ${count}개)`)) return;
+
+            state.categories.splice(idx, 1);
+
+            if (state.selectedCategory === name) {
+                state.selectedCategory = state.categories[0]?.name || null;
+            }
+            renderCategoryChips();
+            renderMenuContainer();
+        }
+
+        function deleteSelectedCategory() {
+            const name = state.selectedCategory;
+            if (!name) return alert("삭제할 카테고리를 먼저 선택하세요.");
+            deleteCategory(name);
+        }
+
         /* =========================================================
            이벤트 바인딩
         ========================================================= */
+        function bindEvents() {
+            // ...
+            qs("#mnu-deleteCategoryBtn")?.addEventListener("click", deleteSelectedCategory);
+        }
+
+        /* =========================================================
+           이벤트 바인딩
+        ========================================================= */
+
+
         function bindEvents() {
             // 사업자번호 인증
             qs("#btnVerifyBiz")?.addEventListener("click", verifyBiz);
