@@ -4,46 +4,66 @@ import path from "path";
 
 // 공통: 숫자 ID 가드
 function parseId(raw) {
-  const n = Number.parseInt(raw, 10);
+  const n = Number.parseInt(String(raw), 10);
   return Number.isSafeInteger(n) ? n : null;
+}
+
+// 업로드 파일 수집 도우미 (multer.any() / fields() 모두 대응)
+function collectFiles(req) {
+  if (!req || !req.files) return [];
+  if (Array.isArray(req.files)) return req.files; // any()
+  // fields(): { field: [files] } -> flat array
+  return Object.values(req.files).flat();
+}
+// 특정 필드만 추출
+function filesByField(files, ...fieldnames) {
+  const set = new Set(fieldnames);
+  return files.filter(f => set.has(f.fieldname));
+}
+// 웹 경로 변환
+function toWebPath(f) {
+  return f?.path
+    ? `/uploads/${path.basename(f.path)}`
+    : f?.filename
+      ? `/uploads/${f.filename}`
+      : null;
 }
 
 /**
  * 등록: FormData (multipart/form-data)
  * 필수: businessName, roadAddress
- * 선택: phone, storeImages[*], storeMenus[i][j][{category|name|price}]
- *       + 확장 필드(업종/카테고리/영업시간/배달/서비스/이벤트/기타/연락처 등)
+ * 선택: phone, storeImages[*], businessCertImage, storeMenus[i][j][{category|name|price}]
  * 응답: { ok:true, id }
  */
 export async function createFoodStore(req, res) {
   const client = await pool.connect();
   try {
     const businessName = (req.body.businessName || "").trim();
-    const roadAddress  = (req.body.roadAddress  || "").trim();
-    const phone        = (req.body.phone        || "").trim();
+    const roadAddress = (req.body.roadAddress || "").trim();
+    const phone = (req.body.phone || "").trim();
 
     if (!businessName || !roadAddress) {
       return res.status(400).json({ ok: false, error: "businessName, roadAddress는 필수" });
     }
 
     // 확장 필드들
-    const businessType     = (req.body.businessType     || "").trim();
+    const businessType = (req.body.businessType || "").trim();
     const businessCategory = (req.body.businessCategory || "").trim();
-    const businessHours    = (req.body.businessHours    || "").trim();
-    const deliveryOption   = (req.body.deliveryOption   || "").trim();
+    const businessHours = (req.body.businessHours || "").trim();
+    const deliveryOption = (req.body.deliveryOption || "").trim();
 
-    const serviceDetails   = (req.body.serviceDetails   || "").trim();
-    const additionalDesc   = (req.body.additionalDesc   || "").trim();
+    const serviceDetails = (req.body.serviceDetails || "").trim();
+    const additionalDesc = (req.body.additionalDesc || "").trim();
 
-    const homepage         = (req.body.homepage         || "").trim();
-    const instagram        = (req.body.instagram        || "").trim();
-    const facebook         = (req.body.facebook         || "").trim();
+    const homepage = (req.body.homepage || "").trim();
+    const instagram = (req.body.instagram || "").trim();
+    const facebook = (req.body.facebook || "").trim();
 
-    const facilities       = (req.body.facilities       || "").trim();
+    const facilities = (req.body.facilities || "").trim();
     const petsAllowed =
       req.body.petsAllowed === "true" ? true :
-      req.body.petsAllowed === "false" ? false : null;
-    const parking          = (req.body.parking          || "").trim();
+        req.body.petsAllowed === "false" ? false : null;
+    const parking = (req.body.parking || "").trim();
 
     await client.query("BEGIN");
 
@@ -67,13 +87,14 @@ export async function createFoodStore(req, res) {
     ]);
     const storeId = rows[0].id;
 
-    // 2) 이미지 저장
-    const files = Array.isArray(req.files) ? req.files : (req.files?.storeImages || []);
-    if (files && files.length) {
-      const urls = files
-        .map(f => (f.path ? `/uploads/${path.basename(f.path)}`
-                          : f.filename ? `/uploads/${f.filename}` : null))
-        .filter(Boolean);
+    // 2) 업로드 파일 분류
+    const allFiles = collectFiles(req);
+    const storeImageFiles = filesByField(allFiles, "storeImages", "storeImages[]");
+    const certFile = filesByField(allFiles, "businessCertImage")[0];
+
+    // 2-1) 대표 이미지 저장 (store_images)
+    if (storeImageFiles.length) {
+      const urls = storeImageFiles.map(toWebPath).filter(Boolean);
       if (urls.length) {
         const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
         await client.query(
@@ -82,6 +103,13 @@ export async function createFoodStore(req, res) {
         );
       }
     }
+
+    // 2-2) 사업자등록증 경로 저장 옵션 (스키마에 컬럼이 있을 때만 사용)
+    // 만약 food_stores 테이블에 business_cert 컬럼이 있다면 주석 해제:
+    // if (certFile) {
+    //   const certPath = toWebPath(certFile);
+    //   await client.query(`UPDATE food_stores SET business_cert=$2 WHERE id=$1`, [storeId, certPath]);
+    // }
 
     // 3) 메뉴 저장
     const menuBuckets = {};
@@ -101,7 +129,7 @@ export async function createFoodStore(req, res) {
     }
     const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
     if (menus.length) {
-      const vals = menus.map((_, i) => `($1,$${i*3+2},$${i*3+3},$${i*3+4})`).join(",");
+      const vals = menus.map((_, i) => `($1,$${i * 3 + 2},$${i * 3 + 3},$${i * 3 + 4})`).join(",");
       const params = [storeId];
       menus.forEach(m => { params.push(m.name, m.price, m.category); });
       await client.query(
@@ -116,7 +144,7 @@ export async function createFoodStore(req, res) {
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
     if (events.length) {
-      const values = events.map((_, i) => `($1,$${i+2},${i})`).join(",");
+      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
       await client.query(
         `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
         [storeId, ...events]
@@ -126,11 +154,12 @@ export async function createFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await pool.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    client.release();
+    // 꼭 client로 release/rollback 하세요 (pool 아님)
+    try { client.release(); } catch { }
   }
 }
 
@@ -142,13 +171,14 @@ export async function getFoodStoreById(req, res) {
     const idNum = parseId(req.params.id);
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
+    // created_at이 스키마에 없을 수 있어 안전하게 NULL로 대체
     const q = `
       SELECT
         id,
         business_name AS "businessName",
         road_address  AS "roadAddress",
         phone,
-        created_at    AS "createdAt"
+        NULL::timestamp AS "createdAt"
       FROM food_stores
       WHERE id = $1
     `;
@@ -171,13 +201,14 @@ export async function getFoodRegisterFull(req, res) {
     const idNum = parseId(req.params.id);
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 1) 가게
+    // 1) 가게 (created_at 미보유 대비)
     const { rows: s } = await pool.query(
       `SELECT
          id,
          business_name,
          road_address AS address,
-         phone, created_at,
+         phone,
+         NULL::timestamp AS created_at,
          business_type, business_category, business_hours, delivery_option,
          service_details, additional_desc,
          homepage, instagram, facebook,
@@ -243,12 +274,11 @@ export async function updateFoodStore(req, res) {
     const idNum = parseId(req.params.id);
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 요청값 정리(보낸 것만 반영)
     const raw = req.body;
     const mapBool = v =>
       v === true || v === "true" ? true
-      : v === false || v === "false" ? false
-      : null;
+        : v === false || v === "false" ? false
+          : null;
 
     const candidate = {
       business_name: raw.businessName?.trim(),
@@ -268,17 +298,17 @@ export async function updateFoodStore(req, res) {
       parking: raw.parking?.trim(),
     };
 
+    await client.query("BEGIN");
+
+    // 부분 업데이트
     const set = [];
     const params = [];
     Object.entries(candidate).forEach(([col, val]) => {
-      if (val !== undefined) {                // undefined면 업데이트 안 함
+      if (val !== undefined) {
         set.push(`${col} = $${set.length + 1}`);
-        params.push(val === "" ? null : val); // 빈문자면 NULL
+        params.push(val === "" ? null : val);
       }
     });
-
-    await client.query("BEGIN");
-
     if (set.length) {
       params.push(idNum);
       await client.query(
@@ -287,12 +317,11 @@ export async function updateFoodStore(req, res) {
       );
     }
 
-    // 이벤트 갱신
+    // 이벤트 전량 교체(보낸 경우)
     const events = Object.entries(raw)
       .filter(([k]) => /^event\d+$/.test(k))
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
-
     if (events.length) {
       await client.query(`DELETE FROM store_events WHERE store_id=$1`, [idNum]);
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
@@ -302,13 +331,11 @@ export async function updateFoodStore(req, res) {
       );
     }
 
-    // 새 이미지 추가(기존 유지)
-    const files = Array.isArray(req.files) ? req.files : (req.files?.storeImages || []);
-    if (files && files.length) {
-      const urls = files
-        .map(f => (f.path ? `/uploads/${path.basename(f.path)}`
-          : f.filename ? `/uploads/${f.filename}` : null))
-        .filter(Boolean);
+    // 새 이미지 추가(기존 유지) — storeImages 계열만
+    const allFiles = collectFiles(req);
+    const newStoreImages = filesByField(allFiles, "storeImages", "storeImages[]");
+    if (newStoreImages.length) {
+      const urls = newStoreImages.map(toWebPath).filter(Boolean);
       if (urls.length) {
         const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
         await client.query(
@@ -318,7 +345,7 @@ export async function updateFoodStore(req, res) {
       }
     }
 
-    // 메뉴 전량 교체(보내온 경우에만)
+    // 메뉴 전량 교체(보낸 경우에만)
     const menuBuckets = {};
     let hasMenu = false;
     for (const [k, v] of Object.entries(raw)) {
@@ -349,10 +376,10 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: idNum });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    client.release();
+    try { client.release(); } catch { }
   }
 }
