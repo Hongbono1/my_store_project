@@ -887,21 +887,56 @@
                 if (b.dataset.mnuBlock === name) b.classList.add("outline", "outline-2", "outline-blue-200");
                 else b.classList.remove("outline", "outline-2", "outline-blue-200");
             });
+
+            function deleteCategory(name) {
+                const idx = state.categories.findIndex(c => c.name === name);
+                if (idx === -1) return;
+
+                const count = state.categories[idx].items.length;
+                if (!confirm(`카테고리 "${name}"를 삭제할까요? (품목 ${count}개)`)) return;
+
+                state.categories.splice(idx, 1);
+
+                // 선택된 카테고리가 삭제되면 새로 선택
+                if (state.selectedCategory === name) {
+                    state.selectedCategory = state.categories[0]?.name || null;
+                }
+
+                renderCategoryChips();
+                renderMenuContainer();
+            }
         }
 
         function renderCategoryChips() {
             const wrap = qs("#mnu-categoryChips");
             if (!wrap) return;
             wrap.innerHTML = "";
+
             state.categories.forEach(cat => {
-                const b = document.createElement("button");
-                b.type = "button";
-                b.className = "chip neo-tag px-3 py-1 text-sm hover:bg-white transition";
-                b.dataset.name = cat.name;
-                b.textContent = cat.name;
-                b.onclick = () => { selectCategory(cat.name); renderMenuContainer(); };
-                wrap.appendChild(b);
+                const box = document.createElement("div");
+                box.className = "flex items-center gap-1";
+
+                const chipBtn = document.createElement("button");
+                chipBtn.type = "button";
+                chipBtn.className = "chip neo-tag px-3 py-1 text-sm hover:bg-white transition";
+                chipBtn.dataset.name = cat.name;
+                chipBtn.textContent = cat.name;
+                chipBtn.onclick = () => { selectCategory(cat.name); renderMenuContainer(); };
+
+                const delBtn = document.createElement("button");
+                delBtn.type = "button";
+                delBtn.className = "px-2 py-1 text-slate-500 hover:text-red-600 rounded-md";
+                delBtn.setAttribute("aria-label", `카테고리 ${cat.name} 삭제`);
+                delBtn.textContent = "×";
+                delBtn.onclick = (e) => { e.stopPropagation(); deleteCategory(cat.name); };
+
+                box.appendChild(chipBtn);
+                box.appendChild(delBtn);
+                wrap.appendChild(box);
             });
+
+            // 선택 표시 유지
+            if (state.selectedCategory) selectCategory(state.selectedCategory);
         }
 
         function renderMenuContainer() {
@@ -958,7 +993,7 @@
                     priceEl.addEventListener("input", (e) => { e.target.value = formatPriceView(e.target.value); cat.items[idx].price = onlyDigits(e.target.value); });
                     delBtn.addEventListener("click", () => { cat.items.splice(idx, 1); renderMenuContainer(); });
                     descEl.addEventListener("input", (e) => { cat.items[idx].description = e.target.value; });
-                    
+
                     list.appendChild(row);
                 });
 
