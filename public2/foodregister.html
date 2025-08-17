@@ -215,6 +215,8 @@
                 <div class="flex flex-col md:flex-row md:items-center gap-3 mb-3">
                     <label class="w-36 font-medium text-blue-900 text-center shrink-0 leading-tight">
                         <span>사업자 등록<br>인증</span>
+                        <input type="hidden" id="bizVerified" name="bizVerified" value="N">
+                        <input type="hidden" id="bizNumber" name="bizNumber" value="">
                     </label>
 
                     <div id="bizRow" class="flex flex-wrap md:flex-nowrap items-center gap-2 flex-1">
@@ -683,6 +685,58 @@
             return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         }
 
+        /* ==== 헬퍼 추가: 사업자번호 3칸 입력 UX (자동 숫자화/자동 이동/붙여넣기) ==== */
+        function getBizNumberParts() {
+            const onlyDigits = s => (s || "").replace(/[^\d]/g, "");
+            const b1 = onlyDigits(document.getElementById("biz1")?.value);
+            const b2 = onlyDigits(document.getElementById("biz2")?.value);
+            const b3 = onlyDigits(document.getElementById("biz3")?.value);
+            return { b1, b2, b3, full: (b1 || "") + (b2 || "") + (b3 || "") };
+        }
+
+        function initBizInputs() {
+            const i1 = document.getElementById("biz1");
+            const i2 = document.getElementById("biz2");
+            const i3 = document.getElementById("biz3");
+            const out = document.getElementById("bizVerifyResult");
+
+            const onlyDigits = s => (s || "").replace(/[^\d]/g, "");
+            const jump = (from, to, max) => {
+                from?.addEventListener("input", () => {
+                    from.value = onlyDigits(from.value).slice(0, max);
+                    if (from.value.length === max) to?.focus();
+                    if (out) out.textContent = "";
+                });
+                from?.addEventListener("keydown", e => {
+                    if (e.key === "Backspace" && from.value.length === 0) to?.focus();
+                });
+                from?.addEventListener("focus", () => from.select());
+            };
+
+            if (i1 && i2 && i3) {
+                jump(i1, i2, 3);
+                jump(i2, i3, 2);
+                i3.addEventListener("input", () => {
+                    i3.value = onlyDigits(i3.value).slice(0, 5);
+                    if (out) out.textContent = "";
+                });
+
+                // 10자리 전체 붙여넣기(예: 123-45-67890 또는 1234567890)
+                i1.addEventListener("paste", e => {
+                    const t = (e.clipboardData || window.clipboardData).getData("text") || "";
+                    const d = onlyDigits(t);
+                    if (d.length === 10) {
+                        e.preventDefault();
+                        i1.value = d.slice(0, 3);
+                        i2.value = d.slice(3, 5);
+                        i3.value = d.slice(5);
+                        i3.focus();
+                        if (out) out.textContent = "";
+                    }
+                });
+            }
+        }
+
         /* =========================================================
            헤더/푸터 포함
         ========================================================= */
@@ -700,17 +754,31 @@
    사업자번호 인증
 ========================================================= */
         async function verifyBiz() {
-            const b1 = onlyDigits(qs("#biz1").value);
-            const b2 = onlyDigits(qs("#biz2").value);
-            const b3 = onlyDigits(qs("#biz3").value);
-            const full = b1 + b2 + b3;
+            const out = document.getElementById("bizVerifyResult");
+            const btn = document.getElementById("btnVerifyBiz");
+            const bizVerified = document.getElementById("bizVerified");
+            const bizNumber = document.getElementById("bizNumber");
+            const nameInput = document.getElementById("businessName");
 
-            const out = qs("#bizVerifyResult");
-            out.textContent = "";
+            const { b1, b2, b3, full } = getBizNumberParts();
+            if (out) { out.textContent = ""; out.className = "text-sm text-center"; }
+
+            // 형식 검증
             if (b1.length !== 3 || b2.length !== 2 || b3.length !== 5) {
-                out.textContent = "사업자번호 형식이 올바르지 않습니다.";
-                out.className = "text-sm text-red-600 text-center";
+                if (out) {
+                    out.textContent = "사업자번호 형식이 올바르지 않습니다.";
+                    out.classList.add("text-red-600");
+                }
+                bizVerified && (bizVerified.value = "N");
                 return;
+            }
+
+            // UI 상태
+            btn && (btn.disabled = true);
+            if (out) {
+                out.textContent = "인증 조회 중…";
+                out.classList.remove("text-red-600", "text-green-700", "text-orange-600");
+                out.classList.add("text-slate-600");
             }
 
             try {
@@ -719,19 +787,48 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ b_no: [full] })
                 });
-                if (!res.ok) throw new Error("응답 오류");
+
+                // 엔드포인트 자체가 없거나 404여도 catch가 아니고 여기로 올 수 있으니 분기
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
                 const data = await res.json();
 
-                const ok = data?.status_code === "OK" || data?.ok === true;
-                out.textContent = ok
-                    ? "사업자번호 인증 요청 성공 (상세 상태는 서버 응답 기준)"
-                    : "인증 실패 또는 상태 확인 불가 (서버 응답 포맷 확인 필요)";
-                out.className = ok
-                    ? "text-sm text-green-700 text-center"
-                    : "text-sm text-red-600 text-center";
-            } catch {
-                out.textContent = "인증 API 미연동 또는 응답 실패 (나중에 연동)";
-                out.className = "text-sm text-orange-600 text-center";
+                // odcloud 응답 형태 우선 처리
+                const rec = Array.isArray(data?.data) ? data.data[0] : null;
+                const isActive =
+                    (rec?.b_stt_cd === "01") || (typeof rec?.b_stt === "string" && rec.b_stt.trim() === "계속사업자") ||
+                    (data?.ok === true && (data?.valid === true || data?.status === "OK"));
+
+                if (isActive) {
+                    bizVerified && (bizVerified.value = "Y");
+                    bizNumber && (bizNumber.value = full);
+
+                    // 상호 자동입력(비어있을 때만)
+                    const bizName = (rec?.b_nm || rec?.biz_name || "").trim();
+                    if (bizName && nameInput && !nameInput.value.trim()) {
+                        nameInput.value = bizName;
+                    }
+
+                    if (out) {
+                        out.textContent = "인증 완료: 계속사업자 상태입니다.";
+                        out.className = "text-sm text-green-700 text-center";
+                    }
+                } else {
+                    bizVerified && (bizVerified.value = "N");
+                    if (out) {
+                        out.textContent = "인증 실패 또는 상태 확인 불가 (서버 응답 포맷 확인 필요)";
+                        out.className = "text-sm text-red-600 text-center";
+                    }
+                }
+            } catch (e) {
+                // ❗ 미연동·실패 시 표시 (요청했던 문구)
+                bizVerified && (bizVerified.value = "N");
+                if (out) {
+                    out.textContent = "인증 API 미연동 또는 응답 실패 (나중에 연동)";
+                    out.className = "text-sm text-orange-600 text-center";
+                }
+            } finally {
+                btn && (btn.disabled = false);
             }
         }
 
@@ -838,8 +935,7 @@
     </div>
     <input class="neo-input w-full px-3 py-2 text-center" placeholder="품목명" value="${item.name || ""}">
     <input class="neo-input w-full px-3 py-2 text-center" placeholder="가격" value="${formatPriceView(item.price || "")}">
-    <button type="button" c
-    lass="neo-btn px-3 py-2">삭제</button>
+    <button type="button" class="neo-btn px-3 py-2">삭제</button>
   </div>
 `;
 
@@ -1260,6 +1356,7 @@
             initImagePreview();
             initPhoneAuth();
             initFABS();
+            initBizInputs();
 
             // Kakao Maps autoload=false → 수동 로드 대기
             if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
