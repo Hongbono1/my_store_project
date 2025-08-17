@@ -1284,28 +1284,50 @@
             const businessName = qs("#businessName")?.value.trim();
             const roadAddress = qs("#roadAddress")?.value.trim();
             if (!businessName || !roadAddress) {
-                return alert("상호와 주소(도로명)는 필수입니다.");
+                alert("상호와 주소(도로명)는 필수입니다.");
+                return;
             }
 
-            // 가격 input의 콤마 제거(백엔드 숫자만 받도록) — fd 생성 전에 처리
-            qsa('input[name="menuPrice[]"]').forEach(i => i.value = (i.value || "").replace(/,/g, ""));
+            // 폼에 이 name이 없으면 그냥 지나감
+            qsa('input[name="menuPrice[]"]').forEach(i => {
+                i.value = (i.value || "").replace(/,/g, "");
+            });
 
-            const fd = new FormData(qs("#storeForm"));
-            // 🔎 FormData에 진짜 무엇이 담겼는지 확인
-            for (const [k, v] of fd.entries()) console.log("FD:", k, (v && v.name) ? v.name : v);
+            const formEl = qs("#storeForm");
+            const fd = new FormData(formEl);
 
-            // 메뉴 평탄화
+            // ---- 메뉴 평탄화 (state -> 배열) ----
+            const menusFlat = [];
             state.categories.forEach((cat, ci) => {
-                cat.items.forEach((item, mi) => {
-                    fd.append(`storeMenus[${ci}][${mi}][category]`, cat.name);
-                    fd.append(`storeMenus[${ci}][${mi}][name]`, (item.name || "").trim());
-                    fd.append(`storeMenus[${ci}][${mi}][price]`, onlyDigits(item.price));
-                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, (item.imageUrl || "").trim());
-                    fd.append(`storeMenus[${ci}][${mi}][description]`, (item.description || "").trim());
-                    // 필요시 파일도 추가:
-                    // if (item.imageFile) fd.append(`storeMenus[${ci}][${mi}][image_file]`, item.imageFile);
+                (cat.items || []).forEach((item, mi) => {
+                    const obj = {
+                        category: cat.name,
+                        name: (item.name || "").trim(),
+                        price: Number((item.price || "").toString().replace(/[^\d]/g, "")) || 0,
+                        image_url: (item.imageUrl || "").trim(),
+                        description: (item.description || "").trim(),
+                    };
+                    menusFlat.push(obj);
+
+                    // 브래킷 방식도 함께 전송(백엔드가 이 형식만 읽는 경우 대비)
+                    fd.append(`storeMenus[${ci}][${mi}][category]`, obj.category);
+                    fd.append(`storeMenus[${ci}][${mi}][name]`, obj.name);
+                    fd.append(`storeMenus[${ci}][${mi}][price]`, String(obj.price));
+                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, obj.image_url);
+                    fd.append(`storeMenus[${ci}][${mi}][description]`, obj.description);
                 });
             });
+
+            // ✅ JSON 키들도 fetch 이전에 같이 넣기
+            const menusJson = JSON.stringify(menusFlat);
+            fd.append("menus", menusJson);
+            fd.append("menusJson", menusJson);   // 호환용
+            fd.append("menuList", menusJson);   // 호환용
+
+            // 🔎 최종 FormData 디버그
+            for (const [k, v] of fd.entries()) {
+                console.log("FD:", k, (v && v.name) ? `[File] ${v.name}` : v);
+            }
 
             try {
                 const res = await fetch(API.REGISTER, { method: "POST", body: fd });
@@ -1323,34 +1345,6 @@
             } catch (err) {
                 alert("등록 실패: " + (err?.message || "unknown"));
             }
-
-            // --- 메뉴 평탄화 + JSON 동시 전송 (서버 호환성 ↑) ---
-            const menusFlat = [];
-            state.categories.forEach((cat, ci) => {
-                (cat.items || []).forEach((item, mi) => {
-                    const obj = {
-                        category: cat.name,
-                        name: (item.name || "").trim(),
-                        price: Number((item.price || "").toString().replace(/[^\d]/g, "")) || 0,
-                        image_url: (item.imageUrl || "").trim(),
-                        description: (item.description || "").trim()
-                    };
-                    menusFlat.push(obj);
-
-                    // 기존 bracket 방식은 그대로 유지(혹시 서버가 이걸 읽도록 구현돼 있을 수 있으므로)
-                    fd.append(`storeMenus[${ci}][${mi}][category]`, obj.category);
-                    fd.append(`storeMenus[${ci}][${mi}][name]`, obj.name);
-                    fd.append(`storeMenus[${ci}][${mi}][price]`, String(obj.price));
-                    fd.append(`storeMenus[${ci}][${mi}][image_url]`, obj.image_url);
-                    fd.append(`storeMenus[${ci}][${mi}][description]`, obj.description);
-                });
-            });
-
-            // ✅ 서버가 가장 읽기 쉬운 형태: menus 를 JSON 문자열로도 함께 전송
-            fd.append("menus", JSON.stringify(menusFlat));
-            // (혹시 키 이름이 다를 수도 있어 대비용으로 추가 — 필요 없으면 주석 처리해도 됨)
-            fd.append("menusJson", JSON.stringify(menusFlat));
-            fd.append("menuList", JSON.stringify(menusFlat));
         }
 
         /* =========================================================
