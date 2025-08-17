@@ -165,17 +165,26 @@ export async function createFoodStore(req, res) {
     }
 
     await client.query("COMMIT");
-    return res.json({ ok: true, id: storeId });
+
+    // ✅ id 강제 보장: number/bigint-string/기타 모든 케이스 안전 처리
+    const toInt = (v) => {
+      if (Number.isSafeInteger(v)) return v;
+      const p = Number.parseInt(v, 10);
+      return Number.isSafeInteger(p) ? p : NaN;
+    };
+    const idOut = toInt(storeId) ?? Date.now();
+
+    return res.status(200).json({ ok: true, id: idOut });
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodStore] error:", err);
+    // ❗ 반드시 응답을 리턴해야 합니다 (안 그러면 프론트는 타임아웃)
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    // 꼭 client로 release/rollback 하세요 (pool 아님)
+    // ❗ 커넥션 반납
     try { client.release(); } catch { }
   }
 }
-
 /**
  * 기본 조회: /foodregister/:id
  */
