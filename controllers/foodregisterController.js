@@ -36,6 +36,68 @@ function toInt(v) {
   return n ? parseInt(n, 10) : 0;
 }
 
+/* ===== 메뉴 파싱 유틸 추가: 중첩 + 브래킷 + 구형 배열 ===== */
+// (A) 중첩 객체 형태(req.body.storeMenus) + (B) 브래킷 키 형태 모두 지원
+function extractMenusFromBody(body) {
+  const out = [];
+  const pushItem = (m) => {
+    if (!m) return;
+    const name = (m.name ?? "").trim();
+    const price = toInt(m.price);
+    if (!name || price <= 0) return;
+    out.push({
+      name,
+      price,
+      category: (m.category ?? "").trim() || null,
+      description: (m.description ?? "").trim() || null,
+      image_url: (m.image_url ?? "").trim() || null,
+    });
+  };
+  // (A) 중첩 객체/배열
+  const sm = body?.storeMenus;
+  if (sm && typeof sm === "object") {
+    const groups = Array.isArray(sm) ? sm : Object.values(sm);
+    groups.forEach((g) => {
+      const items = Array.isArray(g) ? g : Object.values(g || {});
+      items.forEach(pushItem);
+    });
+  }
+  // (B) 브래킷 키
+  const buckets = {};
+  for (const [k, v] of Object.entries(body || {})) {
+    const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
+    if (!m) continue;
+    const idx = `${m[1]}:${m[2]}`;
+    (buckets[idx] ||= { category: null, name: "", price: 0, description: "", image_url: null });
+    const val = String(v ?? "").trim();
+    if (m[3] === "price") buckets[idx].price = toInt(val);
+    else if (m[3] === "category") buckets[idx].category = val || null;
+    else buckets[idx][m[3]] = val;
+  }
+  Object.values(buckets).forEach(pushItem);
+  return out;
+}
+
+// (구형) menuName[] / menuPrice[] / menuCategory[] / menuDesc[] + menuImage[] 파일
+function extractLegacyMenusFromBody(body, menuFiles = []) {
+  const toArr = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+  const names = toArr(body["menuName[]"] ?? body.menuName);
+  const prices = toArr(body["menuPrice[]"] ?? body.menuPrice);
+  const cats = toArr(body["menuCategory[]"] ?? body.menuCategory);
+  const descs = toArr(body["menuDesc[]"] ?? body.menuDesc);
+  const maxLen = Math.max(names.length, prices.length, cats.length, descs.length, menuFiles.length);
+  const rows = [];
+  for (let i = 0; i < maxLen; i++) {
+    const name = (names[i] ?? "").trim();
+    const price = toInt(prices[i]);
+    const category = (cats[i] ?? "").trim() || null;
+    const description = (descs[i] ?? "").trim() || null;
+    const img = menuFiles[i] ? toWebPath(menuFiles[i]) : null;
+    if (name && price > 0) rows.push({ name, price, category, description, image_url: img });
+  }
+  return rows;
+}
+
 /**
  * 등록: FormData (multipart/form-data)
  * 필수: businessName, roadAddress
@@ -131,45 +193,9 @@ export async function createFoodStore(req, res) {
     //   await client.query(`UPDATE food_stores SET business_cert=$2 WHERE id=$1`, [storeId, certPath]);
     // }
 
-    // 3) 메뉴 저장
-    // --- (A) 신규 구조: storeMenus[i][j][...] 파싱 ---
-    const bucketsA = {};
-    for (const [k, v] of Object.entries(req.body)) {
-      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
-      if (!m) continue;
-      const [, ci, mi, key] = m;
-      const idx = `${ci}:${mi}`;
-      bucketsA[idx] ??= { category: null, name: "", price: 0, description: "", image_url: null };
-
-      const val = String(v ?? "").trim();
-      if (key === "price") bucketsA[idx].price = toInt(val);
-      else if (key === "name") bucketsA[idx].name = val;
-      else if (key === "category") bucketsA[idx].category = val || null;
-      else if (key === "description") bucketsA[idx].description = val;
-      else if (key === "image_url") bucketsA[idx].image_url = val || null;
-    }
-    const menusA = Object.values(bucketsA).filter(m => m.name && m.price > 0);
-
-    // --- (B) 구형 구조: menuName[] / menuPrice[] / menuCategory[] (+ menuImage[] 파일) ---
-    const namesB = Array.isArray(req.body["menuName[]"]) ? req.body["menuName[]"] : (req.body.menuName || []);
-    const pricesB = Array.isArray(req.body["menuPrice[]"]) ? req.body["menuPrice[]"] : (req.body.menuPrice || []);
-    const catsB = Array.isArray(req.body["menuCategory[]"]) ? req.body["menuCategory[]"] : (req.body.menuCategory || []);
-    const descB = Array.isArray(req.body["menuDesc[]"]) ? req.body["menuDesc[]"] : (req.body.menuDesc || []);
-    const maxLenB = Math.max(namesB.length, pricesB.length, catsB.length, descB.length, menuImgFiles.length);
-
-    const menusB = [];
-    for (let i = 0; i < maxLenB; i++) {
-      const name = (namesB[i] || "").trim();
-      const price = toInt(pricesB[i]);
-      const cat = (catsB[i] || "").trim() || null;
-      const desc = (descB[i] || "").trim();
-      const imgF = menuImgFiles[i] ? toWebPath(menuImgFiles[i]) : null;
-      if (name && price > 0) {
-        menusB.push({ name, price, category: cat, description: desc, image_url: imgF });
-      }
-    }
-
-    // --- (C) 병합 (둘 다 있으면 이어붙임) ---
+    // 3) 메뉴 저장 — (A) 신규/브래킷 + (B) 구형 배열 → 병합
+    const menusA = extractMenusFromBody(req.body);
+    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
     const menus = [...menusA, ...menusB];
     if (menus.length) {
       const vals = menus.map((_, i) =>
@@ -212,10 +238,10 @@ export async function createFoodStore(req, res) {
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { (await pool).release?.(); } catch { }
-    try { /* 위 라인은 pool instance가 아니라 client여야 하므로 보정 */ } catch { }
+    try { client.release(); } catch { }
   }
 }
+
 
 /**
  * 기본 조회: /foodregister/:id
@@ -351,10 +377,8 @@ export async function updateFoodStore(req, res) {
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
     const raw = req.body;
-    const mapBool = v =>
-      v === true || v === "true" ? true
-        : v === false || v === "false" ? false
-          : null;
+    const mapBool = (v) =>
+      v === true || v === "true" ? true : v === false || v === "false" ? false : null;
 
     const candidate = {
       business_name: raw.businessName?.trim(),
@@ -395,7 +419,7 @@ export async function updateFoodStore(req, res) {
 
     // 이벤트 전량 교체(보낸 경우)
     const events = Object.entries(raw)
-      .filter(([k]) => /^event\d+$/.test(k))
+      .filter(([k]) => /^event\d+$/i.test(k))
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
     if (events.length) {
@@ -423,50 +447,35 @@ export async function updateFoodStore(req, res) {
 
     // 메뉴 전량 교체(보낸 경우만)
     {
-      // (A) 신규 구조
-      const bucketsA = {};
-      let hasMenu = false;
+      const menusA = extractMenusFromBody(raw);
 
-      for (const [k, v] of Object.entries(req.body)) {
-        const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
-        if (!m) continue;
-        hasMenu = true;
-        const [, ci, mi, key] = m;
-        const idx = `${ci}:${mi}`;
-        bucketsA[idx] ??= { category: null, name: "", price: 0, description: "", image_url: null };
-        const val = String(v ?? "").trim();
-        if (key === "price") bucketsA[idx].price = toInt(val);
-        else if (key === "name") bucketsA[idx].name = val;
-        else if (key === "category") bucketsA[idx].category = val || null;
-        else if (key === "description") bucketsA[idx].description = val;
-        else if (key === "image_url") bucketsA[idx].image_url = val || null;
-      }
-
-      // (B) 구형 구조
       const namesB = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : (raw.menuName || []);
       const pricesB = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : (raw.menuPrice || []);
       const catsB = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : (raw.menuCategory || []);
-      if (namesB.length || pricesB.length || catsB.length) hasMenu = true;
+      const hasLegacy = namesB.length || pricesB.length || catsB.length;
 
-      if (hasMenu) {
+      if (menusA.length || hasLegacy) {
         await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
 
-        const menusA = Object.values(bucketsA).filter(m => m.name && m.price > 0);
         const menusB = [];
         for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
           const name = (namesB[i] || "").trim();
           const price = toInt(pricesB[i]);
           const cat = (catsB[i] || "").trim() || null;
-          if (name && price > 0) menusB.push({ name, price, category: cat, image_url: null, description: null });
+          if (name && price > 0) {
+            menusB.push({ name, price, category: cat, image_url: null, description: null });
+          }
         }
 
         const combined = [...menusA, ...menusB];
         if (combined.length) {
-          const vals = combined.map((_, i) =>
-            `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
-          ).join(",");
+          const vals = combined
+            .map((_, i) => `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`)
+            .join(",");
           const p = [idNum];
-          combined.forEach(m => p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null));
+          combined.forEach((m) =>
+            p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null)
+          );
           await client.query(
             `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
             p
@@ -485,3 +494,8 @@ export async function updateFoodStore(req, res) {
     try { client.release(); } catch { }
   }
 }
+
+
+/* ── 호환용 export (기존 명칭과 동시 지원) ───────────────────── */
+export const getFoodStoreFull = getFoodRegisterFull;   // 과거 이름 호환
+export const createFoodRegister = createFoodStore;     // 과거 이름 호환
