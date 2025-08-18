@@ -145,8 +145,7 @@ export async function getFoodRegisterDetail(req, res) {
   try {
     const { rows: storeRows } = await pool.query(
       `SELECT id, business_name, business_type, business_category,
-              delivery_option, business_hours, address, phone, created_at
-       FROM food_stores WHERE id = $1`,
+                  delivery_option, business_hours, address, phone, NULL::timestamp AS created_at FROM food_stores WHERE id = $1`,
       [id]
     );
     if (storeRows.length === 0) {
