@@ -4,7 +4,6 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import * as ctrl from "../controllers/foodregisterController.js";
-
 const router = Router();
 
 /* =========================================
@@ -34,15 +33,19 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 20 * 1024 * 1024,
-    files: 50,
+    fileSize: 20 * 1024 * 1024, // 파일당 20MB
+    files: 200,                  // 총 파일 수 상향
+    fields: 2000,                // 텍스트 필드 수
+    fieldNameSize: 200,
   },
 });
 
 /* 예상 필드만 엄격히 허용 */
 const acceptKnown = upload.fields([
-  { name: "storeImages", maxCount: 10 },     // 대표 이미지(최대 10장까지 허용)
-  { name: "businessCertImage", maxCount: 1 } // 사업자등록증 1장
+  { name: "storeImages", maxCount: 50 },
+  { name: "businessCertImage", maxCount: 1 },
+  { name: "menuImage[]", maxCount: 150 }, // 구형 폼 호환
+  { name: "menuImage", maxCount: 150 },  // 단수 이름도 허용
 ]);
 
 /* 어떤 필드든 허용(예상 밖 필드 들어올 때 사용) */
@@ -51,8 +54,10 @@ const acceptAnyFiles = upload.any();
 /* 하이브리드: 예상치 못한 필드가 들어오면 자동으로 any()로 폴백 */
 function acceptWithFallback(req, res, next) {
   acceptKnown(req, res, (err) => {
+    if (err) {
+      console.warn("[multer] acceptKnown error:", err.code || err.message);
+    }
     if (err && err.code === "LIMIT_UNEXPECTED_FILE") {
-      // 예: 프론트가 새로운 필드명을 보낸 경우 → any로 재시도
       return acceptAnyFiles(req, res, next);
     }
     if (err) return next(err);
