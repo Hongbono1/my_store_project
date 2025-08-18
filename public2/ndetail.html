@@ -504,10 +504,8 @@
                     grid.innerHTML = contactLinks.map(html => `<div>${html}</div>`).join("");
                 }
 
-                // 5) 지도
-                await initMap(store.address || "", store.business_name || store.name || "");
 
-                // 6) 메뉴
+                // 5) 메뉴 (먼저 그리기)  ← 메뉴 먼저 렌더
                 const menuList = $("menuList");
                 menuList.innerHTML = "";
                 if (!menus.length) {
@@ -518,8 +516,7 @@
                         const cat = (it.category || "").toString().trim() || "기타";
                         (byCat[cat] ||= []).push(it);
                     });
-
-                    Object.entries(byCat).forEach(([cat, groupItems]) => { // ← 매개변수도 이름 변경
+                    Object.entries(byCat).forEach(([cat, groupItems]) => {
                         const group = document.createElement("div");
                         const title = document.createElement("h3");
                         title.textContent = "🍱 " + cat;
@@ -531,31 +528,36 @@
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                             const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
                             box.innerHTML = `
-              <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-              <div class="flex-1">
-                <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-                <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
-              </div>
-              <div class="flex flex-col items-center gap-1 shrink-0">
-                <div class="flex items-center gap-1">
-                  <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                  <span class="quantity w-6 text-center">1</span>
-                  <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-                </div>
-                <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-              </div>`;
+        <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+        <div class="flex-1">
+          <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+          <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+        </div>
+        <div class="flex flex-col items-center gap-1 shrink-0">
+          <div class="flex items-center gap-1">
+            <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+            <span class="quantity w-6 text-center">1</span>
+            <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
+          </div>
+          <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+        </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
                             box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
                             box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                            box.querySelector(".addBtn").onclick = () =>
-                                addToCart({ name: it.name, price: it.price, quantity: qty });
+                            box.querySelector(".addBtn").onclick = () => addToCart({ name: it.name, price: it.price, quantity: qty });
                             group.appendChild(box);
                         });
 
                         menuList.appendChild(group);
                     });
                 }
+                // 6) 지도
+                // 지도는 화면 그린 뒤 비동기로 (블로킹 방지)
+                initMap(store.address || "", store.business_name || store.name || "")
+                    .catch(err => console.warn("지도 로딩 실패(무시):", err));
+
+
 
                 // 예약 버튼
                 const reserveBtn = $("reserveBtn");

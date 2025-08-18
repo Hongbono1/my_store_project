@@ -1,4 +1,4 @@
-// controllers/foodregisterController.js
+
 import { Pool } from "pg";
 import path from "path";
 
@@ -54,17 +54,17 @@ export async function createFoodRegister(req, res) {
 
     const form = req.body || {};
     const storeImages = req.files?.["storeImages"] || [];
-    const menuFiles   = req.files?.["menuImage[]"] || [];
-    const bizCert     = (req.files?.["businessCertImage"] || [])[0] || null;
+    const menuFiles = req.files?.["menuImage[]"] || [];
+    const bizCert = (req.files?.["businessCertImage"] || [])[0] || null;
 
     // 필수 필드
-    const businessName     = form.businessName?.trim();
-    const businessType     = form.businessType?.trim() || null;
+    const businessName = form.businessName?.trim();
+    const businessType = form.businessType?.trim() || null;
     const businessCategory = form.businessCategory?.trim() || null;
-    const deliveryOption   = form.deliveryOption?.trim() || null;
-    const businessHours    = form.businessHours?.trim() || null;
-    const address          = form.address?.trim() || null;
-    const phone            = form.phone?.trim() || null;
+    const deliveryOption = form.deliveryOption?.trim() || null;
+    const businessHours = form.businessHours?.trim() || null;
+    const address = form.address?.trim() || null;
+    const phone = form.phone?.trim() || null;
 
     if (!businessName) {
       await client.query("ROLLBACK");
@@ -94,9 +94,9 @@ export async function createFoodRegister(req, res) {
     }
 
     // 3) 메뉴들 (텍스트 & 이미지 인덱스 매칭)
-    const menuNames       = arr(form["menuName[]"]);
-    const menuPrices      = arr(form["menuPrice[]"]);
-    const menuCategories  = arr(form["menuCategory[]"]);
+    const menuNames = arr(form["menuName[]"]);
+    const menuPrices = arr(form["menuPrice[]"]);
+    const menuCategories = arr(form["menuCategory[]"]);
     const maxLen = Math.max(menuNames.length, menuPrices.length, menuCategories.length, menuFiles.length);
 
     const menuRows = [];
@@ -127,7 +127,7 @@ export async function createFoodRegister(req, res) {
       businessCertImage: toUploadsPath(bizCert) || null
     });
   } catch (e) {
-    try { if (client) await client.query("ROLLBACK"); } catch {}
+    try { if (client) await client.query("ROLLBACK"); } catch { }
     if (e?.message === "TIMEOUT") {
       console.error("[foodregister] timeout");
       return res.status(504).json({ error: "upstream timeout" });
@@ -135,7 +135,7 @@ export async function createFoodRegister(req, res) {
     console.error("[createFoodRegister] error:", e);
     return res.status(500).json({ error: "create failed" });
   } finally {
-    try { if (client) client.release(); } catch {}
+    try { if (client) client.release(); } catch { }
   }
 }
 
@@ -167,47 +167,111 @@ export async function getFoodRegisterDetail(req, res) {
 }
 
 export async function getFoodRegisterFull(req, res) {
-  const { id } = req.params;
+  const idNum = Number.parseInt(String(req.params.id), 10);
+  if (!Number.isSafeInteger(idNum)) {
+    return res.status(400).json({ ok: false, error: "Invalid id" });
+  }
+
   try {
-    const { rows } = await pool.query(
+    // 1) 가게
+    const { rows: s } = await pool.query(
+      `SELECT id,
+              business_name,
+              address,
+              phone,
+              business_type, business_category, business_hours, delivery_option,
+              NULL::timestamp AS created_at
+         FROM food_stores
+        WHERE id = $1`,
+      [idNum]
+    );
+    if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
+
+    // 2) 이미지: 두 테이블 합치기 -> {url} 형식으로 반환
+    const { rows: images } = await pool.query(
       `
-      SELECT
-        s.*,
-        COALESCE(
-          ARRAY_AGG(si.image_url ORDER BY si.sort_order, si.id)
-          FILTER (WHERE si.id IS NOT NULL),
-          '{}'
-        )                                   AS images,
-        COALESCE(
-          JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'id', m.id,
-              'category', m.category,
-              'name', m.name,
-              'price', m.price,
-              'image_url', m.image_url
-            )
-            ORDER BY m.id
-          )
-          FILTER (WHERE m.id IS NOT NULL),
-          '[]'
-        )                                   AS menus
-      FROM food_stores s
-      LEFT JOIN food_store_images si ON si.store_id = s.id
-      LEFT JOIN food_menu_items  m  ON m.store_id  = s.id
-      WHERE s.id = $1
-      GROUP BY s.id
+      SELECT url
+        FROM store_images
+       WHERE store_id = $1
+      UNION ALL
+      SELECT image_url AS url
+        FROM food_store_images
+       WHERE store_id = $1
       `,
-      [id]
+      [idNum]
     );
 
-    if (rows.length === 0) return res.status(404).json({ error: "not found" });
+    // 3) 메뉴: 3개 테이블 합치기 (image_url 없는 테이블은 NULL로 맞춤)
+    let menus = [];
+    try {
+      // 뷰가 있으면 우선 사용(선택)
+      const view = await pool.query(
+        `SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
+           FROM v_store_menus
+          WHERE store_id = $1
+          ORDER BY category, name, price`,
+        [idNum]
+      );
+      menus = view.rows;
+    } catch (err) {
+      if (err.code && err.code !== "42P01") throw err; // 뷰 없음이 아니면 그대로 에러
 
-    const { images, menus, ...store } = rows[0];
-    return res.json({ ok: true, store, images, menus });
+      // 뷰가 없으면 폴백 UNION
+      const uni = await pool.query(
+        `
+        SELECT store_id,
+               COALESCE(category,'기타') AS category,
+               name,
+               price,
+               image_url,
+               description
+          FROM menu_items
+         WHERE store_id = $1
+        UNION ALL
+        SELECT store_id,
+               COALESCE(category,'기타') AS category,
+               name,
+               price,
+               NULL::text AS image_url,
+               description
+          FROM store_menus
+         WHERE store_id = $1
+        UNION ALL
+        SELECT store_id,
+               COALESCE(category,'기타') AS category,
+               name,
+               price,
+               image_url,
+               description
+          FROM food_menu_items
+         WHERE store_id = $1
+        ORDER BY category, name, price
+        `,
+        [idNum]
+      );
+      menus = uni.rows;
+    }
+
+    // 4) 이벤트(있으면)
+    let events = [];
+    try {
+      const ev = await pool.query(
+        `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
+        [idNum]
+      );
+      events = ev.rows.map(r => r.content);
+    } catch { }
+
+    return res.json({
+      ok: true,
+      store: s[0],
+      images,  // [{ url: "/uploads/..." }, ...]
+      menus,   // [{ category, name, price, image_url, description }, ...]
+      events
+    });
   } catch (e) {
     console.error("[getFoodRegisterFull] error:", e);
-    return res.status(500).json({ error: "full failed" });
+    return res.status(500).json({ ok: false, error: "server_error" });
   }
 }
 

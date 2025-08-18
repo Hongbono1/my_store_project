@@ -124,33 +124,43 @@ export async function createFoodStore(req, res) {
     //   await client.query(`UPDATE food_stores SET business_cert=$2 WHERE id=$1`, [storeId, certPath]);
     // }
 
-    // 3) 메뉴 저장
+    // 3) 메뉴 저장  
+    // --- 메뉴 파싱 + 저장 ---
     const menuBuckets = {};
     for (const [k, v] of Object.entries(req.body)) {
-      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description)\]$/);
+      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
       if (!m) continue;
       const [, ci, mi, key] = m;
       const idx = `${ci}:${mi}`;
-      menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "" };
-      if (key === "price") {
-        menuBuckets[idx].price = parseInt(String(v).replace(/[^\d]/g, ""), 10) || 0;
-      } else if (key === "category") {
-        menuBuckets[idx].name = String(v).trim();
-      } else if (key === "description") {
-        menuBuckets[idx].description = String(v).trim();
-      }
+      menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "", image_url: null };
+
+      const val = String(v ?? "").trim();
+      if (key === "price") menuBuckets[idx].price = parseInt(val.replace(/[^\d]/g, ""), 10) || 0;
+      else if (key === "name") menuBuckets[idx].name = val;
+      else if (key === "category") menuBuckets[idx].category = val || null;
+      else if (key === "description") menuBuckets[idx].description = val;
+      else if (key === "image_url") menuBuckets[idx].image_url = val || null;
     }
+
     const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
     if (menus.length) {
-      // name, price, category, description → 4개 필드
-      const vals = menus.map((_, i) => `($1,$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4},$${i * 4 + 5})`).join(",");
+      const values = menus.map((_, i) =>
+        `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
+      ).join(",");
+
+
+
       const params = [storeId];
-      menus.forEach(m => { params.push(m.name, m.price, m.category, m.description || null); });
+      menus.forEach(m => {
+        params.push(m.name, m.price, m.category, m.image_url, m.description || null);
+      });
+
       await client.query(
-        `INSERT INTO menu_items (store_id, name, price, category, description) VALUES ${vals}`,
+        `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${values}`,
         params
       );
     }
+
 
     // 4) 이벤트 저장
     const events = Object.entries(req.body)
@@ -224,7 +234,7 @@ export async function getFoodRegisterFull(req, res) {
     const idNum = parseId(req.params.id);
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 1) 가게 (created_at 미보유 대비)
+    // 1) 가게
     const { rows: s } = await pool.query(
       `SELECT
          id,
@@ -242,41 +252,64 @@ export async function getFoodRegisterFull(req, res) {
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지
+    // 2) 이미지: 두 테이블 합치기
     const { rows: images } = await pool.query(
-      `SELECT id, url
-         FROM store_images
-        WHERE store_id = $1
-        ORDER BY id ASC`,
+      `
+      SELECT url
+        FROM store_images
+       WHERE store_id = $1
+      UNION ALL
+      SELECT image_url AS url
+        FROM food_store_images
+       WHERE store_id = $1
+      ORDER BY url
+      `,
       [idNum]
     );
 
-    // 3) 메뉴
-    const { rows: menus } = await pool.query(
-      `SELECT id, name, price,
-          COALESCE(category,'기타') AS category,
-          image_url,
-          description
-     FROM menu_items
-    WHERE store_id = $1
-    ORDER BY id ASC`,
-      [idNum]
-    );
+    // 3) 메뉴: 뷰 있으면 우선 사용, 없으면 3테이블 UNION
+    let menus = [];
+    try {
+      const view = await pool.query(
+        `SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
+           FROM v_store_menus
+          WHERE store_id = $1
+          ORDER BY category, name, price`,
+        [idNum]
+      );
+      menus = view.rows;
+    } catch {
+      const uni = await pool.query(
+        `
+        SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
+          FROM menu_items
+         WHERE store_id = $1
+        UNION ALL
+        SELECT store_id, COALESCE(category,'기타') AS category, name, price, NULL::text AS image_url, description
+          FROM store_menus
+         WHERE store_id = $1
+        UNION ALL
+        SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
+          FROM food_menu_items
+         WHERE store_id = $1
+        ORDER BY category, name, price
+        `,
+        [idNum]
+      );
+      menus = uni.rows;
+    }
 
     // 4) 이벤트
     const { rows: ev } = await pool.query(
-      `SELECT content
-         FROM store_events
-        WHERE store_id = $1
-        ORDER BY ord, id`,
+      `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
       [idNum]
     );
 
     return res.json({
       ok: true,
       store: s[0],
-      images,
-      menus,
+      images,                    // [{url: "..."}...]
+      menus,                     // [{category,name,price,image_url,description}...]
       events: ev.map(x => x.content)
     });
   } catch (err) {
@@ -284,6 +317,7 @@ export async function getFoodRegisterFull(req, res) {
     return res.status(500).json({ ok: false, error: "server_error" });
   }
 }
+
 
 /**
  * 수정: PUT /foodregister/:id
@@ -370,31 +404,47 @@ export async function updateFoodStore(req, res) {
     }
 
     // 메뉴 전량 교체(보낸 경우에만)
-    const menuBuckets = {};
-    let hasMenu = false;
-    for (const [k, v] of Object.entries(raw)) {
-      const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description)\]$/);
-      if (!m) continue;
-      hasMenu = true;
-      const [, ci, mi, key] = m;
-      const idx = `${ci}:${mi}`;
-      menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "" };
-      if (key === "price") menuBuckets[idx].price = parseInt(String(v).replace(/[^\d]/g, ""), 10) || 0;
-      if (key === "name") menuBuckets[idx].name = String(v).trim();
-      if (key === "category") menuBuckets[idx].category = String(v).trim() || null;
-      if (key === "description") menuBuckets[idx].description = String(v).trim();
-    }
-    if (hasMenu) {
-      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
-      const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
-      if (menus.length) {
-        const vals = menus.map((_, i) => `($1,$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4},$${i * 4 + 5})`).join(",");
-        const p = [idNum];
-        menus.forEach(m => { p.push(m.name, m.price, m.category, m.description || null); });
-        await client.query(
-          `INSERT INTO menu_items (store_id, name, price, category, description) VALUES ${vals}`,
-          p
-        );
+    // 메뉴 전량 교체(보낸 경우에만)
+    {
+      const menuBuckets = {};
+      let hasMenu = false;
+
+      for (const [k, v] of Object.entries(req.body)) {
+        const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
+        if (!m) continue;
+        hasMenu = true;
+
+        const [, ci, mi, key] = m;
+        const idx = `${ci}:${mi}`;
+        menuBuckets[idx] ??= { category: null, name: "", price: 0, description: "", image_url: null };
+
+        const val = String(v ?? "").trim();
+        if (key === "price") menuBuckets[idx].price = parseInt(val.replace(/[^\d]/g, ""), 10) || 0;
+        else if (key === "name") menuBuckets[idx].name = val;
+        else if (key === "category") menuBuckets[idx].category = val || null;
+        else if (key === "description") menuBuckets[idx].description = val;
+        else if (key === "image_url") menuBuckets[idx].image_url = val || null;
+      }
+
+      if (hasMenu) {
+        // 기존 메뉴 싹 지우고 다시 넣기
+        await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
+
+        const menus = Object.values(menuBuckets).filter(m => m.name && m.price > 0);
+        if (menus.length) {
+          // ($1=store_id) + (행마다 5개씩) → 총 6컬럼
+          const vals = menus.map((_, i) =>
+            `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
+          ).join(",");
+
+          const p = [idNum];
+          menus.forEach(m => p.push(m.name, m.price, m.category, m.image_url, m.description || null));
+
+          await client.query(
+            `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
+            p
+          );
+        }
       }
     }
 
