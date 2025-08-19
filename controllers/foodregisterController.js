@@ -2,7 +2,17 @@
 import pool from "../db.js";
 import path from "path";
 
+
+
 /* ===================== 공통 유틸 ===================== */
+function parseEventsFrom(req) {
+  const raw = (req && req.body) ? req.body : {};
+  return Object.entries(raw)
+    .filter(([k]) => /^event\d+$/i.test(k))
+    .map(([, v]) => String(v || "").trim())
+    .filter(Boolean);
+}
+
 function parseId(raw) {
   const n = Number.parseInt(String(raw), 10);
   return Number.isSafeInteger(n) ? n : null;
