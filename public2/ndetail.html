@@ -419,9 +419,31 @@
                 // 2) 데이터 표준화
                 const store = json.store || {};
 
-                const images = Array.isArray(json.images)
-                    ? json.images.map(i => i.url || i.image_url || "")
+                // [교체] 이미지 배열 만들기 + 접두어 보강
+                const rawImages = Array.isArray(json.images)
+                    ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
                     : [];
+
+                function fixUploadsPrefix(s) {
+                    if (!s) return "";
+                    s = String(s).trim();
+
+                    // 절대 URL이면 그대로
+                    if (/^https?:\/\//i.test(s)) return s;
+
+                    // 앞의 './' 또는 '/'들 정리 → 'uploads/xxx' 형태로 맞춤
+                    s = s.replace(/^\.?\/+/, "");          // './uploads/a' → 'uploads/a', '/a' → 'a'
+                    if (!/^uploads\//i.test(s)) s = "uploads/" + s;
+
+                    // 중복 슬래시 정리 후 선행 '/' 추가 → 최종 '/uploads/xxx'
+                    return ("/" + s).replace(/\/{2,}/g, "/");
+                }
+
+
+                const imagesFixed = rawImages.map(fixUploadsPrefix).filter(Boolean);
+
+                // 1) 슬라이더
+                slider.init(imagesFixed);
 
                 const rawMenusCandidate =
                     json.menus ??
