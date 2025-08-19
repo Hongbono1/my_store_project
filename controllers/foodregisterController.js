@@ -2,42 +2,39 @@
 import pool from "../db.js";
 import path from "path";
 
-// 공통: 숫자 ID 가드
+/* ===================== 공통 유틸 ===================== */
 function parseId(raw) {
   const n = Number.parseInt(String(raw), 10);
   return Number.isSafeInteger(n) ? n : null;
 }
 
-// 업로드 파일 수집 도우미 (multer.any() / fields() 모두 대응)
 function collectFiles(req) {
   if (!req || !req.files) return [];
-  if (Array.isArray(req.files)) return req.files; // any()
-  // fields(): { field: [files] } -> flat array
-  return Object.values(req.files).flat();
+  if (Array.isArray(req.files)) return req.files; // upload.any()
+  return Object.values(req.files).flat();        // upload.fields()
 }
-// 특정 필드만 추출
+
 function filesByField(files, ...fieldnames) {
   const set = new Set(fieldnames);
-  return files.filter(f => set.has(f.fieldname));
+  return files.filter((f) => set.has(f.fieldname));
 }
-// 웹 경로 변환
+
 function toWebPath(f) {
   return f?.path
     ? `/uploads/${path.basename(f.path)}`
     : f?.filename
-      ? `/uploads/${f.filename}`
-      : null;
+    ? `/uploads/${f.filename}`
+    : null;
 }
 
-// 숫자 추출 "12,000원" → 12000
+// "12,000원" → 12000
 function toInt(v) {
   if (v == null) return 0;
   const n = String(v).replace(/[^\d]/g, "");
   return n ? parseInt(n, 10) : 0;
 }
 
-/* ===== 메뉴 파싱 유틸 추가: 중첩 + 브래킷 + 구형 배열 ===== */
-// (A) 중첩 객체 형태(req.body.storeMenus) + (B) 브래킷 키 형태 모두 지원
+/* ===== 메뉴 파싱 유틸: 신규 브래킷 + 구형 배열 ===== */
 function extractMenusFromBody(body) {
   const out = [];
   const pushItem = (m) => {
@@ -53,7 +50,8 @@ function extractMenusFromBody(body) {
       image_url: (m.image_url ?? "").trim() || null,
     });
   };
-  // (A) 중첩 객체/배열
+
+  // (A) 중첩 객체/배열: body.storeMenus[*][*]
   const sm = body?.storeMenus;
   if (sm && typeof sm === "object") {
     const groups = Array.isArray(sm) ? sm : Object.values(sm);
@@ -62,7 +60,8 @@ function extractMenusFromBody(body) {
       items.forEach(pushItem);
     });
   }
-  // (B) 브래킷 키
+
+  // (B) 브래킷 키: storeMenus[i][j][field]
   const buckets = {};
   for (const [k, v] of Object.entries(body || {})) {
     const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
@@ -75,6 +74,7 @@ function extractMenusFromBody(body) {
     else buckets[idx][m[3]] = val;
   }
   Object.values(buckets).forEach(pushItem);
+
   return out;
 }
 
@@ -98,36 +98,22 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
   return rows;
 }
 
-/**
- * 등록: FormData (multipart/form-data)
- * 필수: businessName, roadAddress
- * 선택: phone, storeImages[*], businessCertImage,
- *       ├ storeMenus[i][j][{category|name|price|description|image_url}] (신규)
- *       └ menuName[] / menuPrice[] / menuCategory[] / menuImage[]       (구형)
- * 응답: { ok:true, id }
- */
+/* ===================== 등록(POST) ===================== */
 export async function createFoodStore(req, res) {
   const client = await pool.connect();
   try {
-    const ct = req.headers["content-type"] || "";
-    console.log("[createFoodStore] ct:", ct);
-    console.log("[createFoodStore] body keys:", Object.keys(req.body || {}));
-
-    // === 필수 필드 ===
     const businessName = (req.body.businessName || "").trim();
     const roadAddress = (req.body.roadAddress || "").trim();
     const phone = (req.body.phone || "").trim();
 
-    // ⚠️ 200으로 내려 프론트 catch 방지 + 어떤 필드가 비었는지 바로 확인
     if (!businessName || !roadAddress) {
       return res.status(200).json({
         ok: false,
         error: "missing_required",
-        fields: { businessName: !!businessName, roadAddress: !!roadAddress }
+        fields: { businessName: !!businessName, roadAddress: !!roadAddress },
       });
     }
 
-    // === 확장 필드 ===
     const businessType = (req.body.businessType || "").trim();
     const businessCategory = (req.body.businessCategory || "").trim();
     const businessHours = (req.body.businessHours || "").trim();
@@ -142,13 +128,16 @@ export async function createFoodStore(req, res) {
 
     const facilities = (req.body.facilities || "").trim();
     const petsAllowed =
-      req.body.petsAllowed === "true" ? true :
-        req.body.petsAllowed === "false" ? false : null;
+      req.body.petsAllowed === "true"
+        ? true
+        : req.body.petsAllowed === "false"
+        ? false
+        : null;
     const parking = (req.body.parking || "").trim();
 
     await client.query("BEGIN");
 
-    // 1) 가게 저장
+    // 1) 가게
     const insertStoreQ = `
       INSERT INTO food_stores (
         business_name, road_address, phone,
@@ -160,22 +149,31 @@ export async function createFoodStore(req, res) {
       RETURNING id
     `;
     const { rows } = await client.query(insertStoreQ, [
-      businessName, roadAddress, phone || null,
-      businessType || null, businessCategory || null, businessHours || null, deliveryOption || null,
-      serviceDetails || null, additionalDesc || null,
-      homepage || null, instagram || null, facebook || null,
-      facilities || null, petsAllowed, parking || null
+      businessName,
+      roadAddress,
+      phone || null,
+      businessType || null,
+      businessCategory || null,
+      businessHours || null,
+      deliveryOption || null,
+      serviceDetails || null,
+      additionalDesc || null,
+      homepage || null,
+      instagram || null,
+      facebook || null,
+      facilities || null,
+      petsAllowed,
+      parking || null,
     ]);
     const storeId = rows[0].id;
 
-    // 2) 파일 수집/분류
+    // 2) 파일 분류
     const allFiles = collectFiles(req);
     const storeImageFiles = filesByField(allFiles, "storeImages", "storeImages[]");
-    const certFile = filesByField(allFiles, "businessCertImage")[0];
-    // 구형 메뉴 이미지 파일 배열 (인덱스 매칭)
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
+    // const certFile = filesByField(allFiles, "businessCertImage")[0];
 
-    // 2-1) 대표 이미지 저장 (store_images)
+    // 2-1) 대표 이미지 저장(단일화: store_images)
     if (storeImageFiles.length) {
       const urls = storeImageFiles.map(toWebPath).filter(Boolean);
       if (urls.length) {
@@ -187,28 +185,21 @@ export async function createFoodStore(req, res) {
       }
     }
 
-    // 2-2) 사업자등록증 경로 저장 (스키마에 있을 때만)
-    // if (certFile) {
-    //   const certPath = toWebPath(certFile);
-    //   await client.query(`UPDATE food_stores SET business_cert=$2 WHERE id=$1`, [storeId, certPath]);
-    // }
-
-    // 3) 메뉴 저장 — (A) 신규/브래킷 + (B) 구형 배열 → 병합
+    // 3) 메뉴 저장(신규 브래킷 + 구형 배열 병합 → menu_items)
     const menusA = extractMenusFromBody(req.body);
     const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
     const menus = [...menusA, ...menusB];
     if (menus.length) {
-      const vals = menus.map((_, i) =>
-        `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
-      ).join(",");
+      const vals = menus
+        .map(
+          (_, i) =>
+            `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
+        )
+        .join(",");
       const p = [storeId];
-      menus.forEach(m => p.push(
-        m.name,
-        m.price,
-        m.category ?? null,
-        m.image_url ?? null,
-        m.description || null
-      ));
+      menus.forEach((m) =>
+        p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description || null)
+      );
       await client.query(
         `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
         p
@@ -217,7 +208,7 @@ export async function createFoodStore(req, res) {
 
     // 4) 이벤트 저장
     const events = Object.entries(req.body)
-      .filter(([k]) => /^event\d+$/.test(k))
+      .filter(([k]) => /^event\d+$/i.test(k))
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
     if (events.length) {
@@ -230,22 +221,22 @@ export async function createFoodStore(req, res) {
 
     await client.query("COMMIT");
 
-    // id 정수화
     const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
     return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try {
+      await pool.query("ROLLBACK");
+    } catch {}
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch { }
+    try {
+      (await pool.connect()).release();
+    } catch {}
   }
 }
 
-
-/**
- * 기본 조회: /foodregister/:id
- */
+/* ===================== 단건 조회(GET /:id) ===================== */
 export async function getFoodStoreById(req, res) {
   try {
     const idNum = parseId(req.params.id);
@@ -270,10 +261,7 @@ export async function getFoodStoreById(req, res) {
   }
 }
 
-/**
- * 풀 상세: /foodregister/:id/full
- * - ndetail.html에서 기대하는 구조(store, images[], menus[], events[])
- */
+/* ===================== 풀 상세(GET /:id/full) ===================== */
 export async function getFoodRegisterFull(req, res) {
   try {
     const idNum = parseId(req.params.id);
@@ -297,7 +285,7 @@ export async function getFoodRegisterFull(req, res) {
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지: 두 테이블 합치기 (객체 배열 유지: [{url}...])
+    // 2) 이미지: 두 테이블 합치기 → {url}
     const { rows: images } = await pool.query(
       `
       SELECT url
@@ -312,7 +300,7 @@ export async function getFoodRegisterFull(req, res) {
       [idNum]
     );
 
-    // 3) 메뉴: 뷰 있으면 우선, 없으면 3테이블 UNION
+    // 3) 메뉴: 뷰 우선, 없으면 3테이블 UNION
     let menus = [];
     try {
       const view = await pool.query(
@@ -353,9 +341,9 @@ export async function getFoodRegisterFull(req, res) {
     return res.json({
       ok: true,
       store: s[0],
-      images,                    // [{url: "..."}...]
-      menus,                     // [{category,name,price,image_url,description}...]
-      events: ev.map(x => x.content)
+      images, // [{url: "..."}...]
+      menus,  // [{category,name,price,image_url,description}...]
+      events: ev.map((x) => x.content),
     });
   } catch (err) {
     console.error("[getFoodRegisterFull] error:", err);
@@ -363,13 +351,7 @@ export async function getFoodRegisterFull(req, res) {
   }
 }
 
-/**
- * 수정: PUT /foodregister/:id
- * - 보낸 필드만 업데이트(빈 문자열은 NULL)
- * - event1..n 오면 이벤트 전량 교체
- * - storeImages 오면 이미지 추가
- * - storeMenus[*] 또는 (구형)menuName[] 등 오면 메뉴 전량 교체
- */
+/* ===================== 수정(PUT /:id) ===================== */
 export async function updateFoodStore(req, res) {
   const client = await pool.connect();
   try {
@@ -446,56 +428,61 @@ export async function updateFoodStore(req, res) {
     }
 
     // 메뉴 전량 교체(보낸 경우만)
-    {
-      const menusA = extractMenusFromBody(raw);
+    const menusA = extractMenusFromBody(raw);
+    const namesB = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : raw.menuName || [];
+    const pricesB = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : raw.menuPrice || [];
+    const catsB =
+      Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : raw.menuCategory || [];
+    const hasLegacy = namesB.length || pricesB.length || catsB.length;
 
-      const namesB = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : (raw.menuName || []);
-      const pricesB = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : (raw.menuPrice || []);
-      const catsB = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : (raw.menuCategory || []);
-      const hasLegacy = namesB.length || pricesB.length || catsB.length;
+    if (menusA.length || hasLegacy) {
+      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
 
-      if (menusA.length || hasLegacy) {
-        await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
-
-        const menusB = [];
-        for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
-          const name = (namesB[i] || "").trim();
-          const price = toInt(pricesB[i]);
-          const cat = (catsB[i] || "").trim() || null;
-          if (name && price > 0) {
-            menusB.push({ name, price, category: cat, image_url: null, description: null });
-          }
+      const menusB = [];
+      for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
+        const name = (namesB[i] || "").trim();
+        const price = toInt(pricesB[i]);
+        const cat = (catsB[i] || "").trim() || null;
+        if (name && price > 0) {
+          menusB.push({ name, price, category: cat, image_url: null, description: null });
         }
+      }
 
-        const combined = [...menusA, ...menusB];
-        if (combined.length) {
-          const vals = combined
-            .map((_, i) => `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`)
-            .join(",");
-          const p = [idNum];
-          combined.forEach((m) =>
-            p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null)
-          );
-          await client.query(
-            `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
-            p
-          );
-        }
+      const combined = [...menusA, ...menusB];
+      if (combined.length) {
+        const vals = combined
+          .map(
+            (_, i) =>
+              `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
+          )
+          .join(",");
+        const p = [idNum];
+        combined.forEach((m) =>
+          p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null)
+        );
+        await client.query(
+          `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
+          p
+        );
       }
     }
 
     await client.query("COMMIT");
     return res.json({ ok: true, id: idNum });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch { }
+    try {
+      client.release();
+    } catch {}
   }
 }
 
-
-/* ── 호환용 export (기존 명칭과 동시 지원) ───────────────────── */
-export const getFoodStoreFull = getFoodRegisterFull;   // 과거 이름 호환
-export const createFoodRegister = createFoodStore;     // 과거 이름 호환
+/* ── 호환용 export ───────────────────── */
+export const getFoodStoreFull = getFoodRegisterFull; // 과거 이름 호환
+export const createFoodRegister = createFoodStore;   // 과거 이름 호환
+export const getFoodRegisterDetail = getFoodStoreById;
