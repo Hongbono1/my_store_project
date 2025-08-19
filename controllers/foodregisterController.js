@@ -23,8 +23,8 @@ function toWebPath(f) {
   return f?.path
     ? `/uploads/${path.basename(f.path)}`
     : f?.filename
-    ? `/uploads/${f.filename}`
-    : null;
+      ? `/uploads/${f.filename}`
+      : null;
 }
 
 // "12,000원" → 12000
@@ -131,8 +131,8 @@ export async function createFoodStore(req, res) {
       req.body.petsAllowed === "true"
         ? true
         : req.body.petsAllowed === "false"
-        ? false
-        : null;
+          ? false
+          : null;
     const parking = (req.body.parking || "").trim();
 
     await client.query("BEGIN");
@@ -224,15 +224,11 @@ export async function createFoodStore(req, res) {
     const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
     return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
   } catch (err) {
-    try {
-      await pool.query("ROLLBACK");
-    } catch {}
+    try { if (client) await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try {
-      (await pool.connect()).release();
-    } catch {}
+    try { if (client) client.release(); } catch { }
   }
 }
 
@@ -472,13 +468,13 @@ export async function updateFoodStore(req, res) {
   } catch (err) {
     try {
       await client.query("ROLLBACK");
-    } catch {}
+    } catch { }
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
     try {
       client.release();
-    } catch {}
+    } catch { }
   }
 }
 
