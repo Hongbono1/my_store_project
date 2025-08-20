@@ -217,10 +217,7 @@ export async function createFoodStore(req, res) {
     }
 
     // 4) 이벤트 저장
-    const events = Object.entries(req.body)
-      .filter(([k]) => /^event\d+$/i.test(k))
-      .map(([, v]) => String(v || "").trim())
-      .filter(Boolean);
+    const events = parseEventsFrom(req);
     if (events.length) {
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
       await client.query(
@@ -402,17 +399,6 @@ export async function updateFoodStore(req, res) {
       await client.query(
         `UPDATE food_stores SET ${set.join(", ")} WHERE id = $${params.length}`,
         params
-      );
-    }
-
-    // 이벤트 전량 교체(보낸 경우)
-    const events = parseEventsFrom(req);   // ✅ 반드시 선언
-    if (events.length) {
-      await client.query(`DELETE FROM store_events WHERE store_id=$1`, [idNum]);
-      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
-      await client.query(
-        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
-        [idNum, ...events]
       );
     }
 
