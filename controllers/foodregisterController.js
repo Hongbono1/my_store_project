@@ -406,10 +406,7 @@ export async function updateFoodStore(req, res) {
     }
 
     // 이벤트 전량 교체(보낸 경우)
-    const events = Object.entries(raw)
-      .filter(([k]) => /^event\d+$/i.test(k))
-      .map(([, v]) => String(v || "").trim())
-      .filter(Boolean);
+    const events = parseEventsFrom(req);   // ✅ 반드시 선언
     if (events.length) {
       await client.query(`DELETE FROM store_events WHERE store_id=$1`, [idNum]);
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
