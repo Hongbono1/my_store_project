@@ -8,14 +8,8 @@ import * as ctrl from "../controllers/foodregisterController.js";
 const router = Router();
 
 /* ⬇️ 추가: 업로드 받을 필드 정의 */
-const storeImageFields = [
-  { name: "storeImages", maxCount: 10 },
-  { name: "storeImages[]", maxCount: 10 },
-];
-const menuImageFields = [
-  { name: "menuImage", maxCount: 20 },
-  { name: "menuImage[]", maxCount: 20 },
-];
+const storeImageFields = [{ name: "storeImages[]", maxCount: 10 }];
+const menuImageFields = [{ name: "menuImage[]", maxCount: 20 }];
 
 /* 업로드 저장소 보장 */
 const uploadDir = path.join(process.cwd(), "uploads");

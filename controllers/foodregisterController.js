@@ -408,7 +408,7 @@ export async function updateFoodStore(req, res) {
     const hasLegacy = namesB.length || pricesB.length || catsB.length;
 
     if (menusA.length || hasLegacy) {
-      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
+      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
 
       const menusB = [];
       for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
