@@ -197,8 +197,11 @@ export async function createFoodStore(req, res) {
 
     // 3) 메뉴 저장(신규 브래킷 + 구형 배열 병합 → menu_items)
     const menusA = extractMenusFromBody(req.body);
-    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
+    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles); // ← 이미지 포함
     const menus = [...menusA, ...menusB];
+
+    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
+
     if (menus.length) {
       const vals = menus
         .map(
@@ -206,13 +209,18 @@ export async function createFoodStore(req, res) {
             `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
         )
         .join(",");
-      const p = [storeId];
-      menus.forEach((m) =>
-        p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description || null)
-      );
+
+      const params = menus.flatMap(m => [
+        m.name,                  // name
+        m.price,                 // price
+        m.category,              // category
+        m.image_url || null,     // image_url
+        m.description || null    // description
+      ]);
+
       await client.query(
         `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
-        p
+        [idNum, ...params]
       );
     }
 
@@ -288,52 +296,24 @@ export async function getFoodRegisterFull(req, res) {
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지: 두 테이블 합치기 → {url}
+    // 2) 이미지 → store_images만 사용
     const { rows: images } = await pool.query(
-      `
-      SELECT url
-        FROM store_images
-       WHERE store_id = $1
-      UNION ALL
-      SELECT image_url AS url
-        FROM food_store_images
-       WHERE store_id = $1
-      ORDER BY url
-      `,
+      `SELECT url 
+         FROM store_images
+        WHERE store_id = $1
+        ORDER BY sort_order, id`,
       [idNum]
     );
 
-    // 3) 메뉴: 뷰 우선, 없으면 3테이블 UNION
-    let menus = [];
-    try {
-      const view = await pool.query(
-        `SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
-           FROM v_store_menus
-          WHERE store_id = $1
-          ORDER BY category, name, price`,
-        [idNum]
-      );
-      menus = view.rows;
-    } catch {
-      const uni = await pool.query(
-        `
-        SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
-          FROM menu_items
-         WHERE store_id = $1
-        UNION ALL
-        SELECT store_id, COALESCE(category,'기타') AS category, name, price, NULL::text AS image_url, description
-          FROM store_menus
-         WHERE store_id = $1
-        UNION ALL
-        SELECT store_id, COALESCE(category,'기타') AS category, name, price, image_url, description
-          FROM food_menu_items
-         WHERE store_id = $1
-        ORDER BY category, name, price
-        `,
-        [idNum]
-      );
-      menus = uni.rows;
-    }
+    // 3) 메뉴
+    const { rows: menus } = await pool.query(
+      `SELECT store_id, COALESCE(category,'기타') AS category,
+              name, price, image_url, description
+         FROM menu_items
+        WHERE store_id = $1
+        ORDER BY category, name, price`,
+      [idNum]
+    );
 
     // 4) 이벤트
     const { rows: ev } = await pool.query(
@@ -344,8 +324,8 @@ export async function getFoodRegisterFull(req, res) {
     return res.json({
       ok: true,
       store: s[0],
-      images, // [{url: "..."}...]
-      menus,  // [{category,name,price,image_url,description}...]
+      images, // [{url: "..."}]
+      menus,  // [{category, name, price, image_url, description}]
       events: ev.map((x) => x.content),
     });
   } catch (err) {
