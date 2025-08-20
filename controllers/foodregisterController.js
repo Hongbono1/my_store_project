@@ -243,9 +243,8 @@ export async function createFoodStore(req, res) {
 /* ===================== 단건 조회(GET /:id) ===================== */
 export async function getFoodStoreById(req, res) {
   try {
-    const idNum = parseId(req.params.id);
-    if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
-
+    const storeId = parseId(req.params.id);
+    if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
     const q = `
       SELECT
         id,
@@ -256,7 +255,7 @@ export async function getFoodStoreById(req, res) {
       FROM food_stores
       WHERE id = $1
     `;
-    const { rows } = await pool.query(q, [idNum]);
+    const { rows } = await pool.query(q, [storeId]);
     if (!rows.length) return res.status(404).json({ ok: false, error: "not_found" });
     return res.json({ ok: true, store: rows[0] });
   } catch (err) {
@@ -410,8 +409,7 @@ export async function updateFoodStore(req, res) {
 
 
     if (menusA.length || hasLegacy) {
-      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
-
+      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
       const menusB = [];
       for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
         const name = (namesB[i] || "").trim();
@@ -442,7 +440,7 @@ export async function updateFoodStore(req, res) {
     }
 
     await client.query("COMMIT");
-    return res.json({ ok: true, id: idNum });
+    return res.json({ ok: true, id: storeId });
   } catch (err) {
     try {
       await client.query("ROLLBACK");
