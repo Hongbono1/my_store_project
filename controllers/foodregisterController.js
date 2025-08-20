@@ -405,13 +405,22 @@ export async function updateFoodStore(req, res) {
     // 새 이미지 추가(기존 유지)
     const allFiles = collectFiles(req);
     const newStoreImages = filesByField(allFiles, "storeImages", "storeImages[]");
+
     if (newStoreImages.length) {
+      // 웹 경로 변환 (/uploads/파일명)
       const urls = newStoreImages.map(toWebPath).filter(Boolean);
+
       if (urls.length) {
-        const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
+        // 기존 이미지 모두 삭제 (중복 방지)
+        await client.query(`DELETE FROM store_images WHERE store_id=$1`, [idNum]);
+
+        // 최대 3장까지만 입력
+        const limited = urls.slice(0, 3);
+        const values = limited.map((_, i) => `($1,$${i + 2})`).join(",");
+
         await client.query(
           `INSERT INTO store_images (store_id, url) VALUES ${values}`,
-          [idNum, ...urls]
+          [idNum, ...limited]
         );
       }
     }
