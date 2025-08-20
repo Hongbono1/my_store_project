@@ -410,7 +410,7 @@ export async function updateFoodStore(req, res) {
 
 
     if (menusA.length || hasLegacy) {
-      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
+      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
 
       const menusB = [];
       for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
