@@ -267,8 +267,8 @@ export async function getFoodStoreById(req, res) {
 /* ===================== 풀 상세(GET /:id/full) ===================== */
 export async function getFoodRegisterFull(req, res) {
   try {
-    const idNum = parseId(req.params.id);
-    if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
+    const storeId = parseId(req.params.id);
+    if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
 
     // 1) 가게
     const { rows: s } = await pool.query(
@@ -284,7 +284,7 @@ export async function getFoodRegisterFull(req, res) {
          facilities, pets_allowed, parking
        FROM food_stores
        WHERE id = $1`,
-      [idNum]
+      [storeId]
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
@@ -294,7 +294,7 @@ export async function getFoodRegisterFull(req, res) {
          FROM store_images
         WHERE store_id = $1
         ORDER BY sort_order, id`,
-      [idNum]
+      [storeId]
     );
 
     // 3) 메뉴
@@ -304,13 +304,13 @@ export async function getFoodRegisterFull(req, res) {
          FROM menu_items
         WHERE store_id = $1
         ORDER BY category, name, price`,
-      [idNum]
+      [storeId]
     );
 
     // 4) 이벤트
     const { rows: ev } = await pool.query(
       `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
-      [idNum]
+      [storeId]
     );
 
     return res.json({
@@ -330,8 +330,8 @@ export async function getFoodRegisterFull(req, res) {
 export async function updateFoodStore(req, res) {
   const client = await pool.connect();
   try {
-    const idNum = parseId(req.params.id);
-    if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
+    const storeId = parseId(req.params.id);
+    if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
 
     const raw = req.body;
     const events = Object.entries(raw)
@@ -371,7 +371,7 @@ export async function updateFoodStore(req, res) {
       }
     });
     if (set.length) {
-      params.push(idNum);
+      params.push(storeId);
       await client.query(
         `UPDATE food_stores SET ${set.join(", ")} WHERE id = $${params.length}`,
         params
@@ -386,14 +386,14 @@ export async function updateFoodStore(req, res) {
       const urls = newStoreImages.map(toWebPath).filter(Boolean);
 
       if (urls.length) {
-        await client.query(`DELETE FROM store_images WHERE store_id=$1`, [idNum]);
+        await client.query(`DELETE FROM store_images WHERE store_id=$1`, [storeId]);
 
         const limited = urls.slice(0, 3);
         const values = limited.map((_, i) => `($1,$${i + 2})`).join(",");
 
         await client.query(
           `INSERT INTO store_images (store_id, url) VALUES ${values}`,
-          [idNum, ...limited]
+          [storeId, ...limited]
         );
       }
     }
@@ -428,7 +428,7 @@ export async function updateFoodStore(req, res) {
               `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
           )
           .join(",");
-        const p = [idNum];
+        const p = [storeId];
         combined.forEach((m) =>
           p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null)
         );
