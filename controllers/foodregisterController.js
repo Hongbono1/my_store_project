@@ -342,6 +342,10 @@ export async function updateFoodStore(req, res) {
     if (!idNum) return res.status(400).json({ ok: false, error: "Invalid id" });
 
     const raw = req.body;
+    const events = Object.entries(raw)
+      .filter(([k]) => /^event\d+$/i.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
     const mapBool = (v) =>
       v === true || v === "true" ? true : v === false || v === "false" ? false : null;
 
