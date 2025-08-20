@@ -399,13 +399,15 @@ export async function updateFoodStore(req, res) {
       }
     }
 
-    // 메뉴 전량 교체(보낸 경우만)
+    // 메뉴 전량 교체(보낸 경우만) mmmm
     const menusA = extractMenusFromBody(raw);
     const namesB = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : raw.menuName || [];
     const pricesB = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : raw.menuPrice || [];
     const catsB =
       Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : raw.menuCategory || [];
     const hasLegacy = namesB.length || pricesB.length || catsB.length;
+
+
 
     if (menusA.length || hasLegacy) {
       await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
