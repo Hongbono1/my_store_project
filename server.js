@@ -11,6 +11,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// ✅ 업로드 파일 서빙
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 /* ── ✅ 미들웨어는 라우트보다 먼저 ────────────────────────────────── */
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));                // ← 반드시 위쪽
