@@ -8,8 +8,17 @@ import * as ctrl from "../controllers/foodregisterController.js";
 const router = Router();
 
 /* ⬇️ 추가: 업로드 받을 필드 정의 */
-const storeImageFields = [{ name: "storeImages[]", maxCount: 10 }];
-const menuImageFields = [{ name: "menuImage[]", maxCount: 20 }];
+const storeImageFields = [
+  { name: "storeImages", maxCount: 10 },  // ← 폼에서 실제로 이 이름을 씀
+  { name: "storeImages[]", maxCount: 10 },  // ← 호환
+];
+const menuImageFields = [
+  { name: "menuImage", maxCount: 20 },  // ← 혹시 단수 이름으로 오는 경우
+  { name: "menuImage[]", maxCount: 20 },  // ← 권장/호환
+];
+const otherFileFields = [
+  { name: "businessCertImage", maxCount: 1 }, // ← 폼에 존재
+];
 
 /* 업로드 저장소 보장 */
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -36,7 +45,7 @@ const upload = multer({
 /* Routes */
 router.post(
   "/",
-  upload.fields([...storeImageFields, ...menuImageFields]),
+  upload.fields([...storeImageFields, ...menuImageFields, ...otherFileFields]),
   ctrl.createFoodStore
 );
 
@@ -44,7 +53,7 @@ router.get("/:id", ctrl.getFoodStoreById);
 router.get("/:id/full", ctrl.getFoodRegisterFull);
 router.put(
   "/:id",
-  upload.fields([...storeImageFields, ...menuImageFields]),
+  upload.fields([...storeImageFields, ...menuImageFields, ...otherFileFields]),
   ctrl.updateFoodStore
 );
 

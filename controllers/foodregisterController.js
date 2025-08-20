@@ -189,7 +189,7 @@ export async function createFoodStore(req, res) {
     const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles); // ← 이미지 포함
     const menus = [...menusA, ...menusB];
 
-    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]); // ✅ fix
+    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]); // ✅ fix
 
     if (menus.length) {
       const vals = menus
