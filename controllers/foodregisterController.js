@@ -2,17 +2,7 @@
 import pool from "../db.js";
 import path from "path";
 
-
-
 /* ===================== 공통 유틸 ===================== */
-function parseEventsFrom(req) {
-  const raw = (req && req.body) ? req.body : {};
-  return Object.entries(raw)
-    .filter(([k]) => /^event\d+$/i.test(k))
-    .map(([, v]) => String(v || "").trim())
-    .filter(Boolean);
-}
-
 function parseId(raw) {
   const n = Number.parseInt(String(raw), 10);
   return Number.isSafeInteger(n) ? n : null;
@@ -181,7 +171,6 @@ export async function createFoodStore(req, res) {
     const allFiles = collectFiles(req);
     const storeImageFiles = filesByField(allFiles, "storeImages", "storeImages[]");
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
-    // const certFile = filesByField(allFiles, "businessCertImage")[0];
 
     // 2-1) 대표 이미지 저장(단일화: store_images)
     if (storeImageFiles.length) {
@@ -195,12 +184,12 @@ export async function createFoodStore(req, res) {
       }
     }
 
-    // 3) 메뉴 저장(신규 브래킷 + 구형 배열 병합 → menu_items)
+    // 3) 메뉴 저장
     const menusA = extractMenusFromBody(req.body);
     const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles); // ← 이미지 포함
     const menus = [...menusA, ...menusB];
 
-    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [idNum]);
+    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]); // ✅ fix
 
     if (menus.length) {
       const vals = menus
@@ -211,21 +200,25 @@ export async function createFoodStore(req, res) {
         .join(",");
 
       const params = menus.flatMap(m => [
-        m.name,                  // name
-        m.price,                 // price
-        m.category,              // category
-        m.image_url || null,     // image_url
-        m.description || null    // description
+        m.name,
+        m.price,
+        m.category,
+        m.image_url || null,
+        m.description || null
       ]);
 
       await client.query(
         `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
-        [idNum, ...params]
+        [storeId, ...params]
       );
     }
 
-    // 4) 이벤트 저장
-    const events = parseEventsFrom(req);
+    // 4) 이벤트 저장 (inline 파싱)
+    const events = Object.entries(req.body)
+      .filter(([k]) => /^event\d+$/i.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
+
     if (events.length) {
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
       await client.query(
@@ -324,8 +317,8 @@ export async function getFoodRegisterFull(req, res) {
     return res.json({
       ok: true,
       store: s[0],
-      images, // [{url: "..."}]
-      menus,  // [{category, name, price, image_url, description}]
+      images,
+      menus,
       events: ev.map((x) => x.content),
     });
   } catch (err) {
@@ -391,14 +384,11 @@ export async function updateFoodStore(req, res) {
     const newStoreImages = filesByField(allFiles, "storeImages", "storeImages[]");
 
     if (newStoreImages.length) {
-      // 웹 경로 변환 (/uploads/파일명)
       const urls = newStoreImages.map(toWebPath).filter(Boolean);
 
       if (urls.length) {
-        // 기존 이미지 모두 삭제 (중복 방지)
         await client.query(`DELETE FROM store_images WHERE store_id=$1`, [idNum]);
 
-        // 최대 3장까지만 입력
         const limited = urls.slice(0, 3);
         const values = limited.map((_, i) => `($1,$${i + 2})`).join(",");
 
@@ -465,6 +455,6 @@ export async function updateFoodStore(req, res) {
 }
 
 /* ── 호환용 export ───────────────────── */
-export const getFoodStoreFull = getFoodRegisterFull; // 과거 이름 호환
-export const createFoodRegister = createFoodStore;   // 과거 이름 호환
+export const getFoodStoreFull = getFoodRegisterFull;
+export const createFoodRegister = createFoodStore;
 export const getFoodRegisterDetail = getFoodStoreById;
