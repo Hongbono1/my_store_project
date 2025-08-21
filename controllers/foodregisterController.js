@@ -81,25 +81,34 @@ function extractMenusFromBody(body) {
 // (구형) menuName[] / menuPrice[] / menuCategory[] / menuDesc[] + menuImage[] 파일
 function extractLegacyMenusFromBody(body, menuFiles = []) {
   const toArr = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+
   const names = toArr(body["menuName[]"] ?? body.menuName);
   const prices = toArr(body["menuPrice[]"] ?? body.menuPrice);
   const cats = toArr(body["menuCategory[]"] ?? body.menuCategory);
   const descs = toArr(body["menuDesc[]"] ?? body.menuDesc);
-  const maxLen = Math.max(names.length, prices.length, cats.length, descs.length, menuFiles.length);
+
   const rows = [];
-  for (let i = 0; i < maxLen; i++) {
-    const name = (names[i] ?? "").trim();
+  for (let i = 0; i < names.length; i++) {
+    const name = (names[i] || "").trim();
     const price = toInt(prices[i]);
-    const category = (cats[i] ?? "").trim() || null;
-    const description = (descs[i] ?? "").trim() || null;
+    const category = (cats[i] || "").trim() || null;
+    const description = (descs[i] || "").trim() || null;
+
+    // 파일 인덱스 매칭
     const img = menuFiles[i] ? toWebPath(menuFiles[i]) : null;
-    if (name && price > 0) rows.push({ name, price, category, description, image_url: img });
+
+    if (name && price > 0) {
+      rows.push({ name, price, category, description, image_url: img });
+    }
   }
   return rows;
 }
 
 /* ===================== 등록(POST) ===================== */
+
+
 export async function createFoodStore(req, res) {
+  console.log("FILES >>>", req.files);
   const client = await pool.connect();
   try {
     const businessName = (req.body.businessName || "").trim();
@@ -216,29 +225,29 @@ export async function createFoodStore(req, res) {
 
     // 4) 이벤트 저장 (inline 파싱)
     const events = Object.entries(req.body)
-    .filter(([k]) => /^event\d+$/i.test(k))
-    .map(([, v]) => String(v || "").trim())
-    .filter(Boolean);
+      .filter(([k]) => /^event\d+$/i.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
 
-  if (events.length) {
-    const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
-    await client.query(
-      `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
-      [storeId, ...events]
-    );
+    if (events.length) {
+      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+      await client.query(
+        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
+        [storeId, ...events]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
+    return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
+  } catch (err) {
+    try { if (client) await client.query("ROLLBACK"); } catch { }
+    console.error("[createFoodStore] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  } finally {
+    try { if (client) client.release(); } catch { }
   }
-
-  await client.query("COMMIT");
-
-  const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
-  return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
-} catch (err) {
-  try { if (client) await client.query("ROLLBACK"); } catch { }
-  console.error("[createFoodStore] error:", err);
-  return res.status(500).json({ ok: false, error: "server_error" });
-} finally {
-  try { if (client) client.release(); } catch { }
-}
 }
 
 /* ===================== 단건 조회(GET /:id) ===================== */
