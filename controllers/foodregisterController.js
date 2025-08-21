@@ -189,7 +189,8 @@ export async function createFoodStore(req, res) {
     const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles); // ← 이미지 포함
     const menus = [...menusA, ...menusB];
 
-    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]); // ✅ fix
+    // 저장 전 기존 것 정리(신규 생성에도 안전)
+    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
 
     if (menus.length) {
       const vals = menus
@@ -199,12 +200,12 @@ export async function createFoodStore(req, res) {
         )
         .join(",");
 
-      const params = menus.flatMap(m => [
+      const params = menus.flatMap((m) => [
         m.name,
         m.price,
-        m.category,
+        m.category || null,
         m.image_url || null,
-        m.description || null
+        m.description || null,
       ]);
 
       await client.query(
@@ -215,29 +216,29 @@ export async function createFoodStore(req, res) {
 
     // 4) 이벤트 저장 (inline 파싱)
     const events = Object.entries(req.body)
-      .filter(([k]) => /^event\d+$/i.test(k))
-      .map(([, v]) => String(v || "").trim())
-      .filter(Boolean);
+    .filter(([k]) => /^event\d+$/i.test(k))
+    .map(([, v]) => String(v || "").trim())
+    .filter(Boolean);
 
-    if (events.length) {
-      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
-      await client.query(
-        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
-        [storeId, ...events]
-      );
-    }
-
-    await client.query("COMMIT");
-
-    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
-    return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
-  } catch (err) {
-    try { if (client) await client.query("ROLLBACK"); } catch { }
-    console.error("[createFoodStore] error:", err);
-    return res.status(500).json({ ok: false, error: "server_error" });
-  } finally {
-    try { if (client) client.release(); } catch { }
+  if (events.length) {
+    const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+    await client.query(
+      `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
+      [storeId, ...events]
+    );
   }
+
+  await client.query("COMMIT");
+
+  const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
+  return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
+} catch (err) {
+  try { if (client) await client.query("ROLLBACK"); } catch { }
+  console.error("[createFoodStore] error:", err);
+  return res.status(500).json({ ok: false, error: "server_error" });
+} finally {
+  try { if (client) client.release(); } catch { }
+}
 }
 
 /* ===================== 단건 조회(GET /:id) ===================== */
