@@ -108,7 +108,10 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
 
 
 export async function createFoodStore(req, res) {
+  console.log("BODY >>>", req.body);
   console.log("FILES >>>", req.files);
+  console.log("FILES >>>", req.files);
+
   const client = await pool.connect();
   try {
     const businessName = (req.body.businessName || "").trim();
