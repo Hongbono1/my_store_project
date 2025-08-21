@@ -952,32 +952,51 @@
                     const row = document.createElement("div");
                     row.className = "space-y-2 border p-3 rounded-lg bg-white shadow-sm";
 
+                    // 🔹 파일 업로드 + 미리보기 같이 넣기
                     row.innerHTML = `
-  <div class="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr_auto] gap-3 items-center">
-    <div class="mnu-cell-center">
-    <input type="file" name="menuImage[]" accept="image/*" class="neo-input mnu-file">
-    </div>
-    <input class="neo-input w-full px-3 py-2 text-center" placeholder="품목명" value="${item.name || ""}">
-    <input class="neo-input w-full px-3 py-2 text-center" placeholder="가격" value="${formatPriceView(item.price || "")}">
-    <button type="button" class="neo-btn neo-danger px-3 py-2">삭제</button>
-  </div>
+              <div class="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr_auto] gap-3 items-center">
+                <div class="mnu-cell-center flex flex-col items-center">
+                  <input type="file" accept="image/*" class="neo-input mnu-file">
+                  <div class="preview mt-2"></div>
+                </div>
+                <input class="neo-input w-full px-3 py-2 text-center" placeholder="품목명" value="${item.name || ""}">
+                <input class="neo-input w-full px-3 py-2 text-center" placeholder="가격" value="${formatPriceView(item.price || "")}">
+                <button type="button" class="neo-btn neo-danger px-3 py-2">삭제</button>
+              </div>
+              <div>
+                <textarea class="neo-input w-full px-3 py-2" rows="2" placeholder="설명 (선택)">${item.description || ""}</textarea>
+              </div>
+            `;
 
-  <!-- 설명(선택) -->
-  <div>
-    <textarea class="neo-input w-full px-3 py-2" rows="2" placeholder="설명 (선택) — 예: 재료/맛/추천 조합 등">${item.description || ""}</textarea>
-  </div>
-`;
-
-
-
-                    const inputs = row.querySelectorAll("input");
-                    const fileEl = inputs[0];
-                    const nameEl = inputs[1];
-                    const priceEl = inputs[2];
+                    const fileEl = row.querySelector("input[type=file]");
+                    const previewEl = row.querySelector(".preview");
+                    const nameEl = row.querySelectorAll("input")[1];
+                    const priceEl = row.querySelectorAll("input")[2];
                     const delBtn = row.querySelector("button");
                     const descEl = row.querySelector("textarea");
 
-                    fileEl.addEventListener("change", (e) => { cat.items[idx].imageFile = e.target.files?.[0] || null; });
+                    // 🔹 파일 선택 시 state에 저장 & 미리보기
+                    fileEl.addEventListener("change", (e) => {
+                        const f = e.target.files?.[0] || null;
+                        cat.items[idx].imageFile = f;
+                        previewEl.innerHTML = "";
+                        if (f) {
+                            const img = document.createElement("img");
+                            img.src = URL.createObjectURL(f);
+                            img.className = "w-16 h-16 object-cover rounded border";
+                            previewEl.appendChild(img);
+                        }
+                    });
+
+                    // 🔹 state에 저장된 파일 미리보기 복원
+                    if (item.imageFile) {
+                        const img = document.createElement("img");
+                        img.src = URL.createObjectURL(item.imageFile);
+                        img.className = "w-16 h-16 object-cover rounded border";
+                        previewEl.appendChild(img);
+                    }
+
+                    // 나머지 입력들 state 반영
                     nameEl.addEventListener("input", (e) => { cat.items[idx].name = e.target.value; });
                     priceEl.addEventListener("input", (e) => { e.target.value = formatPriceView(e.target.value); cat.items[idx].price = onlyDigits(e.target.value); });
                     delBtn.addEventListener("click", () => { cat.items.splice(idx, 1); renderMenuContainer(); });
