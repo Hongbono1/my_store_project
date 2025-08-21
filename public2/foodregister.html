@@ -1316,6 +1316,7 @@
             const fd = new FormData(formEl);
 
             // ---- 메뉴 평탄화 (state -> 배열) ----
+            // ---- 메뉴 평탄화 (state -> 배열) ----
             const menusFlat = [];
             state.categories.forEach((cat, ci) => {
                 (cat.items || []).forEach((item, mi) => {
@@ -1323,12 +1324,12 @@
                         category: cat.name,
                         name: (item.name || "").trim(),
                         price: Number((item.price || "").toString().replace(/[^\d]/g, "")) || 0,
-                        image_url: (item.imageUrl || "").trim(),
+                        image_url: (item.imageUrl || "").trim(),   // 텍스트 URL(선택)
                         description: (item.description || "").trim(),
+                        hasImage: !!item.imageFile                 // 🔹 파일 첨부 여부 메타
                     };
                     menusFlat.push(obj);
 
-                    // 백엔드가 브래킷 형식만 읽는 경우 대비
                     fd.append(`storeMenus[${ci}][${mi}][category]`, obj.category);
                     fd.append(`storeMenus[${ci}][${mi}][name]`, obj.name);
                     fd.append(`storeMenus[${ci}][${mi}][price]`, String(obj.price));
@@ -1337,11 +1338,34 @@
                 });
             });
 
-            // ✅ JSON 키들도 같이 넣기 (서버 호환)
+            // 🔹 폼에서 자동 수집된 (비어있을 수 있는) menuImage[]는 모두 제거
+            fd.delete("menuImage[]");
+
+            // 🔹 state 순서대로 파일 다시 붙이기 (리렌더로 비워진 파일 보완)
+            menusFlat.forEach((m, idx) => {
+                // categories와 items를 같은 순서로 평탄화했으므로 동일 인덱스로 접근
+                const catIdxInfo = (() => {
+                    // 필요 시 추적하지 말고, 위 forEach에서 바로 item을 모아 배열에 저장해도 됩니다.
+                    // 여기서는 간단히 다시 계산:
+                    let count = 0;
+                    for (const c of state.categories) {
+                        for (const it of (c.items || [])) {
+                            if (count === idx) return it;
+                            count++;
+                        }
+                    }
+                })();
+                if (catIdxInfo?.imageFile) {
+                    fd.append("menuImage[]", catIdxInfo.imageFile);  // ← multer: menuImageFields와 매칭
+                }
+            });
+
+            // ✅ JSON 키들도 같이 넣기 (hasImage 포함으로 갱신)
             const menusJson = JSON.stringify(menusFlat);
-            fd.append("menus", menusJson);
-            fd.append("menusJson", menusJson);   // 호환용
-            fd.append("menuList", menusJson);   // 호환용
+            fd.set("menus", menusJson);
+            fd.set("menusJson", menusJson);
+            fd.set("menuList", menusJson);
+
 
             // 🔎 최종 FormData 디버그
             for (const [k, v] of fd.entries()) {

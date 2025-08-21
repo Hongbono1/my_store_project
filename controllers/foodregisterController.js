@@ -379,23 +379,58 @@ export async function updateFoodStore(req, res) {
     }
 
     // 새 이미지 추가(기존 유지)
+    // 3) 메뉴 저장
     const allFiles = collectFiles(req);
-    const newStoreImages = filesByField(allFiles, "storeImages", "storeImages[]");
+    const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
 
-    if (newStoreImages.length) {
-      const urls = newStoreImages.map(toWebPath).filter(Boolean);
+    // 신규 JSON 우선 사용
+    const menusJsonRaw = req.body.menusJson || req.body.menus || req.body.menuList;
+    let menusFromJson = [];
+    try { menusFromJson = JSON.parse(menusJsonRaw || "[]"); } catch { menusFromJson = []; }
 
-      if (urls.length) {
-        await client.query(`DELETE FROM store_images WHERE store_id=$1`, [storeId]);
-
-        const limited = urls.slice(0, 3);
-        const values = limited.map((_, i) => `($1,$${i + 2})`).join(",");
-
-        await client.query(
-          `INSERT INTO store_images (store_id, url) VALUES ${values}`,
-          [storeId, ...limited]
-        );
+    // hasImage 플래그로 파일을 안전하게 매칭
+    let ptr = 0;
+    const menusFromJsonWithFiles = menusFromJson.map((m) => {
+      const base = {
+        name: (m.name || "").trim(),
+        price: toInt(m.price),
+        category: (m.category || "").trim() || null,
+        description: (m.description || "").trim() || null,
+        image_url: (m.image_url || "").trim() || null,
+      };
+      if (m.hasImage && menuImgFiles[ptr]) {
+        base.image_url = toWebPath(menuImgFiles[ptr++]) || base.image_url;
       }
+      return base;
+    });
+
+    // 구형 폼(backward compat): menuName[]/menuPrice[]/menuDesc[] + menuImage[]
+    const legacyMenus = extractLegacyMenusFromBody(req.body, menuImgFiles.slice(ptr));
+
+    // 최종 합치기
+    const menus = [...menusFromJsonWithFiles, ...legacyMenus]
+      .filter(m => m.name && m.price > 0);
+
+    // 저장 전 기존 것 정리(신규 생성에도 안전)
+    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
+
+    if (menus.length) {
+      const vals = menus
+        .map((_, i) => `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`)
+        .join(",");
+
+      const params = menus.flatMap(m => [
+        m.name,
+        m.price,
+        m.category,
+        m.image_url || null,
+        m.description || null
+      ]);
+
+      await client.query(
+        `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
+        [storeId, ...params]
+      );
     }
 
     // 메뉴 전량 교체(보낸 경우만) mmmm
