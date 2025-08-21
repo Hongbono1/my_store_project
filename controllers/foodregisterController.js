@@ -388,8 +388,8 @@ export async function updateFoodStore(req, res) {
       );
     }
 
-    // 새 이미지 추가(기존 유지)
     // 3) 메뉴 저장
+    // 3) 메뉴 저장  (이 블록으로 교체)
     const allFiles = collectFiles(req);
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
 
@@ -414,7 +414,7 @@ export async function updateFoodStore(req, res) {
       return base;
     });
 
-    // 구형 폼(backward compat): menuName[]/menuPrice[]/menuDesc[] + menuImage[]
+    // 구형 폼(백워드 컴패티빌리티): menuName[]/menuPrice[]/menuDesc[] + menuImage[]
     const legacyMenus = extractLegacyMenusFromBody(req.body, menuImgFiles.slice(ptr));
 
     // 최종 합치기
@@ -441,47 +441,6 @@ export async function updateFoodStore(req, res) {
         `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
         [storeId, ...params]
       );
-    }
-
-    // 메뉴 전량 교체(보낸 경우만) mmmm
-    const menusA = extractMenusFromBody(raw);
-    const namesB = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : raw.menuName || [];
-    const pricesB = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : raw.menuPrice || [];
-    const catsB =
-      Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : raw.menuCategory || [];
-    const hasLegacy = namesB.length || pricesB.length || catsB.length;
-
-
-
-    if (menusA.length || hasLegacy) {
-      await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
-      const menusB = [];
-      for (let i = 0; i < Math.max(namesB.length, pricesB.length, catsB.length); i++) {
-        const name = (namesB[i] || "").trim();
-        const price = toInt(pricesB[i]);
-        const cat = (catsB[i] || "").trim() || null;
-        if (name && price > 0) {
-          menusB.push({ name, price, category: cat, image_url: null, description: null });
-        }
-      }
-
-      const combined = [...menusA, ...menusB];
-      if (combined.length) {
-        const vals = combined
-          .map(
-            (_, i) =>
-              `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
-          )
-          .join(",");
-        const p = [storeId];
-        combined.forEach((m) =>
-          p.push(m.name, m.price, m.category ?? null, m.image_url ?? null, m.description ?? null)
-        );
-        await client.query(
-          `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
-          p
-        );
-      }
     }
 
     await client.query("COMMIT");
