@@ -896,6 +896,10 @@
             const panelsWrap = qs('#menuCategoryPanels');
             const addBtn = qs('#btnAddItem');
 
+            // 컨테이너 참조 저장
+            menuState.panelsWrap = panelsWrap;
+            menuState.opened = new Set();
+
             // 옵션 + 패널 생성
             MENU_CATEGORIES.forEach(cat => {
                 const op = document.createElement('option');
@@ -968,28 +972,32 @@
 
             const addBtn = qs('#btnAddItem');
             const currentTxt = qs('#currentCatText');
+            const panel = menuState.panels.get(cat);
 
-            // 선택 전: 기존에 펼친 패널들은 그대로 두고 버튼만 비활성화
-            if (!cat) {
-                addBtn.disabled = true;
+            if (!cat || !panel) {
+                if (addBtn) addBtn.disabled = true;
                 if (currentTxt) currentTxt.textContent = '선택 전';
                 return;
             }
 
-            // 선택됨: 기존 패널은 접지 않고, 방금 선택한 패널만 펼치기
-            addBtn.disabled = false;
+            // ✅ 처음 펼칠 때만: 선택 순서 보장을 위해 맨 아래로 재배치
+            if (!panel.dataset.opened) {
+                panel.dataset.opened = '1';
+                menuState.opened.add(cat);
+                menuState.panelsWrap.appendChild(panel);
+            }
+
+            panel.classList.remove('hidden');
+            if (addBtn) addBtn.disabled = false;
             if (currentTxt) currentTxt.textContent = cat;
 
-            const active = menuState.panels.get(cat);
-            if (active) {
-                active.classList.remove('hidden');  // ← 이 패널만 펼친다 (다른 패널은 유지)
-                // 선택 표시(하이라이트는 선택 사항)
-                menuState.panels.forEach((panel, name) => {
-                    panel.classList.toggle('ring-2', name === cat);
-                    panel.classList.toggle('ring-blue-300', name === cat);
-                });
-                active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+            // 선택 표시(옵션)
+            menuState.panels.forEach((p, name) => {
+                p.classList.toggle('ring-2', name === cat);
+                p.classList.toggle('ring-blue-300', name === cat);
+            });
+
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function deleteCategory(cat) {
@@ -998,15 +1006,16 @@
 
             const list = panel.querySelector(`[data-cat-list="${cat}"]`);
             const count = list ? list.children.length : 0;
-
             const ok = confirm(`‘${cat}’ 카테고리${count ? ` (품목 ${count}개 포함)` : ""}를 삭제할까요?\n입력된 품목들도 같이 삭제됩니다.`);
             if (!ok) return;
 
-            if (list) list.innerHTML = '';            // 품목 비우기
-            panel.classList.add('hidden');            // 패널 숨기기
-            panel.classList.remove('ring-2', 'ring-blue-300'); // 하이라이트 제거
+            if (list) list.innerHTML = '';
+            panel.classList.add('hidden');
 
-            // 현재 선택된 카테고리를 지웠다면 상태 초기화
+            // 선택 순서 관리 초기화
+            panel.removeAttribute('data-opened');
+            if (menuState.opened) menuState.opened.delete(cat);
+
             if (menuState.currentCategory === cat) {
                 menuState.currentCategory = '';
                 const addBtn = qs('#btnAddItem'); if (addBtn) addBtn.disabled = true;
