@@ -5,14 +5,33 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import foodregisterRouter from "./routes/foodregister.js";
+import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// ✅ 요청 ID 부여 (맨 먼저)
+app.use((req, res, next) => {
+  req.id = randomUUID();                 // 요청 고유 ID
+  res.setHeader("X-Request-Id", req.id); // 응답 헤더에도 실어서 추적 쉽게
+  next();
+});
+
+// (선택) 초간단 요청 로거 — 문제 추적에 도움
+app.use((req, res, next) => {
+  const started = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - started;
+    console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
+  });
+  next();
+});
+
 // ✅ 업로드 파일 서빙
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 
 /* ── ✅ 미들웨어는 라우트보다 먼저 ────────────────────────────────── */
 app.use(cors());
@@ -79,6 +98,36 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ── API: 푸드레지스터 ──────────────────────────────────────────── */
 app.use("/foodregister", foodregisterRouter);
+
+// ── 전역 에러 핸들러 ───────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('[error]', req?.id, err);
+
+  // 업로드 오류 (multer)
+  if (err?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ ok: false, error: 'upload_error', code: err.code, message: err.message, reqId: req?.id });
+  }
+  if (err?.code?.startsWith?.('LIMIT_') || /Unexpected field/.test(err?.message || '')) {
+    return res.status(400).json({ ok: false, error: 'upload_error', code: err.code, message: err.message, reqId: req?.id });
+  }
+
+  // DB/유효성 예시 매핑
+  if (err?.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({ ok: false, error: 'duplicate', message: err.sqlMessage || err.message, reqId: req?.id });
+  }
+  if (err?.code === 'ER_BAD_NULL_ERROR') {
+    return res.status(400).json({ ok: false, error: 'null_violation', message: err.sqlMessage || err.message, reqId: req?.id });
+  }
+  if (/Data too long/i.test(err?.message || '')) {
+    return res.status(400).json({ ok: false, error: 'too_long', message: err.message, reqId: req?.id });
+  }
+  if (err?.name === 'SequelizeValidationError') {
+    return res.status(400).json({ ok: false, error: 'validation', message: err.message, reqId: req?.id });
+  }
+
+  // 기본값: 500
+  res.status(500).json({ ok: false, error: 'internal', message: err.message, reqId: req?.id });
+});
 
 /* ── 헬스체크 ──────────────────────────────────────────────────── */
 app.get("/health", (_req, res) => res.json({ ok: true }));

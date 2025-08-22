@@ -39,13 +39,43 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024, files: 50 },
+  // 메뉴 행/텍스트가 많을 수 있으므로 fields/parts 한도도 넉넉히
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 파일 1개 최대 20MB
+    files: 200,                 // 전체 파일 수
+    fields: 2000,               // 파일 아닌 필드 수
+    parts: 2300,                // 파일 + 필드 합
+  },
 });
+
+// ⬇️ fields 정의 병합
+const fieldsDef = [...storeImageFields, ...menuImageFields, ...otherFileFields];
+
+// ⬇️ multer 에러를 잡아 4xx로 JSON 반환하는 래퍼
+const uploadWithCatch = (req, res, next) => {
+  const mw = upload.fields(fieldsDef);
+  mw(req, res, (err) => {
+    if (!err) return next();
+    // MulterError 예시: LIMIT_FILE_SIZE, LIMIT_FILE_COUNT, LIMIT_PART_COUNT, Unexpected field 등
+    console.error("[upload]", req?.id, err);
+    const status =
+      err?.code === "LIMIT_FILE_SIZE" ? 413 : 400; // 파일 크기 초과는 413, 그 외 400
+    return res.status(status).json({
+      ok: false,
+      error: "upload_error",
+      code: err?.code,
+      field: err?.field,
+      message: err?.message,
+      reqId: req?.id,
+    });
+  });
+};
+
 
 /* Routes */
 router.post(
   "/",
-  upload.fields([...storeImageFields, ...menuImageFields, ...otherFileFields]),
+  uploadWithCatch,
   ctrl.createFoodStore
 );
 
@@ -53,7 +83,7 @@ router.get("/:id", ctrl.getFoodStoreById);
 router.get("/:id/full", ctrl.getFoodRegisterFull);
 router.put(
   "/:id",
-  upload.fields([...storeImageFields, ...menuImageFields, ...otherFileFields]),
+  uploadWithCatch,
   ctrl.updateFoodStore
 );
 
