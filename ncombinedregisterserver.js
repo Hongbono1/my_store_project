@@ -5,6 +5,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Pool } from "pg";
 import dotenv from "dotenv";
+import ncombinedRouter from "./routes/ncombinedregister.js";
+
 
 dotenv.config();
 const app = express();
@@ -32,6 +34,8 @@ const upload = multer({ storage });
 // JSON + 정적
 app.use(express.json());
 app.use("/uploads", express.static(uploadDir));
+app.use("/", ncombinedRouter);
+
 
 // ✅ 통합 등록 API
 app.post(
