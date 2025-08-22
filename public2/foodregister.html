@@ -788,7 +788,10 @@
                     qs("#roadAddress").value = data.roadAddress || data.address || "";
                     updateMapByAddress(qs("#roadAddress").value);
                 }
-            }).open();
+            }).open({
+                left: (window.screen.width / 2) - (500 / 2),   // 가로 중앙 (팝업 너비 500px 가정)
+                top: (window.screen.height / 2) - (600 / 2)    // 세로 중앙 (팝업 높이 600px 가정)
+            });
         }
         window.openDaumPostcode = openDaumPostcode;
 
@@ -1167,6 +1170,7 @@
             initFABS();
             initBizInputs();
             initMenuModule();
+            bindPriceFormatters();
 
             if (window.kakao?.maps?.load) {
                 initKakaoMap();
@@ -1179,6 +1183,26 @@
         }
 
         document.addEventListener("DOMContentLoaded", init);
+
+        // ===== 가격 입력 포맷 =====
+        function bindPriceFormatters() {
+            document.addEventListener('input', (e) => {
+                const el = e.target.closest('input[name="menuPrice[]"]');
+                if (!el) return;
+                const right = el.value.length - (el.selectionEnd ?? el.value.length);
+                el.value = formatPriceView(el.value);
+                const pos = Math.max(0, el.value.length - right);
+                requestAnimationFrame(() => el.setSelectionRange(pos, pos));
+            });
+
+            document.addEventListener('paste', (e) => {
+                const el = e.target.closest('input[name="menuPrice[]"]');
+                if (!el) return;
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text');
+                el.value = formatPriceView(onlyDigits(text));
+            });
+        }
     </script>
 </body>
 
