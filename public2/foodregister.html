@@ -1069,15 +1069,78 @@
             const hasAnyMenu = qsa('input[name="menuName[]"]').some(i => i.value.trim() !== "");
             if (!hasAnyMenu) { alert("메뉴를 최소 1개 이상 입력해 주세요."); return; }
 
+            // 숫자만 남기기 (기존 로직 유지)
             qsa('input[name="menuPrice[]"]').forEach(i => { i.value = onlyDigits(i.value); });
 
+            // 디버그: 제출 전 입력 개수/요약
+            const menuNames = qsa('input[name="menuName[]"]').map(i => i.value.trim()).filter(Boolean);
+            const menuPrices = qsa('input[name="menuPrice[]"]').map(i => i.value.trim()).filter(Boolean);
+            const menuCats = qsa('input[name="menuCategory[]"]').map(i => i.value.trim()).filter(Boolean);
+            const menuImageInputs = qsa('input[name="menuImage[]"]');
+            const menuImageCount = menuImageInputs.reduce((n, el) => n + (el.files?.length || 0), 0);
+
             const fd = new FormData(qs('#storeForm'));
+
+            // 💡 FormData 내용 요약 로거 (파일은 이름/크기만)
+            (function logFormDataSummary() {
+                const summary = {};
+                for (const [k, v] of fd.entries()) {
+                    if (v instanceof File) {
+                        (summary[k] ||= []).push({ name: v.name, size: v.size, type: v.type });
+                    } else {
+                        (summary[k] ||= []).push(String(v));
+                    }
+                }
+                console.groupCollapsed('[REGISTER] FormData summary');
+                console.log('menuNames:', menuNames.length, menuNames);
+                console.log('menuPrices:', menuPrices.length, menuPrices);
+                console.log('menuCategories:', menuCats.length, menuCats);
+                console.log('menuImage files total:', menuImageCount);
+                console.dir(summary);
+                console.groupEnd();
+            })();
+
             try {
-                const res = await fetch(API.REGISTER, { method: 'POST', body: fd });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
+                const res = await fetch(API.REGISTER, {
+                    method: 'POST',
+                    body: fd,
+                    // 헤더는 넣지 마세요: Content-Type은 브라우저가 boundary 포함해 자동 지정
+                });
+
+                // 🔍 응답 메타/헤더/본문(스니펫)까지 로그
+                const meta = {
+                    ok: res.ok,
+                    status: res.status,
+                    statusText: res.statusText,
+                    url: res.url
+                };
+                const headers = Object.fromEntries(res.headers.entries());
+                const raw = await res.text(); // 본문 선확보 (JSON이 아니어도 확인 가능)
+                const rawSnippet = raw?.slice(0, 2000); // 너무 길면 잘라서
+
+                console.groupCollapsed('[REGISTER] Response debug');
+                console.log('meta:', meta);
+                console.log('headers:', headers);
+                console.log('body(raw):', rawSnippet);
+                console.groupEnd();
+
+                if (!res.ok) {
+                    // 서버가 에러 메시지를 텍스트로 내려주면 그대로 띄움
+                    throw new Error(`HTTP ${res.status}${rawSnippet ? `: ${rawSnippet}` : ''}`);
+                }
+
+                // OK이면 JSON 파싱 시도
+                let data = {};
+                try {
+                    data = raw ? JSON.parse(raw) : {};
+                } catch (e) {
+                    console.warn('[REGISTER] JSON parse 실패, raw 사용:', e);
+                    data = {};
+                }
+
                 if (!data?.ok || !data?.id) throw new Error("등록 응답에 id가 없습니다.");
 
+                // 성공 처리
                 const modal = qs("#successModal");
                 const okBtn = qs("#successOk");
                 const goDetail = () => location.href = `/ndetail.html?id=${encodeURIComponent(data.id)}`;
@@ -1088,8 +1151,9 @@
                 } else {
                     alert("등록 완료!"); goDetail();
                 }
+
             } catch (err) {
-                console.error(err);
+                console.error('[REGISTER] 실패:', err);
                 alert("등록 실패: " + (err?.message || "unknown"));
             }
         }
