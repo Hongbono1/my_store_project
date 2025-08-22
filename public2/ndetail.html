@@ -81,12 +81,16 @@
             </div>
 
             <!-- 서비스 내용 (내용만 스크롤) -->
-            <div class="text-right mt-2">
-                <button class="openTextModal px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                    data-target="serviceDetails" data-title="서비스 내용">
-                    자세히 보기
-                </button>
-            </div>
+            <!-- 서비스 내용 (내용만 스크롤) -->
+            <div class="rounded-2xl bg-blue-50 shadow p-6 flex flex-col h-48 overflow-hidden">
+                <div class="text-xl font-bold mb-2 border-b border-gray-200 pb-1">서비스 내용</div>
+                <div id="serviceDetails" class="flex-1 overflow-auto text-lg"></div>
+                <div class="text-right mt-2">
+                    <button class="openTextModal px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                        data-target="serviceDetails" data-title="서비스 내용">
+                        자세히 보기
+                    </button>
+                </div>
             </div>
 
             <div class="rounded-2xl bg-yellow-50 shadow p-6 overflow-hidden flex-shrink-0">
@@ -103,6 +107,12 @@
             <div class="rounded-2xl bg-blue-50 shadow p-6 flex flex-col h-48 overflow-hidden">
                 <div class="text-xl font-bold mb-2 border-b border-gray-200 pb-1">추가 설명</div>
                 <div id="additionalDesc" class="flex-1 overflow-auto text-lg"></div>
+                <div class="text-right mt-2">
+                    <button class="openTextModal px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                        data-target="additionalDesc" data-title="추가 설명">
+                        자세히 보기
+                    </button>
+                </div>
             </div>
 
             <div class="rounded-2xl bg-gray-50 shadow p-6 overflow-hidden flex-shrink-0">
@@ -129,6 +139,16 @@
         </section>
     </main>
 
+    <!-- 텍스트 모달 -->
+    <div id="textModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 relative">
+            <h3 id="textModalTitle" class="text-2xl font-bold mb-4"></h3>
+            <div id="textModalBody" class="max-h-[60vh] overflow-auto text-lg leading-relaxed"></div>
+            <button id="textModalClose"
+                class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center hover:bg-gray-200">×</button>
+        </div>
+    </div>
+
     <!-- 이미지 모달 -->
     <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
         <div class="relative">
@@ -136,460 +156,442 @@
             <button id="closeModal"
                 class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">×</button>
         </div>
-        <!-- 텍스트 모달 -->
-        <div id="textModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
-            <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 relative">
-                <h3 id="textModalTitle" class="text-2xl font-bold mb-4"></h3>
-                <div id="textModalBody" class="max-h-[60vh] overflow-auto text-lg leading-relaxed"></div>
-                <button id="textModalClose"
-                    class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center hover:bg-gray-200">×</button>
-            </div>
-        </div>
+    </div>
 
-        <script type="module">
-            // ========== 유틸 ==========
-            const $ = (id) => document.getElementById(id);
+    <script type="module">
+        // ========== 유틸 ==========
+        const $ = (id) => document.getElementById(id);
 
-            function normalizeSrc(src) {
-                if (!src) return "";
-                if (src.startsWith("http") || src.startsWith("/")) return src;
-                return `/uploads/${src}`;
-            }
+        function normalizeSrc(src) {
+            if (!src) return "";
+            if (src.startsWith("http") || src.startsWith("/")) return src;
+            return `/uploads/${src}`;
+        }
 
-            function escapeHtml(s = "") {
-                return s.replace(/[&<>\"']/g, (m) => ({
-                    "&": "&amp;",
-                    "<": "&lt;",
-                    ">": "&gt;",
-                    '"': "&quot;",
-                    "'": "&#39;",
-                }[m]));
-            }
+        function escapeHtml(s = "") {
+            return s.replace(/[&<>\"']/g, (m) => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+            }[m]));
+        }
 
-            const nl2br = (s = "") => escapeHtml(String(s)).replace(/\r?\n/g, "<br>");
+        const nl2br = (s = "") => escapeHtml(String(s)).replace(/\r?\n/g, "<br>");
 
-            // 값 앞 라벨 제거
-            function onlyValue(v) {
-                if (v == null || v === "") return "-";
-                return String(v).replace(/^\s*(업종|카테고리|배달|영업시간)\s*[:：]\s*/, "").trim();
-            }
+        // 값 앞 라벨 제거
+        function onlyValue(v) {
+            if (v == null || v === "") return "-";
+            return String(v).replace(/^\s*(업종|카테고리|배달|영업시간)\s*[:：]\s*/, "").trim();
+        }
 
-            // storeId
-            const q = new URLSearchParams(location.search);
-            const storeId = Number(q.get("id"));
-            if (!Number.isSafeInteger(storeId)) {
-                alert("잘못된 접근입니다. (id 필요)");
-                throw new Error("Invalid storeId"); // <- 이후 fetch 아예 중단
-            }
+        // ========== 이미지 모달 ==========
+        function openModal(src) {
+            $("modalImage").src = src;
+            $("imageModal").classList.remove("hidden");
+        }
+        function closeModal() {
+            $("imageModal").classList.add("hidden");
+        }
 
-            // ========== 이미지 모달 ==========
-            function openModal(src) {
-                $("modalImage").src = src;
-                $("imageModal").classList.remove("hidden");
-            }
-            function closeModal() {
-                $("imageModal").classList.add("hidden");
-            }
+        // ========== 슬라이더 ==========
+        const slider = {
+            imgs: [],
+            idx: 0,
+            init(arr) {
+                this.imgs = (arr || [])
+                    .filter((s) => typeof s === "string" && s.trim() !== "")
+                    .map((s) => normalizeSrc(s.trim()));
 
-            // ========== 슬라이더 ==========
-            const slider = {
-                imgs: [],
-                idx: 0,
-                init(arr) {
-                    this.imgs = (arr || [])
-                        .filter((s) => typeof s === "string" && s.trim() !== "")
-                        .map((s) => normalizeSrc(s.trim()));
-
-                    $("sliderImages").innerHTML = this.imgs
-                        .map((u, i) => {
-                            const n = normalizeSrc(u);
-                            return `
+                $("sliderImages").innerHTML = this.imgs
+                    .map((u, i) => {
+                        const n = normalizeSrc(u);
+                        return `
               <div class="min-w-full h-full">
                 <img src="${n}" data-index="${i}" class="w-full h-full object-cover cursor-pointer select-none" />
               </div>`;
-                        })
-                        .join("");
+                    })
+                    .join("");
 
-                    $("sliderImages").onclick = (e) => {
-                        const img = e.target.closest("img[data-index]");
-                        if (img) {
-                            this.idx = Number(img.dataset.index);
-                            this.update();
-                            openModal(this.imgs[this.idx]);
-                        }
-                    };
-
-                    this.renderThumbs();
-                    this.update();
-
-                    $("prevBtn").onclick = () => this.move(-1);
-                    $("nextBtn").onclick = () => this.move(1);
-                },
-                renderThumbs() {
-                    const box = $("thumbBox");
-                    box.innerHTML = "";
-                    this.imgs.forEach((src, i) => {
-                        const t = document.createElement("img");
-                        t.src = src;
-                        t.alt = `이미지 ${i + 1}`;
-                        t.className = "w-14 h-14 object-cover rounded cursor-pointer border hover:opacity-80";
-                        t.addEventListener("click", () => {
-                            this.idx = i;
-                            this.update();
-                            openModal(src);
-                        });
-                        box.appendChild(t);
-                    });
-                },
-                move(step) {
-                    if (!this.imgs.length) return;
-                    this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
-                    this.update();
-                },
-                update() {
-                    const hasImg = this.imgs.length > 0;
-                    $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
-                    [...$("thumbBox").children].forEach((el, i) => {
-                        el.classList.toggle("ring-2", i === this.idx);
-                        el.classList.toggle("ring-blue-300", i === this.idx);
-                    });
-                    $("prevBtn").classList.toggle("hidden", !hasImg);
-                    $("nextBtn").classList.toggle("hidden", !hasImg);
-                    $("thumbBox").classList.toggle("hidden", !hasImg);
-                },
-            };
-
-            // 모달 키 핸들러
-            (function enableModalKeys() {
-                const modal = $("imageModal");
-                modal.addEventListener("click", (e) => {
-                    if (e.target === modal) closeModal();
-                });
-                window.addEventListener("keydown", (e) => {
-                    if (modal.classList.contains("hidden")) return;
-                    if (e.key === "Escape") closeModal();
-                    if (e.key === "ArrowLeft") {
-                        slider.move(-1);
-                        $("modalImage").src = slider.imgs[slider.idx];
+                $("sliderImages").onclick = (e) => {
+                    const img = e.target.closest("img[data-index]");
+                    if (img) {
+                        this.idx = Number(img.dataset.index);
+                        this.update();
+                        openModal(this.imgs[this.idx]);
                     }
-                    if (e.key === "ArrowRight") {
-                        slider.move(1);
-                        $("modalImage").src = slider.imgs[slider.idx];
-                    }
-                });
-                $("closeModal").addEventListener("click", closeModal);
-            })();
+                };
 
-            // ========== 장바구니 ==========
-            const cart = [];
-            function addToCart(item) {
-                const found = cart.find((c) => c.name === item.name);
-                if (found) found.quantity += item.quantity;
-                else cart.push({ ...item });
-                renderCart();
-            }
-            function renderCart() {
-                const ul = $("cartItems");
-                if (!ul) return;
-                ul.innerHTML = "";
-                let sum = 0;
-                cart.forEach((item, index) => {
-                    const price = Number(item.price) || 0;
-                    const qty = Number(item.quantity) || 1;
-                    const total = price * qty;
-                    sum += total;
-                    const li = document.createElement("li");
-                    li.className = "flex justify-between items-center text-lg py-2";
-                    li.innerHTML = `
+                this.renderThumbs();
+                this.update();
+
+                $("prevBtn").onclick = () => this.move(-1);
+                $("nextBtn").onclick = () => this.move(1);
+            },
+            renderThumbs() {
+                const box = $("thumbBox");
+                box.innerHTML = "";
+                this.imgs.forEach((src, i) => {
+                    const t = document.createElement("img");
+                    t.src = src;
+                    t.alt = `이미지 ${i + 1}`;
+                    t.className = "w-14 h-14 object-cover rounded cursor-pointer border hover:opacity-80";
+                    t.addEventListener("click", () => {
+                        this.idx = i;
+                        this.update();
+                        openModal(src);
+                    });
+                    box.appendChild(t);
+                });
+            },
+            move(step) {
+                if (!this.imgs.length) return;
+                this.idx = (this.idx + step + this.imgs.length) % this.imgs.length;
+                this.update();
+            },
+            update() {
+                const hasImg = this.imgs.length > 0;
+                $("sliderImages").style.transform = `translateX(${-this.idx * 100}%)`;
+                [...$("thumbBox").children].forEach((el, i) => {
+                    el.classList.toggle("ring-2", i === this.idx);
+                    el.classList.toggle("ring-blue-300", i === this.idx);
+                });
+                $("prevBtn").classList.toggle("hidden", !hasImg);
+                $("nextBtn").classList.toggle("hidden", !hasImg);
+                $("thumbBox").classList.toggle("hidden", !hasImg);
+            },
+        };
+
+        // 모달 키 핸들러
+        (function enableModalKeys() {
+            const modal = $("imageModal");
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+            window.addEventListener("keydown", (e) => {
+                if (modal.classList.contains("hidden")) return;
+                if (e.key === "Escape") closeModal();
+                if (e.key === "ArrowLeft") {
+                    slider.move(-1);
+                    $("modalImage").src = slider.imgs[slider.idx];
+                }
+                if (e.key === "ArrowRight") {
+                    slider.move(1);
+                    $("modalImage").src = slider.imgs[slider.idx];
+                }
+            });
+            $("closeModal").addEventListener("click", closeModal);
+        })();
+
+        // ========== 장바구니 ==========
+        const cart = [];
+        function addToCart(item) {
+            const found = cart.find((c) => c.name === item.name);
+            if (found) found.quantity += item.quantity;
+            else cart.push({ ...item });
+            renderCart();
+        }
+        function renderCart() {
+            const ul = $("cartItems");
+            if (!ul) return;
+            ul.innerHTML = "";
+            let sum = 0;
+            cart.forEach((item, index) => {
+                const price = Number(item.price) || 0;
+                const qty = Number(item.quantity) || 1;
+                const total = price * qty;
+                sum += total;
+                const li = document.createElement("li");
+                li.className = "flex justify-between items-center text-lg py-2";
+                li.innerHTML = `
           <span>${item.name} × ${qty}</span>
           <span class="text-xl font-bold">${total.toLocaleString()}원</span>
           <button class="removeBtn bg-red-100 text-red-600 px-2 py-1 rounded text-sm ml-2" data-index="${index}">삭제</button>`;
-                    ul.appendChild(li);
-                });
-                ul.querySelectorAll(".removeBtn").forEach((btn) => {
-                    btn.onclick = () => {
-                        cart.splice(btn.dataset.index, 1);
-                        renderCart();
-                    };
-                });
-                $("cartTotal").textContent = sum.toLocaleString() + "원";
+                ul.appendChild(li);
+            });
+            ul.querySelectorAll(".removeBtn").forEach((btn) => {
+                btn.onclick = () => {
+                    cart.splice(btn.dataset.index, 1);
+                    renderCart();
+                };
+            });
+            $("cartTotal").textContent = sum.toLocaleString() + "원";
+        }
+
+        // ===== 텍스트 모달 =====
+        (function initTextModal() {
+            const modal = $("textModal");
+            const body = $("textModalBody");
+            const title = $("textModalTitle");
+            const closeBtn = $("textModalClose");
+
+            function openTextModal(srcId, label) {
+                const el = $(srcId);
+                if (!el) return;
+                title.textContent = label;
+                body.innerHTML = el.innerHTML || "-";
+                modal.classList.remove("hidden");
             }
 
-            // ========== Kakao 지도 ==========
-            function renderMapActions(lat, lng, name, address) {
-                const parent = $("map").parentElement;
-                let box = document.getElementById("mapActions");
-                if (!box) {
-                    box = document.createElement("div");
-                    box.id = "mapActions";
-                    box.className = "mt-3 flex gap-2";
-                    parent.appendChild(box);
-                } else {
-                    box.innerHTML = "";
+            function closeTextModal() {
+                modal.classList.add("hidden");
+            }
+
+            // 버튼이 나중에 동적으로 생겨도 동작하도록 '이벤트 위임' 사용
+            document.addEventListener("click", (e) => {
+                const btn = e.target.closest(".openTextModal");
+                if (!btn) return;
+                openTextModal(btn.dataset.target, btn.dataset.title);
+            });
+
+            closeBtn.addEventListener("click", closeTextModal);
+            modal.addEventListener("click", (e) => { if (e.target === modal) closeTextModal(); });
+        })();
+
+        // ========== Kakao 지도 ==========
+        function renderMapActions(lat, lng, name, address) {
+            const parent = $("map").parentElement;
+            let box = document.getElementById("mapActions");
+            if (!box) {
+                box = document.createElement("div");
+                box.id = "mapActions";
+                box.className = "mt-3 flex gap-2";
+                parent.appendChild(box);
+            } else {
+                box.innerHTML = "";
+            }
+
+            const place = name || "목적지";
+
+            const openBtn = document.createElement("button");
+            openBtn.className = "px-3 py-1 rounded bg-blue-600 text-white text-sm";
+            openBtn.textContent = "카카오맵 열기";
+            openBtn.onclick = () => {
+                const url =
+                    lat && lng
+                        ? `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`
+                        : `https://map.kakao.com/link/search/${encodeURIComponent(address || place)}`;
+                window.open(url, "_blank", "noopener");
+            };
+
+            const dirBtn = document.createElement("button");
+            dirBtn.className = "px-3 py-1 rounded bg-emerald-600 text-white text-sm";
+            dirBtn.textContent = "길찾기";
+            dirBtn.onclick = () => {
+                const url =
+                    lat && lng
+                        ? `https://map.kakao.com/link/to/${encodeURIComponent(place)},${lat},${lng}`
+                        : `https://map.kakao.com/link/search/${encodeURIComponent(address || place)}`;
+                window.open(url, "_blank", "noopener");
+            };
+
+            box.append(openBtn, dirBtn);
+        }
+
+        // initMap
+        async function initMap(address, name = "") {
+            return new Promise(async (resolve) => {
+                if (!address) {
+                    $("addressText").textContent = "📍 -";
+                    $("map").innerHTML = "";
+                    renderMapActions(null, null, name, address);
+                    resolve();
+                    return;
                 }
+                $("addressText").textContent = `📍 ${address}`;
 
-                const place = name || "목적지";
+                if (!window.kakao || !window.kakao.maps) {
+                    console.error("Kakao SDK tag missing");
+                    renderMapActions(null, null, name, address);
+                    resolve();
+                    return;
+                }
+                await new Promise((r) => kakao.maps.load(r));
 
-                const openBtn = document.createElement("button");
-                openBtn.className = "px-3 py-1 rounded bg-blue-600 text-white text-sm";
-                openBtn.textContent = "카카오맵 열기";
-                openBtn.onclick = () => {
-                    const url =
-                        lat && lng
-                            ? `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`
-                            : `https://map.kakao.com/link/search/${encodeURIComponent(address || place)}`;
-                    window.open(url, "_blank", "noopener");
-                };
+                const geocoder = new kakao.maps.services.Geocoder();
+                const cleaned = address.replace(/^\d{5}\s*/, "").trim();
 
-                const dirBtn = document.createElement("button");
-                dirBtn.className = "px-3 py-1 rounded bg-emerald-600 text-white text-sm";
-                dirBtn.textContent = "길찾기";
-                dirBtn.onclick = () => {
-                    const url =
-                        lat && lng
-                            ? `https://map.kakao.com/link/to/${encodeURIComponent(place)},${lat},${lng}`
-                            : `https://map.kakao.com/link/search/${encodeURIComponent(address || place)}`;
-                    window.open(url, "_blank", "noopener");
-                };
-
-                box.append(openBtn, dirBtn);
-            }
-
-            // initMap
-            async function initMap(address, name = "") {
-                return new Promise(async (resolve) => {
-                    if (!address) {
-                        $("addressText").textContent = "📍 -";
-                        $("map").innerHTML = "";
-                        renderMapActions(null, null, name, address);
-                        resolve();
-                        return;
-                    }
-                    $("addressText").textContent = `📍 ${address}`;
-
-                    if (!window.kakao || !window.kakao.maps) {
-                        console.error("Kakao SDK tag missing");
-                        renderMapActions(null, null, name, address);
-                        resolve();
-                        return;
-                    }
-                    await new Promise((r) => kakao.maps.load(r));
-
-                    const geocoder = new kakao.maps.services.Geocoder();
-                    const cleaned = address.replace(/^\d{5}\s*/, "").trim();
-
-                    geocoder.addressSearch(cleaned, (result, status) => {
-                        if (status !== kakao.maps.services.Status.OK || !result?.length) {
-                            const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
-                            $("map").style.cursor = "pointer";
-                            $("map").title = "카카오맵에서 열기";
-                            $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
-                            renderMapActions(null, null, name, address);
-                            resolve();
-                            return;
-                        }
-
-                        const lat = Number(result[0].y);
-                        const lng = Number(result[0].x);
-                        const coords = new kakao.maps.LatLng(lat, lng);
-                        const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
-                        const marker = new kakao.maps.Marker({ map, position: coords });
-
-                        const place = name || "목적지";
-                        const openKakaoMap = () => {
-                            const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
-                            window.open(url, "_blank", "noopener");
-                        };
+                geocoder.addressSearch(cleaned, (result, status) => {
+                    if (status !== kakao.maps.services.Status.OK || !result?.length) {
+                        const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
                         $("map").style.cursor = "pointer";
                         $("map").title = "카카오맵에서 열기";
-                        $("map").onclick = openKakaoMap;
-                        kakao.maps.event.addListener(map, "click", openKakaoMap);
-                        kakao.maps.event.addListener(marker, "click", openKakaoMap);
-
-                        renderMapActions(lat, lng, place, address);
-
-                        requestAnimationFrame(() => requestAnimationFrame(resolve));
-                    });
-                });
-            }
-
-            // 2) 데이터 표준화 (이 블록으로 교체)
-            (async () => {
-                try {
-                    const q = new URLSearchParams(location.search);
-                    const storeId = Number(q.get("id"));
-                    if (!Number.isSafeInteger(storeId)) {
-                        alert("잘못된 접근입니다. (id 필요)");
-                        throw new Error("Invalid storeId");
+                        $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
+                        renderMapActions(null, null, name, address);
+                        resolve();
+                        return;
                     }
 
-                    const res = await fetch(`/foodregister/${encodeURIComponent(storeId)}/full`);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const json = await res.json();
+                    const lat = Number(result[0].y);
+                    const lng = Number(result[0].x);
+                    const coords = new kakao.maps.LatLng(lat, lng);
+                    const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
+                    const marker = new kakao.maps.Marker({ map, position: coords });
 
-                    // 2) 데이터 표준화
-                    const store = json.store || {};
+                    const place = name || "목적지";
+                    const openKakaoMap = () => {
+                        const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
+                        window.open(url, "_blank", "noopener");
+                    };
+                    $("map").style.cursor = "pointer";
+                    $("map").title = "카카오맵에서 열기";
+                    $("map").onclick = openKakaoMap;
+                    kakao.maps.event.addListener(map, "click", openKakaoMap);
+                    kakao.maps.event.addListener(marker, "click", openKakaoMap);
 
-                    // [교체] 이미지 배열 만들기 + 접두어 보강
-                    const rawImages = Array.isArray(json.images)
-                        ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
+                    renderMapActions(lat, lng, place, address);
+
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                });
+            });
+        }
+
+        // 2) 데이터 표준화 (이 블록으로 교체)
+        (async () => {
+            try {
+                const q = new URLSearchParams(location.search);
+                const storeId = Number(q.get("id"));
+                if (!Number.isSafeInteger(storeId)) {
+                    alert("잘못된 접근입니다. (id 필요)");
+                    throw new Error("Invalid storeId");
+                }
+
+                const res = await fetch(`/foodregister/${encodeURIComponent(storeId)}/full`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+
+                // 2) 데이터 표준화
+                const store = json.store || {};
+
+                // [교체] 이미지 배열 만들기 + 접두어 보강
+                const rawImages = Array.isArray(json.images)
+                    ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
+                    : [];
+
+                function fixUploadsPrefix(s) {
+                    if (!s) return "";
+                    s = String(s).trim();
+
+                    // 절대 URL이면 그대로
+                    if (/^https?:\/\//i.test(s)) return s;
+
+                    // 앞의 './' 또는 '/'들 정리 → 'uploads/xxx' 형태로 맞춤
+                    s = s.replace(/^\.?\/+/, "");          // './uploads/a' → 'uploads/a', '/a' → 'a'
+                    if (!/^uploads\//i.test(s)) s = "uploads/" + s;
+
+                    // 중복 슬래시 정리 후 선행 '/' 추가 → 최종 '/uploads/xxx'
+                    return ("/" + s).replace(/\/{2,}/g, "/");
+                }
+
+
+                const imagesFixed = rawImages.map(fixUploadsPrefix).filter(Boolean);
+
+                // 1) 슬라이더
+                slider.init(imagesFixed);
+
+                const rawMenusCandidate =
+                    json.menus ??
+                    json.storeMenus ??
+                    json.menuList ??
+                    json.menu ??
+                    (json.data && (json.data.menus ?? json.data.storeMenus)) ??
+                    [];
+
+                const rawList = Array.isArray(rawMenusCandidate)
+                    ? rawMenusCandidate
+                    : (rawMenusCandidate && typeof rawMenusCandidate === "object")
+                        ? Object.values(rawMenusCandidate).flatMap(v =>
+                            Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : [])
+                        )
                         : [];
 
-                    function fixUploadsPrefix(s) {
-                        if (!s) return "";
-                        s = String(s).trim();
+                const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
 
-                        // 절대 URL이면 그대로
-                        if (/^https?:\/\//i.test(s)) return s;
+                const menus = rawList.map(m => ({
+                    category: m.category ?? m.category_name ?? m.cat ?? "기타",
+                    name: m.name ?? m.menu_name ?? m.title ?? "",
+                    price: toNumber(m.price ?? m.menu_price ?? m.cost),
+                    image_url: m.image_url ?? m.imageUrl ?? m.image ?? "",
+                    description: m.description ?? m.desc ?? ""
+                }));
 
-                        // 앞의 './' 또는 '/'들 정리 → 'uploads/xxx' 형태로 맞춤
-                        s = s.replace(/^\.?\/+/, "");          // './uploads/a' → 'uploads/a', '/a' → 'a'
-                        if (!/^uploads\//i.test(s)) s = "uploads/" + s;
+                // 2) 기본 정보
+                $("businessNameHeader").textContent = store.business_name || store.name || "상호명 없음";
+                $("businessType").textContent = onlyValue(store.business_type);
+                $("businessCategory").textContent = onlyValue(store.business_category ?? store.category);
+                $("deliveryOption").textContent = onlyValue(store.delivery_option);
+                $("businessHours").textContent = onlyValue(store.business_hours);
 
-                        // 중복 슬래시 정리 후 선행 '/' 추가 → 최종 '/uploads/xxx'
-                        return ("/" + s).replace(/\/{2,}/g, "/");
-                    }
+                // 3) 본문들
+                $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
+                $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
 
+                const events = (json.events || []).map(escapeHtml);
+                $("eventsList").innerHTML = events.length
+                    ? events.map(e => `<li>${e}</li>`).join("")
+                    : `<li>-</li>`;
 
-                    const imagesFixed = rawImages.map(fixUploadsPrefix).filter(Boolean);
-
-                    // ===== 텍스트 모달 =====
-                    (function initTextModal() {
-                        const modal = $("textModal");
-                        const body = $("textModalBody");
-                        const title = $("textModalTitle");
-                        const closeBtn = $("textModalClose");
-
-                        function openTextModal(srcId, label) {
-                            const el = $(srcId);
-                            if (!el) return;
-                            title.textContent = label;
-                            body.innerHTML = el.innerHTML || "-";
-                            modal.classList.remove("hidden");
-                        }
-                        function closeTextModal() {
-                            modal.classList.add("hidden");
-                        }
-
-                        document.querySelectorAll(".openTextModal").forEach(btn => {
-                            btn.addEventListener("click", () =>
-                                openTextModal(btn.dataset.target, btn.dataset.title)
-                            );
-                        });
-
-                        closeBtn.addEventListener("click", closeTextModal);
-                        modal.addEventListener("click", e => { if (e.target === modal) closeTextModal(); });
-                    })();
-
-
-                    // 1) 슬라이더
-                    slider.init(imagesFixed);
-
-                    const rawMenusCandidate =
-                        json.menus ??
-                        json.storeMenus ??
-                        json.menuList ??
-                        json.menu ??
-                        (json.data && (json.data.menus ?? json.data.storeMenus)) ??
-                        [];
-
-                    const rawList = Array.isArray(rawMenusCandidate)
-                        ? rawMenusCandidate
-                        : (rawMenusCandidate && typeof rawMenusCandidate === "object")
-                            ? Object.values(rawMenusCandidate).flatMap(v =>
-                                Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : [])
-                            )
-                            : [];
-
-                    const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
-
-                    const menus = rawList.map(m => ({
-                        category: m.category ?? m.category_name ?? m.cat ?? "기타",
-                        name: m.name ?? m.menu_name ?? m.title ?? "",
-                        price: toNumber(m.price ?? m.menu_price ?? m.cost),
-                        image_url: m.image_url ?? m.imageUrl ?? m.image ?? "",
-                        description: m.description ?? m.desc ?? ""
-                    }));
-
-                    // 1) 슬라이더
-                    slider.init(imagesFixed);
-
-                    // 2) 기본 정보
-                    $("businessNameHeader").textContent = store.business_name || store.name || "상호명 없음";
-                    $("businessType").textContent = onlyValue(store.business_type);
-                    $("businessCategory").textContent = onlyValue(store.business_category ?? store.category);
-                    $("deliveryOption").textContent = onlyValue(store.delivery_option);
-                    $("businessHours").textContent = onlyValue(store.business_hours);
-
-                    // 3) 본문들
-                    $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
-                    $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
-
-                    const events = (json.events || []).map(escapeHtml);
-                    $("eventsList").innerHTML = events.length
-                        ? events.map(e => `<li>${e}</li>`).join("")
-                        : `<li>-</li>`;
-
-                    $("infoEtcList").innerHTML = `
+                $("infoEtcList").innerHTML = `
         <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
         <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
         <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
       `;
 
-                    // 4) 연락처
-                    const phoneNum = store.phone || "";
-                    function linkOrNull(url, label) {
-                        if (!url) return null;
-                        const u = /^https?:\/\//i.test(url) ? url : "http://" + url;
-                        return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label || url)}</a>`;
-                    }
-                    const contactLinks = []; // ← 이름 변경(중복 피하기)
-                    if (phoneNum) {
-                        const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
-                        contactLinks.push(
-                            `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`
-                        );
-                    }
-                    const home = linkOrNull(store.homepage, "홈페이지");
-                    if (home) contactLinks.push(home);
-                    const insta = linkOrNull(store.instagram, "인스타그램");
-                    if (insta) contactLinks.push(insta);
-                    const face = linkOrNull(store.facebook, "페이스북");
-                    if (face) contactLinks.push(face);
+                // 4) 연락처
+                const phoneNum = store.phone || "";
+                function linkOrNull(url, label) {
+                    if (!url) return null;
+                    const u = /^https?:\/\//i.test(url) ? url : "http://" + url;
+                    return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label || url)}</a>`;
+                }
+                const contactLinks = []; // ← 이름 변경(중복 피하기)
+                if (phoneNum) {
+                    const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
+                    contactLinks.push(
+                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`
+                    );
+                }
+                const home = linkOrNull(store.homepage, "홈페이지");
+                if (home) contactLinks.push(home);
+                const insta = linkOrNull(store.instagram, "인스타그램");
+                if (insta) contactLinks.push(insta);
+                const face = linkOrNull(store.facebook, "페이스북");
+                if (face) contactLinks.push(face);
 
-                    const grid = $("contactGrid");
-                    if (!contactLinks.length) {
-                        grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
-                    } else if (contactLinks.length === 1) {
-                        grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
-                    } else {
-                        grid.innerHTML = contactLinks.map(html => `<div>${html}</div>`).join("");
-                    }
+                const grid = $("contactGrid");
+                if (!contactLinks.length) {
+                    grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
+                } else if (contactLinks.length === 1) {
+                    grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
+                } else {
+                    grid.innerHTML = contactLinks.map(html => `<div>${html}</div>`).join("");
+                }
 
 
-                    // 5) 메뉴 (먼저 그리기)  ← 메뉴 먼저 렌더
-                    const menuList = $("menuList");
-                    menuList.innerHTML = "";
-                    if (!menus.length) {
-                        menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
-                    } else {
-                        const byCat = {};
-                        menus.forEach(it => {
-                            const cat = (it.category || "").toString().trim() || "기타";
-                            (byCat[cat] ||= []).push(it);
-                        });
-                        Object.entries(byCat).forEach(([cat, groupItems]) => {
-                            const group = document.createElement("div");
-                            const title = document.createElement("h3");
-                            title.textContent = "🍱 " + cat;
-                            title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
-                            group.appendChild(title);
+                // 5) 메뉴 (먼저 그리기)  ← 메뉴 먼저 렌더
+                const menuList = $("menuList");
+                menuList.innerHTML = "";
+                if (!menus.length) {
+                    menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
+                } else {
+                    const byCat = {};
+                    menus.forEach(it => {
+                        const cat = (it.category || "").toString().trim() || "기타";
+                        (byCat[cat] ||= []).push(it);
+                    });
+                    Object.entries(byCat).forEach(([cat, groupItems]) => {
+                        const group = document.createElement("div");
+                        const title = document.createElement("h3");
+                        title.textContent = "🍱 " + cat;
+                        title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
+                        group.appendChild(title);
 
-                            groupItems.forEach(it => {
-                                const box = document.createElement("div");
-                                box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                                const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
-                                box.innerHTML = `
+                        groupItems.forEach(it => {
+                            const box = document.createElement("div");
+                            box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
+                            const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
+                            box.innerHTML = `
       <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
       <div class="flex-1">
         <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
@@ -604,36 +606,36 @@
         </div>
         <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
       </div>`;
-                                let qty = 1;
-                                const qtySpan = box.querySelector(".quantity");
-                                box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
-                                box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                                box.querySelector(".addBtn").onclick = () => addToCart({ name: it.name, price: it.price, quantity: qty });
-                                group.appendChild(box);
-                            });
-
-                            menuList.appendChild(group);
+                            let qty = 1;
+                            const qtySpan = box.querySelector(".quantity");
+                            box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
+                            box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
+                            box.querySelector(".addBtn").onclick = () => addToCart({ name: it.name, price: it.price, quantity: qty });
+                            group.appendChild(box);
                         });
-                    }
-                    // 6) 지도
-                    // 지도는 화면 그린 뒤 비동기로 (블로킹 방지)
-                    initMap(store.address || "", store.business_name || store.name || "")
-                        .catch(err => console.warn("지도 로딩 실패(무시):", err));
 
-
-
-                    // 예약 버튼
-                    const reserveBtn = $("reserveBtn");
-                    if (reserveBtn) {
-                        reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
-                    }
-
-                } catch (err) {
-                    console.error("상세 로딩 실패:", err);
-                    $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
+                        menuList.appendChild(group);
+                    });
                 }
-            })();
-        </script>
+                // 6) 지도
+                // 지도는 화면 그린 뒤 비동기로 (블로킹 방지)
+                initMap(store.address || "", store.business_name || store.name || "")
+                    .catch(err => console.warn("지도 로딩 실패(무시):", err));
+
+
+
+                // 예약 버튼
+                const reserveBtn = $("reserveBtn");
+                if (reserveBtn) {
+                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
+                }
+
+            } catch (err) {
+                console.error("상세 로딩 실패:", err);
+                $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
+            }
+        })();
+    </script>
 </body>
 
 </html>
