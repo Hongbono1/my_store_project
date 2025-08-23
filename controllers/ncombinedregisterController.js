@@ -1,5 +1,8 @@
+// controllers/ncombinedregisterController.js
 import pool from "../db.js";
 import path from "path";
+
+const asArray = (v) => (Array.isArray(v) ? v : (v != null ? [v] : []));
 
 /* ----------------------
  * 저장 (등록 처리)
@@ -7,9 +10,11 @@ import path from "path";
 export async function createFoodStore(req, res) {
   try {
     const raw = req.body;
-    const files = req.files;
+    const files = req.files || {};
 
     // 1) 기본 가게 정보 저장
+    //   - mainCategory → business_type
+    //   - subCategory  → business_category
     const storeSql = `
       INSERT INTO food_stores
         (business_name, business_type, business_category,
@@ -20,44 +25,51 @@ export async function createFoodStore(req, res) {
       RETURNING id
     `;
     const values = [
-      raw.businessName,
-      raw.businessType,
-      raw.mainCategory,
-      raw.businessHours,
-      raw.deliveryOption,
-      raw.serviceDetails,
-      raw.additionalDesc,
-      raw.phoneNumber,
-      raw.homepage,
-      raw.instagram,
-      raw.facebook,
-      raw.facility,
-      raw.pets === "가능",
-      raw.parking,
-      raw.roadAddress
+      raw.businessName || null,
+      raw.mainCategory || null,
+      raw.subCategory || null,
+      raw.businessHours || null,
+      raw.deliveryOption || null,
+      raw.serviceDetails || null,
+      raw.additionalDesc || null,
+      raw.phoneNumber || null,
+      raw.homepage || null,
+      raw.instagram || null,
+      raw.facebook || null,
+      raw.facility || null,
+      (raw.pets || "").trim() === "가능",
+      raw.parking || null,
+      raw.roadAddress || raw.ownerAddress || null,
     ];
     const { rows } = await pool.query(storeSql, values);
     const storeId = rows[0].id;
 
-    // 2) 이미지 저장
-    if (files?.storeImages) {
-      for (const f of files.storeImages) {
-        await pool.query(
-          `INSERT INTO food_store_images (store_id, url) VALUES ($1, $2)`,
-          [storeId, `/uploads/${path.basename(f.path)}`]
-        );
-      }
+    // 2) 가게 이미지 저장 (옵션)
+    const storeImages = files["storeImages"] || [];
+    for (const f of storeImages) {
+      await pool.query(
+        `INSERT INTO food_store_images (store_id, url) VALUES ($1, $2)`,
+        [storeId, `/uploads/${path.basename(f.path)}`]
+      );
     }
 
     // 3) 메뉴 저장
-    const names = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : [];
-    const prices = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : [];
-    const cats = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : [];
+    // 프론트에서 name="menuName[]", "menuPrice[]", "menuCategory[]", "menuImage[]"
+    const names  = asArray(raw["menuName[]"]);
+    const prices = asArray(raw["menuPrice[]"]);
+    const cats   = asArray(raw["menuCategory[]"]);      // 카테고리 히든필드(프론트에서 생성)
+    const menuImgs = files["menuImage[]"] || [];        // 파일 배열(인덱스 매칭)
+
     for (let i = 0; i < names.length; i++) {
+      const name = names[i] || "";
+      const priceNum = Number(String(prices[i] ?? 0).replace(/[^\d.-]/g, "")) || 0;
+      const cat = (cats[i] || "기타").toString().trim() || "기타";
+      const img = menuImgs[i] ? `/uploads/${path.basename(menuImgs[i].path)}` : null;
+
       await pool.query(
-        `INSERT INTO food_menu_items (store_id, category, name, price)
-         VALUES ($1,$2,$3,$4)`,
-        [storeId, cats[i] || "기타", names[i], Number(prices[i] || 0)]
+        `INSERT INTO food_menu_items (store_id, category, name, price, image_url)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [storeId, cat, name, priceNum, img]
       );
     }
 
@@ -85,7 +97,9 @@ export async function getFoodStoreFull(req, res) {
 
     const menus = (await pool.query(
       `SELECT category, name, price, image_url, description
-       FROM food_menu_items WHERE store_id=$1 ORDER BY category`, [storeId]
+       FROM food_menu_items
+       WHERE store_id=$1
+       ORDER BY category, name`, [storeId]
     )).rows;
 
     const events = (await pool.query(

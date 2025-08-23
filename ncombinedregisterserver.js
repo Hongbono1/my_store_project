@@ -1,23 +1,29 @@
-import { Router } from "express";
-import multer from "multer";
+// ncombinedregisterserver.js
+import express from "express";
+import cors from "cors";
 import path from "path";
-import * as ctrl from "../controllers/ncombinedregisterController.js";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import ncombinedregisterRoutes from "./routes/ncombinedregister.js";
 
-const router = Router();
-const upload = multer({ dest: path.join(process.cwd(), "uploads") });
+dotenv.config();
+const app = express();
+const port = process.env.PORT || 3000;
 
-// 프론트가 POST "/store" 로 요청하므로 라우터 경로도 "/store"
-router.post(
-  "/store",
-  upload.fields([
-    { name: "storeImages", maxCount: 10 },
-    { name: "menuImage",   maxCount: 50 },
-    { name: "businessCertImage", maxCount: 1 },
-  ]),
-  ctrl.createFoodStore
-);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// 상세는 "/foodregister/:id/full" 로 그대로 유지
-router.get("/foodregister/:id/full", ctrl.getFoodStoreFull);
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-export default router;
+// 정적 파일 (HTML + 업로드)
+app.use(express.static(path.join(__dirname, "public2")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ★ 루트에 마운트 → 실제 엔드포인트: /store, /foodregister/:id/full
+app.use("/", ncombinedregisterRoutes);
+
+app.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
