@@ -170,9 +170,15 @@ export async function getFoodStoreFull(req, res) {
     console.log("[getFoodStoreFull] storeId =", storeId);
 
     const { rows: storeRows } = await pool.query({
-      text: `SELECT * FROM food_stores WHERE id=$1`,
+      text: `
+    SELECT *, 
+           (COALESCE(road_address,'') || ' ' || COALESCE(detail_address,'')) AS address
+    FROM food_stores 
+    WHERE id=$1
+  `,
       values: [storeId],
     });
+
     const store = storeRows[0];
 
     const { rows: images } = await pool.query({
