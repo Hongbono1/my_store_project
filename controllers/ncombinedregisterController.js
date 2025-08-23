@@ -1,3 +1,4 @@
+// controllers/foodregisterController.js
 import pool from "../db.js";
 import path from "path";
 
@@ -8,11 +9,13 @@ const n = (v) => {
   const num = Number(String(v ?? "").replace(/[^\d.-]/g, ""));
   return Number.isFinite(num) ? num : 0;
 };
-/** boolean 보정 (가능/true/1/yes) */
+/** boolean 보정 (가능/true/1/yes/on) */
 const b = (v) => {
   const t = String(v ?? "").trim();
   return ["가능", "true", "1", "yes", "on"].includes(t.toLowerCase());
 };
+/** 업로드 파일 → 웹경로 */
+const toWeb = (file) => (file?.path ? `/uploads/${path.basename(file.path)}` : null);
 
 /* ----------------------
  * 저장 (등록 처리)
@@ -25,23 +28,30 @@ export async function createFoodStore(req, res) {
 
     await client.query("BEGIN");
 
-    // 기본 가게 정보 (빈문자라도 넣어 NOT NULL 회피)
+    // ✅ food_stores: address 대신 postal_code, road_address, detail_address 사용
     const storeSql = `
-      INSERT INTO food_stores
-        (business_name, business_type, business_category,
-         business_hours, delivery_option, service_details,
-         additional_desc, phone, homepage, instagram, facebook,
-         facilities, pets_allowed, parking, address)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      INSERT INTO food_stores (
+        business_name, business_type, business_category,
+        business_hours, delivery_option, service_details,
+        additional_desc, phone, homepage, instagram, facebook,
+        facilities, pets_allowed, parking,
+        postal_code, road_address, detail_address
+      ) VALUES (
+        $1,$2,$3,
+        $4,$5,$6,
+        $7,$8,$9,$10,$11,
+        $12,$13,$14,
+        $15,$16,$17
+      )
       RETURNING id
     `;
 
     const storeVals = [
       s(raw.businessName),
-      s(raw.businessType),            // 폼엔 없지만 컬럼이 NOT NULL이면 빈문자 처리
-      s(raw.mainCategory || raw.subCategory), // 메인/서브 중 있는 걸 우선
+      s(raw.businessType),                               // NOT NULL이면 빈문자
+      s(raw.mainCategory || raw.subCategory),
       s(raw.businessHours),
-      s(raw.deliveryOption),          // 폼엔 없으면 빈문자
+      s(raw.deliveryOption),
       s(raw.serviceDetails),
       s(raw.additionalDesc),
       s(raw.phoneNumber),
@@ -49,27 +59,28 @@ export async function createFoodStore(req, res) {
       s(raw.instagram),
       s(raw.facebook),
       s(raw.facility),
-      b(raw.pets),                    // "가능" -> true
+      b(raw.pets),
       s(raw.parking),
-      s(raw.roadAddress || raw.ownerAddress), // 주소가 어디에 왔든 우선값
+      s(raw.postalCode),                                 // ✅ 컬럼 교정
+      s(raw.roadAddress),
+      s(raw.detailAddress),
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
     const storeId = storeResult.rows[0].id;
 
-    // 대표/갤러리 이미지 저장 (옵션)
-    // 입력 name은 "storeImages" (없어도 오류 나지 않게 처리)
-    if (Array.isArray(files.storeImages)) {
-      for (const f of files.storeImages) {
-        await client.query(
-          `INSERT INTO food_store_images (store_id, url) VALUES ($1, $2)`,
-          [storeId, `/uploads/${path.basename(f.path)}`]
-        );
-      }
+    // 대표/갤러리 이미지 (선택)
+    const storeImgs = Array.isArray(files.storeImages) ? files.storeImages : [];
+    for (const f of storeImgs) {
+      const url = toWeb(f);
+      if (!url) continue;
+      await client.query(
+        `INSERT INTO food_store_images (store_id, url) VALUES ($1, $2)`,
+        [storeId, url]
+      );
     }
 
-    // 메뉴 저장
-    // 폼 name: menuName[], menuPrice[], (선택) menuCategory[], (선택) menuImage[]
+    // ✅ 메뉴 저장: 요청 내 중복 메뉴명 dedup (같은 이름이 오면 마지막 값으로)
     const names = Array.isArray(raw["menuName[]"])
       ? raw["menuName[]"]
       : raw.menuName
@@ -80,33 +91,38 @@ export async function createFoodStore(req, res) {
       : raw.menuPrice
       ? [raw.menuPrice]
       : [];
-    const cats = Array.isArray(raw["menuCategory[]"])
-      ? raw["menuCategory[]"]
-      : []; // 없으면 "기타"
+    const cats = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : [];
+    const menuImgs = Array.isArray(files["menuImage[]"]) ? files["menuImage[]"] : [];
 
-    // 메뉴 이미지 파일들(순서를 유지하려면 같은 name으로 업로드해야 함)
-    const menuImages = Array.isArray(files["menuImage[]"])
-      ? files["menuImage[]"]
-      : []; // 없다면 빈 배열
-
-    for (let i = 0; i < names.length; i++) {
-      const category = s(cats[i]) || "기타";
+    // 합치기
+    const tmp = [];
+    const len = Math.max(names.length, prices.length, cats.length, menuImgs.length);
+    for (let i = 0; i < len; i++) {
       const name = s(names[i]);
-      const price = n(prices[i]);
+      if (!name) continue;
+      tmp.push({
+        name,
+        category: s(cats[i]) || "기타",
+        price: n(prices[i]),
+        image_url: toWeb(menuImgs[i]),
+        description: "", // 컬럼 없으면 아래 INSERT에서 제거
+      });
+    }
+    // dedup by name (마지막 승리)
+    const byName = new Map();
+    for (const m of tmp) byName.set(m.name, m);
+    const menus = [...byName.values()];
 
-      // 이미지 파일이 있다면 같은 인덱스로 맵핑(없거나 짧으면 undefined)
-      const imgFile = menuImages[i];
-      const imageUrl = imgFile ? `/uploads/${path.basename(imgFile.path)}` : null;
-
-      // description 컬럼이 없다면 삭제하세요.
+    // INSERT (food_menu_items 사용)
+    for (const m of menus) {
       await client.query(
         `INSERT INTO food_menu_items (store_id, category, name, price, image_url, description)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [storeId, category, name, price, imageUrl, ""]
+        [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
 
-    // 이벤트 저장 (선택) - 테이블 없으면 이 블록 통째로 지우세요.
+    // 이벤트 (선택)
     const ev1 = s(raw.event1);
     const ev2 = s(raw.event2);
     if (ev1) {
@@ -127,8 +143,9 @@ export async function createFoodStore(req, res) {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[createFoodStore] error:", err);
-    // 에러 원인을 프론트에서 볼 수 있게 전달
-    return res.status(500).json({ ok: false, error: "DB insert failed", message: err.message });
+    return res
+      .status(500)
+      .json({ ok: false, error: "DB insert failed", message: err.message });
   } finally {
     client.release();
   }
@@ -149,7 +166,6 @@ export async function getFoodStoreFull(req, res) {
       await pool.query(`SELECT url FROM food_store_images WHERE store_id=$1`, [storeId])
     ).rows;
 
-    // image_url, description 컬럼이 없다면 SELECT 항목에서 제거
     const menus = (
       await pool.query(
         `SELECT category, name, price, image_url, description
@@ -160,7 +176,6 @@ export async function getFoodStoreFull(req, res) {
       )
     ).rows;
 
-    // store_events 테이블이 없으면 이 블록 제거
     const events = (
       await pool.query(
         `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
