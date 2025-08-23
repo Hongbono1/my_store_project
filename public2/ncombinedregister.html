@@ -312,6 +312,7 @@
             <label class="w-32 font-medium" for="detailAddress">상세 주소</label>
             <input id="detailAddress" name="detailAddress" class="flex-1 input-neo px-3 py-2" placeholder="건물명, 동·호수">
           </div>
+          <div id="map" class="w-full h-64 mt-3 border rounded-lg"></div>
         </section>
 
         <!-- 5. 등록 버튼 -->
@@ -539,11 +540,30 @@
       });
     }
 
+    let map, geocoder;
+
+    kakao.maps.load(function () {
+      geocoder = new kakao.maps.services.Geocoder();
+      map = new kakao.maps.Map(document.getElementById("map"), {
+        center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 기본 좌표
+        level: 3
+      });
+    });
+
     function searchStoreAddress() {
       new daum.Postcode({
         oncomplete: function (data) {
           document.getElementById('postalCode').value = data.zonecode;
           document.getElementById('roadAddress').value = data.roadAddress || data.jibunAddress;
+
+          // ✅ 지도에 선택한 주소 표시
+          geocoder.addressSearch(data.roadAddress, function (result, status) {
+            if (status === kakao.maps.services.Status.OK) {
+              const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+              map.setCenter(coords);
+              new kakao.maps.Marker({ map, position: coords });
+            }
+          });
         }
       }).open();
     }
@@ -552,7 +572,8 @@
     document.getElementById('businessForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
-        const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory", "businessName"];
+        const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory",
+          "businessName"];
         for (const k of required) {
           const v = document.getElementsByName(k)[0]?.value?.trim();
           if (!v) {
