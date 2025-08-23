@@ -5,8 +5,10 @@ import path from "path";
 const s = (v) => (v == null ? "" : String(v).trim());
 /** 숫자 보정 */
 const n = (v) => {
-  const num = Number(String(v ?? "").replace(/[^\d.-]/g, ""));
-  return Number.isFinite(num) ? num : 0;
+  const num = Number(String(v ?? "").replace(/[^\d]/g, ""));
+  if (!Number.isFinite(num)) return 0;
+  // ✅ PostgreSQL integer 최대치 제한 (2147483647)
+  return Math.min(num, 2147483647);
 };
 /** boolean 보정 */
 const b = (v) => {
