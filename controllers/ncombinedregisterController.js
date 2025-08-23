@@ -2,76 +2,68 @@
 import pool from "../db.js";
 import path from "path";
 
-/* 웹 경로 변환 */
 function toWebPath(file) {
   return file?.path ? `/uploads/${path.basename(file.path)}` : null;
 }
-
-/* 파일 수집 */
 function collectFiles(req) {
   if (!req || !req.files) return [];
   if (Array.isArray(req.files)) return req.files;
   return Object.values(req.files).flat();
 }
 
-/* =========================================
- * 가게 등록
- * =======================================*/
 export async function createStore(req, res) {
   const client = await pool.connect();
   try {
     const raw = req.body;
+    const files = collectFiles(req);
 
     await client.query("BEGIN");
 
-    // 1) store 저장
-    const storeSql = `
-      INSERT INTO ncombined_stores
-      (business_name, business_type, business_category, business_subcategory,
-       business_hours, delivery_option, service_details, facilities, pets_allowed,
-       parking, phone, homepage, instagram, facebook, additional_desc,
-       postal_code, road_address, detail_address, owner_name, birth_date,
-       owner_email, owner_address, owner_phone, business_cert_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-              $16,$17,$18,$19,$20,$21,$22,$23,$24)
-      RETURNING id
-    `;
+    const certFile = files.find(f => f.fieldname === "businessCertImage");
 
-    const values = [
-      raw.businessName,
-      raw.businessType,
-      raw.businessCategory,
-      raw.businessSubcategory,
-      raw.businessHours,
-      raw.deliveryOption,
-      raw.serviceDetails,
-      raw.facilities,
-      raw.petsAllowed,
-      raw.parking,
-      raw.phone,
-      raw.homepage,
-      raw.instagram,
-      raw.facebook,
-      raw.additionalDesc,
-      raw.postalCode,
-      raw.roadAddress,
-      raw.detailAddress,
-      raw.ownerName,
-      raw.birthDate,
-      raw.ownerEmail,
-      raw.ownerAddress,
-      raw.ownerPhone,
-      (collectFiles(req).find(f => f.fieldname === "businessCertImage") ? 
-        toWebPath(collectFiles(req).find(f => f.fieldname === "businessCertImage")) : null),
-    ];
+    const { rows } = await client.query(
+      `INSERT INTO ncombined_stores
+       (business_name, business_type, business_category, business_subcategory,
+        business_hours, delivery_option, service_details, facilities,
+        pets_allowed, parking, phone, homepage, instagram, facebook,
+        additional_desc, postal_code, road_address, detail_address,
+        owner_name, birth_date, owner_email, owner_address, owner_phone, business_cert_path)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+               $11,$12,$13,$14,$15,$16,$17,$18,
+               $19,$20,$21,$22,$23,$24,$25)
+       RETURNING id`,
+      [
+        raw.businessName || null,
+        raw.businessType || null,
+        raw.businessCategory || null,
+        raw.businessSubcategory || null,
+        raw.businessHours || null,
+        raw.deliveryOption || null,
+        raw.serviceDetails || null,
+        raw.facilities || null,
+        raw.petsAllowed === "true" || raw.petsAllowed === "on",
+        raw.parking === "true" || raw.parking === "on",
+        raw.phone || null,
+        raw.homepage || null,
+        raw.instagram || null,
+        raw.facebook || null,
+        raw.additionalDesc || null,
+        raw.postalCode || null,
+        raw.roadAddress || null,
+        raw.detailAddress || null,
+        raw.ownerName || null,
+        raw.birthDate || null,
+        raw.ownerEmail || null,
+        raw.ownerAddress || null,
+        raw.ownerPhone || null,
+        certFile ? toWebPath(certFile) : null,
+      ]
+    );
 
-    const { rows } = await client.query(storeSql, values);
     const storeId = rows[0].id;
 
-    // 2) 가게 이미지 저장
-    const storeImgs = collectFiles(req).filter(f =>
-      ["storeImages"].includes(f.fieldname)
-    );
+    // 가게 이미지
+    const storeImgs = files.filter(f => f.fieldname === "storeImages");
     for (const img of storeImgs) {
       await client.query(
         `INSERT INTO ncombined_store_images (store_id, url) VALUES ($1,$2)`,
@@ -79,22 +71,24 @@ export async function createStore(req, res) {
       );
     }
 
-    // 3) 메뉴 저장
-    const names = Array.isArray(raw.menuName) ? raw.menuName : [raw.menuName];
-    const prices = Array.isArray(raw.menuPrice) ? raw.menuPrice : [raw.menuPrice];
-    const cats = Array.isArray(raw.menuCategory) ? raw.menuCategory : [raw.menuCategory];
-
-    const menuImgs = collectFiles(req).filter(f =>
-      ["menuImage"].includes(f.fieldname)
-    );
+    // 메뉴
+    const names = raw["menuName[]"] || [];
+    const prices = raw["menuPrice[]"] || [];
+    const cats = raw["menuCategory[]"] || [];
+    const menuImgs = files.filter(f => f.fieldname === "menuImage[]");
 
     for (let i = 0; i < names.length; i++) {
       if (!names[i]) continue;
-      const imgFile = menuImgs[i] || null;
       await client.query(
         `INSERT INTO ncombined_store_menus (store_id, category, name, price, image_url)
          VALUES ($1,$2,$3,$4,$5)`,
-        [storeId, cats[i] || null, names[i], prices[i] || 0, toWebPath(imgFile)]
+        [
+          storeId,
+          cats[i] || null,
+          names[i],
+          prices[i] ? parseInt(prices[i]) : 0,
+          menuImgs[i] ? toWebPath(menuImgs[i]) : null,
+        ]
       );
     }
 
