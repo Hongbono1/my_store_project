@@ -95,6 +95,13 @@ export async function createFoodStore(req, res) {
     const len = Math.max(names.length, prices.length, cats.length, menuImgs.length);
     for (let i = 0; i < len; i++) {
       const name = s(names[i]);
+
+      console.log("---- 메뉴 입력 확인 ----");
+      console.log("raw name:", names[i]);
+      console.log("raw price:", prices[i]);
+      console.log("parsed price:", n(prices[i]));
+      console.log("raw category:", cats[i]);
+      console.log("-----------------------");
       if (!name) continue;
       tmp.push({
         name,
