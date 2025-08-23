@@ -5,7 +5,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
-import ncombinedregisterRoutes from "./routes/ncombinedregister.js";
+import ncombinedregister from "./routes/ncombinedregister.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +18,6 @@ app.use((req, res, next) => {
   res.setHeader("X-Request-Id", req.id);
   next();
 });
-
 app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
@@ -33,11 +32,8 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ───────────────── 정적 파일 ───────────────── */
-// HTML/자바스크립트
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
-// (선택) 기존 public 폴더도 쓰면 유지
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
-// 업로드 파일 (multer 저장 경로와 동일 기준: process.cwd())
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /* ──────────────── 사업자 인증 프록시 (항상 200 반환) ─────────────── */
@@ -58,7 +54,6 @@ app.post("/verify-biz", async (req, res) => {
       return res.status(200).json({ status_code: "ERROR", ok: false, message: "invalid b_no", data: [] });
     }
 
-    // 키 없으면 목업 성공
     if (!process.env.BIZ_API_KEY) {
       return res.status(200).json({
         status_code: "OK",
@@ -66,7 +61,6 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    // 실연동 (Node 18+ 에 내장 fetch 사용)
     const url =
       "https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=" +
       encodeURIComponent(process.env.BIZ_API_KEY);
@@ -92,7 +86,7 @@ app.post("/verify-biz", async (req, res) => {
 
 /* ───────────────── API 라우터 (루트 마운트) ───────────────── */
 // 실제 엔드포인트: POST /store, GET /foodregister/:id/full
-app.use("/", ncombinedregisterRoutes);
+app.use("/", ncombinedregister);
 
 /* ───────────────── 헬스체크 ───────────────── */
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -100,14 +94,12 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 /* ─────────────── 전역 에러 핸들러 (multer/DB 등) ─────────────── */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
-
   if (err?.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
   }
   if (err?.code?.startsWith?.("LIMIT_") || /Unexpected field/.test(err?.message || "")) {
     return res.status(400).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
   }
-
   res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
 });
 
