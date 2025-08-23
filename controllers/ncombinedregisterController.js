@@ -91,6 +91,11 @@ export async function createFoodStore(req, res) {
     const cats = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : [];
     const menuImgs = Array.isArray(files["menuImage[]"]) ? files["menuImage[]"] : [];
 
+    console.log("---- 메뉴 가격 확인 ----");
+    console.log("raw prices:", prices);
+    console.log("parsed prices:", prices.map(p => n(p)));
+    console.log("-----------------------");
+
     const tmp = [];
     const len = Math.max(names.length, prices.length, cats.length, menuImgs.length);
     for (let i = 0; i < len; i++) {
