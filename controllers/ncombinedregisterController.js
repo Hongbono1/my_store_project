@@ -25,6 +25,12 @@ export async function createFoodStore(req, res) {
     const raw = req.body || {};
     const files = req.files || {};
 
+    console.log("==== [createFoodStore] incoming body ====");
+    console.log("menuName[]:", raw["menuName[]"]);
+    console.log("menuPrice[]:", raw["menuPrice[]"]);
+    console.log("menuCategory[]:", raw["menuCategory[]"]);
+    console.log("files:", Object.keys(files));
+
     await client.query("BEGIN");
 
     // ✅ food_stores 저장 (phone → 문자열로)
