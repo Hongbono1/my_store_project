@@ -1,37 +1,32 @@
-// routes/ncombinedregister.js
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
-import * as ctrl from "../controllers/ncombinedregisterController.js";
+import * as ctrl from "../controllers/foodregisterController.js";
 
 const router = Router();
 
-// 업로드 폴더 보장
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// 파일 업로드 설정 (예: ./uploads)
+const upload = multer({ dest: path.join(process.cwd(), "uploads") });
 
-// multer 저장 설정
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "_" + file.originalname.replace(/\s+/g, "_");
-    cb(null, unique);
-  },
-});
-const upload = multer({ storage });
-
-// 등록 라우트
+/* ----------------------
+ * 저장 (등록 페이지 → DB)
+ * ---------------------- */
 router.post(
   "/store",
   upload.fields([
     { name: "storeImages", maxCount: 10 },
-    { name: "menuImage[]", maxCount: 50 },
+    { name: "menuImage", maxCount: 50 },
     { name: "businessCertImage", maxCount: 1 },
   ]),
-  ctrl.createStore
+  ctrl.createFoodStore    // ← 컨트롤러 함수 연결
+);
+
+/* ----------------------
+ * 조회 (상세 페이지 → DB)
+ * ---------------------- */
+router.get(
+  "/foodregister/:id/full",
+  ctrl.getFoodStoreFull   // ← 컨트롤러 함수 연결
 );
 
 export default router;
