@@ -75,7 +75,7 @@ export async function createFoodStore(req, res) {
       const url = toWeb(f);
       if (!url) continue;
       await client.query(
-        `INSERT INTO food_store_images (store_id, url) VALUES ($1, $2)`,
+        `INSERT INTO food_store_images (store_id, image_url) VALUES ($1, $2)`,
         [storeId, url]
       );
     }
