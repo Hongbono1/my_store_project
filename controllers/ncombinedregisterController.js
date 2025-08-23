@@ -165,7 +165,7 @@ export async function getFoodStoreFull(req, res) {
   try {
     const storeId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(storeId)) {
-      return res.status(400).json({ ok:false, error:"invalid_id" });
+      return res.status(400).json({ ok: false, error: "invalid_id" });
     }
     console.log("[getFoodStoreFull] storeId =", storeId);
 
@@ -176,7 +176,7 @@ export async function getFoodStoreFull(req, res) {
     const store = storeRows[0];
 
     const { rows: images } = await pool.query({
-      text: `SELECT url FROM food_store_images WHERE store_id=$1`,
+      text: `SELECT image_url FROM food_store_images WHERE store_id=$1`,
       values: [storeId],
     });
 
@@ -196,10 +196,10 @@ export async function getFoodStoreFull(req, res) {
     });
     const events = evRows.map(r => r.content);
 
-    return res.json({ ok:true, store, images, menus, events });
+    return res.json({ ok: true, store, images, menus, events });
   } catch (err) {
     console.error("[getFoodStoreFull] error:", err);
-    return res.status(500).json({ ok:false, error:"DB fetch failed", message: err.message });
+    return res.status(500).json({ ok: false, error: "DB fetch failed", message: err.message });
   }
 }
 
