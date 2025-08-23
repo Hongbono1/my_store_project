@@ -32,10 +32,10 @@ export async function createFoodStore(req, res) {
     const storeSql = `
       INSERT INTO food_stores (
         business_name, business_type, business_category,
-        business_hours, delivery_option, service_details,
-        additional_desc, phone, homepage, instagram, facebook,
-        facilities, pets_allowed, parking,
-        postal_code, road_address, detail_address
+  business_hours, delivery_option, service_details,
+  additional_desc, phone, homepage, instagram, facebook,
+  facilities, pets_allowed, parking,
+  postal_code, road_address, detail_address
       ) VALUES (
         $1,$2,$3,
         $4,$5,$6,
@@ -48,7 +48,7 @@ export async function createFoodStore(req, res) {
 
     const storeVals = [
       s(raw.businessName),
-      s(raw.businessType),                               // NOT NULL이면 빈문자
+      s(raw.businessType),
       s(raw.mainCategory || raw.subCategory),
       s(raw.businessHours),
       s(raw.deliveryOption),
@@ -61,7 +61,7 @@ export async function createFoodStore(req, res) {
       s(raw.facility),
       b(raw.pets),
       s(raw.parking),
-      s(raw.postalCode),                                 // ✅ 컬럼 교정
+      s(raw.postalCode),
       s(raw.roadAddress),
       s(raw.detailAddress),
     ];
@@ -84,13 +84,13 @@ export async function createFoodStore(req, res) {
     const names = Array.isArray(raw["menuName[]"])
       ? raw["menuName[]"]
       : raw.menuName
-      ? [raw.menuName]
-      : [];
+        ? [raw.menuName]
+        : [];
     const prices = Array.isArray(raw["menuPrice[]"])
       ? raw["menuPrice[]"]
       : raw.menuPrice
-      ? [raw.menuPrice]
-      : [];
+        ? [raw.menuPrice]
+        : [];
     const cats = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : [];
     const menuImgs = Array.isArray(files["menuImage[]"]) ? files["menuImage[]"] : [];
 
@@ -113,11 +113,18 @@ export async function createFoodStore(req, res) {
     for (const m of tmp) byName.set(m.name, m);
     const menus = [...byName.values()];
 
-    // INSERT (food_menu_items 사용)
     for (const m of menus) {
       await client.query(
-        `INSERT INTO food_menu_items (store_id, category, name, price, image_url, description)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
+        `
+    INSERT INTO menu_items (store_id, category, name, price, image_url, description)
+    VALUES ($1,$2,$3,$4,$5,$6)
+    ON CONFLICT (store_id, name)
+    DO UPDATE SET
+      category    = EXCLUDED.category,
+      price       = EXCLUDED.price,
+      description = EXCLUDED.description,
+      image_url   = COALESCE(EXCLUDED.image_url, menu_items.image_url)
+    `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
@@ -166,15 +173,17 @@ export async function getFoodStoreFull(req, res) {
       await pool.query(`SELECT url FROM food_store_images WHERE store_id=$1`, [storeId])
     ).rows;
 
+    // ✅ 교체 코드
     const menus = (
       await pool.query(
         `SELECT category, name, price, image_url, description
-         FROM food_menu_items
-         WHERE store_id=$1
-         ORDER BY category, name`,
+     FROM menu_items
+     WHERE store_id=$1
+     ORDER BY category, name`,
         [storeId]
       )
     ).rows;
+
 
     const events = (
       await pool.query(
