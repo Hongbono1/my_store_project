@@ -1,4 +1,4 @@
-// controllers/foodregisterController.js
+// controllers/ncombinedregisterController.js
 import pool from "../db.js";
 import path from "path";
 
@@ -75,7 +75,7 @@ export async function createFoodStore(req, res) {
       const url = toWeb(f);
       if (!url) continue;
       await client.query(
-        `INSERT INTO food_store_images (store_id, image_url) VALUES ($1, $2)`,
+        ` INSERT INTO store_images (store_id, url) VALUES ($1, $2)`,
         [storeId, url]
       );
     }
@@ -182,7 +182,7 @@ export async function getFoodStoreFull(req, res) {
     const store = storeRows[0];
 
     const { rows: images } = await pool.query({
-      text: `SELECT image_url FROM food_store_images WHERE store_id=$1`,
+      text: `SELECT url FROM store_images WHERE store_id=$1`,
       values: [storeId],
     });
 
