@@ -163,38 +163,43 @@ export async function createFoodStore(req, res) {
  * ---------------------- */
 export async function getFoodStoreFull(req, res) {
   try {
-    const storeId = parseInt(req.params.id, 10);
+    const storeId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(storeId)) {
+      return res.status(400).json({ ok:false, error:"invalid_id" });
+    }
+    console.log("[getFoodStoreFull] storeId =", storeId);
 
-    const store = (
-      await pool.query(`SELECT * FROM food_stores WHERE id=$1`, [storeId])
-    ).rows[0];
+    const { rows: storeRows } = await pool.query({
+      text: `SELECT * FROM food_stores WHERE id=$1`,
+      values: [storeId],
+    });
+    const store = storeRows[0];
 
-    const images = (
-      await pool.query(`SELECT url FROM food_store_images WHERE store_id=$1`, [storeId])
-    ).rows;
+    const { rows: images } = await pool.query({
+      text: `SELECT url FROM food_store_images WHERE store_id=$1`,
+      values: [storeId],
+    });
 
-    // ✅ 교체 코드
-    const menus = (
-      await pool.query(
-        `SELECT category, name, price, image_url, description
-     FROM menu_items
-     WHERE store_id=$1
-     ORDER BY category, name`,
-        [storeId]
-      )
-    ).rows;
+    const { rows: menus } = await pool.query({
+      text: `
+        SELECT category, name, price, image_url, description
+        FROM menu_items
+        WHERE store_id=$1
+        ORDER BY category, name
+      `,
+      values: [storeId],             // ✅ 필수
+    });
 
+    const { rows: evRows } = await pool.query({
+      text: `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
+      values: [storeId],
+    });
+    const events = evRows.map(r => r.content);
 
-    const events = (
-      await pool.query(
-        `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
-        [storeId]
-      )
-    ).rows.map((r) => r.content);
-
-    res.json({ ok: true, store, images, menus, events });
+    return res.json({ ok:true, store, images, menus, events });
   } catch (err) {
     console.error("[getFoodStoreFull] error:", err);
-    res.status(500).json({ ok: false, error: "DB fetch failed", message: err.message });
+    return res.status(500).json({ ok:false, error:"DB fetch failed", message: err.message });
   }
 }
+
