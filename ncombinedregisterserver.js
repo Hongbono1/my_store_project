@@ -4,7 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import ncombinedRouter from "./routes/ncombinedregister.js";
+import ncombinedregisterRoutes from "./routes/ncombinedregister.js";
 
 dotenv.config();
 const app = express();
@@ -21,8 +21,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public2")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+
 // 라우터 연결
-app.use("/", ncombinedRouter);
+app.use("/store", ncombinedregisterRoutes);
 
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
