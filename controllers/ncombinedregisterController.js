@@ -159,6 +159,7 @@ export async function createFoodStore(req, res) {
     }
 
     await client.query("COMMIT");
+    console.log("[createFoodStore] 성공:", storeId); // ✅ 로그 추가
     return res.json({ ok: true, id: storeId });
   } catch (err) {
     await client.query("ROLLBACK");
