@@ -131,9 +131,10 @@ export async function createFoodStore(req, res) {
       });
     }
 
-    const byName = new Map();
-    for (const m of tmp) byName.set(m.name, m);
-    const menus = [...byName.values()];
+    //const byName = new Map();
+    //for (const m of tmp) byName.set(m.name, m);
+    //const menus = [...byName.values()];
+    const menus = tmp;
 
     for (const m of menus) {
       await client.query(
