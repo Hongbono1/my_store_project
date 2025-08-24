@@ -444,16 +444,19 @@
         }
 
         // initMap
+        // ========== Kakao 지도 ==========
         async function initMap(address, name = "") {
             return new Promise(async (resolve) => {
                 if (!address) {
-                    $("addressText").textContent = "📍 -";
-                    $("map").innerHTML = "";
+                    $("addressText").textContent = "📍 주소 정보 없음";
+                    $("map").innerHTML = "<div class='flex items-center justify-center h-full text-gray-500'>주소 없음</div>";
                     renderMapActions(null, null, name, address);
                     resolve();
                     return;
                 }
+
                 $("addressText").textContent = `📍 ${address}`;
+                console.log("지도 주소 검색 시작:", address, "상호:", name);
 
                 if (!window.kakao || !window.kakao.maps) {
                     console.error("Kakao SDK tag missing");
@@ -461,17 +464,16 @@
                     resolve();
                     return;
                 }
-                await new Promise((r) => kakao.maps.load(r));
 
+                await new Promise((r) => kakao.maps.load(r));
                 const geocoder = new kakao.maps.services.Geocoder();
                 const cleaned = address.replace(/^\d{5}\s*/, "").trim();
 
                 geocoder.addressSearch(cleaned, (result, status) => {
+                    console.log("주소검색 결과:", result, "status:", status);
+
                     if (status !== kakao.maps.services.Status.OK || !result?.length) {
-                        const searchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(address)}`;
-                        $("map").style.cursor = "pointer";
-                        $("map").title = "카카오맵에서 열기";
-                        $("map").onclick = () => window.open(searchUrl, "_blank", "noopener");
+                        $("map").innerHTML = "<div class='flex items-center justify-center h-full text-gray-500'>지도 로딩 실패</div>";
                         renderMapActions(null, null, name, address);
                         resolve();
                         return;
@@ -480,6 +482,7 @@
                     const lat = Number(result[0].y);
                     const lng = Number(result[0].x);
                     const coords = new kakao.maps.LatLng(lat, lng);
+
                     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
                     const marker = new kakao.maps.Marker({ map, position: coords });
 
@@ -488,6 +491,7 @@
                         const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
                         window.open(url, "_blank", "noopener");
                     };
+
                     $("map").style.cursor = "pointer";
                     $("map").title = "카카오맵에서 열기";
                     $("map").onclick = openKakaoMap;
@@ -495,11 +499,11 @@
                     kakao.maps.event.addListener(marker, "click", openKakaoMap);
 
                     renderMapActions(lat, lng, place, address);
-
-                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                    resolve();
                 });
             });
         }
+
 
         // 2) 데이터 표준화 (이 블록으로 교체)
         (async () => {
