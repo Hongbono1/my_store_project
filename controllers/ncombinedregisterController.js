@@ -88,10 +88,22 @@ export async function createFoodStore(req, res) {
     }
 
     // ✅ 메뉴 저장
-    const names = Array.isArray(raw["menuName[]"]) ? raw["menuName[]"] : (raw.menuName ? [raw.menuName] : []);
-    const prices = Array.isArray(raw["menuPrice[]"]) ? raw["menuPrice[]"] : (raw.menuPrice ? [raw.menuPrice] : []);
-    const cats = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : [];
-    const menuImgs = Array.isArray(files["menuImage[]"]) ? files["menuImage[]"] : [];
+    // ✅ 메뉴 저장
+    const names = Array.isArray(raw["menuName[]"])
+      ? raw["menuName[]"]
+      : (raw.menuName ? [raw.menuName] : []);
+
+    const prices = Array.isArray(raw["menuPrice[]"])
+      ? raw["menuPrice[]"].map(p => n(p))   // ★ 숫자로 변환
+      : (raw.menuPrice ? [n(raw.menuPrice)] : []);
+
+    const cats = Array.isArray(raw["menuCategory[]"])
+      ? raw["menuCategory[]"]
+      : [];
+
+    const menuImgs = Array.isArray(files["menuImage[]"])
+      ? files["menuImage[]"]
+      : [];
 
     console.log("---- 메뉴 가격 확인 ----");
     console.log("raw prices:", prices);
