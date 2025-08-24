@@ -599,23 +599,71 @@
         }
       });
     }
-    function bindMenuEvents() {
-      document.querySelectorAll('.removeMenuBtn').forEach(btn => {
+
+    // ✅ 전역에 선언 (bindMenuEvents 안에 넣지 말고 밖으로 빼기)
+    // ✅ 메뉴 개수 Hidden input 업데이트
+    function updateMenuCounts() {
+      document.querySelectorAll('[data-category-idx]').forEach((catBox, idx) => {
+        const menus = catBox.querySelectorAll('input[name="menuName[]"]');
+        let hidden = catBox.querySelector(`input[name="menuCount_${idx}"]`);
+        if (!hidden) {
+          hidden = document.createElement("input");
+          hidden.type = "hidden";
+          hidden.name = `menuCount_${idx}`;
+          catBox.appendChild(hidden);
+        }
+        hidden.value = menus.length;
+      });
+    }
+
+    // ✅ 카테고리 이벤트
+    function bindCategoryEvents() {
+      document.querySelectorAll('.removeCategoryBtn').forEach(btn => {
         btn.onclick = function () {
-          this.parentElement.remove();
+          this.closest('[data-category-idx]').remove();
+          updateMenuCounts();
+        };
+      });
+      document.querySelectorAll('.addMenuInCategoryBtn').forEach(btn => {
+        btn.onclick = function () {
+          const menuBox = `
+        <div class="flex gap-2 mt-2 items-center">
+          <input name="menuName[]" placeholder="메뉴명"
+                 class="input-neo px-2 py-1 flex-[2] min-w-0" required>
+          <input name="menuPrice[]" type="number" placeholder="가격"
+                 class="input-neo px-2 py-1 w-28" required>
+          <input name="menuImage[]" type="file" accept="image/*"
+                 class="input-neo px-2 py-1 flex-[3] min-w-0">
+          <button type="button"
+                 class="removeMenuBtn px-3 py-1 bg-red-400 text-white rounded shrink-0">
+            삭제
+          </button>
+        </div>`;
+          this.previousElementSibling.insertAdjacentHTML('beforeend', menuBox);
+          bindMenuEvents();
+          updateMenuCounts();
         }
       });
     }
 
-    let map, geocoder;
-
-    kakao.maps.load(function () {
-      geocoder = new kakao.maps.services.Geocoder();
-      map = new kakao.maps.Map(document.getElementById("map"), {
-        center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 기본 좌표
-        level: 3
+    // ✅ 메뉴 이벤트
+    function bindMenuEvents() {
+      document.querySelectorAll('.removeMenuBtn').forEach(btn => {
+        btn.onclick = function () {
+          this.parentElement.remove();
+          updateMenuCounts();
+        }
       });
-    });
+    }
+
+    function bindMenuEvents() {
+      document.querySelectorAll('.removeMenuBtn').forEach(btn => {
+        btn.onclick = function () {
+          this.parentElement.remove();
+          updateMenuCounts(); // 메뉴 삭제 후 반영
+        }
+      });
+    }
 
     function searchStoreAddress() {
       const layer = document.getElementById('addrLayerStore');
@@ -680,6 +728,8 @@
         alert('에러: ' + err.message);
       }
     });
+
+
 
   </script>
 </body>

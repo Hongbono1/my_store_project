@@ -89,68 +89,64 @@ export async function createFoodStore(req, res) {
 
 
     // ✅ 메뉴 저장
+    // ✅ 메뉴 저장
+    const catNames = Array.isArray(raw["categoryName[]"])
+      ? raw["categoryName[]"]
+      : (raw.categoryName ? [raw.categoryName] : []);
+
     const names = Array.isArray(raw["menuName[]"])
       ? raw["menuName[]"]
       : (raw.menuName ? [raw.menuName] : []);
 
     const prices = Array.isArray(raw["menuPrice[]"])
-      ? raw["menuPrice[]"].map(p => n(p))   // ★ 숫자로 변환
+      ? raw["menuPrice[]"].map(p => n(p))
       : (raw.menuPrice ? [n(raw.menuPrice)] : []);
-
-    const cats = Array.isArray(raw["menuCategory[]"])
-      ? raw["menuCategory[]"]
-      : [];
 
     const menuImgs = Array.isArray(files["menuImage[]"])
       ? files["menuImage[]"]
       : [];
 
-    console.log("---- 메뉴 가격 확인 ----");
-    console.log("raw prices:", prices);
-    console.log("parsed prices:", prices.map(p => n(p)));
-    console.log("-----------------------");
+    // 👉 메뉴를 카테고리별로 묶어서 저장
+    const menus = [];
+    let menuIdx = 0;
+    for (let ci = 0; ci < catNames.length; ci++) {
+      const cat = s(catNames[ci]) || "기타";
 
-    const tmp = [];
-    const len = Math.max(names.length, prices.length, cats.length, menuImgs.length);
-    for (let i = 0; i < len; i++) {
-      const name = s(names[i]);
+      // 카테고리별 메뉴 갯수 (프론트에서 넣는 순서 기준)
+      const count = Number(raw[`menuCount_${ci}`] || 0); // ← 프론트에서 hidden input으로 각 카테고리별 메뉴 수를 넘겨줘야 안전
 
-      console.log("---- 메뉴 입력 확인 ----");
-      console.log("raw name:", names[i]);
-      console.log("raw price:", prices[i]);
-      console.log("parsed price:", n(prices[i]));
-      console.log("raw category:", cats[i]);
-      console.log("-----------------------");
-      if (!name) continue;
-      tmp.push({
-        name,
-        category: s(cats[i]) || "기타",
-        price: n(prices[i]),
-        image_url: toWeb(menuImgs[i]),
-        description: "",
-      });
+      for (let j = 0; j < count; j++) {
+        const name = s(names[menuIdx]);
+        if (!name) { menuIdx++; continue; }
+
+        menus.push({
+          name,
+          category: cat,
+          price: n(prices[menuIdx]),
+          image_url: toWeb(menuImgs[menuIdx]),
+          description: "",
+        });
+        menuIdx++;
+      }
     }
 
-    //const byName = new Map();
-    //for (const m of tmp) byName.set(m.name, m);
-    //const menus = [...byName.values()];
-    const menus = tmp;
-
+    // ✅ DB 저장
     for (const m of menus) {
       await client.query(
         `
-        INSERT INTO menu_items (store_id, category, name, price, image_url, description)
-        VALUES ($1,$2,$3,$4,$5,$6)
-        ON CONFLICT (store_id, name)
-        DO UPDATE SET
-          category    = EXCLUDED.category,
-          price       = EXCLUDED.price,
-          description = EXCLUDED.description,
-          image_url   = COALESCE(EXCLUDED.image_url, menu_items.image_url)
-        `,
+    INSERT INTO menu_items (store_id, category, name, price, image_url, description)
+    VALUES ($1,$2,$3,$4,$5,$6)
+    ON CONFLICT (store_id, name)
+    DO UPDATE SET
+      category    = EXCLUDED.category,
+      price       = EXCLUDED.price,
+      description = EXCLUDED.description,
+      image_url   = COALESCE(EXCLUDED.image_url, menu_items.image_url)
+    `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
+
 
     // ✅ 이벤트
     const ev1 = s(raw.event1);
