@@ -516,15 +516,35 @@
       }
     });
 
+    // --- 전역 초기화 ---
+    let map, geocoder;
+    kakao.maps.load(() => {
+      const container = document.getElementById('map');
+      const options = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 3 }; // 기본 서울 시청 좌표
+      map = new kakao.maps.Map(container, options);
+      geocoder = new kakao.maps.services.Geocoder();
+    });
+
     // --- 가게 주소 검색 함수 ---
     function searchStoreAddress() {
       const layer = document.getElementById('addrLayerStore');
       const overlay = document.getElementById('overlay');
+
       new daum.Postcode({
         oncomplete: function (data) {
-          // ✅ 주소 입력
+          // ✅ 입력창에 주소 반영
           document.getElementById('postalCode').value = data.zonecode;
           document.getElementById('roadAddress').value = data.roadAddress || data.jibunAddress;
+
+          // ✅ 지도 이동 (주소 검색 결과 좌표로 이동)
+          const addr = data.roadAddress || data.jibunAddress;
+          geocoder.addressSearch(addr, function (result, status) {
+            if (status === kakao.maps.services.Status.OK) {
+              const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+              map.setCenter(coords); // 지도 중심 이동
+              new kakao.maps.Marker({ map, position: coords }); // 마커 추가
+            }
+          });
 
           // ✅ 레이어 닫기
           layer.style.display = 'none';
