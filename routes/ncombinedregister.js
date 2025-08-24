@@ -10,7 +10,7 @@ const upload = multer({ dest: path.join(process.cwd(), "uploads") });
 router.post(
   "/store",
   upload.fields([
-    { name: "storeImages", maxCount: 10 },
+    { name: "storeImages", maxCount: 3 },
     { name: "menuImage[]", maxCount: 200 },
     { name: "businessCertImage", maxCount: 1 },
   ]),

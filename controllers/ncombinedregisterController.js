@@ -87,6 +87,7 @@ export async function createFoodStore(req, res) {
       );
     }
 
+
     // ✅ 메뉴 저장
     const names = Array.isArray(raw["menuName[]"])
       ? raw["menuName[]"]
