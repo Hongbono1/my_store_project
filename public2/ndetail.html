@@ -455,8 +455,9 @@
                     return;
                 }
 
+                // 📌 화면에는 상세주소 그대로 표시
                 $("addressText").textContent = `📍 ${address}`;
-                console.log("지도 주소 검색 시작:", address, "상호:", name);
+                console.log("지도 주소 검색 시작 (원본):", address, "상호:", name);
 
                 if (!window.kakao || !window.kakao.maps) {
                     console.error("Kakao SDK tag missing");
@@ -467,7 +468,10 @@
 
                 await new Promise((r) => kakao.maps.load(r));
                 const geocoder = new kakao.maps.services.Geocoder();
-                const cleaned = address.replace(/^\d{5}\s*/, "").trim();
+
+                // 📌 상세주소 제거 후 검색 (도로명까지만)
+                const cleaned = address.replace(/\s\d{1,4}(-\d{1,4})?$/, "").trim();
+                console.log("정제 후 주소:", cleaned);
 
                 geocoder.addressSearch(cleaned, (result, status) => {
                     console.log("주소검색 결과:", result, "status:", status);
@@ -486,24 +490,17 @@
                     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
                     const marker = new kakao.maps.Marker({ map, position: coords });
 
-                    const place = name || "목적지";
-                    const openKakaoMap = () => {
-                        const url = `https://map.kakao.com/link/map/${encodeURIComponent(place)},${lat},${lng}`;
-                        window.open(url, "_blank", "noopener");
-                    };
+                    // 📌 마커 툴팁에 상세주소 그대로
+                    const infowindow = new kakao.maps.InfoWindow({
+                        content: `<div style="padding:5px;font-size:13px;">${name}<br>${address}</div>`
+                    });
+                    infowindow.open(map, marker);
 
-                    $("map").style.cursor = "pointer";
-                    $("map").title = "카카오맵에서 열기";
-                    $("map").onclick = openKakaoMap;
-                    kakao.maps.event.addListener(map, "click", openKakaoMap);
-                    kakao.maps.event.addListener(marker, "click", openKakaoMap);
-
-                    renderMapActions(lat, lng, place, address);
+                    renderMapActions(lat, lng, name, address);
                     resolve();
                 });
             });
         }
-
 
         // 2) 데이터 표준화 (이 블록으로 교체)
         (async () => {
