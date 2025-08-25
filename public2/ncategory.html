@@ -412,12 +412,13 @@
 
             <!-- 파워 광고 -->
             <section class="mt-10">
-                <h2 class="font-bold text-2xl text-red-600 text-center mb-4">파워 광고</h2>
+                <h2 class="font-bold text-2xl text-purple-600 text-center mb-4">파워 광고</h2>
 
                 <!-- 뷰포트: 보이는 영역 -->
                 <div id="powerViewport" class="relative overflow-hidden">
                     <!-- 트랙: 그룹(3장씩)들을 가로로 나열. 너비 고정값 주지 말 것! -->
-                        <div id="powerAdTrack" class="flex transition-transform duration-500 ease-in-out will-change-transform">
+                    <div id="powerAdTrack"
+                        class="flex transition-transform duration-500 ease-in-out will-change-transform">
 
                         <!-- 그룹 1: 카드 3개 -->
                         <div class="power-group flex basis-full shrink-0">
@@ -703,32 +704,13 @@
         document.addEventListener("DOMContentLoaded", () => {
             const viewport = document.getElementById("powerViewport");
             const track = document.getElementById("powerAdTrack");
-            const pool = document.getElementById("powerAdPool");
 
-            const perPage = 3;                 // 한 화면에 보일 카드 수
-            let cards = Array.from(pool.querySelectorAll(".power-card")).map(n => n.cloneNode(true));
-
-            // --- 랜덤 셔플(Fisher-Yates) ---
-            for (let i = cards.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [cards[i], cards[j]] = [cards[j], cards[i]];
-            }
-
-            // --- 3장씩 그룹화해서 트랙에 집어넣기 ---
-            track.innerHTML = "";
-            const groups = Math.ceil(cards.length / perPage);
-            for (let g = 0; g < groups; g++) {
-                const groupEl = document.createElement("div");
-                groupEl.className = "flex basis-full shrink-0";
-                const slice = cards.slice(g * perPage, g * perPage + perPage);
-                slice.forEach(card => groupEl.appendChild(card));
-                track.appendChild(groupEl);
-            }
-
-            // --- 슬라이더 동작 ---
+            // DOM에 이미 있는 그룹 개수 사용
+            let groups = track.querySelectorAll(".power-group").length;
             let index = 0;
+
             function updateSlider() {
-                const slideWidth = viewport.clientWidth; // 픽셀 기준 이동
+                const slideWidth = viewport.clientWidth; // 보이는 영역 실제 폭(px)
                 track.style.transform = `translateX(${-index * slideWidth}px)`;
             }
 
@@ -738,29 +720,29 @@
             // 버튼
             const nextBtn = document.getElementById("nextBtn");
             const prevBtn = document.getElementById("prevBtn");
-            nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
-            prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
+            if (nextBtn && prevBtn) {
+                nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
+                prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
+            }
 
-            // 반응형
+            // 반응형 (그룹 수가 동적으로 바뀌진 않지만 혹시 몰라 재계산 가능)
             window.addEventListener("resize", updateSlider);
 
-            // --- 7초 자동 슬라이드 ---
+            // 7초 자동 슬라이드
             const INTERVAL = 7000;
             let timer = null;
-            function startAuto() { timer = setInterval(next, INTERVAL); }
-            function stopAuto() { if (timer) clearInterval(timer); timer = null; }
+            function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
+            function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
 
-            // 포커스/가시성 관리
+            // 탭 비활성화 시 일시정지/복귀
             document.addEventListener("visibilitychange", () => {
-                if (document.hidden) stopAuto();
-                else startAuto();
+                document.hidden ? stopAuto() : startAuto();
             });
 
-            // 마우스 올리면 일시정지(선택사항)
+            // 마우스 올리면 일시정지(선택)
             viewport.addEventListener("mouseenter", stopAuto);
             viewport.addEventListener("mouseleave", startAuto);
 
-            // 초기 렌더
             updateSlider();
             startAuto();
         });
