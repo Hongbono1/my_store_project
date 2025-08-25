@@ -635,16 +635,23 @@
 
     // ✅ 메뉴 개수 Hidden input 업데이트
     function updateMenuCounts() {
+      // 1) 과거 menuCount_* 전부 제거
+      document.querySelectorAll('input[name^="menuCount_"]').forEach(el => el.remove());
+      // 2) 현재 DOM 순서대로 재생성
       document.querySelectorAll('[data-category-idx]').forEach((catBox, idx) => {
         const menus = catBox.querySelectorAll('input[name="menuName[]"]');
-        let hidden = catBox.querySelector(`input[name="menuCount_${idx}"]`);
-        if (!hidden) {
-          hidden = document.createElement("input");
-          hidden.type = "hidden";
-          hidden.name = `menuCount_${idx}`;
-          catBox.appendChild(hidden);
-        }
-        hidden.value = menus.length;   // ✅ 카테고리별 메뉴 개수 저장
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = `menuCount_${idx}`;
+        hidden.value = menus.length;
+        catBox.appendChild(hidden);
+      });
+    }
+
+    function stampMenuCategories() {
+      document.querySelectorAll('[data-category-idx]').forEach(catBox => {
+        const catName = catBox.querySelector('input[name="categoryName[]"]')?.value?.trim() || '기타';
+        catBox.querySelectorAll('input[name="menuCategory[]"]').forEach(h => h.value = catName);
       });
     }
 
@@ -666,27 +673,42 @@
           updateMenuCounts(); // 카테고리 삭제 반영
         };
       });
+
+
       document.querySelectorAll('.addMenuInCategoryBtn').forEach(btn => {
         btn.onclick = function () {
+          const catBox = this.closest('[data-category-idx]');
+          const catName = catBox.querySelector('input[name="categoryName[]"]')?.value?.trim() || '기타';
+
           const menuBox = `
-        <div class="flex gap-2 mt-2 items-center">
-          <input name="menuName[]" placeholder="메뉴명"
-                 class="input-neo px-2 py-1 flex-[2] min-w-0" required>
-          <input name="menuPrice[]" type="number" placeholder="가격"
-                 class="input-neo px-2 py-1 w-28" required>
-          <input name="menuImage[]" type="file" accept="image/*"
-                 class="input-neo px-2 py-1 flex-[3] min-w-0">
-          <button type="button"
-                 class="removeMenuBtn px-3 py-1 bg-red-400 text-white rounded shrink-0">
-            삭제
-          </button>
-        </div>`;
+      <div class="flex gap-2 mt-2 items-center">
+        <input name="menuName[]" placeholder="메뉴명"
+               class="input-neo px-2 py-1 flex-[2] min-w-0" required>
+        <input name="menuPrice[]" type="number" placeholder="가격"
+               class="input-neo px-2 py-1 w-28" required>
+        <input name="menuImage[]" type="file" accept="image/*"
+               class="input-neo px-2 py-1 flex-[3] min-w-0">
+        <input type="hidden" name="menuCategory[]" value="${catName}">
+        <button type="button"
+               class="removeMenuBtn px-3 py-1 bg-red-400 text-white rounded shrink-0">
+          삭제
+        </button>
+      </div>`;
           this.previousElementSibling.insertAdjacentHTML('beforeend', menuBox);
-          bindMenuEvents();   // 메뉴 삭제 이벤트 바인딩
-          updateMenuCounts(); // 메뉴 추가 반영
+          bindMenuEvents();
+          updateMenuCounts();
         }
       });
     }
+
+    // === 카테고리명 변경 → 하위 메뉴 menuCategory[] 동기화 (전역 1회) ===
+    document.addEventListener('input', (e) => {
+      const inp = e.target.closest('input[name="categoryName[]"]');
+      if (!inp) return;
+      const box = inp.closest('[data-category-idx]');
+      const val = inp.value.trim();
+      box.querySelectorAll('input[name="menuCategory[]"]').forEach(h => h.value = val);
+    });
 
     // 배경 클릭하면 닫기
     document.getElementById('overlay').addEventListener('click', () => {
@@ -695,11 +717,14 @@
       document.getElementById('overlay').style.display = 'none';
     });
 
+
+
     // --- 5. 폼 제출 (함수 외부에 있어야 함) ---
     document.getElementById('businessForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      updateMenuCounts();
+      updateMenuCounts();    // ✅ 개수 정합성
+      stampMenuCategories(); // ✅ 행별 카테고리 확정
 
       try {
         const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory", "businessName"];
