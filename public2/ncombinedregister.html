@@ -100,6 +100,8 @@
       <h2 class="text-3xl font-bold text-center mb-8 drop-shadow">정보 등록</h2>
       <form id="businessForm" class="space-y-7" enctype="multipart/form-data" autocomplete="off">
         <input type="hidden" id="storeId" name="storeId">
+        <input type="hidden" id="businessCategoryCombined" name="businessCategory">
+        <input type="hidden" id="addressCombined" name="address">
 
         <!-- 1. 사업자 인증 -->
         <section class="rounded-2xl p-5 bg-yellow-50/80 mb-5 shadow-inner">
@@ -222,7 +224,7 @@
             <select id="deliveryOption" name="deliveryOption" class="flex-1 input-neo px-3 py-2">
               <option value="">선택</option>
               <option value="가능">가능</option>
-              <option value="불가능">불가능</option>
+              <option value="불가">불가</option>
             </select>
           </div>
         </section>
@@ -303,11 +305,15 @@
           <div class="flex flex-col gap-3">
             <div class="flex flex-col md:flex-row items-center gap-2">
               <label for="facility" class="w-32 font-medium">장애인 편의시설</label>
-              <input id="facility" name="facility" class="flex-1 input-neo px-3 py-2" placeholder="예: 있음/없음">
+              <input id="facility" name="facilities" class="flex-1 input-neo px-3 py-2" placeholder="예: 있음/없음">
             </div>
             <div class="flex flex-col md:flex-row items-center gap-2">
               <label for="pets" class="w-32 font-medium">반려동물</label>
-              <input id="pets" name="pets" class="flex-1 input-neo px-3 py-2" placeholder="예: 가능/불가능">
+              <select id="petsAllowed" name="petsAllowed" class="flex-1 input-neo px-3 py-2">
+                <option value="">선택</option>
+                <option value="true">가능</option>
+                <option value="false">불가</option>
+              </select>
             </div>
             <div class="flex flex-col md:flex-row items-center gap-2">
               <label for="parking" class="w-32 font-medium">주차</label>
@@ -321,8 +327,7 @@
           <div class="flex flex-col gap-3">
             <div class="flex flex-col md:flex-row items-center gap-2">
               <label for="phoneNumber" class="w-32 font-medium">대표전화</label>
-              <input id="phoneNumber" name="phoneNumber" class="flex-1 input-neo px-3 py-2"
-                placeholder="예: 02-123-4567">
+              <input id="phoneNumber" name="phone" class="flex-1 input-neo px-3 py-2" placeholder="예: 02-123-4567">
             </div>
             <div class="flex flex-col md:flex-row items-center gap-2">
               <label for="homepage" class="w-32 font-medium">홈페이지</label>
@@ -705,12 +710,35 @@
             return;
           }
         }
+
+        // ★ 제출 직전 값 보정
+        const main = document.getElementById('mainCategory')?.value?.trim() || '';
+        const sub = document.getElementById('subCategory')?.value?.trim() || '';
+        const road = document.getElementById('roadAddress')?.value?.trim() || '';
+        const detail = document.getElementById('detailAddress')?.value?.trim() || '';
+
+        const catHidden = document.getElementById('businessCategoryCombined'); // name="businessCategory"
+        const addrHidden = document.getElementById('addressCombined');          // name="address"
+        if (catHidden) catHidden.value = [main, sub].filter(Boolean).join(' / ');
+        if (addrHidden) addrHidden.value = [road, detail].filter(Boolean).join(' ');
+
+        // 배달값 정규화 (예방)
+        const delSel = document.getElementById('deliveryOption');
+        if (delSel && delSel.value === '불가능') delSel.value = '불가';
+
+        // 최종 FormData
         const fd = new FormData(e.target);
+
+        // 이벤트를 배열 키로 추가
+        ['event1', 'event2'].forEach(id => {
+          const v = document.getElementById(id)?.value?.trim();
+          if (v) fd.append('events[]', v);
+        });
+
         const res = await fetch('/store', { method: 'POST', body: fd });
         if (!res.ok) throw new Error('서버 에러');
         const data = await res.json();
 
-        // ✅ 등록 완료 후 바로 상세 페이지로 이동
         if (data.ok && data.id) {
           if (confirm('등록이 완료되었습니다!\n상세 페이지로 이동할까요?')) {
             window.location.href = `/ndetail.html?id=${data.id}`;
