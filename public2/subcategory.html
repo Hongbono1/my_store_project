@@ -117,6 +117,38 @@
             return Math.floor((1 - p / l) * 100);
         };
 
+
+
+        // =============================
+        // 광고카드 불러오기
+        // =============================
+        function loadAdStores(category) {
+            fetch(`/api/subcategory/food?category=${category}`)
+                .then(r => r.json())
+                .then(json => {
+                    const grid = document.getElementById("lineGrid");
+                    grid.innerHTML = "";
+                    json.stores.forEach(store => {
+                        const card = document.createElement("div");
+                        card.className =
+                            "bg-white rounded-xl shadow p-3 text-center cursor-pointer hover:shadow-lg transition";
+                        card.innerHTML = `
+            <img src="${store.image}" alt="${store.name}" class="w-full h-40 object-cover rounded-lg mb-2">
+            <h3 class="font-bold">${store.name}</h3>
+            <p class="text-gray-500">${store.category}</p>
+          `;
+                        // ✅ 카드 클릭 시 detail.html 이동
+                        card.addEventListener("click", () => {
+                            window.location.href = `/detail.html?id=${store.id}`;
+                        });
+                        grid.appendChild(card);
+                    });
+                })
+                .catch(err => {
+                    console.error("광고카드 로드 실패:", err);
+                });
+        }
+
         // =============================
         // 렌더링
         // =============================
@@ -171,11 +203,11 @@
                 const card = document.createElement("div");
                 card.className = "bg-white rounded-xl overflow-hidden shadow hover:shadow-lg transition";
                 card.innerHTML = `
-          <img src="${line.image}" alt="${line.name}" class="w-full h-56 object-cover">
-          <div class="p-3 text-center">
-            <div class="font-bold">${line.name}</div>
-            ${line.desc ? `<p class="text-xs text-gray-500 mt-1">${line.desc}</p>` : ""}
-          </div>`;
+        <img src="${line.image}" alt="${line.name}" class="w-full h-56 object-cover">
+        <div class="p-3 text-center">
+          <div class="font-bold">${line.name}</div>
+          ${line.desc ? `<p class="text-xs text-gray-500 mt-1">${line.desc}</p>` : ""}
+        </div>`;
                 grid.appendChild(card);
             });
         }
@@ -201,16 +233,16 @@
                 card.className = "bg-white rounded-xl shadow p-3 text-center hover:shadow-lg transition relative";
                 const discount = calcDiscount(p.price, p.listPrice);
                 card.innerHTML = `
-          <div class="w-full h-32 flex items-center justify-center mb-2">
-            <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-contain">
-          </div>
-          <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
-          <p class="text-gray-500 text-xs md:text-sm mb-1">${p.desc || ""}</p>
-          <div class="flex items-center justify-center gap-1 text-sm md:text-base">
-            <span class="text-red-500 font-bold">${fmtKRW(p.price)}</span>
-            ${p.listPrice ? `<span class="line-through text-gray-400 text-xs">${fmtKRW(p.listPrice)}</span>` : ""}
-            ${discount ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">-${discount}%</span>` : ""}
-          </div>`;
+        <div class="w-full h-32 flex items-center justify-center mb-2">
+          <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-contain">
+        </div>
+        <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
+        <p class="text-gray-500 text-xs md:text-sm mb-1">${p.desc || ""}</p>
+        <div class="flex items-center justify-center gap-1 text-sm md:text-base">
+          <span class="text-red-500 font-bold">${fmtKRW(p.price)}</span>
+          ${p.listPrice ? `<span class="line-through text-gray-400 text-xs">${fmtKRW(p.listPrice)}</span>` : ""}
+          ${discount ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">-${discount}%</span>` : ""}
+        </div>`;
                 grid.appendChild(card);
             });
         }
@@ -223,6 +255,11 @@
             renderFilters();
             renderLines();
             renderProducts();
+
+            // ✅ 광고카드 로드
+            if (TYPE === "food" && CATEGORY) {
+                loadAdStores(CATEGORY);
+            }
         }
 
         document.addEventListener("DOMContentLoaded", loadData);
