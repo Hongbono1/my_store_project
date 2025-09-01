@@ -3,44 +3,37 @@ import pool from "../db.js";
 
 /** 음식점 업종별 가게 조회 */
 export async function getFoodStoresByCategory(req, res) {
-    const { category } = req.query; // /api/subcategory/food?category=한식
-    if (!category) {
-        return res.status(400).json({ ok: false, error: "category가 필요합니다." });
-    }
-
+    const { category } = req.query; // ex) /api/subcategory/food?category=한식
     try {
-        const result = await pool.query(
-            `
-      SELECT fs.id, fs.business_name, fs.business_category,
-             COALESCE(img.image_path, '') AS image
-      FROM food_stores fs
-      LEFT JOIN LATERAL (
-        SELECT si.image_path
-        FROM store_images si
-        WHERE si.store_id = fs.id
-        ORDER BY si.id ASC
-        LIMIT 1
-      ) img ON TRUE
-      WHERE fs.business_category = $1
-      ORDER BY fs.created_at DESC
-      LIMIT 20
-      `,
+        const client = await pool.connect();
+
+        const result = await client.query(
+            `SELECT fs.id, fs.business_name, fs.business_category,
+              COALESCE(MIN(si.image_path), '') AS image_path
+       FROM food_stores fs
+       LEFT JOIN store_images si ON fs.id = si.store_id
+       WHERE fs.business_category = $1
+       GROUP BY fs.id
+       LIMIT 20`,
             [category]
         );
 
-        const stores = result.rows.map((r) => ({
+        client.release();
+
+        const stores = result.rows.map(r => ({
             id: r.id,
             name: r.business_name,
             category: r.business_category,
-            image: r.image || "/uploads/no-image.png",
+            image: r.image_path || "/uploads/no-image.png"
         }));
 
         res.json({ ok: true, stores });
     } catch (err) {
-        console.error("getFoodStoresByCategory error:", err);
+        console.error("getFoodStoresByCategory error", err);
         res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
     }
 }
+
 
 /** 뷰티/통합 서브카테고리 조회 */
 export async function getCombinedStoresByCategory(req, res) {
