@@ -44,24 +44,18 @@ export async function getCombinedStoresByCategory(req, res) {
     }
 
     try {
-        const result = await pool.query(
+        const result = await client.query(
             `
-      SELECT cs.id,
-             cs.business_name,
-             cs.business_subcategory AS category,
-             COALESCE(img.url, '') AS image
-      FROM combined_store_info cs
-      LEFT JOIN LATERAL (
-        SELECT ci.url
-        FROM combined_store_images ci
-        WHERE ci.store_id = cs.id
-        ORDER BY ci.id ASC
-        LIMIT 1
-      ) img ON TRUE
-      WHERE cs.business_subcategory = $1
-      ORDER BY cs.created_at DESC
-      LIMIT 20
-      `,
+  SELECT fs.id,
+         fs.business_name,
+         fs.business_category,
+         COALESCE(MIN(si.url), '') AS image_url
+  FROM food_stores fs
+  LEFT JOIN store_images si ON fs.id = si.store_id
+  WHERE fs.business_category ILIKE '%' || $1 || '%'
+  GROUP BY fs.id
+  LIMIT 20
+  `,
             [category]
         );
 
