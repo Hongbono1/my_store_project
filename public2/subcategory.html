@@ -62,14 +62,14 @@
             .then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
         // =============================
-        // URL 파라미터 가져오기
+        // URL 파라미터
         // =============================
         const params = new URLSearchParams(window.location.search);
         const TYPE = params.get("type");        // food or beauty
-        const CATEGORY = params.get("category"); // 한식, Soap 등
+        const CATEGORY = params.get("category");// 카테고리명
 
         // =============================
-        // 기본 데이터 (백업)
+        // 기본 데이터
         // =============================
         const DEFAULT_DATA = {
             hero: {
@@ -82,7 +82,6 @@
             best: [],
             new: []
         };
-
         let DATA = DEFAULT_DATA;
 
         // =============================
@@ -109,50 +108,166 @@
         }
 
         // =============================
-        // 헬퍼
+        // 광고 카드 (12개 단위 페이징 + 드래그)
         // =============================
-        const fmtKRW = (n) => (Number(n || 0)).toLocaleString("ko-KR") + "원";
-        const calcDiscount = (p, l) => {
-            if (!l || l <= p) return null;
-            return Math.floor((1 - p / l) * 100);
-        };
+        function renderPagedAdStores(stores) {
+            const grid = document.getElementById("lineGrid");
+            let currentPage = 0;
+            const perPage = 12; // 4x3
 
-        // =============================
-        // 광고카드 불러오기
-        // =============================
-        function loadAdStores(category) {
-            const url = TYPE === "food"
-                ? `/api/subcategory/food?category=${category}`
-                : `/api/subcategory/beauty?category=${category}`;
+            function renderPage(page) {
+                grid.innerHTML = "";
+                const start = page * perPage;
+                const end = start + perPage;
+                const pageItems = stores.slice(start, end);
 
-            fetch(url)
-                .then(r => r.json())
-                .then(json => {
-                    const grid = document.getElementById("lineGrid");
-                    grid.innerHTML = "";
-                    (json.stores || []).forEach(store => {
-                        const card = document.createElement("div");
-                        card.className =
-                            "bg-white rounded-xl shadow p-3 text-center cursor-pointer hover:shadow-lg transition";
-                        card.innerHTML = `
-                        <img src="${store.image}" alt="${store.name}" class="w-full h-40 object-cover rounded-lg mb-2">
-                        <h3 class="font-bold">${store.name}</h3>
-                        <p class="text-gray-500">${store.category}</p>
-                    `;
-                        card.addEventListener("click", () => {
-                            window.location.href = `/detail.html?id=${store.id}`;
-                        });
-                        grid.appendChild(card);
+                if (!pageItems.length) {
+                    grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 광고가 없습니다.</div>`;
+                    return;
+                }
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
+
+                pageItems.forEach(store => {
+                    const card = document.createElement("div");
+                    card.className = "neo-card p-0 overflow-hidden relative rounded-2xl cursor-pointer hover:shadow-lg transition";
+                    card.innerHTML = `
+          <div class="w-full h-48">
+            <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
+          </div>
+          <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
+            <div class="font-bold text-lg leading-tight">${store.name}</div>
+            <div class="text-sm text-slate-600">${store.category}</div>
+          </div>`;
+                    card.addEventListener("click", () => {
+                        window.location.href = `/detail.html?id=${store.id}`;
                     });
-                })
-                .catch(err => console.error("광고카드 로드 실패:", err));
+                    wrapper.appendChild(card);
+                });
+
+                grid.appendChild(wrapper);
+
+                // 페이지네이션
+                const controls = document.createElement("div");
+                controls.className = "flex justify-center gap-4 mt-6";
+                controls.innerHTML = `
+        <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="ad-prev">이전</button>
+        <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="ad-next">다음</button>
+      `;
+                grid.appendChild(controls);
+
+                document.getElementById("ad-prev").onclick = () => {
+                    if (currentPage > 0) {
+                        currentPage--;
+                        renderPage(currentPage);
+                    }
+                };
+                document.getElementById("ad-next").onclick = () => {
+                    if ((currentPage + 1) * perPage < stores.length) {
+                        currentPage++;
+                        renderPage(currentPage);
+                    }
+                };
+
+                // 드래그 이동
+                let startX = 0;
+                grid.onmousedown = (e) => (startX = e.clientX);
+                grid.onmouseup = (e) => {
+                    const diff = e.clientX - startX;
+                    if (diff > 50 && currentPage > 0) {
+                        currentPage--;
+                        renderPage(currentPage);
+                    } else if (diff < -50 && (currentPage + 1) * perPage < stores.length) {
+                        currentPage++;
+                        renderPage(currentPage);
+                    }
+                };
+            }
+            renderPage(currentPage);
         }
 
         // =============================
-        // 렌더링
+        // Best Seller / New (8개 단위 페이징 + 드래그)
         // =============================
-        let activeTag = "";
+        function renderPagedProductGrid(gridId, items) {
+            const grid = document.getElementById(gridId);
+            let currentPage = 0;
+            const perPage = 8; // 4+4
 
+            function renderPage(page) {
+                grid.innerHTML = "";
+                const start = page * perPage;
+                const end = start + perPage;
+                const pageItems = items.slice(start, end);
+
+                if (!pageItems.length) {
+                    grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
+                    return;
+                }
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6";
+
+                pageItems.forEach(p => {
+                    const card = document.createElement("div");
+                    card.className = "bg-white rounded-xl shadow p-3 text-center hover:shadow-lg transition cursor-pointer";
+                    card.innerHTML = `
+          <div class="w-full h-32 flex items-center justify-center mb-2">
+            <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-cover rounded-lg">
+          </div>
+          <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
+          <p class="text-gray-500 text-xs md:text-sm mb-1">${p.category}</p>`;
+                    card.addEventListener("click", () => {
+                        window.location.href = `/detail.html?id=${p.id}`;
+                    });
+                    wrapper.appendChild(card);
+                });
+
+                grid.appendChild(wrapper);
+
+                // 페이지네이션
+                const controls = document.createElement("div");
+                controls.className = "flex justify-center gap-4 mt-6";
+                controls.innerHTML = `
+        <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="${gridId}-prev">이전</button>
+        <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="${gridId}-next">다음</button>
+      `;
+                grid.appendChild(controls);
+
+                document.getElementById(`${gridId}-prev`).onclick = () => {
+                    if (currentPage > 0) {
+                        currentPage--;
+                        renderPage(currentPage);
+                    }
+                };
+                document.getElementById(`${gridId}-next`).onclick = () => {
+                    if ((currentPage + 1) * perPage < items.length) {
+                        currentPage++;
+                        renderPage(currentPage);
+                    }
+                };
+
+                // 드래그 이동
+                let startX = 0;
+                grid.onmousedown = (e) => (startX = e.clientX);
+                grid.onmouseup = (e) => {
+                    const diff = e.clientX - startX;
+                    if (diff > 50 && currentPage > 0) {
+                        currentPage--;
+                        renderPage(currentPage);
+                    } else if (diff < -50 && (currentPage + 1) * perPage < items.length) {
+                        currentPage++;
+                        renderPage(currentPage);
+                    }
+                };
+            }
+            renderPage(currentPage);
+        }
+
+        // =============================
+        // 헬퍼 + 필터
+        // =============================
         function bindHero() {
             document.getElementById("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
             document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
@@ -165,95 +280,36 @@
             const allBtn = makeFilterBtn("All", "");
             wrap.appendChild(allBtn);
             (DATA.filters || []).forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-            setActiveFilterBtn(activeTag);
         }
 
         function makeFilterBtn(label, tagVal) {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
-            btn.dataset.tag = tagVal;
-            btn.setAttribute("aria-pressed", tagVal === activeTag ? "true" : "false");
             btn.textContent = label;
-            btn.addEventListener("click", () => {
-                activeTag = tagVal;
-                setActiveFilterBtn(activeTag);
-                renderLines();
-                renderProducts();
-            });
+            btn.onclick = () => {
+                renderPagedAdStores(DATA.stores || []);
+            };
             return btn;
         }
 
-        function setActiveFilterBtn(tag) {
-            document.querySelectorAll("#filterContainer [data-tag]").forEach(el => {
-                el.setAttribute("aria-pressed", el.dataset.tag === tag ? "true" : "false");
-            });
-        }
-
-        function renderLines() {
-            const grid = document.getElementById("lineGrid");
-            grid.innerHTML = "";
-            const list = (DATA.stores || []).filter(l => !activeTag || (l.category === activeTag));
-            if (!list.length) {
-                grid.innerHTML = `<div class="text-center text-gray-500 sm:col-span-3">해당 라인의 콘텐츠가 없습니다.</div>`;
-                return;
-            }
-            list.forEach(line => {
-                const card = document.createElement("div");
-                card.className = "bg-white rounded-xl overflow-hidden shadow hover:shadow-lg transition";
-                card.innerHTML = `
-                <img src="${line.image}" alt="${line.name}" class="w-full h-56 object-cover">
-                <div class="p-3 text-center">
-                    <div class="font-bold">${line.name}</div>
-                    <p class="text-xs text-gray-500 mt-1">${line.category}</p>
-                </div>`;
-                grid.appendChild(card);
-            });
-        }
-
+        // =============================
+        // 렌더링
+        // =============================
         function renderProducts() {
-            renderProductGrid("bestGrid", DATA.best || []);
-            renderProductGrid("newGrid", DATA.new || []);
+            renderPagedProductGrid("bestGrid", DATA.best || []);
+            renderPagedProductGrid("newGrid", DATA.new || []);
         }
 
-        function renderProductGrid(gridId, items) {
-            const grid = document.getElementById(gridId);
-            grid.innerHTML = "";
-            if (!items.length) {
-                grid.innerHTML = `<div class="col-span-2 md:col-span-4 text-center text-gray-500">해당 조건의 상품이 없습니다.</div>`;
-                return;
-            }
-            items.forEach(p => {
-                const card = document.createElement("div");
-                card.className = "bg-white rounded-xl shadow p-3 text-center hover:shadow-lg transition relative";
-                card.innerHTML = `
-                <div class="w-full h-32 flex items-center justify-center mb-2">
-                    <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-cover rounded-lg">
-                </div>
-                <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
-                <p class="text-gray-500 text-xs md:text-sm mb-1">${p.category}</p>
-            `;
-                card.addEventListener("click", () => {
-                    window.location.href = `/detail.html?id=${p.id}`;
-                });
-                grid.appendChild(card);
-            });
-        }
-
-        // =============================
-        // 초기화
-        // =============================
         function init() {
             bindHero();
             renderFilters();
-            renderLines();
+            renderPagedAdStores(DATA.stores || []);
             renderProducts();
         }
 
         document.addEventListener("DOMContentLoaded", loadData);
     </script>
-
-
 </body>
 
 </html>
