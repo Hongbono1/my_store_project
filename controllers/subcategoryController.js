@@ -17,7 +17,7 @@ export async function getFoodStoresByCategory(req, res) {
       GROUP BY fs.id
       LIMIT 20
       `,
-            [category]
+            [category + "%"]
         );
 
         const stores = result.rows.map((r) => ({
