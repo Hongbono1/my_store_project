@@ -1,7 +1,5 @@
-// controllers/subcategoryController.js
 import pool from "../db.js";
 
-/** 음식점 업종별 가게 조회 (이미 작성됨) */
 /** 뷰티/통합 서브카테고리 조회 */
 export async function getCombinedStoresByCategory(req, res) {
     const { category } = req.query;
@@ -39,49 +37,7 @@ export async function getCombinedStoresByCategory(req, res) {
     }
 }
 
-
-
-/** 뷰티/통합 서브카테고리 조회 (이미 작성됨) */
-export async function getCombinedStoresByCategory(req, res) {
-    const { category } = req.query; // /api/subcategory/beauty?category=미용
-    if (!category) {
-        return res
-            .status(400)
-            .json({ ok: false, error: "category가 필요합니다." });
-    }
-
-    try {
-        const result = await client.query(
-            `
-  SELECT fs.id,
-         fs.business_name,
-         fs.business_category,
-         COALESCE(MIN(si.url), '') AS image_url
-  FROM food_stores fs
-  LEFT JOIN store_images si ON fs.id = si.store_id
-  WHERE fs.business_category ILIKE '%' || $1 || '%'
-  GROUP BY fs.id
-  LIMIT 20
-  `,
-            [category]
-        );
-
-        const stores = result.rows.map((r) => ({
-            id: r.id,
-            name: r.business_name,
-            category: r.category,
-            image: r.image || "/uploads/no-image.png",
-        }));
-
-        res.json({ ok: true, stores });
-    } catch (err) {
-        console.error("getCombinedStoresByCategory error:", err);
-        res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
-    }
-}
-
-
-/** ✅ Best Seller: 조회수가 많은 가게 (조회수 컬럼 없으면 created_at 기준으로 대체) */
+/** ✅ Best Seller */
 export async function getBestStores(req, res) {
     try {
         const result = await pool.query(
@@ -93,7 +49,7 @@ export async function getBestStores(req, res) {
       FROM food_stores fs
       LEFT JOIN store_images si ON fs.id = si.store_id
       GROUP BY fs.id
-      ORDER BY fs.created_at ASC  -- ⚠️ 조회수 컬럼 없으므로 오래된 순으로 대체
+      ORDER BY fs.created_at ASC
       LIMIT 8
       `
         );
@@ -112,7 +68,7 @@ export async function getBestStores(req, res) {
     }
 }
 
-/** ✅ New registration: 최근 일주일 등록된 가게 */
+/** ✅ New registration */
 export async function getNewStores(req, res) {
     try {
         const result = await pool.query(
