@@ -91,16 +91,25 @@
         async function loadData() {
             try {
                 if (TYPE === "food") {
-                    // ✅ food는 /api/subcategory/food
                     const res = await fetch(`/api/subcategory/food?category=${CATEGORY}`);
                     DATA = await res.json();
                 } else if (TYPE === "beauty") {
-                    // ✅ beauty는 /api/subcategory/combined/:category
-                    const res = await fetch(`/api/subcategory/combined/${CATEGORY}`);
+                    const res = await fetch(`/api/subcategory/beauty?category=${CATEGORY}`);
                     DATA = await res.json();
                 } else {
                     DATA = DEFAULT_DATA;
                 }
+
+                // ✅ Best Seller 불러오기
+                const bestRes = await fetch(`/api/subcategory/best`);
+                const bestJson = await bestRes.json();
+                DATA.best = bestJson.stores || [];
+
+                // ✅ New registration 불러오기
+                const newRes = await fetch(`/api/subcategory/new`);
+                const newJson = await newRes.json();
+                DATA.new = newJson.stores || [];
+
             } catch (e) {
                 console.error("데이터 불러오기 실패:", e);
                 DATA = DEFAULT_DATA;
@@ -135,10 +144,10 @@
                         card.className =
                             "bg-white rounded-xl shadow p-3 text-center cursor-pointer hover:shadow-lg transition";
                         card.innerHTML = `
-      <img src="${store.image}" alt="${store.name}" class="w-full h-40 object-cover rounded-lg mb-2">
-      <h3 class="font-bold">${store.name}</h3>
-      <p class="text-gray-500">${store.category}</p>
-    `;
+                        <img src="${store.image}" alt="${store.name}" class="w-full h-40 object-cover rounded-lg mb-2">
+                        <h3 class="font-bold">${store.name}</h3>
+                        <p class="text-gray-500">${store.category}</p>
+                    `;
                         card.addEventListener("click", () => {
                             window.location.href = `/detail.html?id=${store.id}`;
                         });
@@ -147,7 +156,6 @@
                 })
                 .catch(err => console.error("광고카드 로드 실패:", err));
         }
-
 
         // =============================
         // 렌더링
@@ -194,7 +202,7 @@
         function renderLines() {
             const grid = document.getElementById("lineGrid");
             grid.innerHTML = "";
-            const list = (DATA.lines || []).filter(l => !activeTag || (l.tag === activeTag));
+            const list = (DATA.stores || []).filter(l => !activeTag || (l.category === activeTag));
             if (!list.length) {
                 grid.innerHTML = `<div class="text-center text-gray-500 sm:col-span-3">해당 라인의 콘텐츠가 없습니다.</div>`;
                 return;
@@ -203,11 +211,11 @@
                 const card = document.createElement("div");
                 card.className = "bg-white rounded-xl overflow-hidden shadow hover:shadow-lg transition";
                 card.innerHTML = `
-      <img src="${line.image}" alt="${line.name}" class="w-full h-56 object-cover">
-      <div class="p-3 text-center">
-        <div class="font-bold">${line.name}</div>
-        ${line.desc ? `<p class="text-xs text-gray-500 mt-1">${line.desc}</p>` : ""}
-      </div>`;
+                <img src="${line.image}" alt="${line.name}" class="w-full h-56 object-cover">
+                <div class="p-3 text-center">
+                    <div class="font-bold">${line.name}</div>
+                    <p class="text-xs text-gray-500 mt-1">${line.category}</p>
+                </div>`;
                 grid.appendChild(card);
             });
         }
@@ -220,33 +228,26 @@
         function renderProductGrid(gridId, items) {
             const grid = document.getElementById(gridId);
             grid.innerHTML = "";
-            const list = (items || []).filter(p => {
-                if (!activeTag) return true;
-                return Array.isArray(p.tags) && p.tags.includes(activeTag);
-            });
-            if (!list.length) {
+            if (!items.length) {
                 grid.innerHTML = `<div class="col-span-2 md:col-span-4 text-center text-gray-500">해당 조건의 상품이 없습니다.</div>`;
                 return;
             }
-            list.forEach(p => {
+            items.forEach(p => {
                 const card = document.createElement("div");
                 card.className = "bg-white rounded-xl shadow p-3 text-center hover:shadow-lg transition relative";
-                const discount = calcDiscount(p.price, p.listPrice);
                 card.innerHTML = `
-      <div class="w-full h-32 flex items-center justify-center mb-2">
-        <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-contain">
-      </div>
-      <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
-      <p class="text-gray-500 text-xs md:text-sm mb-1">${p.desc || ""}</p>
-      <div class="flex items-center justify-center gap-1 text-sm md:text-base">
-        <span class="text-red-500 font-bold">${fmtKRW(p.price)}</span>
-        ${p.listPrice ? `<span class="line-through text-gray-400 text-xs">${fmtKRW(p.listPrice)}</span>` : ""}
-        ${discount ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">-${discount}%</span>` : ""}
-      </div>`;
+                <div class="w-full h-32 flex items-center justify-center mb-2">
+                    <img src="${p.image}" alt="${p.name}" class="w-full h-32 object-cover rounded-lg">
+                </div>
+                <h3 class="font-semibold text-sm md:text-base">${p.name}</h3>
+                <p class="text-gray-500 text-xs md:text-sm mb-1">${p.category}</p>
+            `;
+                card.addEventListener("click", () => {
+                    window.location.href = `/detail.html?id=${p.id}`;
+                });
                 grid.appendChild(card);
             });
         }
-
 
         // =============================
         // 초기화
@@ -257,15 +258,15 @@
             renderLines();
             renderProducts();
 
-            // ✅ 광고카드 로드 (food/beauty 공통)
             if (CATEGORY) {
-                loadAdStores(CATEGORY);
+                loadAdStores(CATEGORY); // ✅ 광고카드 (All of the items)
             }
         }
 
         document.addEventListener("DOMContentLoaded", loadData);
-
     </script>
+
+
 </body>
 
 </html>
