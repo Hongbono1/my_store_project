@@ -1,11 +1,12 @@
-// server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+
 import ncombinedregister from "./routes/ncombinedregister.js";
+import subcategoryRouter from "./routes/subcategory.js";   // ★ 추가
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +15,7 @@ const app = express();
 
 /* ───────────────── 공통 미들웨어 ───────────────── */
 app.use((req, res, next) => {
-  req.id = randomUUID();                       // 요청 고유 ID
+  req.id = randomUUID();
   res.setHeader("X-Request-Id", req.id);
   next();
 });
@@ -85,13 +86,13 @@ app.post("/verify-biz", async (req, res) => {
 });
 
 /* ───────────────── API 라우터 (루트 마운트) ───────────────── */
-// 실제 엔드포인트: POST /store, GET /foodregister/:id/full
 app.use("/", ncombinedregister);
+app.use("/api/subcategory", subcategoryRouter);   // ★ 추가됨
 
 /* ───────────────── 헬스체크 ───────────────── */
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ─────────────── 전역 에러 핸들러 (multer/DB 등) ─────────────── */
+/* ─────────────── 전역 에러 핸들러 ─────────────── */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
