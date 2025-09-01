@@ -37,6 +37,7 @@ app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+
 /* ──────────────── 사업자 인증 프록시 (항상 200 반환) ─────────────── */
 app.post("/verify-biz", async (req, res) => {
   try {
