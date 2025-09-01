@@ -39,6 +39,7 @@ export async function getFoodStoresByCategory(req, res) {
 }
 
 /** 뷰티/통합 서브카테고리 조회 */
+/** 뷰티/통합 서브카테고리 조회 */
 export async function getCombinedStoresByCategory(req, res) {
     const { category } = req.query;
     if (!category) {
@@ -50,11 +51,11 @@ export async function getCombinedStoresByCategory(req, res) {
             `
       SELECT cs.id,
              cs.business_name,
-             cs.business_subcategory AS category,
+             cs.business_category AS category,   -- ✅ 여기서 category는 business_category
              COALESCE(MIN(ci.url), '') AS image
       FROM combined_store_info cs
       LEFT JOIN combined_store_images ci ON cs.id = ci.store_id
-      WHERE cs.business_subcategory ILIKE $1
+      WHERE cs.business_category ILIKE $1      -- ✅ 검색도 business_category 로
       GROUP BY cs.id
       LIMIT 20
       `,
@@ -74,6 +75,7 @@ export async function getCombinedStoresByCategory(req, res) {
         res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
     }
 }
+
 
 /** Best Seller (조회수 기준 + 최신순 보조정렬) */
 export async function getBestStores(req, res) {
