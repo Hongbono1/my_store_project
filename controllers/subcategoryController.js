@@ -2,12 +2,11 @@
 import pool from "../db.js";
 
 /** 음식점 업종별 가게 조회 (이미 작성됨) */
+/** 뷰티/통합 서브카테고리 조회 */
 export async function getCombinedStoresByCategory(req, res) {
-    const { category } = req.query; // /api/subcategory/beauty?category=미용/이발
+    const { category } = req.query;
     if (!category) {
-        return res
-            .status(400)
-            .json({ ok: false, error: "category가 필요합니다." });
+        return res.status(400).json({ ok: false, error: "category가 필요합니다." });
     }
 
     try {
@@ -15,14 +14,12 @@ export async function getCombinedStoresByCategory(req, res) {
             `
             SELECT cs.id,
                    cs.business_name,
-                   cs.business_category,
-                   cs.business_subcategory,
+                   cs.business_subcategory AS category,
                    COALESCE(MIN(ci.url), '') AS image
             FROM combined_store_info cs
             LEFT JOIN combined_store_images ci ON cs.id = ci.store_id
-            WHERE cs.business_subcategory ILIKE '%' || $1 || '%'
+            WHERE cs.business_subcategory ILIKE $1
             GROUP BY cs.id
-            ORDER BY cs.created_at DESC
             LIMIT 20
             `,
             [category]
@@ -31,8 +28,7 @@ export async function getCombinedStoresByCategory(req, res) {
         const stores = result.rows.map((r) => ({
             id: r.id,
             name: r.business_name,
-            category: r.business_category,
-            subcategory: r.business_subcategory,
+            category: r.category,
             image: r.image || "/uploads/no-image.png",
         }));
 
@@ -42,6 +38,7 @@ export async function getCombinedStoresByCategory(req, res) {
         res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
     }
 }
+
 
 
 /** 뷰티/통합 서브카테고리 조회 (이미 작성됨) */
