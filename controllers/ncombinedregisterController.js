@@ -8,7 +8,8 @@ const s = (v) => (v == null ? "" : String(v).trim());
 const n = (v) => {
   const num = Number(String(v ?? "").replace(/[^\d]/g, ""));
   if (!Number.isFinite(num)) return 0;
-  return Math.min(num, 2147483647); // PostgreSQL integer 최대치
+  // ✅ PostgreSQL integer 최대치 제한 (2147483647)
+  return Math.min(num, 2147483647);
 };
 /** boolean 보정 */
 const b = (v) => {
@@ -31,6 +32,11 @@ export async function createCombinedStore(req, res) {
     const allFiles = Array.isArray(req.files)
       ? req.files
       : Object.values(req.files || {}).flat();
+
+    console.log("==== [createCombinedStore] incoming body ====");
+    console.log("menuName[]:", raw["menuName[]"]);
+    console.log("menuPrice[]:", raw["menuPrice[]"]);
+    console.log("menuCategory[]:", raw["menuCategory[]"]);
 
     await client.query("BEGIN");
 
@@ -79,12 +85,11 @@ export async function createCombinedStore(req, res) {
     const storeImageFiles = allFiles.filter((f) => f.fieldname === "storeImages");
     for (const f of storeImageFiles) {
       const url = toWeb(f);
-      if (url) {
-        await client.query(
-          `INSERT INTO combined_store_images (store_id, url) VALUES ($1, $2)`,
-          [storeId, url]
-        );
-      }
+      if (!url) continue;
+      await client.query(
+        `INSERT INTO combined_store_images (store_id, url) VALUES ($1, $2)`,
+        [storeId, url]
+      );
     }
 
     // ✅ 메뉴 저장
@@ -100,7 +105,9 @@ export async function createCombinedStore(req, res) {
     const menuImgUrls = menuImageFiles.map((f) => toWeb(f)) ?? [];
 
     const menus = [];
+
     if (catsByRow) {
+      // 행별 1:1 매칭
       const len = Math.max(names.length, prices.length, catsByRow.length);
       for (let i = 0; i < len; i++) {
         const name = s(names[i]);
@@ -114,6 +121,7 @@ export async function createCombinedStore(req, res) {
         });
       }
     } else {
+      // 구방식 fallback: categoryName[] + menuCount_x
       const catNames = arr(raw["categoryName[]"] ?? raw.categoryName);
       let k = 0;
       for (let ci = 0; ci < catNames.length; ci++) {
@@ -189,6 +197,7 @@ export async function getCombinedStoreFull(req, res) {
       return res.status(400).json({ ok: false, error: "invalid_id" });
     }
 
+    // ✅ 상점 정보
     const { rows: storeRows } = await pool.query({
       text: `
         SELECT *,
@@ -200,11 +209,13 @@ export async function getCombinedStoreFull(req, res) {
     });
     const store = storeRows[0];
 
+    // ✅ 이미지
     const { rows: images } = await pool.query({
       text: `SELECT url FROM combined_store_images WHERE store_id=$1 ORDER BY sort_order, id`,
       values: [storeId],
     });
 
+    // ✅ 메뉴
     const { rows: menus } = await pool.query({
       text: `
         SELECT category, name, price, image_url, description
@@ -215,6 +226,7 @@ export async function getCombinedStoreFull(req, res) {
       values: [storeId],
     });
 
+    // ✅ 이벤트
     const { rows: evRows } = await pool.query({
       text: `SELECT content FROM combined_store_events WHERE store_id=$1 ORDER BY ord`,
       values: [storeId],

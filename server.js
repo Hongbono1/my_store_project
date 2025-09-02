@@ -1,3 +1,4 @@
+// server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -5,9 +6,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
-import ncombinedregister from "./routes/ncombinedregister.js";
-import subcategoryRouter from "./routes/subcategory.js";   // ★ 추가
-import foodregisterRouter from "./routes/foodregister.js"; 
+import foodregisterRouter from "./routes/foodregister.js";     // 음식점 전용
+import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용
+import subcategoryRouter from "./routes/subcategory.js";       // 서브카테고리 전용
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +38,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
 
 /* ──────────────── 사업자 인증 프록시 (항상 200 반환) ─────────────── */
 app.post("/verify-biz", async (req, res) => {
@@ -87,10 +87,15 @@ app.post("/verify-biz", async (req, res) => {
   }
 });
 
-/* ───────────────── API 라우터 (루트 마운트) ───────────────── */
-app.use("/", foodregisterRouter);
-app.use("/", ncombinedregister);
-app.use("/api/subcategory", subcategoryRouter);   // ★ 추가됨
+/* ───────────────── API 라우터 (prefix로 분리) ───────────────── */
+// 음식점 등록/조회 API → /store/...
+app.use("/store", foodregisterRouter);
+
+// 통합 등록/조회 API → /foodregister/...
+app.use("/foodregister", ncombinedregister);
+
+// 서브카테고리 API → /api/subcategory/...
+app.use("/api/subcategory", subcategoryRouter);
 
 /* ───────────────── 헬스체크 ───────────────── */
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -99,10 +104,22 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
-    return res.status(413).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
+    return res.status(413).json({
+      ok: false,
+      error: "upload_error",
+      code: err.code,
+      message: err.message,
+      reqId: req?.id,
+    });
   }
   if (err?.code?.startsWith?.("LIMIT_") || /Unexpected field/.test(err?.message || "")) {
-    return res.status(400).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
+    return res.status(400).json({
+      ok: false,
+      error: "upload_error",
+      code: err.code,
+      message: err.message,
+      reqId: req?.id,
+    });
   }
   res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
 });
