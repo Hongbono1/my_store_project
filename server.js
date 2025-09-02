@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";   // ★ 추가
+import foodregisterRouter from "./routes/foodregister.js"; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,6 +89,7 @@ app.post("/verify-biz", async (req, res) => {
 
 /* ───────────────── API 라우터 (루트 마운트) ───────────────── */
 app.use("/", ncombinedregister);
+app.use("/", foodregisterRouter);
 app.use("/api/subcategory", subcategoryRouter);   // ★ 추가됨
 
 /* ───────────────── 헬스체크 ───────────────── */
