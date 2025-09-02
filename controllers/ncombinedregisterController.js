@@ -197,7 +197,7 @@ export async function getCombinedStoreFull(req, res) {
       return res.status(400).json({ ok: false, error: "invalid_id" });
     }
 
-    // ✅ 상점 정보
+    /* ────────────── 1) 기본 상점 정보 ────────────── */
     const { rows: storeRows } = await pool.query({
       text: `
         SELECT *,
@@ -207,16 +207,45 @@ export async function getCombinedStoreFull(req, res) {
       `,
       values: [storeId],
     });
-    const store = storeRows[0];
 
-    // ✅ 이미지
-    const { rows: images } = await pool.query({
-      text: `SELECT url FROM combined_store_images WHERE store_id=$1 ORDER BY sort_order, id`,
+    if (!storeRows.length) {
+      return res.status(404).json({ ok: false, error: "not_found" });
+    }
+
+    const base = storeRows[0];
+    const store = {
+      id: base.id,
+      business_name: base.business_name ?? "-",
+      business_type: base.business_type ?? "-",
+      business_category: base.business_category ?? "-",
+      delivery_option: base.delivery_option ?? "-",
+      business_hours: base.business_hours ?? "-",
+      service_details: base.service_details ?? "-",
+      additional_desc: base.additional_desc ?? "-",
+      phone: base.phone ?? "",
+      homepage: base.homepage ?? "",
+      instagram: base.instagram ?? "",
+      facebook: base.facebook ?? "",
+      facilities: base.facilities ?? "-",
+      pets_allowed: base.pets_allowed ?? null,
+      parking: base.parking ?? "-",
+      address: base.address ?? "-",
+    };
+
+    /* ────────────── 2) 이미지 ────────────── */
+    const { rows: imageRows } = await pool.query({
+      text: `
+        SELECT url 
+        FROM combined_store_images 
+        WHERE store_id=$1 
+        ORDER BY sort_order, id
+      `,
       values: [storeId],
     });
+    const images = imageRows.map(r => ({ url: r.url }));
 
-    // ✅ 메뉴
-    const { rows: menus } = await pool.query({
+    /* ────────────── 3) 메뉴 ────────────── */
+    const { rows: menuRows } = await pool.query({
       text: `
         SELECT category, name, price, image_url, description
         FROM combined_menu_items
@@ -225,19 +254,42 @@ export async function getCombinedStoreFull(req, res) {
       `,
       values: [storeId],
     });
+    const menus = menuRows.map(r => ({
+      category: r.category ?? "기타",
+      name: r.name,
+      price: r.price ?? 0,
+      image_url: r.image_url,
+      description: r.description ?? ""
+    }));
 
-    // ✅ 이벤트
+    /* ────────────── 4) 이벤트 ────────────── */
     const { rows: evRows } = await pool.query({
-      text: `SELECT content FROM combined_store_events WHERE store_id=$1 ORDER BY ord`,
+      text: `
+        SELECT content 
+        FROM combined_store_events 
+        WHERE store_id=$1 
+        ORDER BY ord
+      `,
       values: [storeId],
     });
-    const events = evRows.map((r) => r.content);
+    const events = evRows.map(r => r.content).filter(Boolean);
 
-    return res.json({ ok: true, store, images, menus, events });
+    /* ────────────── 최종 응답 ────────────── */
+    return res.json({
+      ok: true,
+      store,
+      images,
+      menus,
+      events,
+    });
   } catch (err) {
     console.error("[getCombinedStoreFull] error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: "DB fetch failed", message: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "DB fetch failed",
+      message: err.message,
+    });
   }
 }
+
+
