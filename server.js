@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
 import foodregisterRouter from "./routes/foodregister.js";     // 음식점 전용 (/store)
-import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용 (/foodregister)
+import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용 (/combined)
 import subcategoryRouter from "./routes/subcategory.js";       // 서브카테고리 전용 (/api/subcategory)
 
 const __filename = fileURLToPath(import.meta.url);
@@ -92,30 +92,51 @@ app.post("/verify-biz", async (req, res) => {
 console.log("[boot] mounting /store -> foodregisterRouter");
 app.use("/store", foodregisterRouter);
 
-// 통합 등록/조회 API → /foodregister/...
-console.log("[boot] mounting /foodregister -> ncombinedregister");
+// 통합 등록/조회 API → /combined/...
+console.log("[boot] mounting /combined -> ncombinedregister");
 app.use("/combined", ncombinedregister);
 
 // 서브카테고리 API → /api/subcategory/...
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
 
-/* ───────────────── 헬스체크/디버그 ───────────────── */
+/* ───────────────── 헬스체크 ───────────────── */
 app.get("/__ping", (_req, res) => res.json({ ok: true }));
-app.get("/__routes", (_req, res) =>
-  res.json({
-    ok: true,
-    routes: [
-      "GET  /store/:id/full",
-      "POST /store (파일 업로드)",
-      "GET  /foodregister/:id/full", // ← 통합 상세
-      "POST /foodregister/store (파일 업로드)",
-      "GET  /api/subcategory?main=...",
-    ],
-  })
-);
 
-/* ─────────────── 전역 에러/404 핸들러 ─────────────── */
+/* ───────────────── 라우트 목록(동적 수집) ───────────────── */
+function collectRoutes(app) {
+  const out = [];
+
+  app._router?.stack?.forEach(layer => {
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase()).join(", ");
+      out.push(`${methods} ${layer.route.path}`);
+      return;
+    }
+    if (layer.name === "router" && layer.handle?.stack) {
+      // mount path 추출
+      let mount = "";
+      if (layer.regexp && layer.regexp.fast_star !== true) {
+        const m = layer.regexp.toString().match(/\\\/([^\\^?]+)\\\//);
+        if (m && m[1]) mount = `/${m[1]}`;
+      }
+      layer.handle.stack.forEach(r => {
+        if (r.route) {
+          const methods = Object.keys(r.route.methods).map(m => m.toUpperCase()).join(", ");
+          out.push(`${methods} ${mount}${r.route.path}`);
+        }
+      });
+    }
+  });
+
+  return out.sort();
+}
+
+app.get("/__routes", (_req, res) => {
+  res.json({ ok: true, routes: collectRoutes(app) });
+});
+
+/* ─────────────── 전역 에러 핸들러 ─────────────── */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
@@ -127,9 +148,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
 });
 
-// API 404를 JSON으로
+/* ─────────────── 404 핸들러 (API는 JSON) ─────────────── */
 app.use((req, res) => {
-  if (/^(\/store|\/foodregister|\/api)\b/.test(req.path)) {
+  // 🔧 /foodregister → /combined 로 반영
+  if (/^(\/store|\/combined|\/api)\b/.test(req.path)) {
     return res.status(404).json({ ok: false, error: "not_found", path: req.path });
   }
   // 그 외는 정적 404 (기본 HTML)
