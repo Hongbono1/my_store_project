@@ -1,7 +1,8 @@
 // controllers/subcategoryController.js
 import pool from "../db.js";
 
-/** 음식점 업종별 가게 조회 */
+/** ======================== 음식점 전용 ======================== */
+// 음식점 업종별 가게 조회
 export async function getFoodStoresByCategory(req, res) {
     const { category } = req.query;
     if (!category) {
@@ -11,13 +12,13 @@ export async function getFoodStoresByCategory(req, res) {
     try {
         const result = await pool.query(
             `
-      SELECT c.id,
-             c.business_name,
-             c.business_category AS category,
-             COALESCE((SELECT url FROM combined_store_images WHERE store_id = c.id LIMIT 1), '') AS image
-      FROM combined_store_info c
-      WHERE c.business_category = $1
-      ORDER BY c.created_at DESC
+      SELECT f.id,
+             f.business_name,
+             f.business_category AS category,
+             COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
+      FROM food_stores f
+      WHERE f.business_category = $1
+      ORDER BY f.created_at DESC
       `,
             [category]
         );
@@ -32,11 +33,12 @@ export async function getFoodStoresByCategory(req, res) {
         res.json({ ok: true, stores });
     } catch (err) {
         console.error("getFoodStoresByCategory error:", err);
-        res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
+        res.status(500).json({ ok: false, error: "food 서브카테고리 조회 실패" });
     }
 }
 
-/** 뷰티/통합 서브카테고리 조회 */
+/** ======================== 통합/뷰티 ======================== */
+// 뷰티/통합 서브카테고리 조회
 export async function getCombinedStoresByCategory(req, res) {
     const { category } = req.query;
     if (!category) {
@@ -70,12 +72,72 @@ export async function getCombinedStoresByCategory(req, res) {
         res.json({ ok: true, stores });
     } catch (err) {
         console.error("getCombinedStoresByCategory error:", err);
-        res.status(500).json({ ok: false, error: "서브카테고리 조회 실패" });
+        res.status(500).json({ ok: false, error: "combined 서브카테고리 조회 실패" });
     }
 }
 
-/** Best Seller (조회수 기준 + 최신순 보조정렬) */
-export async function getBestStores(req, res) {
+/** ======================== Best / New ======================== */
+// 음식점 Best Seller
+export async function getBestFoodStores(req, res) {
+    try {
+        const result = await pool.query(
+            `
+      SELECT f.id,
+             f.business_name,
+             f.business_category AS category,
+             COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
+      FROM food_stores f
+      ORDER BY f.view_count DESC NULLS LAST, f.created_at DESC
+      LIMIT 20
+      `
+        );
+
+        const stores = result.rows.map((r) => ({
+            id: r.id,
+            name: r.business_name,
+            category: r.category,
+            image: r.image || "/uploads/no-image.png",
+        }));
+
+        res.json({ ok: true, stores });
+    } catch (err) {
+        console.error("getBestFoodStores error:", err);
+        res.status(500).json({ ok: false, error: "food Best stores 조회 실패" });
+    }
+}
+
+// 음식점 신규 등록 (최근 7일)
+export async function getNewFoodStores(req, res) {
+    try {
+        const result = await pool.query(
+            `
+      SELECT f.id,
+             f.business_name,
+             f.business_category AS category,
+             COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
+      FROM food_stores f
+      WHERE f.created_at >= NOW() - INTERVAL '7 days'
+      ORDER BY f.created_at DESC
+      LIMIT 20
+      `
+        );
+
+        const stores = result.rows.map((r) => ({
+            id: r.id,
+            name: r.business_name,
+            category: r.category,
+            image: r.image || "/uploads/no-image.png",
+        }));
+
+        res.json({ ok: true, stores });
+    } catch (err) {
+        console.error("getNewFoodStores error:", err);
+        res.status(500).json({ ok: false, error: "food 신규 가게 조회 실패" });
+    }
+}
+
+// 통합 Best Seller
+export async function getBestCombinedStores(req, res) {
     try {
         const result = await pool.query(
             `
@@ -98,13 +160,13 @@ export async function getBestStores(req, res) {
 
         res.json({ ok: true, stores });
     } catch (err) {
-        console.error("getBestStores error:", err);
-        res.status(500).json({ ok: false, error: "Best stores 조회 실패" });
+        console.error("getBestCombinedStores error:", err);
+        res.status(500).json({ ok: false, error: "combined Best stores 조회 실패" });
     }
 }
 
-/** New registration (최근 7일 내 등록된 가게) */
-export async function getNewStores(req, res) {
+// 통합 신규 등록 (최근 7일)
+export async function getNewCombinedStores(req, res) {
     try {
         const result = await pool.query(
             `
@@ -128,7 +190,7 @@ export async function getNewStores(req, res) {
 
         res.json({ ok: true, stores });
     } catch (err) {
-        console.error("getNewStores error:", err);
-        res.status(500).json({ ok: false, error: "신규 가게 조회 실패" });
+        console.error("getNewCombinedStores error:", err);
+        res.status(500).json({ ok: false, error: "combined 신규 가게 조회 실패" });
     }
 }

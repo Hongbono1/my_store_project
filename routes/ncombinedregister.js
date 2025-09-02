@@ -7,6 +7,7 @@ import * as ctrl from "../controllers/ncombinedregisterController.js";
 const router = Router();
 const upload = multer({ dest: path.join(process.cwd(), "uploads") });
 
+// Combined Store 등록
 router.post(
   "/store",
   upload.fields([
@@ -14,9 +15,10 @@ router.post(
     { name: "menuImage[]", maxCount: 200 },
     { name: "businessCertImage", maxCount: 1 },
   ]),
-  ctrl.createFoodStore
+  ctrl.createCombinedStore   // ✅ 이름 맞춤
 );
 
-router.get("/foodregister/:id/full", ctrl.getFoodStoreFull);
+// Combined Store 상세 조회
+router.get("/combined/:id/full", ctrl.getCombinedStoreFull); // ✅ 이름/경로 명확히
 
 export default router;
