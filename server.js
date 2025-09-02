@@ -94,7 +94,7 @@ app.use("/store", foodregisterRouter);
 
 // 통합 등록/조회 API → /foodregister/...
 console.log("[boot] mounting /foodregister -> ncombinedregister");
-app.use("/foodregister", ncombinedregister);
+app.use("/combined", ncombinedregister);
 
 // 서브카테고리 API → /api/subcategory/...
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
