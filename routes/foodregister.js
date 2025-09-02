@@ -80,7 +80,7 @@ router.post(
 );
 
 router.get("/:id", ctrl.getFoodStoreById);
-router.get("/:id/full", ctrl.getFoodRegisterFull);
+router.get("/store/:id/full", ctrl.getFoodRegisterFull);
 router.put(
   "/:id",
   uploadWithCatch,
