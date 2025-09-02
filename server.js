@@ -88,8 +88,8 @@ app.post("/verify-biz", async (req, res) => {
 });
 
 /* ───────────────── API 라우터 (루트 마운트) ───────────────── */
-app.use("/", ncombinedregister);
 app.use("/", foodregisterRouter);
+app.use("/", ncombinedregister);
 app.use("/api/subcategory", subcategoryRouter);   // ★ 추가됨
 
 /* ───────────────── 헬스체크 ───────────────── */
