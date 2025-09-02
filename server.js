@@ -6,9 +6,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
-import foodregisterRouter from "./routes/foodregister.js";     // 음식점 전용
-import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용
-import subcategoryRouter from "./routes/subcategory.js";       // 서브카테고리 전용
+import foodregisterRouter from "./routes/foodregister.js";     // 음식점 전용 (/store)
+import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용 (/foodregister)
+import subcategoryRouter from "./routes/subcategory.js";       // 서브카테고리 전용 (/api/subcategory)
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,39 +89,51 @@ app.post("/verify-biz", async (req, res) => {
 
 /* ───────────────── API 라우터 (prefix로 분리) ───────────────── */
 // 음식점 등록/조회 API → /store/...
+console.log("[boot] mounting /store -> foodregisterRouter");
 app.use("/store", foodregisterRouter);
 
 // 통합 등록/조회 API → /foodregister/...
+console.log("[boot] mounting /foodregister -> ncombinedregister");
 app.use("/foodregister", ncombinedregister);
 
 // 서브카테고리 API → /api/subcategory/...
+console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
 
-/* ───────────────── 헬스체크 ───────────────── */
-app.get("/health", (_req, res) => res.json({ ok: true }));
+/* ───────────────── 헬스체크/디버그 ───────────────── */
+app.get("/__ping", (_req, res) => res.json({ ok: true }));
+app.get("/__routes", (_req, res) =>
+  res.json({
+    ok: true,
+    routes: [
+      "GET  /store/:id/full",
+      "POST /store (파일 업로드)",
+      "GET  /foodregister/:id/full", // ← 통합 상세
+      "POST /foodregister/store (파일 업로드)",
+      "GET  /api/subcategory?main=...",
+    ],
+  })
+);
 
-/* ─────────────── 전역 에러 핸들러 ─────────────── */
+/* ─────────────── 전역 에러/404 핸들러 ─────────────── */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
-    return res.status(413).json({
-      ok: false,
-      error: "upload_error",
-      code: err.code,
-      message: err.message,
-      reqId: req?.id,
-    });
+    return res.status(413).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
   }
   if (err?.code?.startsWith?.("LIMIT_") || /Unexpected field/.test(err?.message || "")) {
-    return res.status(400).json({
-      ok: false,
-      error: "upload_error",
-      code: err.code,
-      message: err.message,
-      reqId: req?.id,
-    });
+    return res.status(400).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
   }
   res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
+});
+
+// API 404를 JSON으로
+app.use((req, res) => {
+  if (/^(\/store|\/foodregister|\/api)\b/.test(req.path)) {
+    return res.status(404).json({ ok: false, error: "not_found", path: req.path });
+  }
+  // 그 외는 정적 404 (기본 HTML)
+  res.status(404).send("<h1>Not Found</h1>");
 });
 
 /* ───────────────── 서버 시작 ───────────────── */
