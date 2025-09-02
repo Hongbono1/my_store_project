@@ -1,3 +1,4 @@
+// controllers/foodregisterController.js
 import pool from "../db.js";
 import path from "path";
 
@@ -16,9 +17,10 @@ const b = (v) => {
   return ["가능", "true", "1", "yes", "on"].includes(t.toLowerCase());
 };
 /** 업로드 파일 → 웹경로 */
-const toWeb = (file) => (file?.path ? `/uploads/${path.basename(file.path)}` : null);
+const toWeb = (file) =>
+  file?.path ? `/uploads/${path.basename(file.path)}` : null;
 /** 배열화 유틸 */
-const arr = (v) => (Array.isArray(v) ? v : (v != null ? [v] : []));
+const arr = (v) => (Array.isArray(v) ? v : v != null ? [v] : []);
 
 /* ----------------------
  * 저장 (등록 처리)
@@ -40,20 +42,20 @@ export async function createFoodStore(req, res) {
 
     await client.query("BEGIN");
 
-    // ✅ food_stores 저장 (phone → name='phone' 사용, 불일치 보정)
+    // ✅ combined_store_info 저장
     const storeSql = `
-      INSERT INTO food_stores (
+      INSERT INTO combined_store_info (
         business_name, business_type, business_category,
         business_hours, delivery_option, service_details,
         additional_desc, phone, homepage, instagram, facebook,
         facilities, pets_allowed, parking,
-        postal_code, road_address, detail_address
+        postal_code, road_address, detail_address, created_at
       ) VALUES (
         $1,$2,$3,
         $4,$5,$6,
         $7,$8,$9,$10,$11,
         $12,$13,$14,
-        $15,$16,$17
+        $15,$16,$17,NOW()
       )
       RETURNING id
     `;
@@ -61,17 +63,17 @@ export async function createFoodStore(req, res) {
     const storeVals = [
       s(raw.businessName),
       s(raw.businessType),
-      s(raw.mainCategory || raw.subCategory),    // 원하면 결합 문자열 사용도 가능
+      s(raw.mainCategory || raw.subCategory),
       s(raw.businessHours),
       s(raw.deliveryOption),
       s(raw.serviceDetails),
       s(raw.additionalDesc),
-      s(raw.phone ?? raw.phoneNumber),           // ← 프론트 name='phone'
+      s(raw.phone ?? raw.phoneNumber),
       s(raw.homepage),
       s(raw.instagram),
       s(raw.facebook),
-      s(raw.facilities),                         // ← name='facilities'
-      b(raw.petsAllowed),                        // ← name='petsAllowed'
+      s(raw.facilities),
+      b(raw.petsAllowed),
       s(raw.parking),
       s(raw.postalCode),
       s(raw.roadAddress),
@@ -81,35 +83,33 @@ export async function createFoodStore(req, res) {
     const storeResult = await client.query(storeSql, storeVals);
     const storeId = storeResult.rows[0].id;
 
-    // ✅ 대표/갤러리 이미지 저장 (any/fields 모두 호환)
-    const storeImageFiles = allFiles.filter(f => f.fieldname === "storeImages");
+    // ✅ 대표/갤러리 이미지 저장
+    const storeImageFiles = allFiles.filter((f) => f.fieldname === "storeImages");
     for (const f of storeImageFiles) {
       const url = toWeb(f);
       if (!url) continue;
       await client.query(
-        `INSERT INTO store_images (store_id, url) VALUES ($1, $2)`,
+        `INSERT INTO combined_store_images (store_id, url) VALUES ($1, $2)`,
         [storeId, url]
       );
     }
 
-    // ===================== 메뉴 저장 (menuCategory[] 우선) =====================
-    const names   = arr(raw["menuName[]"]  ?? raw.menuName);
-    const pricesR = arr(raw["menuPrice[]"] ?? raw.menuPrice);
-    const prices  = pricesR.map((p) => n(p));
+    // ✅ 메뉴 저장
+    const names = arr(raw["menuName[]"] ?? raw.menuName);
+    const prices = arr(raw["menuPrice[]"] ?? raw.menuPrice).map((p) => n(p));
+    const catsByRow = Array.isArray(raw["menuCategory[]"])
+      ? raw["menuCategory[]"]
+      : null;
 
-    // ★ 프론트가 행마다 넣어주는 카테고리 (가장 안전)
-    const catsByRow = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : null;
-
-    // 메뉴 이미지 (any/fields 호환: menuImage[] 또는 menuImage)
     const menuImageFiles = allFiles.filter(
-      f => f.fieldname === "menuImage[]" || f.fieldname === "menuImage"
+      (f) => f.fieldname === "menuImage[]" || f.fieldname === "menuImage"
     );
     const menuImgUrls = menuImageFiles.map((f) => toWeb(f)) ?? [];
 
     const menus = [];
 
     if (catsByRow) {
-      // ✅ 새 방식: 각 행 1:1 매칭
+      // 행별 1:1 매칭
       const len = Math.max(names.length, prices.length, catsByRow.length);
       for (let i = 0; i < len; i++) {
         const name = s(names[i]);
@@ -123,7 +123,7 @@ export async function createFoodStore(req, res) {
         });
       }
     } else {
-      // ✅ 구방식 fallback: menuCount_*로 카테고리별 개수 복구
+      // 구방식 fallback: categoryName[] + menuCount_x
       const catNames = arr(raw["categoryName[]"] ?? raw.categoryName);
       let k = 0;
       for (let ci = 0; ci < catNames.length; ci++) {
@@ -143,39 +143,34 @@ export async function createFoodStore(req, res) {
       }
     }
 
-    // (선택) 과거 오염 데이터가 있다면 전량 교체하고 싶을 때 주석 해제
-    // await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
-
-    // ✅ DB upsert
     for (const m of menus) {
       await client.query(
         `
-        INSERT INTO menu_items (store_id, category, name, price, image_url, description)
+        INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
         VALUES ($1,$2,$3,$4,$5,$6)
         ON CONFLICT (store_id, name)
         DO UPDATE SET
           category    = EXCLUDED.category,
           price       = EXCLUDED.price,
           description = EXCLUDED.description,
-          image_url   = COALESCE(EXCLUDED.image_url, menu_items.image_url)
+          image_url   = COALESCE(EXCLUDED.image_url, combined_menu_items.image_url)
         `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
-    // ===================== 메뉴 저장 끝 =======================================
 
     // ✅ 이벤트
     const ev1 = s(raw.event1);
     const ev2 = s(raw.event2);
     if (ev1) {
       await client.query(
-        `INSERT INTO store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
+        `INSERT INTO combined_store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
         [storeId, 1, ev1]
       );
     }
     if (ev2) {
       await client.query(
-        `INSERT INTO store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
+        `INSERT INTO combined_store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
         [storeId, 2, ev2]
       );
     }
@@ -204,35 +199,38 @@ export async function getFoodStoreFull(req, res) {
       return res.status(400).json({ ok: false, error: "invalid_id" });
     }
 
+    // ✅ 상점 정보
     const { rows: storeRows } = await pool.query({
       text: `
         SELECT *,
                (COALESCE(road_address,'') || ' ' || COALESCE(detail_address,'')) AS address
-        FROM food_stores 
+        FROM combined_store_info
         WHERE id=$1
       `,
       values: [storeId],
     });
     const store = storeRows[0];
 
-    // ✅ store_images.url 기준
+    // ✅ 이미지
     const { rows: images } = await pool.query({
-      text: `SELECT url FROM store_images WHERE store_id=$1 ORDER BY sort_order, id`,
+      text: `SELECT url FROM combined_store_images WHERE store_id=$1 ORDER BY sort_order, id`,
       values: [storeId],
     });
 
+    // ✅ 메뉴
     const { rows: menus } = await pool.query({
       text: `
         SELECT category, name, price, image_url, description
-        FROM menu_items
+        FROM combined_menu_items
         WHERE store_id=$1
         ORDER BY category, name
       `,
       values: [storeId],
     });
 
+    // ✅ 이벤트
     const { rows: evRows } = await pool.query({
-      text: `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
+      text: `SELECT content FROM combined_store_events WHERE store_id=$1 ORDER BY ord`,
       values: [storeId],
     });
     const events = evRows.map((r) => r.content);
