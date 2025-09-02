@@ -433,11 +433,6 @@
                             <input id="newCatInput2" type="text" placeholder="새 카테고리" class="neo-input px-3 py-2 w-40">
                             <button type="button" id="btnAddCat2" class="neo-btn px-3 py-2 text-sm">추가</button>
 
-                            <!-- 카테고리 선택 -->
-                            <select id="menuCategorySelect" class="neo-input px-3 py-2 w-40">
-                                <option value="">카테고리 선택</option>
-                            </select>
-
                             <!-- 품목 추가 -->
                             <button type="button" id="btnAddItem" class="neo-btn px-3 py-2 text-sm" disabled>품목
                                 추가</button>
@@ -901,104 +896,68 @@
         // ============================
         // 메뉴 카테고리 → 품목 모듈 (정리본)
         // ============================
-        const menuState = { currentCategory: "", panels: new Map() };
+
+        // 전역 상태
+        const menuState = { currentCategory: "", panels: new Map(), opened: new Set(), panelsWrap: null };
 
         function initMenuModule() {
-            const sel = qs('#menuCategorySelect');
             const panelsWrap = qs('#menuCategoryPanels');
             const addBtn = qs('#btnAddItem');
             const addCatBtn = qs('#btnAddCat');
             const newCatInput = qs('#newCatInput');
+            const addCatBtn2 = qs('#btnAddCat2');
+            const newCatInput2 = qs('#newCatInput2');
 
             menuState.panelsWrap = panelsWrap;
-            menuState.opened = new Set();
 
-            // 새 카테고리 추가
+            // 상단 카테고리 추가 버튼
             addCatBtn?.addEventListener('click', () => {
                 const name = (newCatInput?.value || "").trim();
                 if (!name) return alert('카테고리 이름을 입력하세요.');
-                if (menuState.panels.has(name)) {
-                    alert('이미 존재하는 카테고리입니다.');
-                    showCategory(name);
-                    return;
-                }
+                if (menuState.panels.has(name)) { alert('이미 존재하는 카테고리입니다.'); showCategory(name); return; }
                 addCategory(name);
                 newCatInput.value = "";
                 showCategory(name);
             });
+            newCatInput?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCatBtn?.click(); } });
 
-            // Enter 입력으로도 추가 가능
-            newCatInput?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addCatBtn?.click();
-                }
-            });
-
-            // 선택 변경 시 패널 표시
-            sel.addEventListener('change', () => showCategory(sel.value));
-
-            // 품목 추가 버튼
-            addBtn.addEventListener('click', () => {
-                if (!menuState.currentCategory) return alert('카테고리를 먼저 선택하세요.');
-                addMenuRowTo(menuState.currentCategory);
-            });
-
-            // 새 카테고리 추가 (아래쪽 컨트롤 바)
-            const addCatBtn2 = qs('#btnAddCat2');
-            const newCatInput2 = qs('#newCatInput2');
-
+            // 하단 카테고리 추가 버튼
             addCatBtn2?.addEventListener('click', () => {
                 const name = (newCatInput2?.value || "").trim();
                 if (!name) return alert('카테고리 이름을 입력하세요.');
-                if (menuState.panels.has(name)) {
-                    alert('이미 존재하는 카테고리입니다.');
-                    showCategory(name);
-                    return;
-                }
+                if (menuState.panels.has(name)) { alert('이미 존재하는 카테고리입니다.'); showCategory(name); return; }
                 addCategory(name);
                 newCatInput2.value = "";
                 showCategory(name);
             });
+            newCatInput2?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCatBtn2?.click(); } });
 
-            newCatInput2?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addCatBtn2?.click();
-                }
+            // 품목 추가 버튼
+            addBtn?.addEventListener('click', () => {
+                if (!menuState.currentCategory) return alert('카테고리를 먼저 선택하세요.');
+                addMenuRowTo(menuState.currentCategory);
             });
-
-            // 초기화 → 아무 카테고리도 없음
-            sel.value = "";
-            Array.from(sel.options).forEach(op => op.selected = (op.value === ""));
         }
 
+        // ==== 보조 함수들은 initMenuModule 바깥에 위치 ====
         function addCategory(cat) {
-            const sel = qs('#menuCategorySelect');
             const panelsWrap = menuState.panelsWrap;
-
-            // 셀렉트 옵션 추가
-            const op = document.createElement('option');
-            op.value = cat; op.textContent = cat;
-            sel.appendChild(op);
-
-            // 패널 생성
             const panel = document.createElement('div');
             panel.dataset.panel = cat;
             panel.className = "hidden neo-section p-4";
             panel.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h4 class="text-lg font-semibold text-blue-900">${cat}</h4>
-      <button type="button" class="neo-btn neo-danger px-3 py-1 text-xs cat-delete" data-cat="${cat}">
-        카테고리 삭제
-      </button>
-    </div>
-    <div class="space-y-4" data-cat-list="${cat}"></div>
-  `;
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="text-lg font-semibold text-blue-900">${cat}</h4>
+        <button type="button" class="neo-btn neo-danger px-3 py-1 text-xs cat-delete" data-cat="${cat}">
+          카테고리 삭제
+        </button>
+      </div>
+      <div class="space-y-4" data-cat-list="${cat}"></div>
+    `;
             panelsWrap.appendChild(panel);
             menuState.panels.set(cat, panel);
 
-            // 삭제 버튼 이벤트
+            // 삭제 이벤트
             panel.querySelector('.cat-delete').addEventListener('click', () => deleteCategory(cat));
         }
 
@@ -1006,7 +965,6 @@
             menuState.currentCategory = cat;
             const addBtn = qs('#btnAddItem');
             const currentTxt = qs('#currentCatText');
-            const sel = qs('#menuCategorySelect');
             const panel = menuState.panels.get(cat);
 
             if (!cat || !panel) {
@@ -1015,6 +973,7 @@
                 return;
             }
 
+            // 모든 패널 토글
             menuState.panels.forEach((p, name) => {
                 p.classList.toggle('hidden', name !== cat);
                 p.classList.toggle('ring-2', name === cat);
@@ -1023,8 +982,6 @@
 
             if (addBtn) addBtn.disabled = false;
             if (currentTxt) currentTxt.textContent = cat;
-            if (sel && sel.value !== cat) sel.value = cat;
-
             panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
@@ -1034,21 +991,15 @@
 
             const list = panel.querySelector(`[data-cat-list="${cat}"]`);
             const count = list ? list.children.length : 0;
-            const ok = confirm(`‘${cat}’ 카테고리${count ? ` (품목 ${count}개 포함)` : ""}를 삭제할까요?`);
-            if (!ok) return;
+            if (!confirm(`‘${cat}’ 카테고리${count ? ` (품목 ${count}개 포함)` : ""}를 삭제할까요?`)) return;
 
             panel.remove();
             menuState.panels.delete(cat);
 
-            // 셀렉트에서 제거
-            const sel = qs('#menuCategorySelect');
-            Array.from(sel.options).forEach(op => { if (op.value === cat) op.remove(); });
-
             if (menuState.currentCategory === cat) {
                 menuState.currentCategory = '';
-                if (qs('#btnAddItem')) qs('#btnAddItem').disabled = true;
-                if (qs('#currentCatText')) qs('#currentCatText').textContent = '선택 전';
-                sel.value = '';
+                qs('#btnAddItem').disabled = true;
+                qs('#currentCatText').textContent = '선택 전';
             }
         }
 
@@ -1067,11 +1018,13 @@
             // 카테고리 주입
             node.querySelector('.menu-cat-hidden').value = cat;
 
+            // 추가 + 포커스
             const list = qs(`[data-cat-list="${cat}"]`);
             list.appendChild(node);
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             row.querySelector('input[name="menuName[]"]')?.focus();
         }
+
 
         function showCategory(cat) {
             menuState.currentCategory = cat;
@@ -1126,7 +1079,7 @@
                 menuState.currentCategory = '';
                 const addBtn = qs('#btnAddItem'); if (addBtn) addBtn.disabled = true;
                 const currentTxt = qs('#currentCatText'); if (currentTxt) currentTxt.textContent = '선택 전';
-                const sel = qs('#menuCategorySelect'); if (sel) sel.value = '';
+
             }
         }
 
