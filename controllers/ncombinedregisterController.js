@@ -43,7 +43,7 @@ export async function createCombinedStore(req, res) {
     // ✅ combined_store_info 저장
     const storeSql = `
       INSERT INTO combined_store_info (
-        business_name, business_type, business_category,
+        business_name, business_number,  business_type, business_category,
         business_hours, delivery_option, service_details,
         additional_desc, phone, homepage, instagram, facebook,
         facilities, pets_allowed, parking,
@@ -59,6 +59,7 @@ export async function createCombinedStore(req, res) {
     `;
 
     const storeVals = [
+      s(raw.businessNumber),
       s(raw.businessName),
       s(raw.businessType),
       s(raw.mainCategory || raw.subCategory),
