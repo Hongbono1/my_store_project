@@ -42,41 +42,39 @@ export async function createCombinedStore(req, res) {
 
     // ✅ combined_store_info 저장
     const storeSql = `
-      INSERT INTO combined_store_info (
-        business_name, business_number,  business_type, business_category,
-        business_hours, delivery_option, service_details,
-        additional_desc, phone, homepage, instagram, facebook,
-        facilities, pets_allowed, parking,
-        postal_code, road_address, detail_address, created_at
-      ) VALUES (
-        $1,$2,$3,
-        $4,$5,$6,
-        $7,$8,$9,$10,$11,
-        $12,$13,$14,
-        $15,$16,$17,NOW()
-      )
-      RETURNING id
-    `;
+  INSERT INTO combined_store_info (
+    business_number, business_name, business_type, business_category,
+    business_hours, delivery_option, service_details,
+    additional_desc, phone, homepage, instagram, facebook,
+    facilities, pets_allowed, parking,
+    postal_code, road_address, detail_address, created_at
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,
+    $7,$8,$9,$10,$11,$12,
+    $13,$14,$15,$16,$17,$18,NOW()
+  )
+  RETURNING id
+`;
 
     const storeVals = [
-      s(raw.businessNumber),
-      s(raw.businessName),
-      s(raw.businessType),
-      s(raw.mainCategory || raw.subCategory),
-      s(raw.businessHours),
-      s(raw.deliveryOption),
-      s(raw.serviceDetails),
-      s(raw.additionalDesc),
-      s(raw.phone ?? raw.phoneNumber),
-      s(raw.homepage),
-      s(raw.instagram),
-      s(raw.facebook),
-      s(raw.facilities),
-      b(raw.petsAllowed),
-      s(raw.parking),
-      s(raw.postalCode),
-      s(raw.roadAddress),
-      s(raw.detailAddress),
+      s(raw.businessNumber),  // $1 → business_number
+      s(raw.businessName),    // $2 → business_name
+      s(raw.businessType),    // $3
+      s(raw.mainCategory || raw.subCategory), // $4
+      s(raw.businessHours),   // $5
+      s(raw.deliveryOption),  // $6
+      s(raw.serviceDetails),  // $7
+      s(raw.additionalDesc),  // $8
+      s(raw.phone ?? raw.phoneNumber), // $9
+      s(raw.homepage),        // $10
+      s(raw.instagram),       // $11
+      s(raw.facebook),        // $12
+      s(raw.facilities),      // $13
+      b(raw.petsAllowed),     // $14
+      s(raw.parking),         // $15
+      s(raw.postalCode),      // $16
+      s(raw.roadAddress),     // $17
+      s(raw.detailAddress),   // $18
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
