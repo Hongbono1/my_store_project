@@ -176,22 +176,6 @@ export async function createCombinedStore(req, res) {
       );
     }
 
-    // ✅ 이벤트
-    const ev1 = s(raw.event1);
-    const ev2 = s(raw.event2);
-    if (ev1) {
-      await client.query(
-        `INSERT INTO combined_store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
-        [storeId, 1, ev1]
-      );
-    }
-    if (ev2) {
-      await client.query(
-        `INSERT INTO combined_store_events (store_id, ord, content) VALUES ($1,$2,$3)`,
-        [storeId, 2, ev2]
-      );
-    }
-
     await client.query("COMMIT");
     console.log("[createCombinedStore] 성공:", storeId);
     return res.json({ ok: true, id: storeId });
