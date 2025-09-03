@@ -43,38 +43,58 @@ export async function createCombinedStore(req, res) {
     // ✅ combined_store_info 저장
     const storeSql = `
   INSERT INTO combined_store_info (
-    business_number, business_name, business_type, business_category,
+    business_number, business_name, business_type, 
+    business_category, business_subcategory,
     business_hours, delivery_option, service_details,
-    additional_desc, phone, homepage, instagram, facebook,
-    facilities, pets_allowed, parking,
-    postal_code, road_address, detail_address, created_at
+    event1, event2, facilities, pets_allowed, parking,
+    phone, homepage, instagram, facebook,
+    additional_desc, postal_code, road_address, detail_address,
+    owner_name, birth_date, owner_email, owner_address, owner_phone,
+    business_cert_path, created_at
   ) VALUES (
-    $1,$2,$3,$4,$5,$6,
-    $7,$8,$9,$10,$11,$12,
-    $13,$14,$15,$16,$17,$18,NOW()
+    $1,$2,$3,
+    $4,$5,
+    $6,$7,$8,
+    $9,$10,$11,$12,$13,
+    $14,$15,$16,$17,
+    $18,$19,$20,$21,
+    $22,$23,$24,$25,$26,
+    $27,NOW()
   )
   RETURNING id
 `;
 
+    const certFile = allFiles.find(f => f.fieldname === "businessCertImage");
+    const certPath = certFile ? toWeb(certFile) : null;
+
     const storeVals = [
-      s(raw.businessNumber),   // $1
-      s(raw.businessName),     // $2
-      s(raw.businessType),     // $3
-      s(raw.mainCategory || raw.subCategory), // $4
-      s(raw.businessHours),    // $5
-      s(raw.deliveryOption),   // $6
-      s(raw.serviceDetails),   // $7
-      s(raw.additionalDesc),   // $8
-      s(raw.phone ?? raw.phoneNumber), // $9
-      s(raw.homepage),         // $10
-      s(raw.instagram),        // $11
-      s(raw.facebook),         // $12
-      s(raw.facilities),       // $13
-      b(raw.petsAllowed),      // $14
-      s(raw.parking),          // $15
-      s(raw.postalCode),       // $16
-      s(raw.roadAddress),      // $17
-      s(raw.detailAddress),    // $18
+      s(raw.businessNumber),                   // $1
+      s(raw.businessName),                     // $2
+      s(raw.businessType),                     // $3
+      s(raw.mainCategory),                     // $4
+      s(raw.subCategory),                      // $5
+      s(raw.businessHours),                    // $6
+      s(raw.deliveryOption),                   // $7
+      s(raw.serviceDetails),                   // $8
+      s(raw.event1),                           // $9
+      s(raw.event2),                           // $10
+      s(raw.facilities),                       // $11
+      b(raw.petsAllowed),                      // $12
+      s(raw.parking),                          // $13
+      s(raw.phone ?? raw.phoneNumber),         // $14
+      s(raw.homepage),                         // $15
+      s(raw.instagram),                        // $16
+      s(raw.facebook),                         // $17
+      s(raw.additionalDesc),                   // $18
+      s(raw.postalCode),                       // $19
+      s(raw.roadAddress),                      // $20
+      s(raw.detailAddress),                    // $21
+      s(raw.ownerName),                        // $22
+      raw.birthDate ? new Date(raw.birthDate) : null, // $23
+      s(raw.ownerEmail),                       // $24
+      [s(raw.ownerAddress), s(raw.ownerAddressDetail)].filter(Boolean).join(' '), // $25
+      s(raw.ownerPhone),                       // $26
+      certPath                                 // $27
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
