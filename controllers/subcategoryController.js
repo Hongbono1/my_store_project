@@ -53,23 +53,25 @@ export async function getCombinedStoresByCategory(req, res) {
              cs.business_name,
              cs.business_category AS category,
              cs.business_type,
-             COALESCE(MIN(ci.url), '') AS image
-      FROM combined_store_info cs
+COALESCE(ARRAY_AGG(ci.url) FILTER (WHERE ci.url IS NOT NULL) , '{}') AS images
+             FROM combined_store_info cs
       LEFT JOIN combined_store_images ci ON cs.id = ci.store_id
       WHERE cs.business_category ILIKE $1
       GROUP BY cs.id
       ORDER BY cs.created_at DESC
       LIMIT 20
       `,
-            [category]
+            [category]   // 🔹 여기서 ILIKE 검색어 그대로 사용
         );
 
         const stores = result.rows.map((r) => ({
             id: r.id,
             name: r.business_name,
             category: r.category,
-            image: r.image || "/uploads/no-image.png",
             business_type: r.business_type,
+            image: r.image && r.image.trim() !== ""
+                ? r.image
+                : "/uploads/no-image.png",   // 🔹 기본 이미지 보강
         }));
 
         res.json({ ok: true, stores });

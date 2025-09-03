@@ -7,9 +7,9 @@ import * as ctrl from "../controllers/ncombinedregisterController.js";
 const router = Router();
 const upload = multer({ dest: path.join(process.cwd(), "uploads") });
 
-// [POST] /foodregister/store
+// [POST] /combined
 router.post(
-  "/store",
+  "/",
   upload.fields([
     { name: "storeImages", maxCount: 3 },
     { name: "menuImage[]", maxCount: 200 },
@@ -18,7 +18,7 @@ router.post(
   ctrl.createCombinedStore
 );
 
-// [GET] /foodregister/:id/full  ← ★ 프리픽스 없이!
+// [GET] /combined/:id/full
 router.get("/:id/full", ctrl.getCombinedStoreFull);
 
 export default router;
