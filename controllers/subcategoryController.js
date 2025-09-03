@@ -1,4 +1,3 @@
-// controllers/subcategoryController.js
 import pool from "../db.js";
 
 /** ======================== 음식점 전용 ======================== */
@@ -15,6 +14,7 @@ export async function getFoodStoresByCategory(req, res) {
       SELECT f.id,
              f.business_name,
              f.business_category AS category,
+             '음식점' AS business_type,
              COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
       FROM food_stores f
       WHERE f.business_category = $1
@@ -28,6 +28,7 @@ export async function getFoodStoresByCategory(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });
@@ -51,6 +52,7 @@ export async function getCombinedStoresByCategory(req, res) {
       SELECT cs.id,
              cs.business_name,
              cs.business_category AS category,
+             cs.business_type,
              COALESCE(MIN(ci.url), '') AS image
       FROM combined_store_info cs
       LEFT JOIN combined_store_images ci ON cs.id = ci.store_id
@@ -67,6 +69,7 @@ export async function getCombinedStoresByCategory(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });
@@ -85,6 +88,7 @@ export async function getBestFoodStores(req, res) {
       SELECT f.id,
              f.business_name,
              f.business_category AS category,
+             '음식점' AS business_type,
              COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
       FROM food_stores f
       ORDER BY f.view_count DESC NULLS LAST, f.created_at DESC
@@ -97,6 +101,7 @@ export async function getBestFoodStores(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });
@@ -114,6 +119,7 @@ export async function getNewFoodStores(req, res) {
       SELECT f.id,
              f.business_name,
              f.business_category AS category,
+             '음식점' AS business_type,
              COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
       FROM food_stores f
       WHERE f.created_at >= NOW() - INTERVAL '7 days'
@@ -127,6 +133,7 @@ export async function getNewFoodStores(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });
@@ -144,6 +151,7 @@ export async function getBestCombinedStores(req, res) {
       SELECT cs.id,
              cs.business_name,
              cs.business_category AS category,
+             cs.business_type,
              COALESCE((SELECT url FROM combined_store_images WHERE store_id = cs.id LIMIT 1), '') AS image
       FROM combined_store_info cs
       ORDER BY cs.view_count DESC NULLS LAST, cs.created_at DESC
@@ -156,6 +164,7 @@ export async function getBestCombinedStores(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });
@@ -173,6 +182,7 @@ export async function getNewCombinedStores(req, res) {
       SELECT cs.id,
              cs.business_name,
              cs.business_category AS category,
+             cs.business_type,
              COALESCE((SELECT url FROM combined_store_images WHERE store_id = cs.id LIMIT 1), '') AS image
       FROM combined_store_info cs
       WHERE cs.created_at >= NOW() - INTERVAL '7 days'
@@ -186,6 +196,7 @@ export async function getNewCombinedStores(req, res) {
             name: r.business_name,
             category: r.category,
             image: r.image || "/uploads/no-image.png",
+            business_type: r.business_type,
         }));
 
         res.json({ ok: true, stores });

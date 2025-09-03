@@ -563,36 +563,34 @@
         }
 
         // 2) 데이터 표준화 (이 블록으로 교체)
-        // 2) 데이터 표준화 (이 블록으로 교체)
         (async () => {
             try {
-                // ✅ API URL 선택 + 폴백
+                // ✅ URL 파라미터
                 const q = new URLSearchParams(location.search);
-                const storeId = Number(q.get("id"));
-                const preferred = (q.get("type") || "combined").toLowerCase(); // 기본값 combined
+                const id = Number(q.get("id"));
+                const type = (q.get("type") || "food").toLowerCase();
 
-                if (!Number.isSafeInteger(storeId)) {
+                if (!Number.isSafeInteger(id)) {
                     alert("잘못된 접근입니다. (id 필요)");
                     throw new Error("Invalid storeId");
                 }
 
-                // preferred 먼저 → 실패 시 반대쪽
-                const tryOrder = preferred === "food"
-                    ? [`/store/${storeId}/full`, `/combined/${storeId}/full`]
-                    : [`/combined/${storeId}/full`, `/store/${storeId}/full`];
+                // ✅ 단일 URL 결정
+                let apiUrl = type === "combined"
+                    ? `/combined/${id}/full`
+                    : `/store/${id}/full`;
 
-                let json = null, usedUrl = null, lastStatus = 0;
-                for (const url of tryOrder) {
-                    const r = await fetch(url);
-                    if (r.ok) {
-                        json = await r.json();
-                        usedUrl = url;
-                        break;
-                    }
-                    lastStatus = r.status;
+                // (옵션) 한 번만 반대로 폴백
+                let res = await fetch(apiUrl);
+                if (!res.ok) {
+                    const altUrl = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
+                    const res2 = await fetch(altUrl);
+                    if (res2.ok) { res = res2; apiUrl = altUrl; }
                 }
-                if (!json) throw new Error(`HTTP ${lastStatus} (both failed)`);
-                console.log("[DETAIL] used api:", usedUrl);
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                console.log("[DETAIL] used api:", apiUrl);
 
                 // ===== 여기부터는 'json' 써서 그대로 렌더 =====
                 const store = json.store || {};
@@ -757,7 +755,7 @@
 
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
-                $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
+                document.getElementById("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
             }
         })();
 
