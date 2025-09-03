@@ -9,7 +9,7 @@ const upload = multer({ dest: path.join(process.cwd(), "uploads") });
 
 // [POST] /combined
 router.post(
-  "/",
+  "/store",
   upload.fields([
     { name: "storeImages", maxCount: 3 },
     { name: "menuImage[]", maxCount: 200 },
