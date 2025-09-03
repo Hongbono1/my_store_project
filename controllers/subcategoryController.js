@@ -61,7 +61,7 @@ COALESCE(ARRAY_AGG(ci.url) FILTER (WHERE ci.url IS NOT NULL) , '{}') AS images
       ORDER BY cs.created_at DESC
       LIMIT 20
       `,
-            [category]   // 🔹 여기서 ILIKE 검색어 그대로 사용
+            [`%${category}%`]   // 🔹 여기서 ILIKE 검색어 그대로 사용
         );
 
         const stores = result.rows.map((r) => ({
