@@ -57,24 +57,24 @@ export async function createCombinedStore(req, res) {
 `;
 
     const storeVals = [
-      s(raw.businessNumber),                       // $1 → business_number
-      s(raw.businessName),                         // $2 → business_name
-      s(raw.businessType),                         // $3 → business_type
-      s(raw.mainCategory || raw.subCategory),      // $4 → business_category
-      s(raw.businessHours),                        // $5
-      s(raw.deliveryOption),                       // $6
-      s(raw.serviceDetails),                       // $7
-      s(raw.additionalDesc),                       // $8
-      s(raw.phone ?? raw.phoneNumber),             // $9
-      s(raw.homepage),                             // $10
-      s(raw.instagram),                            // $11
-      s(raw.facebook),                             // $12
-      s(raw.facilities),                           // $13
-      b(raw.petsAllowed),                          // $14
-      s(raw.parking),                              // $15
-      s(raw.postalCode),                           // $16
-      s(raw.roadAddress),                          // $17
-      s(raw.detailAddress),                        // $18
+      s(raw.businessNumber),   // $1
+      s(raw.businessName),     // $2
+      s(raw.businessType),     // $3
+      s(raw.mainCategory || raw.subCategory), // $4
+      s(raw.businessHours),    // $5
+      s(raw.deliveryOption),   // $6
+      s(raw.serviceDetails),   // $7
+      s(raw.additionalDesc),   // $8
+      s(raw.phone ?? raw.phoneNumber), // $9
+      s(raw.homepage),         // $10
+      s(raw.instagram),        // $11
+      s(raw.facebook),         // $12
+      s(raw.facilities),       // $13
+      b(raw.petsAllowed),      // $14
+      s(raw.parking),          // $15
+      s(raw.postalCode),       // $16
+      s(raw.roadAddress),      // $17
+      s(raw.detailAddress),    // $18
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
