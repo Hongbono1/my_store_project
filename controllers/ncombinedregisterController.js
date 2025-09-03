@@ -163,15 +163,9 @@ export async function createCombinedStore(req, res) {
     for (const m of menus) {
       await client.query(
         `
-        INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
-        VALUES ($1,$2,$3,$4,$5,$6)
-        ON CONFLICT (store_id, name)
-        DO UPDATE SET
-          category    = EXCLUDED.category,
-          price       = EXCLUDED.price,
-          description = EXCLUDED.description,
-          image_url   = COALESCE(EXCLUDED.image_url, combined_menu_items.image_url)
-        `,
+    INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
+    VALUES ($1,$2,$3,$4,$5,$6)
+    `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
