@@ -316,7 +316,7 @@ export async function getFoodRegisterFull(req, res) {
               name, price, image_url, description
          FROM menu_items
         WHERE store_id = $1
-        ORDER BY category, name, price`,
+        ORDER BY id ASC`,  
       [storeId]
     );
 
