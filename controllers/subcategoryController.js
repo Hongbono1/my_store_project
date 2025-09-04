@@ -146,7 +146,13 @@ export async function getNewFoodStores(req, res) {
 }
 
 // 통합 Best Seller
-export async function getBestCombinedStores(req, res) {
+// 뷰티/통합 서브카테고리 조회
+export async function getCombinedStoresByCategory(req, res) {
+    const { category } = req.query;
+    if (!category) {
+        return res.status(400).json({ ok: false, error: "category가 필요합니다." });
+    }
+
     try {
         const result = await pool.query(
             `
@@ -156,25 +162,30 @@ export async function getBestCombinedStores(req, res) {
              cs.business_type,
              COALESCE((SELECT url FROM combined_store_images WHERE store_id = cs.id LIMIT 1), '') AS image
       FROM combined_store_info cs
-      ORDER BY cs.view_count DESC NULLS LAST, cs.created_at DESC
+      WHERE cs.business_category ILIKE $1
+      ORDER BY cs.created_at DESC
       LIMIT 20
-      `
+      `,
+            [`%${category}%`]   // 🔹 부분 검색 유지
         );
 
         const stores = result.rows.map((r) => ({
             id: r.id,
             name: r.business_name,
             category: r.category,
-            image: r.image || "/uploads/no-image.png",
             business_type: r.business_type,
+            image: r.image && r.image.trim() !== ""
+                ? r.image
+                : "/uploads/no-image.png",   // 🔹 기본 이미지 보강
         }));
 
         res.json({ ok: true, stores });
     } catch (err) {
-        console.error("getBestCombinedStores error:", err);
-        res.status(500).json({ ok: false, error: "combined Best stores 조회 실패" });
+        console.error("getCombinedStoresByCategory error:", err);
+        res.status(500).json({ ok: false, error: "combined 서브카테고리 조회 실패" });
     }
 }
+
 
 // 통합 신규 등록 (최근 7일)
 export async function getNewCombinedStores(req, res) {
