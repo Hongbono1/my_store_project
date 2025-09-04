@@ -83,14 +83,44 @@
 
     <script>
 
-        function goBack() {
-            // 단순히 무조건 뒤로가기
-            window.history.back();
+        // === 전역으로 바인딩된 이전/다음 함수 ===
+        window.goBack = function () {
+            if (document.referrer && document.referrer !== location.href) {
+                window.history.back();
+            } else {
+                window.location.href = "/category.html";
+            }
+        };
+
+        window.goNext = function () {
+            window.history.forward();
+        };
+
+        // === 헤더/푸터 동적 포함 (최상단 추가) ===
+        async function loadPartial(targetId, url) {
+            const el = document.getElementById(targetId);
+            if (!el) return;
+            try {
+                const res = await fetch(url + `?v=${Date.now()}`, { cache: "no-cache" });
+                el.innerHTML = await res.text();
+                // (옵션) partial 안 <script> 실행
+                el.querySelectorAll("script").forEach(old => {
+                    const s = document.createElement("script");
+                    [...old.attributes].forEach(a => s.setAttribute(a.name, a.value));
+                    s.textContent = old.textContent || "";
+                    old.replaceWith(s);
+                });
+            } catch (e) {
+                console.warn("partial load failed:", url, e);
+            }
         }
 
-        function goNext() {
-            window.history.forward();
-        }
+        // 레지스터와 동일한 경로 사용
+        await loadPartial("header-placeholder", "/components/header.html");
+        await loadPartial("footer-placeholder", "/components/footer.html");
+
+        document.getElementById('header-placeholder')?.style.setProperty('display', 'contents');
+        document.getElementById('footer-placeholder')?.style.setProperty('display', 'contents');
         // =============================
         // 헤더/푸터 로드
         // =============================
