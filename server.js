@@ -36,6 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /* ───────────────── 정적 파일 ───────────────── */
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
+app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 /* ──────────────── 사업자 인증 프록시 (항상 200 반환) ─────────────── */
