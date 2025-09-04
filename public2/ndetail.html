@@ -696,12 +696,17 @@
                 if (!menus.length) {
                     menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
                 } else {
-                    const byCat = {};
+                    const byCat = new Map();
+
+                    // 입력 순서대로 카테고리 그룹 만들기
                     menus.forEach(it => {
                         const cat = (it.category || "").toString().trim() || "기타";
-                        (byCat[cat] ||= []).push(it);
+                        if (!byCat.has(cat)) byCat.set(cat, []);   // 처음 나온 카테고리만 새로 생성
+                        byCat.get(cat).push(it);
                     });
-                    Object.entries(byCat).forEach(([cat, groupItems]) => {
+
+                    // Map을 순서대로 순회
+                    byCat.forEach((groupItems, cat) => {
                         const group = document.createElement("div");
                         const title = document.createElement("h3");
                         title.textContent = "🍱 " + cat;
@@ -713,20 +718,20 @@
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                             const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
                             box.innerHTML = `
-            <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
-            <div class="flex-1 min-w-0">
-              <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-              <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
-              ${it.description ? `<div class="text-sm text-gray-500 mt-1">${escapeHtml(it.description)}</div>` : ""}
+          <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
+          <div class="flex-1 min-w-0">
+            <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
+            <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+            ${it.description ? `<div class="text-sm text-gray-500 mt-1">${escapeHtml(it.description)}</div>` : ""}
+          </div>
+          <div class="flex flex-col items-center gap-1 shrink-0">
+            <div class="flex items-center gap-1">
+              <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
+              <span class="quantity w-6 text-center">1</span>
+              <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
             </div>
-            <div class="flex flex-col items-center gap-1 shrink-0">
-              <div class="flex items-center gap-1">
-                <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
-                <span class="quantity w-6 text-center">1</span>
-                <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
-              </div>
-              <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
-            </div>`;
+            <button class="addBtn px-3 py-1 bg-blue-600 text-white text-sm rounded">담기</button>
+          </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
                             box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
@@ -763,7 +768,7 @@
         const storeId = params.get("id");
 
         console.log("가져온 storeId:", storeId);
-        
+
 
     </script>
 </body>
