@@ -7,25 +7,25 @@ import pool from "../db.js";
  */
 export async function registerHotBlog(req, res) {
     try {
-        const { title, qa_mode } = req.body;
+        const { title, store_name, category, phone, url, address, qa_mode } = req.body;
         let { qa } = req.body;
         const coverImage = req.body.coverImage || null;
 
-        // qa가 문자열이 아니면 강제로 JSON 문자열로 변환
+        // qa를 JSON 문자열로 변환
         if (qa && typeof qa !== "string") {
             try {
                 qa = JSON.stringify(qa);
-            } catch (e) {
-                console.error("[registerHotBlog] qa stringify 실패:", e);
-                qa = "[]"; // 안전 fallback
+            } catch {
+                qa = "[]";
             }
         }
 
         const result = await pool.query(
-            `INSERT INTO hotblogs (title, qa_mode, qa, cover_image, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
+            `INSERT INTO hotblogs 
+       (title, cover_image, store_name, category, phone, url, address, qa_mode, qa, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
        RETURNING id`,
-            [title, qa_mode, qa || "[]", coverImage]
+            [title, coverImage, store_name, category, phone, url, address, qa_mode, qa]
         );
 
         res.json({ success: true, id: result.rows[0].id });
