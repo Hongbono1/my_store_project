@@ -25,6 +25,8 @@
                 -6px -6px 12px rgba(255, 255, 255, 1);
         }
     </style>
+
+    
 </head>
 
 <body class="bg-gray-100 text-gray-800">
@@ -33,7 +35,7 @@
     <div id="header-placeholder"></div>
 
     <!-- 상단 띠배너 -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
         <div class="neo-card h-28 flex flex-col items-center justify-center text-center cursor-pointer">
             <p class="text-lg sm:text-xl md:text-2xl font-bold">네이버에 새집마련</p>
             <p class="text-gray-600 text-sm sm:text-base">내 취향을 기록할 새로운 공간</p>
@@ -115,48 +117,42 @@
                 <div class="flex justify-center gap-6 w-full">
                     <!-- 카드 1 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
                     </div>
                     <!-- 카드 2 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
                     </div>
                     <!-- 카드 3 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
                     </div>
                     <!-- 카드 4 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
                     </div>
                     <!-- 카드 5 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
                     </div>
                     <!-- 카드 6 -->
                     <div class="w-32 sm:w-40 text-center">
-                        <div
-                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
                         <p class="text-xs sm:text-sm text-gray-400">업종</p>
@@ -310,7 +306,7 @@
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             /* ───────── header/footer 불러오기 ───────── */
             fetch("/components/header.html")
                 .then(res => res.text())
@@ -320,163 +316,95 @@
                 .then(res => res.text())
                 .then(data => document.getElementById("footer-placeholder").innerHTML = data);
 
-            document.addEventListener("DOMContentLoaded", async () => {
+            /* ───────── Best Pick 슬라이더 ───────── */
+            let allStores = [];
+            try {
                 const res = await fetch("/api/best-pick");
-                const allStores = await res.json(); // [{id, image, name, category}, ...]
-
-                const viewport = document.getElementById("bestViewport");
-                const track = document.getElementById("bestTrack");
-                let index = 0;
-                let groups = [];
-
-                // 1) 배열 셔플
-                function shuffle(array) {
-                    return array.sort(() => 0.5 - Math.random());
+                if (res.ok) {
+                    allStores = await res.json(); // [{id, image, name, category}, ...]
                 }
+            } catch (e) {
+                console.error("API 요청 실패", e);
+            }
 
-                // 2) 18개 → 6개씩 그룹화
-                function makeGroups() {
-                    const shuffled = shuffle([...allStores]);
-                    const result = [];
-                    for (let i = 0; i < shuffled.length; i += 6) {
-                        result.push(shuffled.slice(i, i + 6));
-                    }
-                    return result;
+            // 데이터 없으면 샘플 더미
+            if (!allStores || allStores.length === 0) {
+                allStores = Array.from({ length: 18 }, (_, i) => ({
+                    id: i + 1,
+                    name: `샘플 ${i + 1}`,
+                    category: "업종",
+                    image: "/uploads/no-image.png"
+                }));
+            }
+
+            const track = document.getElementById("bestTrack");
+            let index = 0;
+            let groups = [];
+
+            // 배열 셔플
+            function shuffle(array) {
+                return array.sort(() => 0.5 - Math.random());
+            }
+
+            // 18개 → 6개씩 그룹화
+            function makeGroups() {
+                const shuffled = shuffle([...allStores]);
+                const result = [];
+                for (let i = 0; i < shuffled.length; i += 6) {
+                    result.push(shuffled.slice(i, i + 6));
                 }
+                return result;
+            }
 
-                // 3) 그룹 HTML
-                function createGroup(stores) {
-                    const group = document.createElement("div");
-                    group.className = "flex justify-center gap-6 basis-full shrink-0";
-                    stores.forEach(store => {
-                        const card = document.createElement("a");
-                        card.href = `detail.html?id=${store.id}`;
-                        card.className = "block text-center w-28 sm:w-40";
-                        card.innerHTML = `
+            // 그룹 HTML 생성
+            function createGroup(stores) {
+                const group = document.createElement("div");
+                group.className = "flex justify-center gap-6 basis-full shrink-0";
+                stores.forEach(store => {
+                    const card = document.createElement("a");
+                    card.href = `detail.html?id=${store.id}`;
+                    card.className = "block text-center w-28 sm:w-40";
+                    card.innerHTML = `
         <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
           <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
         </div>
         <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
         <p class="text-xs sm:text-sm text-gray-600">${store.category}</p>
       `;
-                        group.appendChild(card);
-                    });
-                    return group;
-                }
+                    group.appendChild(card);
+                });
+                return group;
+            }
 
-                document.addEventListener("DOMContentLoaded", async () => {
-                    const res = await fetch("/api/best-pick");
-                    const allStores = await res.json(); // [{id, image, name, category}, ...]
-
-                    const viewport = document.getElementById("bestViewport");
-                    const track = document.getElementById("bestTrack");
-                    let index = 0;
-                    let groups = [];
-
-                    // 1) 배열 셔플
-                    function shuffle(array) {
-                        return array.sort(() => 0.5 - Math.random());
-                    }
-
-                    // 2) 18개 → 6개씩 그룹화
-                    function makeGroups() {
-                        const shuffled = shuffle([...allStores]);
-                        const result = [];
-                        for (let i = 0; i < shuffled.length; i += 6) {
-                            result.push(shuffled.slice(i, i + 6));
-                        }
-                        return result;
-                    }
-
-                    // 3) 그룹 HTML
-                    function createGroup(stores) {
-                        const group = document.createElement("div");
-                        group.className = "flex justify-center gap-6 basis-full shrink-0";
-                        stores.forEach(store => {
-                            const card = document.createElement("a");
-                            card.href = `detail.html?id=${store.id}`;
-                            card.className = "block text-center w-28 sm:w-40";
-                            card.innerHTML = `
-        <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-          <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
-        </div>
-        <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
-        <p class="text-xs sm:text-sm text-gray-600">${store.category}</p>
-      `;
-                            group.appendChild(card);
-                        });
-                        return group;
-                    }
-
-                    // 4) 그룹 렌더링
-                    function renderGroup() {
-                        // 그룹 다 보여줬으면 다시 셔플
-                        if (index >= groups.length) {
-                            groups = makeGroups();
-                            index = 0;
-                        }
-
-                        track.innerHTML = ""; // 기존 제거
-                        const group = createGroup(groups[index]);
-                        track.appendChild(group);
-                    }
-
-                    // 5) 슬라이드 이동
-                    function nextSlide() {
-                        index++;
-                        renderGroup();
-                    }
-
-                    // 버튼
-                    document.getElementById("bestNext").addEventListener("click", nextSlide);
-                    document.getElementById("bestPrev").addEventListener("click", () => {
-                        index = index > 0 ? index - 1 : 0;
-                        renderGroup();
-                    });
-
-                    // 자동 4초마다 실행
-                    setInterval(nextSlide, 4000);
-
-                    // 초기
+            // 그룹 렌더링
+            function renderGroup() {
+                if (index >= groups.length) {
                     groups = makeGroups();
-                    renderGroup();
-                });
-
-                // 4) 그룹 렌더링
-                function renderGroup() {
-                    // 그룹 다 보여줬으면 다시 셔플
-                    if (index >= groups.length) {
-                        groups = makeGroups();
-                        index = 0;
-                    }
-
-                    track.innerHTML = ""; // 기존 제거
-                    const group = createGroup(groups[index]);
-                    track.appendChild(group);
+                    index = 0;
                 }
+                track.innerHTML = "";
+                track.appendChild(createGroup(groups[index]));
+            }
 
-                // 5) 슬라이드 이동
-                function nextSlide() {
-                    index++;
-                    renderGroup();
-                }
+            // 다음 슬라이드
+            function nextSlide() {
+                index++;
+                renderGroup();
+            }
 
-                // 버튼
-                document.getElementById("bestNext").addEventListener("click", nextSlide);
-                document.getElementById("bestPrev").addEventListener("click", () => {
-                    index = index > 0 ? index - 1 : 0;
-                    renderGroup();
-                });
-
-                // 자동 4초마다 실행
-                setInterval(nextSlide, 4000);
-
-                // 초기
-                groups = makeGroups();
+            // 버튼 이벤트
+            document.getElementById("bestNext").addEventListener("click", nextSlide);
+            document.getElementById("bestPrev").addEventListener("click", () => {
+                index = index > 0 ? index - 1 : 0;
                 renderGroup();
             });
 
+            // 자동 4초마다 실행
+            setInterval(nextSlide, 4000);
 
+            // 초기 그룹 렌더링
+            groups = makeGroups();
+            renderGroup();
 
             /* ───────── 박스 데이터 렌더링 (검색어/뉴스/이벤트/추천) ───────── */
             const data = {
@@ -515,9 +443,7 @@
         function goNext() {
             window.history.forward();
         }
-
     </script>
-
 
 </body>
 
