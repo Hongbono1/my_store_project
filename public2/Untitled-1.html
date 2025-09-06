@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>홍보 블로그 상세</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-4xl mx-auto p-6 bg-white shadow rounded mt-8">
+
+    <!-- 제목 / 날짜 -->
+    <h1 id="title" class="text-3xl font-bold mb-2 text-center"></h1>
+    <p id="meta" class="text-gray-500 text-sm text-center mb-6"></p>
+
+    <!-- 대표 이미지 -->
+    <div class="mb-10">
+      <img id="coverImage" class="w-full h-72 object-cover rounded shadow" alt="대표 이미지">
+    </div>
+
+    <!-- 질문/답변 섹션 -->
+    <div id="qaArea" class="space-y-16"></div>
+
+    <!-- 하단 버튼 -->
+    <div class="mt-12 flex justify-between">
+      <a href="hotbloglist.html"
+         class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">목록으로</a>
+      <div class="space-x-2">
+        <button class="bg-yellow-400 text-white px-4 py-2 rounded">카카오톡 공유</button>
+        <button class="bg-green-500 text-white px-4 py-2 rounded">네이버 공유</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadBlog() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get("id");
+      if (!id) {
+        alert("잘못된 접근입니다.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/hotblog/${id}`);
+        const data = await res.json();
+        if (!data.success) {
+          alert("블로그를 불러올 수 없습니다.");
+          return;
+        }
+
+        const blog = data.blog;
+
+        // 제목 / 날짜
+        document.getElementById("title").textContent = blog.title;
+        document.getElementById("meta").textContent =
+          new Date(blog.created_at).toLocaleDateString("ko-KR");
+
+        // 대표 이미지
+        if (blog.cover_image) {
+          document.getElementById("coverImage").src = blog.cover_image;
+        } else {
+          document.getElementById("coverImage").style.display = "none";
+        }
+
+        // 질문/답변
+        const qaList = JSON.parse(blog.qa || "[]");
+        const qaArea = document.getElementById("qaArea");
+
+        qaArea.innerHTML = qaList.map((item, i) => {
+          const isEven = i % 2 === 1; // 홀짝 → 좌우 번갈아
+          const rotation = i % 3 === 0
+            ? "rotate-45"
+            : (i % 3 === 1 ? "rotate-12" : "-rotate-12");
+
+          return `
+            <div class="flex items-center gap-8 ${isEven ? "flex-row-reverse" : ""}">
+              <!-- 사진 -->
+              <div class="w-40 h-40 relative">
+                ${item.image
+                  ? `<img src="${item.image}" class="w-full h-full object-cover rounded transform ${rotation} shadow-xl">`
+                  : `<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 transform ${rotation}">No Image</div>`
+                }
+              </div>
+              <!-- 질문/답변 -->
+              <div>
+                <p class="font-bold text-lg mb-2">${item.question}</p>
+                <p class="text-gray-700 whitespace-pre-line">${item.answer}</p>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+      } catch (err) {
+        alert("서버 연결 실패");
+      }
+    }
+
+    loadBlog();
+  </script>
+</body>
+</html>

@@ -1,22 +1,12 @@
 import { Router } from "express";
-import multer from "multer";
-import path from "path";
-import * as hotblogController from "../controllers/hotblogController.js";
+import * as hotblogCtrl from "../controllers/hotblogController.js";
 
 const router = Router();
 
-/* 파일 업로드 설정 */
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, "uploads"),
-    filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
-const upload = multer({ storage });
+// 홍보 블로그 등록
+router.post("/register", hotblogCtrl.registerHotBlog);
 
-/* 블로그 등록 */
-router.post(
-    "/register",
-    upload.any(), // coverImage + q&a 이미지들
-    hotblogController.registerHotBlog
-);
+// 홍보 블로그 상세 조회
+router.get("/:id", hotblogCtrl.getHotBlog);
 
 export default router;

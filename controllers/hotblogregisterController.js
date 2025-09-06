@@ -1,41 +1,41 @@
 import pool from "../db.js";
-import path from "path";
 
-const toWeb = (file) => (file ? "/uploads/" + path.basename(file.filename) : null);
-
+// 블로그 등록
 export async function registerHotBlog(req, res) {
-    const client = await pool.connect();
     try {
-        const { mode, title, category, content } = req.body;
+        const { title, qa_mode, qa } = req.body;
+        const coverImage = req.body.coverImage || null;
 
-        const coverFile = req.files.find(f => f.fieldname === "coverImage");
-        const coverImage = coverFile ? toWeb(coverFile) : null;
-
-        // 질문/답변/이미지 데이터 JSON 묶기
-        const qa = [];
-        for (const [key, val] of Object.entries(req.body)) {
-            if (/_q\d+/.test(key)) {
-                qa.push({ field: key, value: val });
-            }
-        }
-        req.files.forEach(f => {
-            if (/_q\d+_image/.test(f.fieldname)) {
-                qa.push({ field: f.fieldname, value: toWeb(f) });
-            }
-        });
-
-        const result = await client.query(
-            `INSERT INTO hot_blogs (mode, title, cover_image, category, content, qa)
-       VALUES ($1,$2,$3,$4,$5,$6)
+        const result = await pool.query(
+            `INSERT INTO hotblogs (title, qa_mode, qa, cover_image, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
        RETURNING id`,
-            [mode, title, coverImage, category || null, content || null, JSON.stringify(qa)]
+            [title, qa_mode, qa, coverImage]
         );
 
         res.json({ success: true, id: result.rows[0].id });
     } catch (err) {
-        console.error("[hotblog] insert error", err);
-        res.status(500).json({ success: false, error: "DB insert failed" });
-    } finally {
-        client.release();
+        console.error("[registerHotBlog]", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+}
+
+// 블로그 조회
+export async function getHotBlog(req, res) {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT * FROM hotblogs WHERE id = $1`,
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: "not_found" });
+        }
+
+        res.json({ success: true, blog: result.rows[0] });
+    } catch (err) {
+        console.error("[getHotBlog]", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 }
