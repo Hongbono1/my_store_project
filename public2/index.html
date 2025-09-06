@@ -108,8 +108,61 @@
 
         <!-- 뷰포트 -->
         <div id="bestViewport" class="relative overflow-hidden">
-            <!-- 트랙 (JS에서 동적으로 그룹이 채워짐) -->
-            <div id="bestTrack" class="flex transition-transform duration-500 ease-in-out will-change-transform"></div>
+            <!-- 트랙 (JS에서 실제 데이터로 교체됨) -->
+            <div id="bestTrack" class="flex transition-transform duration-500 ease-in-out will-change-transform">
+
+                <!-- ✅ 기본 placeholder 그룹 (6개 카드) -->
+                <div class="flex justify-center gap-6 w-full">
+                    <!-- 카드 1 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                    <!-- 카드 2 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                    <!-- 카드 3 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                    <!-- 카드 4 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                    <!-- 카드 5 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                    <!-- 카드 6 -->
+                    <div class="w-32 sm:w-40 text-center">
+                        <div
+                            class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto">
+                        </div>
+                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
+                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
+                    </div>
+                </div>
+            </div>
 
             <!-- 좌/우 버튼 -->
             <button id="bestPrev"
@@ -311,6 +364,84 @@
                     return group;
                 }
 
+                document.addEventListener("DOMContentLoaded", async () => {
+                    const res = await fetch("/api/best-pick");
+                    const allStores = await res.json(); // [{id, image, name, category}, ...]
+
+                    const viewport = document.getElementById("bestViewport");
+                    const track = document.getElementById("bestTrack");
+                    let index = 0;
+                    let groups = [];
+
+                    // 1) 배열 셔플
+                    function shuffle(array) {
+                        return array.sort(() => 0.5 - Math.random());
+                    }
+
+                    // 2) 18개 → 6개씩 그룹화
+                    function makeGroups() {
+                        const shuffled = shuffle([...allStores]);
+                        const result = [];
+                        for (let i = 0; i < shuffled.length; i += 6) {
+                            result.push(shuffled.slice(i, i + 6));
+                        }
+                        return result;
+                    }
+
+                    // 3) 그룹 HTML
+                    function createGroup(stores) {
+                        const group = document.createElement("div");
+                        group.className = "flex justify-center gap-6 basis-full shrink-0";
+                        stores.forEach(store => {
+                            const card = document.createElement("a");
+                            card.href = `detail.html?id=${store.id}`;
+                            card.className = "block text-center w-28 sm:w-40";
+                            card.innerHTML = `
+        <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+          <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
+        </div>
+        <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
+        <p class="text-xs sm:text-sm text-gray-600">${store.category}</p>
+      `;
+                            group.appendChild(card);
+                        });
+                        return group;
+                    }
+
+                    // 4) 그룹 렌더링
+                    function renderGroup() {
+                        // 그룹 다 보여줬으면 다시 셔플
+                        if (index >= groups.length) {
+                            groups = makeGroups();
+                            index = 0;
+                        }
+
+                        track.innerHTML = ""; // 기존 제거
+                        const group = createGroup(groups[index]);
+                        track.appendChild(group);
+                    }
+
+                    // 5) 슬라이드 이동
+                    function nextSlide() {
+                        index++;
+                        renderGroup();
+                    }
+
+                    // 버튼
+                    document.getElementById("bestNext").addEventListener("click", nextSlide);
+                    document.getElementById("bestPrev").addEventListener("click", () => {
+                        index = index > 0 ? index - 1 : 0;
+                        renderGroup();
+                    });
+
+                    // 자동 4초마다 실행
+                    setInterval(nextSlide, 4000);
+
+                    // 초기
+                    groups = makeGroups();
+                    renderGroup();
+                });
+
                 // 4) 그룹 렌더링
                 function renderGroup() {
                     // 그룹 다 보여줬으면 다시 셔플
@@ -344,6 +475,8 @@
                 groups = makeGroups();
                 renderGroup();
             });
+
+
 
             /* ───────── 박스 데이터 렌더링 (검색어/뉴스/이벤트/추천) ───────── */
             const data = {
@@ -382,6 +515,7 @@
         function goNext() {
             window.history.forward();
         }
+
     </script>
 
 
