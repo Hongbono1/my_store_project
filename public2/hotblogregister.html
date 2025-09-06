@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>홍보 블로그 작성</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="max-w-4xl mx-auto p-6">
+        <h1 class="text-2xl font-bold mb-6 flex justify-center">✍️ 홍보 블로그 작성</h1>
+
+        <!-- 작성 방식 선택 -->
+        <div class="mb-6 space-x-4 flex justify-center">
+            <label><input type="radio" name="mode" value="theme" checked> 오늘의 테마 추천</label>
+            <label><input type="radio" name="mode" value="random"> 오늘의 랜덤 추천</label>
+            <label><input type="radio" name="mode" value="self"> 내가 묻고 내가 답하는 방식</label>
+        </div>
+
+        <!-- 공통 폼 -->
+        <form id="blogForm" enctype="multipart/form-data" class="space-y-6 bg-white p-6 rounded shadow">
+            <div>
+                <label class="block mb-2 font-semibold">제목</label>
+                <input type="text" name="title" class="w-full border rounded p-2" required>
+            </div>
+
+            <div>
+                <label class="block mb-2 font-semibold">대표 이미지</label>
+                <input type="file" name="coverImage" accept="image/*" class="w-full border rounded p-2" required>
+            </div>
+
+            <!-- 질문/답변 영역 -->
+            <div id="qaSection" class="space-y-4"></div>
+
+            <div class="flex justify-center mb-6">
+                <button form="blogForm" type="submit"
+                    class="bg-blue-600 text-white px-8 py-2 rounded-lg shadow hover:bg-blue-700">
+                    저장하기
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        /* ===== 질문 세트 ===== */
+        const themeQuestions = [
+            "오늘의 테마와 가게가 잘 맞는 이유는 무엇인가요?",
+            "이 테마와 어울리는 대표 메뉴(또는 서비스)는 무엇인가요?",
+            "계절·날씨·상황과 잘 어울리는 부분은 무엇인가요?",
+            "이 테마에서 손님들이 가장 좋아하는 점은 무엇인가요?",
+            "테마와 관련된 특별 이벤트나 혜택이 있나요?",
+            "테마와 어울리는 공간(분위기/인테리어)이 있다면 소개해주세요.",
+            "손님들에게 이 테마를 꼭 추천하고 싶은 이유는 무엇인가요?",
+            "사장님이 생각하는 ‘오늘의 테마’와 가게의 핵심 매력은 무엇인가요?"
+        ];
+
+        const randomQuestions = [
+            "가게의 대표 메뉴(또는 서비스)는 무엇인가요?",
+            "단골손님들이 가장 많이 찾는 이유는 무엇인가요?",
+            "처음 방문하는 손님들에게 꼭 추천하고 싶은 것은 무엇인가요?",
+            "가게 운영에 있어 가장 중요하게 생각하는 가치는 무엇인가요?",
+            "우리 가게만의 특별한 서비스나 자랑거리는 무엇인가요?",
+            "손님들에게 가장 많이 듣는 칭찬은 무엇인가요?",
+            "앞으로 손님들에게 어떤 가게로 기억되고 싶으신가요?",
+            "사장님이 생각하는 우리 가게의 가장 큰 매력은 무엇인가요?"
+        ];
+
+        const qaSection = document.getElementById("qaSection");
+        const modeRadios = document.querySelectorAll("input[name='mode']");
+
+        /* ===== 운영자형 질문 카드 생성 ===== */
+        function makeQaCards(list, type) {
+            return list.map((q, i) => `
+        <div class="border rounded-xl p-4 shadow bg-gray-50 mb-4">
+          <label class="block font-bold mb-1">Q${i + 1}. ${q}</label>
+          <textarea name="${type}_q${i + 1}_answer" rows="3" maxlength="300"
+                    class="w-full border rounded px-3 py-2 mb-2"
+                    placeholder="답변을 입력해주세요"></textarea>
+          <label class="block font-bold mb-1">사진 (선택)</label>
+          <input type="file" name="${type}_q${i + 1}_image" accept="image/*"
+                 class="border rounded px-3 py-2 w-full">
+        </div>
+      `).join('');
+        }
+
+        /* ===== 업주 자가형 관리 ===== */
+        let customQaList = [{ question: "", answer: "" }];
+
+        function renderCustomQa() {
+            qaSection.innerHTML = customQaList.map((item, i) => `
+        <div class="border rounded-xl p-4 shadow bg-gray-50 mb-4 relative">
+          <label class="block font-bold mb-1">질문 ${i + 1}</label>
+          <input type="text" name="custom_q${i + 1}_question"
+                 class="w-full border rounded px-3 py-2 mb-2"
+                 maxlength="100" placeholder="질문을 입력하세요" required
+                 value="${item.question}">
+          <label class="block font-bold mb-1">답변</label>
+          <textarea name="custom_q${i + 1}_answer" rows="3" maxlength="500"
+                    class="w-full border rounded px-3 py-2 mb-2"
+                    placeholder="답변을 입력하세요" required>${item.answer}</textarea>
+          <label class="block font-bold mb-1">사진 (선택)</label>
+          <input type="file" name="custom_q${i + 1}_image" accept="image/*"
+                 class="border rounded px-3 py-2 w-full">
+          ${i > 0 ? `<button type="button" onclick="removeCustomQa(${i})"
+                     class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold">×</button>` : ""}
+        </div>
+      `).join('') + `
+        <div class="flex justify-center mt-4">
+          <button type="button" onclick="addCustomQa()"
+            class="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600">+ 질문/답변 추가</button>
+        </div>
+      `;
+        }
+
+        window.addCustomQa = function () {
+            if (customQaList.length >= 8) return alert("최대 8개까지만 작성할 수 있습니다!");
+            customQaList.push({ question: "", answer: "" });
+            renderCustomQa();
+        };
+
+        window.removeCustomQa = function (i) {
+            customQaList.splice(i, 1);
+            renderCustomQa();
+        };
+
+        /* ===== 모드 토글 ===== */
+        function setMode(mode) {
+            if (mode === "theme") {
+                qaSection.innerHTML = makeQaCards(themeQuestions, "theme");
+            } else if (mode === "random") {
+                qaSection.innerHTML = makeQaCards(randomQuestions, "random");
+            } else if (mode === "self") {
+                customQaList = [{ question: "", answer: "" }];
+                renderCustomQa();
+            }
+        }
+
+        modeRadios.forEach(radio => {
+            radio.addEventListener("change", () => setMode(radio.value));
+        });
+
+        // 기본: 테마 모드
+        setMode("theme");
+
+        /* ===== 폼 제출 ===== */
+        document.getElementById("blogForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            try {
+                const res = await fetch("/api/blog/register", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("등록 완료!");
+                    location.href = `/blogdetail.html?id=${data.blog_id}`;
+                } else {
+                    alert("등록 실패: " + (data.error || "다시 시도해주세요"));
+                }
+            } catch (err) {
+                alert("서버 연결 실패");
+            }
+        });
+
+        /* ===== 폼 제출 ===== */
+        document.getElementById("blogForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            try {
+                const res = await fetch("/api/hotblog/register", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("등록 완료!");
+                    location.href = `/hotblogdetail.html?id=${data.id}`;
+                } else {
+                    alert("등록 실패: " + (data.error || "다시 시도해주세요"));
+                }
+            } catch (err) {
+                alert("서버 연결 실패");
+            }
+        });
+
+    </script>
+</body>
+
+</html>
