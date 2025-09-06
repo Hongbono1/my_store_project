@@ -101,7 +101,7 @@ app.use("/combined", ncombinedregister);
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
 
-console.log("[boot] mounting /api/hotblog -> hotblogRouter");
+console.log("[boot] mounting /api/hotblog -> hotblogregister");
 app.use("/api/hotblog", hotblogRouter);
 
 /* ───────────────── 헬스체크 ───────────────── */
