@@ -1,19 +1,31 @@
+// controllers/hotblogregisterController.js
 import pool from "../db.js";
 
-// 블로그 등록
+/**
+ * 홍보 블로그 등록
+ * - qa는 항상 JSON.stringify() 해서 저장
+ */
 export async function registerHotBlog(req, res) {
     try {
         const { title, qa_mode } = req.body;
-        const qa = req.body.qa ? JSON.stringify(req.body.qa) : null;
+        let { qa } = req.body;
+        const coverImage = req.body.coverImage || null;
 
-        // 파일 업로드가 multer로 처리된 경우
-        const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
+        // qa가 문자열이 아니면 강제로 JSON 문자열로 변환
+        if (qa && typeof qa !== "string") {
+            try {
+                qa = JSON.stringify(qa);
+            } catch (e) {
+                console.error("[registerHotBlog] qa stringify 실패:", e);
+                qa = "[]"; // 안전 fallback
+            }
+        }
 
         const result = await pool.query(
             `INSERT INTO hotblogs (title, qa_mode, qa, cover_image, created_at)
        VALUES ($1, $2, $3, $4, NOW())
        RETURNING id`,
-            [title, qa_mode, qa, coverImage]
+            [title, qa_mode, qa || "[]", coverImage]
         );
 
         res.json({ success: true, id: result.rows[0].id });
@@ -23,7 +35,9 @@ export async function registerHotBlog(req, res) {
     }
 }
 
-// 블로그 조회
+/**
+ * 홍보 블로그 단일 조회
+ */
 export async function getHotBlog(req, res) {
     try {
         const { id } = req.params;
@@ -36,14 +50,13 @@ export async function getHotBlog(req, res) {
             return res.status(404).json({ success: false, error: "not_found" });
         }
 
-        // qa 필드는 JSON.parse 해서 클라이언트에 전달
         const blog = result.rows[0];
-        if (blog.qa) {
-            try {
-                blog.qa = JSON.parse(blog.qa);
-            } catch {
-                // 파싱 실패 시 그대로 둠
-            }
+
+        // qa를 JSON.parse 해서 객체/배열로 반환 (프론트에서 그대로 사용 가능)
+        try {
+            blog.qa = JSON.parse(blog.qa || "[]");
+        } catch {
+            blog.qa = [];
         }
 
         res.json({ success: true, blog });
