@@ -3,8 +3,11 @@ import pool from "../db.js";
 // 블로그 등록
 export async function registerHotBlog(req, res) {
     try {
-        const { title, qa_mode, qa } = req.body;
-        const coverImage = req.body.coverImage || null;
+        const { title, qa_mode } = req.body;
+        const qa = req.body.qa ? JSON.stringify(req.body.qa) : null;
+
+        // 파일 업로드가 multer로 처리된 경우
+        const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
 
         const result = await pool.query(
             `INSERT INTO hotblogs (title, qa_mode, qa, cover_image, created_at)
@@ -33,7 +36,17 @@ export async function getHotBlog(req, res) {
             return res.status(404).json({ success: false, error: "not_found" });
         }
 
-        res.json({ success: true, blog: result.rows[0] });
+        // qa 필드는 JSON.parse 해서 클라이언트에 전달
+        const blog = result.rows[0];
+        if (blog.qa) {
+            try {
+                blog.qa = JSON.parse(blog.qa);
+            } catch {
+                // 파싱 실패 시 그대로 둠
+            }
+        }
+
+        res.json({ success: true, blog });
     } catch (err) {
         console.error("[getHotBlog]", err);
         res.status(500).json({ success: false, error: err.message });

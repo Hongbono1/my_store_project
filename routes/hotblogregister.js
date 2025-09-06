@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as hotblogCtrl from "../controllers/hotblogController.js";
+import * as hotblogCtrl from "../controllers/hotblogregisterController.js"; // ✅ 파일명 맞춤
 
 const router = Router();
 
