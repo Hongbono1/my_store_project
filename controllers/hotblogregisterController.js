@@ -77,9 +77,9 @@ export async function registerHotBlog(req, res) {
         const result = await pool.query(
             `
       INSERT INTO hotblogs
-        (user_id, title, store_name, category, qa_mode, qa, phone, url, cover_image, created_at)
-      VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+         (user_id, title, store_name, category, qa_mode, qa, phone, url, cover_image, created_at)
+       VALUES
+         ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9, now())
       RETURNING id
       `,
             [userId, title, store_name, category, qa_mode, JSON.stringify(qa), phone || null, url || null, coverImage]
