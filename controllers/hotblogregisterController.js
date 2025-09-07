@@ -27,7 +27,17 @@ const RANDOM_QUESTIONS = [
 /** 홍보 블로그 등록 */
 export async function registerHotBlog(req, res) {
     try {
-        const { title, store_name, category, qa_mode, phone, url } = req.body || {};
+        const { title, store_name, category, phone, url } = req.body || {};
+        let { qa_mode } = req.body || {};
+
+        // ✅ qa_mode 자동 감지 (프런트 누락/구버전 폼 대비)
+        if (!qa_mode) {
+            const keys = Object.keys(req.body || {});
+            if (keys.some(k => k.startsWith("theme_q"))) qa_mode = "theme";
+            else if (keys.some(k => k.startsWith("random_q"))) qa_mode = "random";
+            else if (keys.some(k => k.startsWith("custom_q"))) qa_mode = "self";
+        }
+
         if (!title || !store_name || !category || !qa_mode) {
             return res.status(400).json({
                 success: false,
