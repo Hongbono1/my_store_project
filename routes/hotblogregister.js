@@ -8,7 +8,7 @@ const router = Router();
 const upload = multer({ dest: "uploads/" });
 
 // 홍보 블로그 등록 (대표이미지 coverImage 1장)
-router.post("/register", upload.single("coverImage"), hotblogCtrl.registerHotBlog);
+router.post("/register", upload.any(), hotblogCtrl.registerHotBlog);
 
 // 홍보 블로그 상세 조회
 router.get("/:id", hotblogCtrl.getHotBlog);
