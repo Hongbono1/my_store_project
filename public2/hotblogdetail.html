@@ -2,8 +2,8 @@
 <html lang="ko">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>홍보 블로그 상세</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -15,9 +15,12 @@
     <p id="meta" class="text-gray-500 text-sm text-center mb-6"></p>
 
     <!-- 대표 이미지 -->
-    <div class="mb-8">
+    <div id="coverWrap" class="mb-8">
       <img id="coverImage" class="w-full h-60 object-cover rounded shadow" alt="대표 이미지">
     </div>
+
+    <!-- 가게 기본 정보 -->
+    <div id="info" class="mb-6 text-center space-y-1"></div>
 
     <!-- 질문/답변 섹션 -->
     <div id="qaArea" class="space-y-12"></div>
@@ -27,61 +30,23 @@
       <a href="hotbloglist.html"
         class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-300 text-sm">목록으로</a>
       <div class="space-x-2">
-        <button class="bg-yellow-400 text-white px-3 py-1.5 rounded text-sm">카카오톡 공유</button>
-        <button class="bg-green-500 text-white px-3 py-1.5 rounded text-sm">네이버 공유</button>
+        <button id="shareKakao" class="bg-yellow-400 text-white px-3 py-1.5 rounded text-sm">카카오톡 공유</button>
+        <button id="shareNaver" class="bg-green-500 text-white px-3 py-1.5 rounded text-sm">네이버 공유</button>
       </div>
     </div>
   </div>
 
   <script>
-    async function loadBlog() {
-      const params = new URLSearchParams(location.search);
-      const id = params.get("id");
-      if (!id) {
-        renderEmptyQa();
-        return;
-      }
+    const $ = (sel) => document.querySelector(sel);
 
-      try {
-        const res = await fetch(`/api/hotblog/${id}`);
-        const data = await res.json();
-        if (!data.success) {
-          renderEmptyQa();
-          return;
-        }
-
-        const blog = data.blog;
-
-        // 제목 / 날짜
-        document.getElementById("title").textContent = blog.title;
-        document.getElementById("meta").textContent =
-          new Date(blog.created_at).toLocaleDateString("ko-KR");
-
-        // 대표 이미지
-        if (blog.cover_image) {
-          document.getElementById("coverImage").src = blog.cover_image;
-        } else {
-          document.getElementById("coverImage").style.display = "none";
-        }
-
-        // 질문/답변
-        const qaList = JSON.parse(blog.qa || "[]");
-        if (qaList.length === 0) {
-          renderEmptyQa();
-          return;
-        }
-        renderQa(qaList);
-
-      } catch (err) {
-        console.error(err);
-        renderEmptyQa();
-      }
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+      );
     }
 
-    // 기본 Q/A 없을 때 보여주는 틀
     function renderEmptyQa() {
-      const qaArea = document.getElementById("qaArea");
-      qaArea.innerHTML = `
+      $("#qaArea").innerHTML = `
         <div class="flex items-center gap-8">
           <div class="w-40 h-40 relative">
             <div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 transform rotate-6 rounded-lg">
@@ -96,38 +61,99 @@
       `;
     }
 
-    // 실제 데이터 있을 때 출력
     function renderQa(qaList) {
-      const qaArea = document.getElementById("qaArea");
+      const qaArea = $("#qaArea");
       qaArea.innerHTML = qaList.map((item, i) => {
-        const isEven = i % 2 === 1; // 좌우 번갈아 배치
-        const rotation = i % 3 === 0
-          ? "rotate-6"
-          : (i % 3 === 1 ? "-rotate-6" : "rotate-12");
+        const isEven = i % 2 === 1; // 좌우 번갈아
+        const rotation = i % 3 === 0 ? "rotate-6" : (i % 3 === 1 ? "-rotate-6" : "rotate-12");
+        const q = escapeHtml(item.q);
+        const a = escapeHtml(item.a);
+        const img = item.image_url;
 
         return `
-      <div class="flex items-center gap-8 ${isEven ? "flex-row-reverse" : ""}">
-        <!-- 사진 -->
-        <div class="w-40 h-40 relative">
-          ${item.image
-            ? `<img src="${item.image}" class="w-full h-full object-cover rounded transform ${rotation} shadow-xl">`
+          <div class="flex items-center gap-8 ${isEven ? "flex-row-reverse" : ""}">
+            <!-- 사진 -->
+            <div class="w-40 h-40 relative">
+              ${img
+            ? `<img src="${img}" alt="qa-${i + 1}" class="w-full h-full object-cover rounded transform ${rotation} shadow-xl" onerror="this.replaceWith(document.createElement('div'));this.parentElement.innerHTML='<div class=&quot;w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 transform ${rotation} rounded-lg&quot;>No Image</div>';">`
             : `<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 transform ${rotation} rounded-lg">No Image</div>`
           }
-        </div>
-        <!-- 질문/답변 카드 -->
-        <div class="flex-1 space-y-2">
-          <p class="italic font-bold text-yellow-600 flex items-center gap-1">
-            💬 ${item.question || "질문 없음"}
-          </p>
-          <div class="bg-gray-100 p-3 rounded shadow text-gray-800 font-semibold">
-            ${item.answer || "답변 없음"}
+            </div>
+            <!-- 질문/답변 카드 -->
+            <div class="flex-1 space-y-2">
+              <p class="italic font-bold text-yellow-600 flex items-center gap-1">💬 ${q || "질문 없음"}</p>
+              <div class="bg-gray-100 p-3 rounded shadow text-gray-800 whitespace-pre-wrap">
+                ${a || "답변 없음"}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    `;
+        `;
       }).join("");
     }
 
+    async function loadBlog() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get("id");
+      if (!id) { renderEmptyQa(); return; }
+
+      try {
+        const res = await fetch(`/api/hotblog/${id}`);
+        const data = await res.json();
+        if (!data.success) { renderEmptyQa(); return; }
+
+        const blog = data.blog;
+
+        // 제목 / 날짜
+        $("#title").textContent = blog.title || "";
+        $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
+
+        // 대표 이미지
+        if (blog.cover_image) {
+          $("#coverImage").src = blog.cover_image;
+          $("#coverImage").alt = escapeHtml(blog.title || "cover");
+        } else {
+          $("#coverWrap").style.display = "none";
+        }
+
+        // 가게 기본 정보(가게명 / 전화 / URL)
+        const info = [];
+        if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
+        if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
+        if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
+        $("#info").innerHTML = info.join("") || "";
+
+        // 질문/답변
+        const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
+        if (!qaList.length) { renderEmptyQa(); return; }
+        renderQa(qaList);
+
+        // 공유 버튼 동작
+        const shareTitle = blog.title || "홍보 블로그";
+        const shareUrl = location.href;
+
+        async function webShareOrCopy(text, url) {
+          if (navigator.share) {
+            try { await navigator.share({ title: text, url }); return; } catch (_) { }
+          }
+          try {
+            await navigator.clipboard.writeText(url);
+            alert("링크가 복사되었습니다.");
+          } catch {
+            prompt("아래 링크를 복사하세요:", url);
+          }
+        }
+
+        $("#shareKakao").addEventListener("click", () => webShareOrCopy(shareTitle, shareUrl));
+        $("#shareNaver").addEventListener("click", () => {
+          // 네이버 공유 전용 스킴이 필요하면 교체 가능. 기본은 링크 공유/복사로 처리.
+          webShareOrCopy(shareTitle, shareUrl);
+        });
+
+      } catch (err) {
+        console.error(err);
+        renderEmptyQa();
+      }
+    }
 
     loadBlog();
   </script>

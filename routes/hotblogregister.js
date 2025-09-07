@@ -1,3 +1,4 @@
+// routes/hotblogregister.js
 import { Router } from "express";
 import multer from "multer";
 import { registerHotBlog, getHotBlog } from "../controllers/hotblogregisterController.js";
