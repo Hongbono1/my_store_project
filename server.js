@@ -1,4 +1,3 @@
-// server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -6,9 +5,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
-import foodregisterRouter from "./routes/foodregister.js";     // 음식점 전용 (/store)
-import ncombinedregister from "./routes/ncombinedregister.js"; // 통합 전용 (/combined)
-import subcategoryRouter from "./routes/subcategory.js";       // 서브카테고리 전용 (/api/subcategory)
+import foodregisterRouter from "./routes/foodregister.js";
+import ncombinedregister from "./routes/ncombinedregister.js";
+import subcategoryRouter from "./routes/subcategory.js";
 import hotblogRouter from "./routes/hotblogregister.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-/* ───────────────── 공통 미들웨어 ───────────────── */
+/* 공통 미들웨어 */
 app.use((req, res, next) => {
   req.id = randomUUID();
   res.setHeader("X-Request-Id", req.id);
@@ -35,12 +34,13 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ───────────────── 정적 파일 ───────────────── */
+/* 정적 파일 */
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-/* ──────────────── 사업자 인증 프록시 (항상 200 반환) ─────────────── */
+
+/* 사업자 인증 프록시 */
 app.post("/verify-biz", async (req, res) => {
   try {
     const body = req.body || {};
@@ -88,29 +88,25 @@ app.post("/verify-biz", async (req, res) => {
   }
 });
 
-/* ───────────────── API 라우터 (prefix로 분리) ───────────────── */
-// 음식점 등록/조회 API → /store/...
+/* API 라우터 */
 console.log("[boot] mounting /store -> foodregisterRouter");
 app.use("/store", foodregisterRouter);
 
-// 통합 등록/조회 API → /combined/...
 console.log("[boot] mounting /combined -> ncombinedregister");
 app.use("/combined", ncombinedregister);
 
-// 서브카테고리 API → /api/subcategory/...
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
 
 console.log("[boot] mounting /api/hotblog -> hotblogregister");
 app.use("/api/hotblog", hotblogRouter);
 
-/* ───────────────── 헬스체크 ───────────────── */
+/* 헬스체크 */
 app.get("/__ping", (_req, res) => res.json({ ok: true }));
 
-/* ───────────────── 라우트 목록(동적 수집) ───────────────── */
+/* 라우트 목록 */
 function collectRoutes(app) {
   const out = [];
-
   app._router?.stack?.forEach(layer => {
     if (layer.route) {
       const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase()).join(", ");
@@ -118,7 +114,6 @@ function collectRoutes(app) {
       return;
     }
     if (layer.name === "router" && layer.handle?.stack) {
-      // mount path 추출
       let mount = "";
       if (layer.regexp && layer.regexp.fast_star !== true) {
         const m = layer.regexp.toString().match(/\\\/([^\\^?]+)\\\//);
@@ -132,15 +127,11 @@ function collectRoutes(app) {
       });
     }
   });
-
   return out.sort();
 }
+app.get("/__routes", (_req, res) => res.json({ ok: true, routes: collectRoutes(app) }));
 
-app.get("/__routes", (_req, res) => {
-  res.json({ ok: true, routes: collectRoutes(app) });
-});
-
-/* ─────────────── 전역 에러 핸들러 ─────────────── */
+/* 전역 에러 핸들러 */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
@@ -152,16 +143,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
 });
 
-/* ─────────────── 404 핸들러 (API는 JSON) ─────────────── */
+/* 404 핸들러 */
 app.use((req, res) => {
-  // 🔧 /foodregister → /combined 로 반영
   if (/^(\/store|\/combined|\/api)\b/.test(req.path)) {
     return res.status(404).json({ ok: false, error: "not_found", path: req.path });
   }
-  // 그 외는 정적 404 (기본 HTML)
   res.status(404).send("<h1>Not Found</h1>");
 });
 
-/* ───────────────── 서버 시작 ───────────────── */
+/* 서버 시작 */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ server on :${PORT}`));
