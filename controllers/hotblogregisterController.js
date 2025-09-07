@@ -1,6 +1,4 @@
 // controllers/hotblogregisterController.js
-console.log("[DEBUG BODY]", req.body);
-console.log("[DEBUG FILE]", req.file);
 import pool from "../db.js";
 
 /**
@@ -9,51 +7,77 @@ import pool from "../db.js";
  */
 export async function registerHotBlog(req, res) {
     try {
-        const { title, store_name, category, qa_mode } = req.body;
-        let { qa } = req.body;
+        console.log("[DEBUG body]", req.body);
+        console.log("[DEBUG file]", req.file);
 
-        const userId = 1; // ⚠️ 현재는 로그인 시스템이 없으므로 user_id = 1로 고정
-        // 추후 로그인 기능 추가 시 req.user.id 로 교체해야 함
+        const { title, store_name, category, qa_mode, phone, url } = req.body;
+        let { qa } = req.body;
+        const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
+
+        const userId = 1; // ⚠️ 로그인 시스템 없음 → 임시 고정
 
         // qa JSON 변환
         if (qa && typeof qa !== "string") {
             try {
                 qa = JSON.stringify(qa);
-            } catch (e) {
-                console.error("[registerHotBlog] qa stringify 실패:", e);
+            } catch {
                 qa = "[]";
             }
         }
 
         const result = await pool.query(
             `
-      INSERT INTO hotblogs (user_id, title, store_name, category, qa_mode, qa, created_at)
-      VALUES ($1,$2,$3,$4,$5,$6, now())
-      ON CONFLICT (user_id)
-      DO UPDATE SET
-        title       = EXCLUDED.title,
-        store_name  = EXCLUDED.store_name,
-        category    = EXCLUDED.category,
-        qa_mode     = EXCLUDED.qa_mode,
-        qa          = EXCLUDED.qa,
-        created_at  = now()
-      RETURNING id
-      `,
-            [userId, title, store_name, category, qa_mode, qa]
+            INSERT INTO hotblogs (user_id, title, store_name, category, qa_mode, qa, phone, url, cover_image, created_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+              title       = EXCLUDED.title,
+              store_name  = EXCLUDED.store_name,
+              category    = EXCLUDED.category,
+              qa_mode     = EXCLUDED.qa_mode,
+              qa          = EXCLUDED.qa,
+              phone       = EXCLUDED.phone,
+              url         = EXCLUDED.url,
+              cover_image = EXCLUDED.cover_image,
+              created_at  = now()
+            RETURNING id
+            `,
+            [userId, title, store_name, category, qa_mode, qa, phone, url, coverImage]
         );
 
-        // 등록 or 갱신된 id 반환
         const blogId = result.rows[0].id;
 
-        res.json({
-            success: true,
-            id: blogId,
-            message: "오늘의 테마 추천 저장 완료"
-        });
+        res.json({ success: true, id: blogId, message: "홍보 블로그 저장 완료" });
     } catch (err) {
         console.error("registerHotBlog error:", err);
         res.status(500).json({ success: false, error: "DB insert/update failed" });
     }
 }
 
+/**
+ * 홍보 블로그 단일 조회
+ */
+export async function getHotBlog(req, res) {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`SELECT * FROM hotblogs WHERE id = $1`, [id]);
 
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: "not_found" });
+        }
+
+        const blog = result.rows[0];
+
+        // qa를 JSON.parse 해서 배열로 반환
+        try {
+            blog.qa = JSON.parse(blog.qa || "[]");
+        } catch {
+            blog.qa = [];
+        }
+
+        res.json({ success: true, blog });
+    } catch (err) {
+        console.error("[getHotBlog]", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+}
