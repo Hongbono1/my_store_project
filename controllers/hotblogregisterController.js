@@ -65,11 +65,11 @@ export async function registerHotBlog(req, res) {
             qa = base
                 .map((q, i) => {
                     const aRaw = req.body[`${qa_mode}_q${i + 1}_answer`] ?? "";
-                    const a = aRaw.toString().trim();
+                    const a = aRaw.toString().trim();   // ✅ 공백 제거 + 안전 처리
                     const image_url = filesByField[`${qa_mode}_q${i + 1}_image`] || null;
                     return { q, a, image_url };
                 })
-                .filter(({ a, image_url }) => a.length > 0 || image_url); // ✅ 최소 답변 또는 이미지 필요
+                .filter(({ a, image_url }) => a.length > 0 || image_url); // ✅ 답변 또는 이미지 있는 항목만 저장
 
         } else if (qa_mode === "self") {
             for (let i = 1; i <= 8; i++) {
