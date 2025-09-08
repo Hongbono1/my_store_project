@@ -30,10 +30,10 @@ export async function registerHotBlog(req, res) {
         const { title, store_name, category, phone, url } = req.body || {};
         let { qa_mode } = req.body || {};
 
-        // 들어온 key 확인(디버깅)
+        // 들어온 key 확인
         console.log("[hotblog/register] keys:", Object.keys(req.body || {}));
 
-        // ✅ qa_mode 자동감지 (라디오 누락/옛 폼 대비)
+        // ✅ qa_mode 자동감지
         if (!qa_mode) {
             const keys = Object.keys(req.body || {});
             if (keys.some(k => k.startsWith("theme_q"))) qa_mode = "theme";
@@ -51,11 +51,13 @@ export async function registerHotBlog(req, res) {
 
         // 파일 맵 (필드명 → 업로드 URL)
         const filesByField = {};
-        (req.files || []).forEach(f => { filesByField[f.fieldname] = `/uploads/${f.filename}`; });
+        (req.files || []).forEach(f => {
+            filesByField[f.fieldname] = `/uploads/${f.filename}`;
+        });
 
         const coverImage = filesByField["coverImage"] || null;
 
-        // ✅ 서버가 직접 QA 구성 (q/a/image_url)
+        // ✅ 서버가 직접 QA 구성
         let qa = [];
         if (qa_mode === "theme" || qa_mode === "random") {
             const base = qa_mode === "theme" ? THEME_QUESTIONS : RANDOM_QUESTIONS;
@@ -90,9 +92,9 @@ export async function registerHotBlog(req, res) {
         const userId = 1; // TODO: 로그인 붙이면 교체
         const result = await pool.query(
             `INSERT INTO hotblogs
-         (user_id, title, store_name, category, qa_mode, qa, phone, url, cover_image, created_at)
+       (user_id, title, store_name, category, qa_mode, qa, phone, url, cover_image, created_at)
        VALUES
-         ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9, now())
+       ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9, now())
        RETURNING id`,
             [userId, title, store_name, category, qa_mode, JSON.stringify(qa), phone || null, url || null, coverImage]
         );
@@ -112,7 +114,18 @@ export async function getHotBlog(req, res) {
         if (result.rows.length === 0) return res.status(404).json({ success: false, error: "not_found" });
 
         const blog = result.rows[0];
-        try { blog.qa = JSON.parse(blog.qa || "[]"); } catch { blog.qa = []; }
+
+        // ✅ jsonb / 문자열 모두 대응
+        if (blog.qa && typeof blog.qa === "string") {
+            try {
+                blog.qa = JSON.parse(blog.qa);
+            } catch {
+                blog.qa = [];
+            }
+        } else if (!Array.isArray(blog.qa)) {
+            blog.qa = [];
+        }
+
         res.json({ success: true, blog });
     } catch (err) {
         console.error("[getHotBlog]", err);
