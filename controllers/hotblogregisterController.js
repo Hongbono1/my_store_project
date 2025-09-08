@@ -59,21 +59,30 @@ export async function registerHotBlog(req, res) {
         let qa = [];
         if (qa_mode === "theme" || qa_mode === "random") {
             const base = qa_mode === "theme" ? THEME_QUESTIONS : RANDOM_QUESTIONS;
-            qa = base.map((q, i) => {
-                const a = (req.body[`${qa_mode}_q${i + 1}_answer`] ?? "").toString();
-                const image_url = filesByField[`${qa_mode}_q${i + 1}_image`] || null;
-                return { q, a, image_url };
-            });
+
+            qa = base
+                .map((q, i) => {
+                    const aRaw = req.body[`${qa_mode}_q${i + 1}_answer`] ?? "";
+                    const a = aRaw.toString().trim();
+                    const image_url = filesByField[`${qa_mode}_q${i + 1}_image`] || null;
+                    return { q, a, image_url };
+                })
+                .filter(({ a, image_url }) => a.length > 0 || image_url); // ✅ 최소 답변 또는 이미지 필요
+
         } else if (qa_mode === "self") {
             for (let i = 1; i <= 8; i++) {
                 const q = (req.body[`custom_q${i}_question`] ?? "").toString().trim();
-                const a = (req.body[`custom_q${i}_answer`] ?? "").toString();
+                const a = (req.body[`custom_q${i}_answer`] ?? "").toString().trim();
                 if (!q && !a) continue;
                 const image_url = filesByField[`custom_q${i}_image`] || null;
                 qa.push({ q, a, image_url });
             }
         } else {
-            try { qa = JSON.parse(req.body.qa || "[]"); } catch { qa = []; }
+            try {
+                qa = JSON.parse(req.body.qa || "[]");
+            } catch {
+                qa = [];
+            }
         }
 
         console.log("[hotblog/register] qa_mode=", qa_mode, "qa_len=", qa.length);
