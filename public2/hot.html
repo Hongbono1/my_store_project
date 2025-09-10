@@ -186,131 +186,137 @@
         </a>
       </div>
 
+      <!-- 오늘의 랜덤 추천 -->
       <div class="bg-white rounded-lg shadow-md p-6 h-64">
         <h3 class="text-xl font-bold mb-4">🎲 오늘의 랜덤 추천</h3>
-        <p class="text-gray-600 mb-4">오늘은 어떤 가게가 선택되었을까요?</p>
-        <a id="randomLink" href="#"
+        <p class="text-gray-600 mb-4">
+          오늘은 어떤 가게가 선택되었을까요?
+        </p>
+        <a id="randomBlogLink"
           class="inline-block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
           블로그에서 보기
         </a>
       </div>
+
+      <!-- ✅ 우측 하단 고정 네비게이션 -->
+      <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
+
+        <!-- 이전 -->
+        <div class="flex flex-col items-center">
+          <button onclick="goBack()"
+            class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">
+            ←
+          </button>
+          <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
+        </div>
+
+        <!-- 다음 -->
+        <div class="flex flex-col items-center">
+          <button onclick="goNext()"
+            class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">
+            →
+          </button>
+          <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
+        </div>
+
+        <!-- 홈 -->
+        <div class="flex flex-col items-center">
+          <a href="/index.html"
+            class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow hover:from-blue-600 hover:to-blue-700 transition">
+            🏠
+          </a>
+          <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
+        </div>
+      </div>
     </div>
-  </section>
 
-  <!-- ✅ 우측 하단 고정 네비게이션 -->
-  <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const slider = document.getElementById("ad-slider");
+        const totalSets = slider.children.length; // 4세트
+        let index = 0;
+        let interval;
 
-    <!-- 이전 -->
-    <div class="flex flex-col items-center">
-      <button onclick="goBack()"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">
-        ←
-      </button>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
-    </div>
+        function showSlide(i) {
+          index = (i + totalSets) % totalSets; // 음수 방지
+          slider.style.transform = `translateX(-${index * 100}%)`;
+        }
 
-    <!-- 다음 -->
-    <div class="flex flex-col items-center">
-      <button onclick="goNext()"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">
-        →
-      </button>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
-    </div>
+        // 자동 넘김 (3초마다, 총 12초 루프)
+        function startAutoSlide() {
+          interval = setInterval(() => {
+            showSlide(index + 1);
+          }, 3000);
+        }
 
-    <!-- 홈 -->
-    <div class="flex flex-col items-center">
-      <a href="/index.html"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow hover:from-blue-600 hover:to-blue-700 transition">
-        🏠
-      </a>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
-    </div>
-  </div>
-  </div>
+        function stopAutoSlide() {
+          clearInterval(interval);
+        }
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const slider = document.getElementById("ad-slider");
-      const totalSets = slider.children.length; // 4세트
-      let index = 0;
-      let interval;
+        // 버튼 이벤트
+        document.getElementById("prev-btn").addEventListener("click", () => {
+          stopAutoSlide();
+          showSlide(index - 1);
+          startAutoSlide();
+        });
 
-      function showSlide(i) {
-        index = (i + totalSets) % totalSets; // 음수 방지
-        slider.style.transform = `translateX(-${index * 100}%)`;
-      }
-
-      // 자동 넘김 (3초마다, 총 12초 루프)
-      function startAutoSlide() {
-        interval = setInterval(() => {
+        document.getElementById("next-btn").addEventListener("click", () => {
+          stopAutoSlide();
           showSlide(index + 1);
-        }, 3000);
-      }
+          startAutoSlide();
+        });
 
-      function stopAutoSlide() {
-        clearInterval(interval);
-      }
-
-      // 버튼 이벤트
-      document.getElementById("prev-btn").addEventListener("click", () => {
-        stopAutoSlide();
-        showSlide(index - 1);
         startAutoSlide();
       });
 
-      document.getElementById("next-btn").addEventListener("click", () => {
-        stopAutoSlide();
-        showSlide(index + 1);
-        startAutoSlide();
-      });
+      async function loadRecommendations() {
+        try {
+          const res = await fetch("/api/recommend"); // 서버 API 호출
+          const data = await res.json();
 
-      startAutoSlide();
-    });
+          const list = document.getElementById("recommend-list");
+          list.innerHTML = ""; // 초기화
 
-    async function loadRecommendations() {
-      try {
-        const res = await fetch("/api/recommend"); // 서버 API 호출
-        const data = await res.json();
-
-        const list = document.getElementById("recommend-list");
-        list.innerHTML = ""; // 초기화
-
-        data.recommendations.slice(0, 5).forEach((store, index) => {
-          const li = document.createElement("li");
-          li.innerHTML = `
+          data.recommendations.slice(0, 5).forEach((store, index) => {
+            const li = document.createElement("li");
+            li.innerHTML = `
           ${index + 1}. 
           <a href="detail.html?id=${store.id}" 
              class="text-blue-600 hover:underline font-medium">
             ${store.name}
           </a> – ${store.category}
         `;
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error("추천 가게 불러오기 실패:", err);
+            list.appendChild(li);
+          });
+        } catch (err) {
+          console.error("추천 가게 불러오기 실패:", err);
+        }
       }
-    }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      // hotblogdetail.html 글들의 ID 예시 (나중에 서버 연결하면 자동으로 불러오기 가능)
-      const blogIds = [1, 5, 12, 23, 37, 44];
+      document.addEventListener("DOMContentLoaded", async () => {
+        try {
+          const res = await fetch("/api/random-hotblog");
+          const data = await res.json();
+          if (data.ok && data.blog) {
+            document.getElementById("randomBlogLink").href = `hotblogdetail.html?id=${data.blog.id}`;
+            document.getElementById("randomBlogLink").innerText = data.blog.title || "블로그에서 보기";
+          } else {
+            document.getElementById("randomBlogLink").innerText = "추천 글 없음";
+          }
+        } catch (e) {
+          console.error("랜덤 추천 로드 실패:", e);
+          document.getElementById("randomBlogLink").innerText = "불러오기 실패";
+        }
+      });
 
-      // 랜덤으로 하나 선택
-      const randomId = blogIds[Math.floor(Math.random() * blogIds.length)];
+      // 페이지 로딩 시 실행
+      document.addEventListener("DOMContentLoaded", loadRecommendations);
 
-      // 링크 변경
-      document.getElementById("randomLink").href = `hotblogdetail.html?id=${randomId}`;
-    });
+      // ✅ 네비게이션 버튼
+      function goBack() { window.history.back(); }
+      function goNext() { window.history.forward(); }
 
-    // 페이지 로딩 시 실행
-    document.addEventListener("DOMContentLoaded", loadRecommendations);
-
-    // ✅ 네비게이션 버튼
-    function goBack() { window.history.back(); }
-    function goNext() { window.history.forward(); }
-
-  </script>
+    </script>
 
 </body>
 
