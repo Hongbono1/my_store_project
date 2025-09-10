@@ -143,44 +143,38 @@
         fetch('/components/footer.html')
             .then(r => r.text()).then(d => document.getElementById('footer').innerHTML = d);
 
+
         // ✅ 더미 데이터 (API 연동 없을 경우 대비)
-        let discountData = [];
-        let eventData = [];
+        let newsData = [];
 
         // API 연동 (실패 시 더미로 대체)
         async function fetchData() {
             try {
                 const disRes = await fetch('/api/discount');
-                discountData = disRes.ok ? await disRes.json() : [];
-            } catch { discountData = []; }
+                const discountData = disRes.ok ? await disRes.json() : [];
 
-            try {
                 const evtRes = await fetch('/api/event');
-                eventData = evtRes.ok ? await evtRes.json() : [];
-            } catch { eventData = []; }
+                const eventData = evtRes.ok ? await evtRes.json() : [];
+
+                // 두 데이터 합치기
+                newsData = [...discountData, ...eventData];
+
+            } catch {
+                newsData = [];
+            }
 
             // 더미 데이터 채우기 (없을 경우)
-            if (!discountData.length) {
-                discountData = Array.from({ length: 12 }).map((_, i) => ({
+            if (!newsData.length) {
+                newsData = Array.from({ length: 12 }).map((_, i) => ({
                     image: "/uploads/no-image.png",
-                    title: `할인 ${i + 1}`,
-                    desc: `할인 설명 ${i + 1}`,
+                    title: `소식 ${i + 1}`,
+                    desc: `소식 설명 ${i + 1}`,
                     link: "#",
                     ctaText: "자세히 보기"
                 }));
             }
-            if (!eventData.length) {
-                eventData = Array.from({ length: 14 }).map((_, i) => ({
-                    image: "/uploads/no-image.png",
-                    title: `이벤트 ${i + 1}`,
-                    desc: `이벤트 설명 ${i + 1}`,
-                    link: "#",
-                    ctaText: "쿠폰 받기"
-                }));
-            }
 
-            updateDiscount();
-            updateEvent();
+            updateNews();
         }
 
         // ✅ 카드 모양 (네오모피즘 + 글래스모피즘 + 3D)
@@ -189,15 +183,15 @@
             d.className =
                 "bg-white/70 backdrop-blur-lg rounded-2xl shadow-[8px_8px_20px_rgba(0,0,0,0.15),-8px_-8px_20px_rgba(255,255,255,0.6)] overflow-hidden hover:scale-105 transform transition duration-300";
             d.innerHTML = `
-      <img src="${image}" class="h-40 w-full object-cover">
-      <div class="p-6 text-center">
-        <h3 class="text-xl font-bold text-gray-800">${title}</h3>
-        <p class="text-gray-600 mt-2">${desc}</p>
-        <a href="${link}" 
-           class="mt-4 inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-indigo-500 hover:to-blue-500 transition">
-           ${ctaText}
-        </a>
-      </div>`;
+            <img src="${image}" class="h-40 w-full object-cover">
+                <div class="p-6 text-center">
+                    <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                    <p class="text-gray-600 mt-2">${desc}</p>
+                    <a href="${link}"
+                        class="mt-4 inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-indigo-500 hover:to-blue-500 transition">
+                        ${ctaText}
+                    </a>
+                </div>`;
             return d;
         }
 
@@ -210,49 +204,31 @@
             pageItems.forEach(item => $.appendChild(createUnifiedCard(item)));
         }
 
-        // ✅ 할인 소식 페이지네이션
-        let disPage = 0;
-        const disPageSize = 6;
-        function updateDiscount() {
-            renderPagedGrid("discountGrid", discountData, disPage, disPageSize);
-            const totalPages = Math.ceil(discountData.length / disPageSize);
-            document.getElementById("discountPageInfo").innerText = `${disPage + 1} / ${totalPages}`;
-        }
-        document.getElementById("discountPrev").onclick = () => {
-            if (disPage > 0) disPage--;
-            updateDiscount();
-        };
-        document.getElementById("discountNext").onclick = () => {
-            if ((disPage + 1) * disPageSize < discountData.length) disPage++;
-            updateDiscount();
-        };
+        // ✅ 뉴스 페이지네이션
+        let newsPage = 0;
+        const newsPageSize = 6;
 
-        // ✅ 이벤트 소식 페이지네이션
-        let evtPage = 0;
-        const evtPageSize = 6;
-        function updateEvent() {
-            renderPagedGrid("eventGrid", eventData, evtPage, evtPageSize);
-            const totalPages = Math.ceil(eventData.length / evtPageSize);
-            document.getElementById("eventPageInfo").innerText = `${evtPage + 1} / ${totalPages}`;
+        function updateNews() {
+            renderPagedGrid("newsGrid", newsData, newsPage, newsPageSize);
+            const totalPages = Math.ceil(newsData.length / newsPageSize);
+            document.getElementById("newsPageInfo").innerText = `${newsPage + 1} / ${totalPages}`;
         }
-        document.getElementById("eventPrev").onclick = () => {
-            if (evtPage > 0) evtPage--;
-            updateEvent();
+
+        document.getElementById("newsPrev").onclick = () => {
+            if (newsPage > 0) newsPage--;
+            updateNews();
         };
-        document.getElementById("eventNext").onclick = () => {
-            if ((evtPage + 1) * evtPageSize < eventData.length) evtPage++;
-            updateEvent();
+        document.getElementById("newsNext").onclick = () => {
+            if ((newsPage + 1) * newsPageSize < newsData.length) newsPage++;
+            updateNews();
         };
 
         // ✅ 초기 로딩
         fetchData();
 
-        function goBack() {
-            window.history.back();   // 바로 전에 본 페이지
-        }
-        function goNext() {
-            window.history.forward(); // 앞으로 갈 페이지
-        }
+        // ✅ 네비게이션 버튼
+        function goBack() { window.history.back(); }
+        function goNext() { window.history.forward(); }
 
     </script>
 </body>
