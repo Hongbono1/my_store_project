@@ -85,24 +85,31 @@
         </h2>
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
             <!-- 좌측 만화 이미지 -->
-            <div class="lg:col-span-1 flex flex-col gap-8 h-full">
-                <div
-                    class="flex-1 overflow-hidden rounded-2xl border border-gray-200 shadow-[4px_4px_12px_rgba(0,0,0,0.1),-4px_-4px_12px_rgba(255,255,255,0.9)]">
+            <div class="lg:col-span-1 flex flex-col gap-6 h-full">
+                <div class="flex-1 overflow-hidden rounded-2xl border border-gray-200 
+        shadow-[4px_4px_12px_rgba(0,0,0,0.1),-4px_-4px_12px_rgba(255,255,255,0.9)]">
                     <img src="https://via.placeholder.com/300x400?text=만화1" alt="만화 이미지 상단"
                         class="w-full h-full object-cover" />
                 </div>
-                <div
-                    class="flex-1 overflow-hidden rounded-2xl border border-gray-200 shadow-[4px_4px_12px_rgba(0,0,0,0.1),-4px_-4px_12px_rgba(255,255,255,0.9)]">
+                <div class="flex-1 overflow-hidden rounded-2xl border border-gray-200 
+        shadow-[4px_4px_12px_rgba(0,0,0,0.1),-4px_-4px_12px_rgba(255,255,255,0.9)]">
                     <img src="https://via.placeholder.com/300x400?text=만화2" alt="만화 이미지 하단"
                         class="w-full h-full object-cover" />
                 </div>
             </div>
+
             <!-- 우측 광고 리스트 -->
             <div id="suggest-random-list" class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <!-- JS에서 광고 카드 삽입 -->
             </div>
         </div>
     </section>
+
+    <!-- ✅ 페이지네이션 버튼 -->
+    <div class="flex justify-center gap-4 mt-6">
+        <button id="prevPage" onclick="changePage(-1)" class="px-4 py-2 bg-gray-200 rounded">이전</button>
+        <button id="nextPage" onclick="changePage(1)" class="px-4 py-2 bg-gray-200 rounded">다음</button>
+    </div>
 
     <!-- ✅ 우측 하단 고정 네비게이션 -->
     <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
@@ -147,25 +154,6 @@
         fetch('components/footer.html')
             .then(r => r.text()).then(d => { document.getElementById('footer').innerHTML = d; });
 
-        async function renderMixedAds() {
-            const container = document.getElementById("suggest-random-list");
-            container.innerHTML = "";
-
-            let data = await safeFetch("/storepride/mix");
-            if (!data.length) data = Array(8).fill(null);
-
-            data.forEach(ad => {
-                container.appendChild(createAdCard(ad));
-            });
-        }
-
-        document.addEventListener("DOMContentLoaded", async () => {
-            const prideList = await safeFetch("/storepride/list");
-            renderAdBoxes("suggest-boxes", prideList);
-
-            // ✅ 랜덤+확정 광고 실행
-            renderMixedAds("suggest-random");   // ❌ 여기서 "suggest-random"을 줬는데 함수는 못 받음
-        });
 
         // ✅ 홍보의 추천 카드
 
@@ -187,7 +175,6 @@
   `;
             return a;
         }
-
 
         // ✅ 빈 카드 (placeholder)
         function createEmptyHotPlaceCard() {
@@ -233,8 +220,6 @@
             return a;
         }
 
-
-
         // "정보 없음" 카드
         function createEmptyAdCard() {
             const adBox = document.createElement("div");
@@ -271,7 +256,7 @@
         function renderAds(containerId, ads, totalCards = 8) {
             const container = document.getElementById(containerId);
             container.innerHTML = "";
-            const data = ads.slice(0, totalCards);
+            const data = ads.slice(0, totalCards); // 최대 8개까지만 잘라오기
             while (data.length < totalCards) data.push(null);
             data.forEach(ad => container.appendChild(createAdCard(ad)));
         }
@@ -282,23 +267,6 @@
             catch (e) { console.error(url, e); }
             return [];
         }
-
-        document.addEventListener("DOMContentLoaded", async () => {
-            // Top4 placeholder
-            renderTop4([]);
-
-            // 데이터 불러오기
-            const prideList = await safeFetch("/storepride/list");
-
-            // 확정 광고 박스
-            renderAdBoxes("suggest-boxes", prideList);
-
-            // 랜덤+확정 광고
-            renderMixedAds("suggest-random");
-
-            // 슬라이드 광고
-            renderSliderAds(prideList);
-        });
 
         // (1) 광고박스 레이아웃: 이미지+상호명, 클릭시 상세 이동
         function createSimpleSlideAdCard(ad) {
@@ -378,6 +346,49 @@
         function goBack() { window.history.back(); }
         function goNext() { window.history.forward(); }
 
+        // 전역 변수 추가 (renderMixedAds 위쪽에 둡니다)
+        let currentPage = 1;
+        const pageSize = 8;
+        const maxPages = 5;
+
+        async function renderMixedAds() {
+            const container = document.getElementById("suggest-random-list");
+            container.innerHTML = "";
+
+            let data = await safeFetch("/storepride/mix");
+            if (!data.length) {
+                data = Array(pageSize).fill(null);
+            }
+
+            // ✅ 현재 페이지 데이터만 자르기
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageData = data.slice(start, end);
+
+            pageData.forEach(ad => container.appendChild(createAdCard(ad)));
+
+            // ✅ 버튼 상태 업데이트
+            document.getElementById("prevPage").disabled = currentPage === 1;
+            document.getElementById("nextPage").disabled = currentPage === maxPages || end >= data.length;
+        }
+
+        // 🚀 DOMContentLoaded는 제일 하단에 딱 한 번만 두세요!
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Top4 placeholder
+            renderTop4([]);
+
+            // 데이터 불러오기
+            const prideList = await safeFetch("/storepride/list");
+
+            // 확정 광고 박스
+            renderAdBoxes("suggest-boxes", prideList);
+
+            // 랜덤+확정 광고
+            renderMixedAds();
+
+            // 슬라이드 광고
+            renderSliderAds(prideList);
+        });
 
     </script>
 
