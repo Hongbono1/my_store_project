@@ -270,39 +270,38 @@
           <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
         </div>
       </div>
-    </div>
 
-    <script>
-      document.addEventListener("DOMContentLoaded", async () => {
-        let index = 0;
-        let interval;
+      <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+          let index = 0;
+          let interval;
 
-        const slider = document.getElementById("ad-slider");
+          const slider = document.getElementById("ad-slider");
 
-        function showSlide(i) {
-          const totalSets = slider.children.length;
-          if (totalSets === 0) return;
-          index = (i + totalSets) % totalSets;
-          slider.style.transform = `translateX(-${index * 100}%)`;
-        }
+          function showSlide(i) {
+            const totalSets = slider.children.length;
+            if (totalSets === 0) return;
+            index = (i + totalSets) % totalSets;
+            slider.style.transform = `translateX(-${index * 100}%)`;
+          }
 
-        function startAutoSlide() {
-          interval = setInterval(() => {
-            showSlide(index + 1);
-          }, 5000);
-        }
+          function startAutoSlide() {
+            interval = setInterval(() => {
+              showSlide(index + 1);
+            }, 5000);
+          }
 
-        function stopAutoSlide() {
-          clearInterval(interval);
-        }
+          function stopAutoSlide() {
+            clearInterval(interval);
+          }
 
-        // ✅ 광고 불러오기
-        async function loadPowerAds() {
-          try {
-            const res = await fetch("/api/ads/power");
-            const ads = await res.json();
+          // ✅ 광고 불러오기
+          async function loadPowerAds() {
+            try {
+              const res = await fetch("/api/ads/power");
+              const ads = await res.json();
 
-            slider.innerHTML = ads.map(ad => `
+              slider.innerHTML = ads.map(ad => `
         <a href="${ad.link}" class="flex-shrink-0 w-full h-64">
           <img src="${ad.image_url}" 
                alt="${ad.title}" 
@@ -310,78 +309,78 @@
         </a>
       `).join("");
 
-            showSlide(0);
-            startAutoSlide();
-          } catch (e) {
-            console.error("파워 광고 불러오기 실패:", e);
+              showSlide(0);
+              startAutoSlide();
+            } catch (e) {
+              console.error("파워 광고 불러오기 실패:", e);
+            }
           }
-        }
 
-        // ✅ 추천 가게 불러오기
-        async function loadRecommendations() {
-          try {
-            const res = await fetch("/api/recommend");
-            const data = await res.json();
-            const list = document.getElementById("recommend-list");
-            list.innerHTML = "";
+          // ✅ 추천 가게 불러오기
+          async function loadRecommendations() {
+            try {
+              const res = await fetch("/api/recommend");
+              const data = await res.json();
+              const list = document.getElementById("recommend-list");
+              list.innerHTML = "";
 
-            data.recommendations.slice(0, 5).forEach((store, idx) => {
-              const li = document.createElement("li");
-              li.innerHTML = `
+              data.recommendations.slice(0, 5).forEach((store, idx) => {
+                const li = document.createElement("li");
+                li.innerHTML = `
           ${idx + 1}.
           <a href="detail.html?id=${store.id}" 
              class="text-blue-600 hover:underline font-medium">
             ${store.name}
           </a> – ${store.category}
         `;
-              list.appendChild(li);
-            });
-          } catch (err) {
-            console.error("추천 가게 불러오기 실패:", err);
-          }
-        }
-
-        // ✅ 랜덤 블로그 불러오기
-        async function loadRandomBlog() {
-          try {
-            const res = await fetch("/api/random-hotblog");
-            const data = await res.json();
-            const linkEl = document.getElementById("randomBlogLink");
-            if (data.ok && data.blog) {
-              linkEl.href = `hotblogdetail.html?id=${data.blog.id}`;
-              linkEl.innerText = data.blog.title || "블로그에서 보기";
-            } else {
-              linkEl.innerText = "추천 글 없음";
+                list.appendChild(li);
+              });
+            } catch (err) {
+              console.error("추천 가게 불러오기 실패:", err);
             }
-          } catch (e) {
-            console.error("랜덤 추천 로드 실패:", e);
-            document.getElementById("randomBlogLink").innerText = "불러오기 실패";
           }
-        }
 
-        // 버튼 이벤트
-        document.getElementById("prev-btn").addEventListener("click", () => {
-          stopAutoSlide();
-          showSlide(index - 1);
-          startAutoSlide();
+          // ✅ 랜덤 블로그 불러오기
+          async function loadRandomBlog() {
+            try {
+              const res = await fetch("/api/random-hotblog");
+              const data = await res.json();
+              const linkEl = document.getElementById("randomBlogLink");
+              if (data.ok && data.blog) {
+                linkEl.href = `hotblogdetail.html?id=${data.blog.id}`;
+                linkEl.innerText = data.blog.title || "블로그에서 보기";
+              } else {
+                linkEl.innerText = "추천 글 없음";
+              }
+            } catch (e) {
+              console.error("랜덤 추천 로드 실패:", e);
+              document.getElementById("randomBlogLink").innerText = "불러오기 실패";
+            }
+          }
+
+          // 버튼 이벤트
+          document.getElementById("prev-btn").addEventListener("click", () => {
+            stopAutoSlide();
+            showSlide(index - 1);
+            startAutoSlide();
+          });
+          document.getElementById("next-btn").addEventListener("click", () => {
+            stopAutoSlide();
+            showSlide(index + 1);
+            startAutoSlide();
+          });
+
+          // 초기 실행
+          await loadPowerAds();
+          await loadRecommendations();
+          await loadRandomBlog();
         });
-        document.getElementById("next-btn").addEventListener("click", () => {
-          stopAutoSlide();
-          showSlide(index + 1);
-          startAutoSlide();
-        });
 
-        // 초기 실행
-        await loadPowerAds();
-        await loadRecommendations();
-        await loadRandomBlog();
-      });
+        // ✅ 네비게이션 버튼
+        function goBack() { window.history.back(); }
+        function goNext() { window.history.forward(); }
 
-      // ✅ 네비게이션 버튼
-      function goBack() { window.history.back(); }
-      function goNext() { window.history.forward(); }
-
-    </script>
+      </script>
 
 </body>
 
