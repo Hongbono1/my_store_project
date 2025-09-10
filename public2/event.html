@@ -88,16 +88,37 @@
     <section class="max-w-6xl mx-auto px-4 py-12">
         <h2 class="text-3xl font-bold mb-8 text-center text-blue-700">✨ 추천 소식</h2>
         <div id="recommendGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        <div class="flex justify-center gap-4 mt-6">
+            <button id="recommendPrev"
+                class="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 backdrop-blur-lg shadow-[4px_4px_10px_rgba(0,0,0,0.1),-4px_-4px_10px_rgba(255,255,255,0.6)] hover:scale-110 transition">
+                ‹
+            </button>
+            <span id="recommendPageInfo" class="px-3 py-2 text-gray-700 font-bold"></span>
+            <button id="recommendNext"
+                class="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 backdrop-blur-lg shadow-[4px_4px_10px_rgba(0,0,0,0.1),-4px_-4px_10px_rgba(255,255,255,0.6)] hover:scale-110 transition">
+                ›
+            </button>
+        </div>
+
     </section>
 
     <!-- ✅ 이벤트 소식 (6장 고정, 카드 모양 동일) -->
-    <section class="max-w-6xl mx-auto px-4 py-12">
-        <div class="rounded-3xl bg-gradient-to-r from-yellow-50 to-orange-50 shadow-inner p-1">
-            <div class="rounded-3xl p-6">
-                <h2 class="text-3xl font-bold mb-8 text-center text-orange-600">🔥 이벤트 소식</h2>
-                <div id="eventGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+    <section class="max-w-6xl mx-auto px-4 py-12 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl shadow-inner">
+        <h2 class="text-3xl font-bold mb-8 text-center text-orange-600">🔥 이벤트 소식</h2>
+        <div id="eventGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        <div class="flex justify-center gap-4 mt-6">
+            <div class="flex justify-center gap-4 mt-6">
+                <button id="eventPrev"
+                    class="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 backdrop-blur-lg shadow-[4px_4px_10px_rgba(0,0,0,0.1),-4px_-4px_10px_rgba(255,255,255,0.6)] hover:scale-110 transition">
+                    ‹
+                </button>
+                <span id="eventPageInfo" class="px-3 py-2 text-gray-700 font-bold"></span>
+                <button id="eventNext"
+                    class="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 backdrop-blur-lg shadow-[4px_4px_10px_rgba(0,0,0,0.1),-4px_-4px_10px_rgba(255,255,255,0.6)] hover:scale-110 transition">
+                    ›
+                </button>
             </div>
-        </div>
+
     </section>
 
     <!-- Footer -->
@@ -110,71 +131,111 @@
         fetch('/components/footer.html')
             .then(r => r.text()).then(d => document.getElementById('footer').innerHTML = d);
 
-        // 예시 데이터 (연동 전)
-        const recommendData = [
-            { id: 1, image: "/uploads/store1.jpg", name: "홍길동 분식", desc: "신규 오픈! 떡볶이+튀김 세트 인기", link: "detail.html?id=1" },
-            { id: 2, image: "/uploads/store2.jpg", name: "이몽룡 카페", desc: "달콤한 디저트 & 스페셜티 커피 추천", link: "detail.html?id=2" },
-            { id: 3, image: "/uploads/store3.jpg", name: "성춘향 헤어샵", desc: "가을맞이 헤어 컬러 트렌드", link: "detail.html?id=3" },
-        ];
+        // ✅ 더미 데이터 (API 연동 없을 경우 대비)
+        let recommendData = [];
+        let eventData = [];
 
-        const eventData = [
-            { id: "event1", image: "/uploads/store4.jpg", title: "20% 할인!", desc: "치킨 세트 전 메뉴 적용", cta: "쿠폰 받기", link: "#" },
-            { id: "event2", image: "/uploads/store5.jpg", title: "무료 음료 증정", desc: "커피 2잔 이상 주문 시", cta: "쿠폰 받기", link: "#" },
-            { id: "event3", image: "/uploads/store6.jpg", title: "배달비 0원", desc: "주말 한정, 분식 전 메뉴", cta: "쿠폰 받기", link: "#" },
-        ];
+        // API 연동 (실패 시 더미로 대체)
+        async function fetchData() {
+            try {
+                const recRes = await fetch('/api/recommend');
+                recommendData = recRes.ok ? await recRes.json() : [];
+            } catch { recommendData = []; }
 
-        // 공통 렌더 유틸(6장 고정)
-        function renderGrid(containerId, items, total, cardFactory, emptyFactory) {
-            const $ = document.getElementById(containerId);
-            $.innerHTML = "";
-            const data = items.slice(0, total);
-            while (data.length < total) data.push(null);        // 부족하면 더미(placeholder)로 채움
-            data.forEach(item => $.appendChild(item ? cardFactory(item) : emptyFactory()));
+            try {
+                const evtRes = await fetch('/api/event');
+                eventData = evtRes.ok ? await evtRes.json() : [];
+            } catch { eventData = []; }
+
+            // 더미 데이터 채우기 (없을 경우)
+            if (!recommendData.length) {
+                recommendData = Array.from({ length: 12 }).map((_, i) => ({
+                    image: "/uploads/no-image.png",
+                    title: `추천 ${i + 1}`,
+                    desc: `추천 설명 ${i + 1}`,
+                    link: "#",
+                    ctaText: "자세히 보기"
+                }));
+            }
+            if (!eventData.length) {
+                eventData = Array.from({ length: 14 }).map((_, i) => ({
+                    image: "/uploads/no-image.png",
+                    title: `이벤트 ${i + 1}`,
+                    desc: `이벤트 설명 ${i + 1}`,
+                    link: "#",
+                    ctaText: "쿠폰 받기"
+                }));
+            }
+
+            updateRecommend();
+            updateEvent();
         }
 
-        // ✅ 위 카드와 완전히 동일한 템플릿 (추천/이벤트 공용)
+        // ✅ 카드 모양 (네오모피즘 + 글래스모피즘 + 3D)
         function createUnifiedCard({ image, title, desc, link, ctaText = "자세히 보기" }) {
-            const card = document.createElement("div");
-            card.className = "bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition";
-            card.innerHTML = `
-      <img src="${image || '/uploads/no-image.png'}" alt="${title || ''}" class="h-40 w-full object-cover">
-      <div class="p-6 text-center">
-        <h3 class="text-xl font-bold">${title || '정보 없음'}</h3>
-        <p class="text-gray-600 mt-2">${desc || ''}</p>
-        <a href="${link || '#'}" class="mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded-lg">${ctaText}</a>
-      </div>`;
-            return card;
-        }
-
-        // ✅ 위 카드 모양에 맞춘 더미(스켈레톤)
-        function createUnifiedEmpty() {
             const d = document.createElement("div");
-            d.className = "bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition";
+            d.className =
+                "bg-white/70 backdrop-blur-lg rounded-2xl shadow-[8px_8px_20px_rgba(0,0,0,0.15),-8px_-8px_20px_rgba(255,255,255,0.6)] overflow-hidden hover:scale-105 transform transition duration-300";
             d.innerHTML = `
-      <div class="w-full h-40 bg-gray-100 animate-pulse"></div>
-      <div class="p-6">
-        <div class="h-4 w-2/3 bg-gray-100 rounded mb-2 animate-pulse"></div>
-        <div class="h-3 w-1/2 bg-gray-100 rounded animate-pulse"></div>
+      <img src="${image}" class="h-40 w-full object-cover">
+      <div class="p-6 text-center">
+        <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+        <p class="text-gray-600 mt-2">${desc}</p>
+        <a href="${link}" 
+           class="mt-4 inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-indigo-500 hover:to-blue-500 transition">
+           ${ctaText}
+        </a>
       </div>`;
             return d;
         }
 
-        // 실행: 두 섹션 모두 동일 카드 + 더미로 6장 고정
-        document.addEventListener("DOMContentLoaded", () => {
-            
-            // 추천 소식 → 통일 템플릿
-            const recItems = recommendData.map(x => ({
-                id: x.id ? `rec-${x.id}` : undefined,
-                image: x.image, title: x.name, desc: x.desc, link: x.link, ctaText: "자세히 보기"
-            }));
-            renderGrid("recommendGrid", recItems, 6, createUnifiedCard, createUnifiedEmpty);
+        // ✅ 페이지네이션 렌더링
+        function renderPagedGrid(containerId, items, pageIndex, pageSize) {
+            const $ = document.getElementById(containerId);
+            $.innerHTML = "";
+            const start = pageIndex * pageSize;
+            const pageItems = items.slice(start, start + pageSize);
+            pageItems.forEach(item => $.appendChild(createUnifiedCard(item)));
+        }
 
-            // 이벤트 소식 → 통일 템플릿(버튼 문구만 변경) + id 매핑(#event1, #event2…)
-            const evtItems = eventData.map(x => ({
-                id: x.id, image: x.image, title: x.title, desc: x.desc, link: x.link, ctaText: x.cta || "쿠폰 받기"
-            }));
-            renderGrid("eventGrid", evtItems, 6, createUnifiedCard, createUnifiedEmpty);
-        });
+        // ✅ 추천 소식 페이지네이션
+        let recPage = 0;
+        const recPageSize = 6;
+        function updateRecommend() {
+            renderPagedGrid("recommendGrid", recommendData, recPage, recPageSize);
+            const totalPages = Math.ceil(recommendData.length / recPageSize);
+            document.getElementById("recommendPageInfo").innerText = `${recPage + 1} / ${totalPages}`;
+        }
+
+        document.getElementById("recommendPrev").onclick = () => {
+            if (recPage > 0) recPage--;
+            updateRecommend();
+        };
+        document.getElementById("recommendNext").onclick = () => {
+            if ((recPage + 1) * recPageSize < recommendData.length) recPage++;
+            updateRecommend();
+        };
+
+        // ✅ 이벤트 소식 페이지네이션
+        let evtPage = 0;
+        const evtPageSize = 6;
+        function updateEvent() {
+            renderPagedGrid("eventGrid", eventData, evtPage, evtPageSize);
+            const totalPages = Math.ceil(eventData.length / evtPageSize);
+            document.getElementById("eventPageInfo").innerText = `${evtPage + 1} / ${totalPages}`;
+        }
+
+        document.getElementById("eventPrev").onclick = () => {
+            if (evtPage > 0) evtPage--;
+            updateEvent();
+        };
+        document.getElementById("eventNext").onclick = () => {
+            if ((evtPage + 1) * evtPageSize < eventData.length) evtPage++;
+            updateEvent();
+        };
+
+        // ✅ 초기 로딩
+        fetchData();
     </script>
 </body>
 
