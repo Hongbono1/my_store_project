@@ -252,24 +252,21 @@
 </html>
 
 <script>
-
     // 제철 음식 불러오기 (큰 광고박스)
     async function loadSeasonFood() {
         try {
             const res = await fetch("/api/season-foods");
             const data = await res.json();
             const el = document.getElementById("season-food");
-            if (el) {
-                el.innerHTML = `
-                  <div>
-                    <img src="${data.image_url}" alt="${data.name}" class="w-full h-64 object-cover md:h-full">
-                  </div>
-                  <div class="p-6 flex flex-col justify-center text-center md:text-left">
-                    <h3 class="text-2xl font-bold mb-3">${data.name}</h3>
-                    <p class="text-gray-600 mb-4">${data.description}</p>
-                  </div>
-                `;
-            }
+            el.innerHTML = `
+              <div>
+                <img src="${data.image_url}" alt="${data.name}" class="w-full h-64 object-cover md:h-full">
+              </div>
+              <div class="p-6 flex flex-col justify-center text-center md:text-left">
+                <h3 class="text-2xl font-bold mb-3">${data.name}</h3>
+                <p class="text-gray-600 mb-4">${data.description}</p>
+              </div>
+            `;
         } catch (e) {
             console.error(e);
         }
@@ -280,18 +277,31 @@
         try {
             const res = await fetch(`/api/mood-foods?mood=${mood}`);
             const data = await res.json();
-            const moodBox = document.getElementById("mood-food");
-            if (moodBox && data) {
-                moodBox.innerHTML = `
-                  <div>
-                    <img src="${data.image_url}" alt="${data.name}" class="w-full h-64 object-cover md:h-full">
-                  </div>
-                  <div class="p-6 flex flex-col justify-center text-center md:text-left">
-                    <h3 class="text-2xl font-bold mb-3">${data.name}</h3>
-                    <p class="text-gray-600 mb-4">${data.description}</p>
-                  </div>
+            const el = document.getElementById("mood-food");
+
+            // 데이터가 없을 때 대비
+            if (!data || !data.name) {
+                el.innerHTML = `
+                  <div class="p-6 text-center text-gray-500">추천 데이터를 불러오지 못했습니다.</div>
                 `;
+                return;
             }
+
+            el.innerHTML = `
+              <div>
+                <img src="${data.image_url}" alt="${data.name}" class="w-full h-64 object-cover md:h-full">
+              </div>
+              <div class="p-6 flex flex-col justify-center text-center md:text-left">
+                <h3 class="text-2xl font-bold mb-3 break-keep">${data.name}</h3>
+                <p class="text-gray-600 mb-4 break-keep">${data.description}</p>
+                <a href="mood-detail.html?mood=${mood}" 
+                   class="inline-block bg-blue-600 text-white text-sm px-4 py-2 rounded 
+                          hover:bg-blue-700 transition self-center md:self-start">
+                   자세히 보기
+                </a>
+              </div>
+            `;
+
             loadAds([mood]); // mood 태그 기반 광고 불러오기
         } catch (e) {
             console.error(e);
@@ -311,7 +321,7 @@
         party: "즐거운 순간을 더욱 특별하게 만드는 파티 음식",
         tired: "지친 몸에 활력을 주는 든든한 보양 음식",
         happy: "행복한 순간을 더 즐겁게 만들어주는 특별한 음식",
-        alone: "혼자여도 만족스러운 한 끼"
+        alone: "혼자여도 든든하고 만족스러운 한 끼"
     };
 
     // 광고 불러오기 (작은 박스, 최대 8개)
@@ -322,48 +332,41 @@
             const data = await res.json();
             const grid = document.getElementById("ad-grid");
 
-            if (!data.length) {
+            if (data.length === 0) {
                 grid.innerHTML = `<p class="col-span-4 text-center text-gray-500">현재 노출할 광고가 없습니다.</p>`;
                 return;
             }
 
             grid.innerHTML = data.slice(0, 8).map(ad => `
-        <a href="${ad.link}" target="_blank"
-            class="bg-white rounded-lg shadow-md p-4 flex flex-col items-center hover:shadow-lg transition">
-            <img src="${ad.image_url}" alt="${ad.title}" class="w-full h-32 object-cover rounded mb-3">
+              <a href="${ad.link}" target="_blank"
+                 class="bg-white rounded-lg shadow-md p-4 flex flex-col items-center hover:shadow-lg transition">
+                <img src="${ad.image_url}" alt="${ad.title}" class="w-full h-32 object-cover rounded mb-3">
                 <h4 class="font-bold text-gray-800">${ad.title}</h4>
-        </a>
-        `).join("");
+              </a>
+            `).join("");
         } catch (e) {
             console.error(e);
         }
     }
 
-    // 초기 실행
     document.addEventListener("DOMContentLoaded", () => {
-        const textBox = document.getElementById("mood-text");
-        const linkBox = document.getElementById("mood-link");
         const moodBox = document.getElementById("mood-food");
 
         // 버튼 클릭 이벤트
         document.querySelectorAll(".mood-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 const mood = btn.dataset.mood;
-                const text = moodTexts[mood] || "추천 음식을 불러오는 중입니다";
-
-                // 문구 즉시 변경
-                textBox.innerText = text;
-                linkBox.href = `mood-detail.html?mood=${mood}`;
-
-                // 서버 데이터 요청
+                // moodTexts 문구를 description으로 대체
                 loadMoodFood(mood);
             });
         });
 
+        // 초기 실행
         loadSeasonFood();
         loadAds();
     });
 </script>
+
 
 
 </body>
