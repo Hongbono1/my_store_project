@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오늘의 제철 음식</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- 1단계: 오늘의 제철 음식 -->
+  <section class="max-w-4xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-center mb-6">🥗 오늘의 제철 음식</h1>
+    <div id="season-food" class="bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200 
+                shadow-[8px_8px_20px_rgba(0,0,0,0.08),-8px_-8px_20px_rgba(255,255,255,0.9)] 
+                grid md:grid-cols-2 gap-6 overflow-hidden min-h-[250px]">
+      <!-- JS 데이터 삽입 -->
+    </div>
+  </section>
+
+  <!-- 2단계: 현 계절에 맞는 계절 음식 -->
+  <section class="max-w-4xl mx-auto px-4 py-10">
+    <h2 class="text-3xl font-bold text-center mb-6">😋 현 계절에 맞는 계절 음식</h2>
+
+    <!-- 버튼 -->
+    <div class="flex flex-wrap justify-center gap-3 mb-8">
+      <button class="mood-btn bg-blue-100 px-4 py-2 rounded-full hover:bg-blue-200" data-mood="spring">봄</button>
+      <button class="mood-btn bg-blue-100 px-4 py-2 rounded-full hover:bg-blue-200" data-mood="summer">여름</button>
+      <button class="mood-btn bg-blue-100 px-4 py-2 rounded-full hover:bg-blue-200" data-mood="autumn">가을</button>
+      <button class="mood-btn bg-blue-100 px-4 py-2 rounded-full hover:bg-blue-200" data-mood="winter">겨울</button>
+    </div>
+
+    <!-- 결과 카드 -->
+    <div id="mood-food" class="bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200
+                shadow-[8px_8px_20px_rgba(0,0,0,0.08),-8px_-8px_20px_rgba(255,255,255,0.9)]
+                grid md:grid-cols-2 gap-6 overflow-hidden min-h-[250px]">
+      <div>
+        <img src="https://via.placeholder.com/600x400?text=계절음식" alt="계절 음식" class="w-full h-64 object-cover md:h-full">
+      </div>
+      <div class="p-6 flex flex-col justify-center text-center md:text-left">
+        <h3 id="mood-text" class="text-2xl font-bold mb-3 break-keep">
+          이런 계절 음식은 어때요?
+        </h3>
+        <a id="mood-link" href="#" class="inline-block bg-blue-600 text-white text-sm px-4 py-2 rounded 
+                  hover:bg-blue-700 transition self-center md:self-start">
+          자세히 보기
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3단계: 우리동네 계절 음식 추천 -->
+  <section class="max-w-6xl mx-auto px-4 py-10">
+    <h2 class="text-2xl font-bold text-center mb-6">📢 우리동네 계절 음식 추천</h2>
+
+    <!-- 광고 리스트 -->
+    <div id="ad-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+      <!-- 광고 카드 삽입 -->
+    </div>
+
+    <!-- 페이지 네이션 -->
+    <div class="flex justify-center gap-2" id="pagination"></div>
+  </section>
+
+  <script>
+    /* ==============================
+       ✅ 제철 음식 불러오기
+    ============================== */
+    async function loadSeasonFood() {
+      try {
+        const res = await fetch("/api/season-foods");
+        const data = await res.json();
+        const el = document.getElementById("season-food");
+
+        el.innerHTML = `
+          <div>
+            <img src="${data.image_url || 'https://via.placeholder.com/600x400?text=제철음식'}" 
+                 alt="${data.name}" 
+                 class="w-full h-64 object-cover md:h-full">
+          </div>
+          <div class="p-6 flex flex-col justify-center text-center md:text-left">
+            <h3 class="text-2xl font-bold mb-3">${data.name}</h3>
+            <p class="text-gray-600 mb-4">${data.description || '설명이 준비 중입니다.'}</p>
+            <p class="text-sm text-gray-500">📍 산지: ${data.region || '정보 없음'}</p>
+            <a href="season-detail.html?food=${encodeURIComponent(data.name)}"
+               class="mt-4 flex items-center justify-center w-32 h-10 
+                      bg-gradient-to-r from-yellow-400 to-pink-400 
+                      text-white text-sm font-semibold rounded-full shadow 
+                      hover:opacity-90 transition self-center md:self-start">
+              자세히 보기
+            </a>
+          </div>
+        `;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    /* ==============================
+       ✅ 계절별 음식 매핑
+    ============================== */
+    const seasonFoods = {
+      spring: { text: "싱그러운 봄나물과 해산물", img: "https://via.placeholder.com/600x400?text=봄음식" },
+      summer: { text: "더위를 이겨내는 시원한 여름 음식", img: "https://via.placeholder.com/600x400?text=여름음식" },
+      autumn: { text: "풍성한 가을의 제철 음식", img: "https://via.placeholder.com/600x400?text=가을음식" },
+      winter: { text: "따뜻하게 즐기는 겨울 별미", img: "https://via.placeholder.com/600x400?text=겨울음식" }
+    };
+
+    async function loadMoodFood(season) {
+      const moodBox = document.getElementById("mood-food");
+      const seasonData = seasonFoods[season] || { text: "추천 음식을 불러오는 중입니다.", img: "https://via.placeholder.com/600x400" };
+
+      moodBox.innerHTML = `
+        <div>
+          <img src="${seasonData.img}" alt="${season}" class="w-full h-64 object-cover md:h-full">
+        </div>
+        <div class="p-6 flex flex-col justify-center text-center md:text-left">
+          <h3 class="text-2xl font-bold mb-3 break-keep">${seasonData.text}</h3>
+          <a href="season-detail.html?season=${season}" 
+             class="inline-block bg-blue-600 text-white text-sm px-4 py-2 rounded 
+                    hover:bg-blue-700 transition self-center md:self-start">
+             자세히 보기
+          </a>
+        </div>
+      `;
+    }
+
+    /* ==============================
+       ✅ 광고 불러오기 + 페이지네이션
+    ============================== */
+    let adsData = [];
+    let currentPage = 1;
+    const adsPerPage = 8;
+
+    async function loadAds() {
+      try {
+        const res = await fetch("/api/ads?tags=season");
+        adsData = await res.json();
+        renderAds();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderAds(page = 1) {
+      currentPage = page;
+      const grid = document.getElementById("ad-grid");
+      grid.innerHTML = "";
+
+      if (!adsData.length) {
+        grid.innerHTML = `<p class="col-span-4 text-center text-gray-500">현재 노출할 광고가 없습니다.</p>`;
+        return;
+      }
+
+      const start = (page - 1) * adsPerPage;
+      const end = start + adsPerPage;
+      const pageAds = adsData.slice(start, end);
+
+      pageAds.forEach(ad => {
+        grid.innerHTML += `
+          <div class="relative bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200 
+                      shadow-md flex flex-col overflow-hidden p-4">
+            <div class="w-full h-40 bg-gray-100 rounded-xl mb-4 overflow-hidden">
+              <img src="${ad.image_url}" alt="${ad.title}" class="w-full h-full object-cover">
+            </div>
+            <h4 class="font-extrabold text-lg text-gray-800 mb-2 text-center">${ad.title}</h4>
+            <p class="text-gray-500 text-sm text-center mb-4">${ad.category || ''}</p>
+            <a href="detail.html?id=${ad.id}" 
+               class="mt-auto inline-block text-center bg-gradient-to-r from-yellow-400 to-pink-400 
+                      text-white font-semibold px-4 py-2 rounded-full shadow hover:opacity-90 transition">
+              더보기
+            </a>
+          </div>
+        `;
+      });
+
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const totalPages = Math.ceil(adsData.length / adsPerPage);
+      const pagination = document.getElementById("pagination");
+      pagination.innerHTML = "";
+
+      for (let i = 1; i <= totalPages; i++) {
+        pagination.innerHTML += `
+          <button onclick="renderAds(${i})" 
+            class="px-3 py-1 rounded-md ${i === currentPage ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}">
+            ${i}
+          </button>
+        `;
+      }
+    }
+
+    /* ==============================
+       ✅ 초기 실행
+    ============================== */
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSeasonFood();
+      loadAds();
+
+      document.querySelectorAll(".mood-btn").forEach(btn => {
+        btn.addEventListener("click", () => loadMoodFood(btn.dataset.mood));
+      });
+    });
+  </script>
+</body>
+
+</html>
