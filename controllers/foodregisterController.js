@@ -86,6 +86,8 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
   const prices = toArr(body["menuPrice[]"] ?? body.menuPrice);
   const cats = toArr(body["menuCategory[]"] ?? body.menuCategory);
   const descs = toArr(body["menuDesc[]"] ?? body.menuDesc);
+  const themes = toArr(body["menuTheme[]"] ?? body.menuTheme); // ✅ 추가됨
+
 
   const rows = [];
   for (let i = 0; i < names.length; i++) {
@@ -98,7 +100,8 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
     const img = menuFiles[i] ? toWebPath(menuFiles[i]) : null;
 
     if (name && price > 0) {
-      rows.push({ name, price, category, description, image_url: img });
+      const theme = (themes[i] || "").trim() || null;
+      rows.push({ name, price, category, description, image_url: img, theme }); // ✅ theme 추가
     }
   }
   return rows;
@@ -150,19 +153,17 @@ export async function createFoodStore(req, res) {
     await client.query("BEGIN");
 
     // 1) 가게
-    const theme = (req.body.theme || "").trim();
-
     const insertStoreQ = `
   INSERT INTO food_stores (
     business_name, road_address, phone,
     business_type, business_category, business_hours, delivery_option,
     service_details, additional_desc,
     homepage, instagram, facebook,
-    facilities, pets_allowed, parking,
-    theme
-  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    facilities, pets_allowed, parking
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
   RETURNING id
 `;
+
     const { rows } = await client.query(insertStoreQ, [
       businessName,
       roadAddress,
@@ -178,9 +179,9 @@ export async function createFoodStore(req, res) {
       facebook || null,
       facilities || null,
       petsAllowed,
-      parking || null,
-      theme || null,
+      parking || null
     ]);
+
     const storeId = rows[0].id;
 
     // 2) 파일 분류
@@ -202,17 +203,16 @@ export async function createFoodStore(req, res) {
 
     // 3) 메뉴 저장
     const menusA = extractMenusFromBody(req.body);
-    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles); // ← 이미지 포함
+    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
     const menus = [...menusA, ...menusB];
 
-    // 저장 전 기존 것 정리(신규 생성에도 안전)
+    // 저장 전 기존 것 정리
     await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
 
     if (menus.length) {
       const vals = menus
-        .map(
-          (_, i) =>
-            `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`
+        .map((_, i) =>
+          `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`
         )
         .join(",");
 
@@ -222,39 +222,40 @@ export async function createFoodStore(req, res) {
         m.category || null,
         m.image_url || null,
         m.description || null,
+        m.theme || null, // ✅ 추가됨
       ]);
 
       await client.query(
-        `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
+        `INSERT INTO menu_items (store_id, name, price, category, image_url, description, theme) VALUES ${vals}`,
         [storeId, ...params]
       );
     }
 
     // 4) 이벤트 저장 (inline 파싱)
     const events = Object.entries(req.body)
-      .filter(([k]) => /^event\d+$/i.test(k))
-      .map(([, v]) => String(v || "").trim())
-      .filter(Boolean);
+    .filter(([k]) => /^event\d+$/i.test(k))
+    .map(([, v]) => String(v || "").trim())
+    .filter(Boolean);
 
-    if (events.length) {
-      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
-      await client.query(
-        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
-        [storeId, ...events]
-      );
-    }
-
-    await client.query("COMMIT");
-
-    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
-    return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
-  } catch (err) {
-    try { if (client) await client.query("ROLLBACK"); } catch { }
-    console.error("[createFoodStore] error:", err);
-    return res.status(500).json({ ok: false, error: "server_error" });
-  } finally {
-    try { if (client) client.release(); } catch { }
+  if (events.length) {
+    const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+    await client.query(
+      `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
+      [storeId, ...events]
+    );
   }
+
+  await client.query("COMMIT");
+
+  const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
+  return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
+} catch (err) {
+  try { if (client) await client.query("ROLLBACK"); } catch { }
+  console.error("[createFoodStore] error:", err);
+  return res.status(500).json({ ok: false, error: "server_error" });
+} finally {
+  try { if (client) client.release(); } catch { }
+}
 }
 
 /* ===================== 단건 조회(GET /:id) ===================== */
