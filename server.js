@@ -9,6 +9,8 @@ import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
 import hotblogRouter from "./routes/hotblogregister.js";
+import ownerRouter from "./routes/owner.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +41,8 @@ app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/owner", ownerRouter);
+
 
 /* 사업자 인증 프록시 */
 app.post("/verify-biz", async (req, res) => {

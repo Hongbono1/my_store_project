@@ -131,6 +131,22 @@
                     <canvas id="statsChart" height="100"></canvas>
                 </div>
 
+                <!-- ✅ 기간 선택 버튼 -->
+                <div class="flex flex-wrap gap-2 justify-end mb-4">
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="daily">일간</button>
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="weekly">주간</button>
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="monthly">월간</button>
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="quarterly">분기</button>
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="half">반기</button>
+                    <button class="period-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                        data-period="yearly">연간</button>
+                </div>
+
                 <!-- 📦 최근 주문 내역 -->
                 <div class="bg-white rounded-2xl shadow p-6">
                     <h3 class="text-lg font-bold mb-4">🧾 최근 주문 내역</h3>
@@ -145,27 +161,9 @@
                                     <th class="text-left py-2 px-3">상태</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-2 px-3">#A1024</td>
-                                    <td class="py-2 px-3">김치찌개</td>
-                                    <td class="py-2 px-3">₩8,000</td>
-                                    <td class="py-2 px-3">10:45</td>
-                                    <td class="py-2 px-3 text-green-600 font-semibold">완료</td>
-                                </tr>
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-2 px-3">#A1023</td>
-                                    <td class="py-2 px-3">비빔밥</td>
-                                    <td class="py-2 px-3">₩9,000</td>
-                                    <td class="py-2 px-3">10:20</td>
-                                    <td class="py-2 px-3 text-yellow-600 font-semibold">진행중</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="py-2 px-3">#A1022</td>
-                                    <td class="py-2 px-3">된장찌개</td>
-                                    <td class="py-2 px-3">₩7,500</td>
-                                    <td class="py-2 px-3">09:55</td>
-                                    <td class="py-2 px-3 text-gray-600 font-semibold">대기중</td>
+                            <tbody id="recent-orders-body">
+                                <tr>
+                                    <td colspan="5" class="py-6 text-center text-gray-400">로딩 중...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -290,6 +288,165 @@
 
     <!-- ✅ JS: 메뉴 전환 + 그래프 -->
     <script>
+
+        // ✅ 1. 대시보드 정보 불러오기
+        async function loadDashboard() {
+            const res = await fetch(`/owner/dashboard?store_id=${storeId}`);
+            const data = await res.json();
+            if (data.ok) {
+                document.querySelector("#today-visitors").textContent = data.today_visitors || 0;
+                document.querySelector("#favorites").textContent = data.favorites || 0;
+                document.querySelector("#orders").textContent = data.order_count || 0;
+                document.querySelector("#reviews").textContent = data.reviews || 0;
+                document.querySelector("#today-sales").textContent = `₩${Number(data.today_sales || 0).toLocaleString()}`;
+            }
+        }
+
+        // ✅ 공통 유틸 + loadRecentOrders
+        const storeId =
+            new URLSearchParams(location.search).get("store_id") ||
+            localStorage.getItem("store_id") ||
+            "1"; // 로그인 후 실제 store_id로 바꿀 예정
+
+        function formatPrice(value) {
+            return "₩" + Number(value || 0).toLocaleString();
+        }
+
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString("ko-KR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+            });
+        }
+
+        function formatStatus(status) {
+            switch (status) {
+                case "pending":
+                    return `<span class="text-gray-600 font-semibold">대기중</span>`;
+                case "preparing":
+                    return `<span class="text-yellow-600 font-semibold">조리중</span>`;
+                case "delivering":
+                    return `<span class="text-blue-600 font-semibold">배달중</span>`;
+                case "completed":
+                    return `<span class="text-green-600 font-semibold">완료</span>`;
+                case "canceled":
+                    return `<span class="text-red-600 font-semibold">취소</span>`;
+                default:
+                    return `<span class="text-gray-600 font-semibold">${status}</span>`;
+            }
+        }
+
+        // ✅ 실제 DB 주문 데이터를 가져와 테이블에 반영
+        async function loadRecentOrders() {
+            const tbody = document.getElementById("recent-orders-body");
+            tbody.innerHTML =
+                `<tr><td colspan="5" class="py-6 text-center text-gray-400">로딩 중...</td></tr>`;
+
+            try {
+                const res = await fetch(`/owner/orders?store_id=${storeId}`);
+                const json = await res.json();
+
+                if (!json.ok || !json.orders.length) {
+                    tbody.innerHTML =
+                        `<tr><td colspan="5" class="py-6 text-center text-gray-400">최근 주문이 없습니다.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = json.orders.map(o => `
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-2 px-3">#A${String(o.id).padStart(5, "0")}</td>
+            <td class="py-2 px-3">${o.menu_label}</td>
+            <td class="py-2 px-3">${formatPrice(o.total_price)}</td>
+            <td class="py-2 px-3">${formatTime(o.created_at)}</td>
+            <td class="py-2 px-3">${formatStatus(o.status)}</td>
+          </tr>
+        `).join("");
+            } catch (err) {
+                console.error("[loadRecentOrders]", err);
+                tbody.innerHTML =
+                    `<tr><td colspan="5" class="py-6 text-center text-red-500">주문 불러오기 실패</td></tr>`;
+            }
+        }
+
+        // ✅ 페이지 로드시 실행
+        window.addEventListener("DOMContentLoaded", async () => {
+            await loadDashboard();
+            await loadStats("weekly");
+            await loadStoreInfo();
+            await loadMenuList();
+            await loadRecentOrders(); // ✅ 이 줄이 핵심
+        });
+
+        // ✅ 2. 기간별 그래프 불러오기
+        async function loadStats(period = "weekly") {
+            const res = await fetch(`/owner/stats?store_id=${storeId}&period=${period}`);
+            const data = await res.json();
+            if (data.ok) updateChart(data.data);
+        }
+
+        // ✅ Chart.js 차트 업데이트
+        let chartInstance;
+        function updateChart(rows) {
+            const ctx = document.getElementById("statsChart");
+            if (chartInstance) chartInstance.destroy();
+
+            const labels = rows.map(r => r.label);
+            const values = rows.map(r => r.total_sales);
+
+            chartInstance = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels,
+                    datasets: [{
+                        label: "매출 (천원)",
+                        data: values,
+                        borderColor: "#3B82F6",
+                        backgroundColor: "rgba(59,130,246,0.15)",
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // ✅ 3. 가게 정보 불러오기
+        async function loadStoreInfo() {
+            const res = await fetch(`/owner/store?store_id=${storeId}`);
+            const data = await res.json();
+            if (data.ok && data.store) {
+                document.querySelector("[name='storeAddress']").value = data.store.address || "";
+                document.querySelector("[name='openHours']").value = data.store.open_hours || "";
+                document.querySelector("[name='description']").value = data.store.description || "";
+            }
+        }
+
+        // ✅ 4. 메뉴 목록 불러오기
+        async function loadMenuList() {
+            const res = await fetch(`/owner/menu?store_id=${storeId}`);
+            const data = await res.json();
+            const container = document.getElementById("menu-list");
+            container.innerHTML = "";
+            if (data.ok && data.menus.length) {
+                data.menus.forEach(m => {
+                    const div = document.createElement("div");
+                    div.className = "p-4 bg-white rounded-xl shadow";
+                    div.innerHTML = `
+        <h3 class="font-bold">${m.name}</h3>
+        <p class="text-gray-500">₩${Number(m.price).toLocaleString()}</p>
+      `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        // ✅ 5. 기간 버튼 이벤트 연결
+        document.querySelectorAll(".period-btn").forEach(btn => {
+            btn.addEventListener("click", () => loadStats(btn.dataset.period));
+        });
+
         // ✅ 메뉴 전환
         const links = document.querySelectorAll(".nav-link");
         const sections = document.querySelectorAll(".content-section");
@@ -328,54 +485,8 @@
             });
         });
 
-        // ✅ 그래프 렌더링
-        const ctx = document.getElementById("statsChart");
-        if (ctx) {
-            new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: ["월", "화", "수", "목", "금", "토", "일"],
-                    datasets: [
-                        {
-                            label: "방문자",
-                            data: [120, 135, 110, 160, 150, 200, 180],
-                            borderColor: "#3B82F6",
-                            backgroundColor: "rgba(59,130,246,0.1)",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                        {
-                            label: "주문 건수",
-                            data: [20, 25, 18, 30, 28, 40, 35],
-                            borderColor: "#A855F7",
-                            backgroundColor: "rgba(168,85,247,0.1)",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                        {
-                            label: "매출(만원)",
-                            data: [80, 90, 70, 120, 110, 150, 130],
-                            borderColor: "#F97316",
-                            backgroundColor: "rgba(249,115,22,0.1)",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { stepSize: 20 },
-                        },
-                    },
-                    plugins: {
-                        legend: { position: "bottom" },
-                    },
-                },
-            });
-        }
+
+
     </script>
 
 </body>
