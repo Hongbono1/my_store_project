@@ -150,16 +150,19 @@ export async function createFoodStore(req, res) {
     await client.query("BEGIN");
 
     // 1) 가게
+    const theme = (req.body.theme || "").trim();
+
     const insertStoreQ = `
-      INSERT INTO food_stores (
-        business_name, road_address, phone,
-        business_type, business_category, business_hours, delivery_option,
-        service_details, additional_desc,
-        homepage, instagram, facebook,
-        facilities, pets_allowed, parking
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-      RETURNING id
-    `;
+  INSERT INTO food_stores (
+    business_name, road_address, phone,
+    business_type, business_category, business_hours, delivery_option,
+    service_details, additional_desc,
+    homepage, instagram, facebook,
+    facilities, pets_allowed, parking,
+    theme
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+  RETURNING id
+`;
     const { rows } = await client.query(insertStoreQ, [
       businessName,
       roadAddress,
@@ -176,6 +179,7 @@ export async function createFoodStore(req, res) {
       facilities || null,
       petsAllowed,
       parking || null,
+      theme || null,
     ]);
     const storeId = rows[0].id;
 
@@ -316,7 +320,7 @@ export async function getFoodRegisterFull(req, res) {
               name, price, image_url, description
          FROM menu_items
         WHERE store_id = $1
-        ORDER BY id ASC`,  
+        ORDER BY id ASC`,
       [storeId]
     );
 
