@@ -77,20 +77,29 @@ export async function getRecentOrders(req, res) {
     try {
         const result = await pool.query(
             `
-      SELECT id, amount, status, to_char(ordered_at, 'YYYY-MM-DD HH24:MI') AS ordered_at
-      FROM orders
-      WHERE store_id=$1
-      ORDER BY ordered_at DESC
-      LIMIT 10
-      `,
+            SELECT 
+                o.id,
+                COALESCE(SUM(oi.price * oi.quantity), 0) AS total_price,
+                string_agg(oi.menu_name, ', ') AS menu_label,
+                o.status,
+                o.ordered_at AS created_at
+            FROM orders o
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            WHERE o.store_id = $1
+            GROUP BY o.id, o.status, o.ordered_at
+            ORDER BY o.ordered_at DESC
+            LIMIT 10
+            `,
             [store_id]
         );
+
         res.json({ ok: true, orders: result.rows });
     } catch (err) {
         console.error("[getRecentOrders]", err);
         res.status(500).json({ ok: false, error: "DB 조회 오류" });
     }
 }
+
 
 /* =========================================================
    🏪 4. 가게 정보 (조회 / 수정)
