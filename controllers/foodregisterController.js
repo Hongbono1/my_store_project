@@ -154,48 +154,57 @@ export async function createFoodStore(req, res) {
 
     // 1) 가게
     const insertStoreQ = `
-  INSERT INTO food_stores (
-    business_name, road_address, phone,
+  INSERT INTO store_info (
+    business_name, owner_name, phone, email, address,
     business_type, business_category, business_hours, delivery_option,
     service_details, additional_desc,
     homepage, instagram, facebook,
     facilities, pets_allowed, parking
-  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+  ) VALUES (
+    $1,$2,$3,$4,$5,
+    $6,$7,$8,$9,
+    $10,$11,
+    $12,$13,$14,
+    $15,$16,$17
+  )
   RETURNING id
 `;
 
     const { rows } = await client.query(insertStoreQ, [
       businessName,
-      roadAddress,
-      phone || null,
-      businessType || null,
-      businessCategory || null,
-      businessHours || null,
-      deliveryOption || null,
-      serviceDetails || null,
-      additionalDesc || null,
-      homepage || null,
-      instagram || null,
-      facebook || null,
-      facilities || null,
-      petsAllowed,
-      parking || null
+      (req.body.ownerName || null),
+      (phone || null),
+      (req.body.ownerEmail || req.body.email || null),
+      roadAddress,                       // ✅ address 로 매핑
+      (businessType || null),
+      (businessCategory || null),
+      (businessHours || null),
+      (deliveryOption || null),
+      (serviceDetails || null),
+      (additionalDesc || null),
+      (homepage || null),
+      (instagram || null),
+      (facebook || null),
+      (facilities || null),
+      (petsAllowed),
+      (parking || null)
     ]);
 
     const storeId = rows[0].id;
+
 
     // 2) 파일 분류
     const allFiles = collectFiles(req);
     const storeImageFiles = filesByField(allFiles, "storeImages", "storeImages[]");
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
 
-    // 2-1) 대표 이미지 저장(단일화: store_images)
+    // 대표/추가 이미지
     if (storeImageFiles.length) {
       const urls = storeImageFiles.map(toWebPath).filter(Boolean);
       if (urls.length) {
-        const values = urls.map((_, i) => `($1,$${i + 2})`).join(",");
+        const values = urls.map((_, i) => `($1,$${i + 2},${i})`).join(",");
         await client.query(
-          `INSERT INTO store_images (store_id, url) VALUES ${values}`,
+          `INSERT INTO store_images (store_id, url, sort_order) VALUES ${values}`,
           [storeId, ...urls]
         );
       }
@@ -207,55 +216,55 @@ export async function createFoodStore(req, res) {
     const menus = [...menusA, ...menusB];
 
     // 저장 전 기존 것 정리
-    await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
+    await client.query(`DELETE FROM store_menu WHERE store_id = $1`, [storeId]);
 
     if (menus.length) {
-      const vals = menus
-        .map((_, i) =>
-          `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`
-        )
+      const values = menus
+        .map((_, i) => `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`)
         .join(",");
 
-      const params = menus.flatMap((m) => [
+      const params = menus.flatMap(m => [
         m.name,
         m.price,
-        m.category || null,
-        m.image_url || null,
-        m.description || null,
-        m.theme || null, // ✅ 추가됨
+        (m.category || null),
+        (m.image_url || null),
+        (m.description || null),
+        (m.theme || null)
       ]);
 
       await client.query(
-        `INSERT INTO menu_items (store_id, name, price, category, image_url, description, theme) VALUES ${vals}`,
+        `INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme)
+     VALUES ${values}`,
         [storeId, ...params]
       );
     }
 
+
     // 4) 이벤트 저장 (inline 파싱)
     const events = Object.entries(req.body)
-    .filter(([k]) => /^event\d+$/i.test(k))
-    .map(([, v]) => String(v || "").trim())
-    .filter(Boolean);
+      .filter(([k]) => /^event\d+$/i.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
 
-  if (events.length) {
-    const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
-    await client.query(
-      `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
-      [storeId, ...events]
-    );
+    if (events.length) {
+      const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
+      await client.query(
+        `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
+        [storeId, ...events]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
+    return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
+  } catch (err) {
+    try { if (client) await client.query("ROLLBACK"); } catch { }
+    console.error("[createFoodStore] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  } finally {
+    try { if (client) client.release(); } catch { }
   }
-
-  await client.query("COMMIT");
-
-  const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
-  return res.status(200).json({ ok: true, id: toSafeInt(storeId) || Date.now() });
-} catch (err) {
-  try { if (client) await client.query("ROLLBACK"); } catch { }
-  console.error("[createFoodStore] error:", err);
-  return res.status(500).json({ ok: false, error: "server_error" });
-} finally {
-  try { if (client) client.release(); } catch { }
-}
 }
 
 /* ===================== 단건 조회(GET /:id) ===================== */
