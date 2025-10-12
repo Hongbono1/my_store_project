@@ -143,35 +143,42 @@
       if (!id) { renderEmptyQa(); return; }
 
       try {
-        const res = await fetch(`/api/hotblog/${id}`);
-        const data = await res.json();
-        if (!data.success) { renderEmptyQa(); return; }
-
-        const blog = data.blog;
-
-        // 제목 / 날짜
-        $("#title").textContent = blog.title || "";
-        $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
-
-        // 대표 이미지
-        if (blog.cover_image) {
-          $("#coverImage").src = blog.cover_image;
-          $("#coverImage").alt = escapeHtml(blog.title || "cover");
+        // URL 파라미터에서 store id를 읽어서 동적으로 호출
+        const q = new URLSearchParams(location.search);
+        const storeId = q.get('store_id') ?? q.get('id');
+        if (!storeId) {
+            console.error("store id missing for hotblog fetch");
         } else {
-          $("#coverWrap").style.display = "none";
+            const res = await fetch(`/api/hotblog/${encodeURIComponent(storeId)}`);
+            const data = await res.json();
+            if (!data.success) { renderEmptyQa(); return; }
+
+            const blog = data.blog;
+
+            // 제목 / 날짜
+            $("#title").textContent = blog.title || "";
+            $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
+
+            // 대표 이미지
+            if (blog.cover_image) {
+              $("#coverImage").src = blog.cover_image;
+              $("#coverImage").alt = escapeHtml(blog.title || "cover");
+            } else {
+              $("#coverWrap").style.display = "none";
+            }
+
+            // 가게 기본 정보
+            const info = [];
+            if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
+            if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
+            if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
+            $("#info").innerHTML = info.join("") || "";
+
+            // 질문/답변
+            const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
+            if (!qaList.length) { renderEmptyQa(); return; }
+            renderQa(qaList);
         }
-
-        // 가게 기본 정보
-        const info = [];
-        if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
-        if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
-        if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
-        $("#info").innerHTML = info.join("") || "";
-
-        // 질문/답변
-        const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
-        if (!qaList.length) { renderEmptyQa(); return; }
-        renderQa(qaList);
 
       } catch (err) {
         console.error(err);
