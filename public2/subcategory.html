@@ -372,6 +372,81 @@
             window.history.forward();
         }
     </script>
+    <script>
+    (async function(){
+      // 1) API로 목록을 가져오는 경우 (경로는 프로젝트에 맞게 수정)
+      let list;
+      try {
+        const q = new URLSearchParams(location.search);
+        const category = q.get("category") || "";
+        // 엔드포인트 경로가 다르면 여기 수정하세요
+        const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(category)}`);
+        list = res.ok ? await res.json() : null;
+      } catch(e) {
+        console.warn("subcategory list fetch failed", e);
+        list = null;
+      }
+
+      // 2) 유틸: 다양한 키를 허용하는 안전한 매핑
+      function mapName(store){
+        return store?.business_name ?? store?.businessName ?? store?.name ?? store?.title ?? "";
+      }
+      function mapType(store){
+        return store?.business_type ?? store?.businessType ?? store?.type ?? store?.category ?? "";
+      }
+
+      // 3) 화면에 이미 렌더된 카드들 보정 (data-store-id 사용 시)
+      document.querySelectorAll("[data-store-id]").forEach(async (card) => {
+        const id = card.dataset.storeId;
+        if (!id) return;
+        // 카드 내부에 name/type 요소가 있다고 가정 (.store-name, .store-type)
+        const nameEl = card.querySelector(".store-name");
+        const typeEl = card.querySelector(".store-type");
+
+        // 우선 API 목록 결과에서 찾기
+        let store = null;
+        if (list && list.ok && Array.isArray(list.stores)) {
+          store = list.stores.find(s => String(s.id) === String(id)) ?? null;
+        }
+
+        // 목록에 없으면 개별 상세 호출로 보완
+        if (!store) {
+          try {
+            const typeParam = new URLSearchParams(location.search).get("type") || "combined";
+            const api = typeParam === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+            const r = await fetch(api);
+            if (r.ok) {
+              const j = await r.json();
+              store = j.store ?? j;
+            }
+          } catch (e) { /* ignore */ }
+        }
+
+        if (nameEl && store) nameEl.textContent = mapName(store) || nameEl.textContent || "-";
+        if (typeEl && store) typeEl.textContent = mapType(store) || typeEl.textContent || "-";
+      });
+
+      // 4) 만약 서브카테고리 목록을 JS로 렌더한다면 (간단한 예)
+      if (!document.querySelector("#subcategory-container") && list && list.ok && Array.isArray(list.stores)) {
+        const container = document.createElement("div");
+        container.id = "subcategory-container";
+        container.className = "grid grid-cols-3 gap-6";
+        list.stores.forEach(s => {
+          const name = mapName(s) || "-";
+          const type = mapType(s) || "-";
+          const img = s.image || "/uploads/no-image.png";
+          container.innerHTML += `
+            <div class="card p-4 bg-white rounded" data-store-id="${s.id}">
+              <img src="${img}" class="w-full h-40 object-cover rounded mb-3" />
+              <div class="text-lg font-semibold store-name">${name}</div>
+              <div class="text-sm text-gray-500 store-type">${type}</div>
+            </div>
+          `;
+        });
+        document.querySelector("main")?.appendChild(container);
+      }
+    })();
+    </script>
 </body>
 
 </html>
