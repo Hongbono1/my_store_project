@@ -598,80 +598,80 @@
         // 2) 데이터 표준화 (이 블록으로 교체)
         (async () => {
             try {
-                // ✅ URL 파라미터
                 const q = new URLSearchParams(location.search);
-                const id = Number(q.get("id"));
+                const idRaw = q.get("id");
+                const id = Number(idRaw);
                 const type = (q.get("type") || "food").toLowerCase();
 
-                if (!Number.isSafeInteger(id)) {
-                    alert("잘못된 접근입니다. (id 필요)");
-                    throw new Error("Invalid storeId");
-                }
+                if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
 
-                // ✅ 단일 URL 결정
-                let apiUrl = type === "combined"
-                    ? `/combined/${id}/full`
-                    : `/store/${id}/full`;
+                let apiUrl = type === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
 
-                console.log("🔥 DEBUG - type:", type, "apiUrl:", type === "combined"
-                    ? `/combined/${id}/full`
-                    : `/store/${id}/full`);
-
-                // (옵션) 한 번만 반대로 폴백
+                // fetch + 한 번만 폴백
                 let res = await fetch(apiUrl);
                 if (!res.ok) {
-                    const altUrl = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
-                    const res2 = await fetch(altUrl);
-                    if (res2.ok) { res = res2; apiUrl = altUrl; }
+                    const alt = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
+                    const tryAlt = await fetch(alt);
+                    if (tryAlt.ok) { res = tryAlt; apiUrl = alt; }
                 }
-
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
                 const json = await res.json();
                 console.log("[DETAIL] used api:", apiUrl);
 
-                // ===== 여기부터는 'json' 써서 그대로 렌더 =====
-                const store = json.store || {};
+                const store = json.store ?? json.data ?? {};
 
-                // 기존: const rawImages = Array.isArray(json.images)
-                //    ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
-                //    : [];
-                
-                // 변경: 다양한 포맷을 허용하도록 방어적 파싱
-                const rawImages = (() => {
-                  const srcCandidates = json.images ?? json.store?.images ?? json.data?.images ?? [];
-                  if (!Array.isArray(srcCandidates)) return [];
-                  return srcCandidates
-                    .map(i => {
-                      if (!i && i !== 0) return "";
-                      if (typeof i === "string") return i;
-                      if (typeof i === "object") return i.url || i.image_url || i.path || i.filename || i.src || "";
-                      return "";
-                    })
-                    .filter(Boolean);
-                })();
+                // images: 다양한 포맷 허용
+                const rawImagesCand = json.images ?? store.images ?? json.data?.images ?? [];
+                const rawImages = Array.isArray(rawImagesCand)
+                    ? rawImagesCand.map(i => {
+                        if (!i && i !== 0) return "";
+                        if (typeof i === "string") return i;
+                        if (typeof i === "object") return i.url || i.image_url || i.path || i.filename || i.src || "";
+                        return "";
+                    }).filter(Boolean)
+                    : [];
+                const imagesFixed = rawImages.map(normalizeSrc).filter(Boolean);
+                slider.init(imagesFixed);
 
-                function fixUploadsPrefix(s) {
-                    if (!s) return "";
-                    s = String(s).trim();
-                    if (/^https?:\/\//i.test(s)) return s;
-                    s = s.replace(/^\.?\/+/, "");
-                    if (!/^uploads\//i.test(s)) s = "uploads/" + s;
-                    return ("/" + s).replace(/\/{2,}/g, "/");
+                // menus: 항상 정의 (다양한 스키마 허용)
+                const rawMenusCandidate = json.menus ?? json.storeMenus ?? json.menuList ?? json.menu ?? json.data?.menus ?? [];
+                let rawList = [];
+                if (Array.isArray(rawMenusCandidate)) rawList = rawMenusCandidate;
+                else if (rawMenusCandidate && typeof rawMenusCandidate === "object") {
+                    rawList = Object.values(rawMenusCandidate).flatMap(v => Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : []));
                 }
-                const imagesFixed = rawImages.map(fixUploadsPrefix).filter(Boolean);
+                const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
+                const menus = rawList.map(m => ({
+                    category: m?.category ?? m?.category_name ?? m?.cat ?? "기타",
+                    name: m?.name ?? m?.menu_name ?? m?.title ?? "",
+                    price: toNumber(m?.price ?? m?.menu_price ?? m?.cost),
+                    image_url: m?.image_url ?? m?.imageUrl ?? m?.image ?? "",
+                    description: m?.description ?? m?.desc ?? ""
+                }));
 
-                // ===== events 방어적 파싱 =====
-                const events = (() => {
-                  const ev = json.events ?? json.store?.events ?? json.event ?? json.data?.events ?? [];
-                  if (!Array.isArray(ev)) return [];
-                  return ev
-                    .map(e => (typeof e === "string" ? e : (e.content || e.text || e.body || "")))
-                    .filter(Boolean)
-                    .map(escapeHtml);
-                })();
-                $("eventsList").innerHTML = events.length
-                    ? events.map(e => `<li>${e}</li>`).join("")
-                    : `<li>-</li>`;
+                // 기본 정보 렌더
+                $("businessNameHeader").textContent = store.business_name ?? store.name ?? "상호명 없음";
+                $("businessType").textContent = onlyValue(store.business_type);
+                $("businessCategory").textContent = onlyValue(store.business_category ?? store.category);
+                $("deliveryOption").textContent = onlyValue(store.delivery_option);
+                $("businessHours").textContent = onlyValue(store.business_hours);
+
+                $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
+                $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
+
+                // events: 방어적 파싱
+                const rawEvents = json.events ?? store.events ?? json.eventList ?? json.eventsList ?? json.data?.events ?? [];
+                const eventsArr = Array.isArray(rawEvents)
+                    ? rawEvents.map(ev => {
+                        if (!ev && ev !== 0) return "";
+                        if (typeof ev === "string") return ev;
+                        if (typeof ev === "object") return ev.content ?? ev.text ?? ev.body ?? ev.name ?? "";
+                        return String(ev);
+                    }).filter(Boolean)
+                    : [];
+                const events = eventsArr.map(escapeHtml);
+                $("eventsList").innerHTML = events.length ? events.map(e => `<li>${e}</li>`).join("") : `<li>-</li>`;
 
                 $("infoEtcList").innerHTML = `
       <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
@@ -679,68 +679,48 @@
       <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
     `;
 
-                // 4) 연락처
-                const phoneNum = store.phone || "";
-                function linkOrNull(url, label) {
-                    if (!url) return null;
-                    const u = /^https?:\/\//i.test(url) ? url : "http://" + url;
-                    return `<a href="${u}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label || url)}</a>`;
-                }
+                // 연락처
+                const phoneNum = store.phone ?? "";
                 const contactLinks = [];
                 if (phoneNum) {
                     const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
-                    contactLinks.push(
-                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`
-                    );
+                    contactLinks.push(`<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`);
                 }
-                const home = linkOrNull(store.homepage, "홈페이지");
-                if (home) contactLinks.push(home);
-                const insta = linkOrNull(store.instagram, "인스타그램");
-                if (insta) contactLinks.push(insta);
-                const face = linkOrNull(store.facebook, "페이스북");
-                if (face) contactLinks.push(face);
-
+                const linkOrNull = (url, label) => url ? `<a href="${/^https?:\/\//i.test(url) ? url : "http://" + url}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label ?? url)}</a>` : null;
+                [ [store.homepage, "홈페이지"], [store.instagram, "인스타그램"], [store.facebook, "페이스북"] ].forEach(([u, l]) => { const h = linkOrNull(u, l); if (h) contactLinks.push(h); });
                 const grid = $("contactGrid");
-                if (!contactLinks.length) {
-                    grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
-                } else if (contactLinks.length === 1) {
-                    grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
-                } else {
-                    grid.innerHTML = contactLinks.map(html => `<div>${html}</div>`).join("");
-                }
+                if (!contactLinks.length) grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
+                else if (contactLinks.length === 1) grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
+                else grid.innerHTML = contactLinks.map(x => `<div>${x}</div>`).join("");
 
-                // 5) 메뉴
+
+                // 메뉴 렌더
                 const menuList = $("menuList");
                 menuList.innerHTML = "";
                 if (!menus.length) {
                     menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
                 } else {
                     const byCat = new Map();
-
-                    // 입력 순서대로 카테고리 그룹 만들기
                     menus.forEach(it => {
                         const cat = (it.category || "").toString().trim() || "기타";
-                        if (!byCat.has(cat)) byCat.set(cat, []);   // 처음 나온 카테고리만 새로 생성
+                        if (!byCat.has(cat)) byCat.set(cat, []);
                         byCat.get(cat).push(it);
                     });
-
-                    // Map을 순서대로 순회
                     byCat.forEach((groupItems, cat) => {
                         const group = document.createElement("div");
                         const title = document.createElement("h3");
                         title.textContent = "🍱 " + cat;
                         title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
                         group.appendChild(title);
-
                         groupItems.forEach(it => {
                             const box = document.createElement("div");
                             box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
-                            const imgSrc = normalizeSrc(it.image_url || it.imageUrl || "");
+                            const imgSrc = normalizeSrc(it.image_url || "");
                             box.innerHTML = `
           <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
           <div class="flex-1 min-w-0">
-            <div class="text-lg font-bold mb-1 truncate">${it.name}</div>
-            <div class="text-base font-medium text-gray-700">${Number(it.price).toLocaleString()}원</div>
+            <div class="text-lg font-bold mb-1 truncate">${escapeHtml(it.name || "-")}</div>
+            <div class="text-base font-medium text-gray-700">${Number(it.price || 0).toLocaleString()}원</div>
             ${it.description ? `<div class="text-sm text-gray-500 mt-1">${escapeHtml(it.description)}</div>` : ""}
           </div>
           <div class="flex flex-col items-center gap-1 shrink-0">
@@ -758,28 +738,19 @@
                             box.querySelector(".addBtn").onclick = () => addToCart({ name: it.name, price: it.price, quantity: qty });
                             group.appendChild(box);
                         });
-
                         menuList.appendChild(group);
                     });
                 }
 
-                // 6) 지도
-                initMap(store.address || "", store.business_name || store.name || "")
-                    .catch(err => console.warn("지도 로딩 실패(무시):", err));
-
-                // 예약 버튼
-                const reserveBtn = $("reserveBtn");
-                if (reserveBtn) {
-                    reserveBtn.onclick = () => alert("예약 신청 기능은 곧 제공됩니다! (여기에 폼/모달 연결)");
-                }
-
-                // 높이 동기화
+                // 지도, 예약, 레이아웃
+                initMap(store.address ?? "", store.business_name ?? store.name ?? "").catch(() => {});
+                $("reserveBtn")?.addEventListener("click", () => alert("예약 신청 기능은 곧 제공됩니다!"));
                 syncRightColHeight();
                 setTimeout(syncRightColHeight, 300);
 
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
-                document.getElementById("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
+                $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
             }
         })();
 
