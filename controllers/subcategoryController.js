@@ -11,14 +11,14 @@ export async function getFoodStoresByCategory(req, res) {
     try {
         const result = await pool.query(
             `
-            SELECT f.id,
-                   f.business_name,
-                   f.business_category AS category,
+            SELECT s.id,
+                   s.business_name,
+                   s.business_category AS category,
                    '음식점' AS business_type,
-                   COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
-            FROM food_stores f
-            WHERE f.business_category = $1
-            ORDER BY f.created_at DESC
+                   COALESCE((SELECT url FROM store_images WHERE store_id = s.id LIMIT 1), '') AS image
+            FROM store_info s
+            WHERE s.business_category = $1
+            ORDER BY s.created_at DESC
             `,
             [category]
         );
@@ -83,13 +83,13 @@ export async function getBestFoodStores(req, res) {
     try {
         const result = await pool.query(
             `
-            SELECT f.id,
-                   f.business_name,
-                   f.business_category AS category,
+            SELECT s.id,
+                   s.business_name,
+                   s.business_category AS category,
                    '음식점' AS business_type,
-                   COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
-            FROM food_stores f
-            ORDER BY f.view_count DESC NULLS LAST, f.created_at DESC
+                   COALESCE((SELECT url FROM store_images WHERE store_id = s.id LIMIT 1), '') AS image
+            FROM store_info s
+            ORDER BY s.view_count DESC NULLS LAST, s.created_at DESC
             LIMIT 20
             `
         );
@@ -114,14 +114,14 @@ export async function getNewFoodStores(req, res) {
     try {
         const result = await pool.query(
             `
-            SELECT f.id,
-                   f.business_name,
-                   f.business_category AS category,
+            SELECT s.id,
+                   s.business_name,
+                   s.business_category AS category,
                    '음식점' AS business_type,
-                   COALESCE((SELECT url FROM store_images WHERE store_id = f.id LIMIT 1), '') AS image
-            FROM food_stores f
-            WHERE f.created_at >= NOW() - INTERVAL '7 days'
-            ORDER BY f.created_at DESC
+                   COALESCE((SELECT url FROM store_images WHERE store_id = s.id LIMIT 1), '') AS image
+            FROM store_info s
+            WHERE s.created_at >= NOW() - INTERVAL '7 days'
+            ORDER BY s.created_at DESC
             LIMIT 20
             `
         );
