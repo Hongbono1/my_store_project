@@ -65,20 +65,32 @@
   <div id="footer-placeholder"></div>
 
   <script>
-    // ✅ 헤더/푸터 동적 로드
-    async function loadHeaderFooter() {
+    // 방어: URL에 템플릿 플레이스홀더가 남아있으면 제거(네트워크 잘못된 요청 차단)
+    (function sanitizeTemplatePlaceholders() {
       try {
-        const header = await fetch("https://www.hongbono1.com/components/header.html").then(r => r.text());
-        document.getElementById("header-placeholder").innerHTML = header;
+        const decoded = decodeURIComponent(location.search || "");
+        if (decoded.includes("{{store_id}}")) {
+          const cleaned = decoded.replace(/\{\{store_id\}\}/g, "");
+          history.replaceState(null, "", location.pathname + cleaned);
+          console.warn("Removed template placeholder from URL:", cleaned);
+        }
+      } catch (e) { /* ignore */ }
+    })();
 
-        const footer = await fetch("https://www.hongbono1.com/components/footer.html").then(r => r.text());
-        document.getElementById("footer-placeholder").innerHTML = footer;
-      } catch (e) {
-        console.error("헤더/푸터 로드 실패:", e);
-      }
-    }
-
-    loadHeaderFooter();
+     // ✅ 헤더/푸터 동적 로드
+     async function loadHeaderFooter() {
+       try {
+         const header = await fetch("https://www.hongbono1.com/components/header.html").then(r => r.text());
+         document.getElementById("header-placeholder").innerHTML = header;
+ 
+         const footer = await fetch("https://www.hongbono1.com/components/footer.html").then(r => r.text());
+         document.getElementById("footer-placeholder").innerHTML = footer;
+       } catch (e) {
+         console.error("헤더/푸터 로드 실패:", e);
+       }
+     }
+ 
+     loadHeaderFooter();
     
     const $ = (sel) => document.querySelector(sel);
 
@@ -139,52 +151,65 @@
 
     async function loadBlog() {
       const params = new URLSearchParams(location.search);
-      const id = params.get("id");
-      if (!id) { renderEmptyQa(); return; }
+      const storeId = params.get('store_id') ?? params.get('id');
+      if (!storeId) { renderEmptyQa(); return; }
+
+      if (/\{|\}/.test(storeId)) {
+        console.error("Invalid storeId in URL (template left):", storeId);
+        renderEmptyQa();
+        return;
+      }
 
       try {
-        // URL 파라미터에서 store id를 읽어서 동적으로 호출
-        const q = new URLSearchParams(location.search);
-        const storeId = q.get('store_id') ?? q.get('id');
-        if (!storeId) {
-            console.error("store id missing for hotblog fetch");
+        const apiUrl = `/api/hotblog/${encodeURIComponent(storeId)}`;
+        console.log("[hotblog] fetch", apiUrl);
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        if (!data.success) { renderEmptyQa(); return; }
+
+        const blog = data.blog;
+
+        // 제목 / 날짜
+        $("#title").textContent = blog.title || "";
+        $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
+
+        // 대표 이미지
+        if (blog.cover_image) {
+          $("#coverImage").src = blog.cover_image;
+          $("#coverImage").alt = escapeHtml(blog.title || "cover");
         } else {
-            const res = await fetch(`/api/hotblog/${encodeURIComponent(storeId)}`);
-            const data = await res.json();
-            if (!data.success) { renderEmptyQa(); return; }
-
-            const blog = data.blog;
-
-            // 제목 / 날짜
-            $("#title").textContent = blog.title || "";
-            $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
-
-            // 대표 이미지
-            if (blog.cover_image) {
-              $("#coverImage").src = blog.cover_image;
-              $("#coverImage").alt = escapeHtml(blog.title || "cover");
-            } else {
-              $("#coverWrap").style.display = "none";
-            }
-
-            // 가게 기본 정보
-            const info = [];
-            if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
-            if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
-            if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
-            $("#info").innerHTML = info.join("") || "";
-
-            // 질문/답변
-            const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
-            if (!qaList.length) { renderEmptyQa(); return; }
-            renderQa(qaList);
+          $("#coverWrap").style.display = "none";
         }
+
+        // 가게 기본 정보
+        const info = [];
+        if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
+        if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
+        if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
+        $("#info").innerHTML = info.join("") || "";
+
+        // 질문/답변
+        const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
+        if (!qaList.length) { renderEmptyQa(); return; }
+        renderQa(qaList);
 
       } catch (err) {
         console.error(err);
         renderEmptyQa();
       }
     }
+
+    // 방어: URL에 템플릿 플레이스홀더가 남아있으면 제거(네트워크 잘못된 요청 차단)
+    (function sanitizeTemplatePlaceholders() {
+      try {
+        const decoded = decodeURIComponent(location.search || "");
+        if (decoded.includes("{{store_id}}")) {
+          const cleaned = decoded.replace(/\{\{store_id\}\}/g, "");
+          history.replaceState(null, "", location.pathname + cleaned);
+          console.warn("Removed template placeholder from URL:", cleaned);
+        }
+      } catch (e) { /* ignore */ }
+    })();
 
     // ✅ 전역에서 실행될 ID/버튼 함수
     // 현재 ID 가져오기
@@ -199,12 +224,15 @@
         alert("이전 글이 없습니다.");
       }
     }
-
++
++    // alias: 기존 onclick에서 사용 중인 goBack() 을 지원 (호출 안전성)
++    function goBack() { goPrev(); }
+ 
     // 다음 페이지 이동
     function goNext() {
       location.href = `hotblogdetail.html?id=${currentId + 1}`;
     }
-
+ 
     loadBlog();
 
 
