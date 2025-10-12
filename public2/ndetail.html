@@ -660,17 +660,18 @@
                 $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
                 $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
 
-                // events: 방어적 파싱
+                // events: 방어적(간단·안전) 파싱 — 오류를 절대 던지지 않음
                 const rawEvents = json.events ?? store.events ?? json.eventList ?? json.eventsList ?? json.data?.events ?? [];
-                const eventsArr = Array.isArray(rawEvents)
-                    ? rawEvents.map(ev => {
-                        if (!ev && ev !== 0) return "";
-                        if (typeof ev === "string") return ev;
-                        if (typeof ev === "object") return ev.content ?? ev.text ?? ev.body ?? ev.name ?? "";
-                        return String(ev);
-                    }).filter(Boolean)
-                    : [];
-                const events = eventsArr.map(escapeHtml);
+                const eventsArr = [];
+                if (Array.isArray(rawEvents)) {
+                    for (const ev of rawEvents) {
+                        if (ev === null || ev === undefined) continue;
+                        if (typeof ev === "string") eventsArr.push(ev);
+                        else if (typeof ev === "object") eventsArr.push(ev.content ?? ev.text ?? ev.body ?? ev.name ?? "");
+                        else eventsArr.push(String(ev));
+                    }
+                }
+                const events = eventsArr.filter(Boolean).map(escapeHtml);
                 $("eventsList").innerHTML = events.length ? events.map(e => `<li>${e}</li>`).join("") : `<li>-</li>`;
 
                 $("infoEtcList").innerHTML = `
