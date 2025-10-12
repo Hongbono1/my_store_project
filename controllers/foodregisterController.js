@@ -297,25 +297,25 @@ export async function getFoodRegisterFull(req, res) {
     const storeId = parseId(req.params.id);
     if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 1) 가게
+    // 1) 가게 (store_info 테이블 사용)
     const { rows: s } = await pool.query(
       `SELECT
          id,
          business_name,
-         road_address AS address,
+         address,
          phone,
-         NULL::timestamp AS created_at,
+         created_at,
          business_type, business_category, business_hours, delivery_option,
          service_details, additional_desc,
          homepage, instagram, facebook,
          facilities, pets_allowed, parking
-       FROM food_stores
+       FROM store_info
        WHERE id = $1`,
       [storeId]
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지 → store_images만 사용
+    // 2) 이미지 → store_images 사용 (기존과 동일)
     const { rows: images } = await pool.query(
       `SELECT url 
          FROM store_images
@@ -324,17 +324,17 @@ export async function getFoodRegisterFull(req, res) {
       [storeId]
     );
 
-    // 3) 메뉴
+    // 3) 메뉴 → store_menu 테이블로 변경
     const { rows: menus } = await pool.query(
       `SELECT store_id, COALESCE(category,'기타') AS category,
               name, price, image_url, description
-         FROM menu_items
+         FROM store_menu
         WHERE store_id = $1
         ORDER BY id ASC`,
       [storeId]
     );
 
-    // 4) 이벤트
+    // 4) 이벤트 (기존과 동일)
     const { rows: ev } = await pool.query(
       `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
       [storeId]
