@@ -185,19 +185,20 @@
 
                 pageItems.forEach(store => {
                     const card = document.createElement("div");
-                    card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-72 bg-white";
-                    // 안전한 필드 매핑 (fallback)
-                    const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
-                    const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
-                    const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
-
-                    // DEBUG: 값 확인 (콘솔에 출력)
-                    console.log("[renderPagedAdStores] id:", store.id, "name:", dispName, "category:", dispCategory);
-
-                    // 이미지 컨테이너를 고정 높이로 통일 (다른 그리드와 동일하게 h-40 사용)
+                    // 전체 카드 높이는 내용에 맞게 자동, 이미지 영역은 234px 고정
+                    card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white";
+                     // 안전한 필드 매핑 (fallback)
+                     const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
+                     const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
+                     const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
+ 
+                     // DEBUG: 값 확인 (콘솔에 출력)
+                     console.log("[renderPagedAdStores] id:", store.id, "name:", dispName, "category:", dispCategory);
+ 
+                    const imgNorm = normalizeSrc(imgSrc);
                     card.innerHTML = `
-          <div class="relative h-40">
-            <img src="${imgSrc}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
+          <div class="relative h-[234px]">
+            <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
               <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
               <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
@@ -274,29 +275,29 @@
                     const dispName = p?.name ?? p?.business_name ?? p?.businessName ?? p?.title ?? "-";
                     const dispCategory = p?.category ?? p?.business_category ?? p?.businessCategory ?? "";
                     const imgSrc = p?.image ?? p?.image_url ?? p?.url ?? "/uploads/no-image.png";
-                    const safeImg = imgSrc || "/uploads/no-image.png";
+                    const safeImg = normalizeSrc(imgSrc);
 
                     // DEBUG: 값 확인
                     console.log("[renderPagedProductGrid] id:", p.id, "name:", dispName);
 
                     const card = document.createElement("div");
-                    card.className = "bg-white rounded-xl shadow p-0 text-center hover:shadow-lg transition cursor-pointer overflow-hidden";
+                    card.className = "bg-white rounded-xl shadow p-0 text-center hover:shadow-lg transition cursor-pointer overflow-hidden h-auto";
                     card.innerHTML = `
-          <div class="w-full h-40 mb-0 relative">
+          <div class="w-full mb-0 relative h-[234px]">
             <img src="${safeImg}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-lg">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 px-3 py-2">
               <h3 class="font-semibold text-sm md:text-base text-gray-800 truncate mb-0">${escapeHtml(dispName)}</h3>
               <p class="text-gray-600 text-xs md:text-sm mb-0">${escapeHtml(dispCategory)}</p>
             </div>
           </div>`;
-
-                     // 상세로 이동 (type 결정도 안전하게)
-                     card.addEventListener("click", () => {
-                         const bt = p?.business_type ?? p?.businessType ?? p?.business_category ?? "";
-                         const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
-                         window.location.href = `/ndetail.html?id=${p.id}&type=${type}`;
-                     });
-                     wrapper.appendChild(card);
+ 
+                      // 상세로 이동 (type 결정도 안전하게)
+                      card.addEventListener("click", () => {
+                          const bt = p?.business_type ?? p?.businessType ?? p?.business_category ?? "";
+                          const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
+                          window.location.href = `/ndetail.html?id=${p.id}&type=${type}`;
+                      });
+                      wrapper.appendChild(card);
                  });
 
                 grid.appendChild(wrapper);
@@ -413,12 +414,11 @@
     </script>
     <script>
     (async function(){
-      // 1) API로 목록을 가져오는 경우 (경로는 프로젝트에 맞게 수정)
+      // 1) API로 목록을 가져오는 경우
       let list;
       try {
         const q = new URLSearchParams(location.search);
         const category = q.get("category") || "";
-        // 엔드포인트 경로가 다르면 여기 수정하세요
         const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(category)}`);
         list = res.ok ? await res.json() : null;
       } catch(e) {
@@ -438,17 +438,14 @@
       document.querySelectorAll("[data-store-id]").forEach(async (card) => {
         const id = card.dataset.storeId;
         if (!id) return;
-        // 카드 내부에 name/type 요소가 있다고 가정 (.store-name, .store-type)
         const nameEl = card.querySelector(".store-name");
         const typeEl = card.querySelector(".store-type");
 
-        // 우선 API 목록 결과에서 찾기
         let store = null;
         if (list && list.ok && Array.isArray(list.stores)) {
           store = list.stores.find(s => String(s.id) === String(id)) ?? null;
         }
 
-        // 목록에 없으면 개별 상세 호출로 보완
         if (!store) {
           try {
             const typeParam = new URLSearchParams(location.search).get("type") || "combined";
@@ -477,8 +474,8 @@
           container.innerHTML += `
             <div class="card p-4 bg-white rounded" data-store-id="${s.id}">
               <img src="${img}" class="w-full h-40 object-cover rounded mb-3" />
-              <div class="text-lg font-semibold store-name">${name}</div>
-              <div class="text-sm text-gray-500 store-type">${type}</div>
+              <div class="text-lg font-semibold store-name">${escapeHtml(name)}</div>
+              <div class="text-sm text-gray-500 store-type">${escapeHtml(type)}</div>
             </div>
           `;
         });
@@ -486,6 +483,5 @@
       }
     })();
     </script>
-</body>
-
+  </body>
 </html>
