@@ -632,9 +632,23 @@
                 // ===== 여기부터는 'json' 써서 그대로 렌더 =====
                 const store = json.store || {};
 
-                const rawImages = Array.isArray(json.images)
-                    ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
-                    : [];
+                // 기존: const rawImages = Array.isArray(json.images)
+                //    ? json.images.map(i => i.url || i.image_url || i.path || i.filename || "")
+                //    : [];
+                
+                // 변경: 다양한 포맷을 허용하도록 방어적 파싱
+                const rawImages = (() => {
+                  const srcCandidates = json.images ?? json.store?.images ?? json.data?.images ?? [];
+                  if (!Array.isArray(srcCandidates)) return [];
+                  return srcCandidates
+                    .map(i => {
+                      if (!i && i !== 0) return "";
+                      if (typeof i === "string") return i;
+                      if (typeof i === "object") return i.url || i.image_url || i.path || i.filename || i.src || "";
+                      return "";
+                    })
+                    .filter(Boolean);
+                })();
 
                 function fixUploadsPrefix(s) {
                     if (!s) return "";
@@ -646,47 +660,15 @@
                 }
                 const imagesFixed = rawImages.map(fixUploadsPrefix).filter(Boolean);
 
-                // 1) 슬라이더
-                slider.init(imagesFixed);
-
-                const rawMenusCandidate =
-                    json.menus ??
-                    json.storeMenus ??
-                    json.menuList ??
-                    json.menu ??
-                    (json.data && (json.data.menus ?? json.data.storeMenus)) ??
-                    [];
-
-                const rawList = Array.isArray(rawMenusCandidate)
-                    ? rawMenusCandidate
-                    : (rawMenusCandidate && typeof rawMenusCandidate === "object")
-                        ? Object.values(rawMenusCandidate).flatMap(v =>
-                            Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : [])
-                        )
-                        : [];
-
-                const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
-
-                const menus = rawList.map(m => ({
-                    category: m.category ?? m.category_name ?? m.cat ?? "기타",
-                    name: m.name ?? m.menu_name ?? m.title ?? "",
-                    price: toNumber(m.price ?? m.menu_price ?? m.cost),
-                    image_url: m.image_url ?? m.imageUrl ?? m.image ?? "",
-                    description: m.description ?? m.desc ?? ""
-                }));
-
-                // 2) 기본 정보
-                $("businessNameHeader").textContent = store.business_name || store.name || "상호명 없음";
-                $("businessType").textContent = onlyValue(store.business_type);
-                $("businessCategory").textContent = onlyValue(store.business_category ?? store.category);
-                $("deliveryOption").textContent = onlyValue(store.delivery_option);
-                $("businessHours").textContent = onlyValue(store.business_hours);
-
-                // 3) 본문들
-                $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
-                $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
-
-                const events = (json.events || []).map(escapeHtml);
+                // ===== events 방어적 파싱 =====
+                const events = (() => {
+                  const ev = json.events ?? json.store?.events ?? json.event ?? json.data?.events ?? [];
+                  if (!Array.isArray(ev)) return [];
+                  return ev
+                    .map(e => (typeof e === "string" ? e : (e.content || e.text || e.body || "")))
+                    .filter(Boolean)
+                    .map(escapeHtml);
+                })();
                 $("eventsList").innerHTML = events.length
                     ? events.map(e => `<li>${e}</li>`).join("")
                     : `<li>-</li>`;

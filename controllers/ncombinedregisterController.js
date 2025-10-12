@@ -170,6 +170,17 @@ export async function createCombinedStore(req, res) {
       );
     }
 
+    // ✅ 이벤트 저장 (클라이언트에서 events[]로 전송됨)
+    const eventsArr = arr(raw['events[]'] ?? raw.events);
+    for (let i = 0; i < eventsArr.length; i++) {
+      const content = s(eventsArr[i]);
+      if (!content) continue;
+      await client.query(
+        `INSERT INTO combined_store_events (store_id, content, ord) VALUES ($1, $2, $3)`,
+        [storeId, content, i + 1]
+      );
+    }
+
     await client.query("COMMIT");
     console.log("[createCombinedStore] 성공:", storeId);
     return res.json({ ok: true, id: storeId });
