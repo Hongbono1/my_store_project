@@ -8,9 +8,9 @@ import { randomUUID } from "crypto";
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
-import hotblogRouter from "./routes/hotblogregister.js";
+import hotblogRouter from "./routes/hotblog.js";
 import ownerRouter from "./routes/owner.js";
-
+import { hotblog } from "./routes/hotblog";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

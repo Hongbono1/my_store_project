@@ -162,68 +162,127 @@
   <div id="footer"></div>
 
   <script>
-    /* 더미 데이터 */
-    const DEMO = Array.from({length: 16}, (_,i)=>({
-      id: i+1,
-      title: `핫 디테일 ${i+1}`,
-      store: ["하늘식당","도쿄우동","밤비네일","루미에르헤어","강남동물병원"][i%5],
-      category: ["food","beauty","life","event"][i%4],
-      img: `https://picsum.photos/seed/hybrid${i}/600/400`,
-      desc: "감각적인 네오+글래스 디자인을 적용한 MALL HANKOOK 핫 디테일.",
-      rating: (3.5 + Math.random()*1.5).toFixed(1)
-    }));
-
     const grid = document.getElementById("grid");
     const filterBtns = document.querySelectorAll(".filter-btn");
 
-    /* 카드 렌더링 */
+    // 안전한 필드 매핑
+    function mapBlogToCard(b) {
+      return {
+        id: b.id,
+        title: b.title || b.store_name || "제목 없음",
+        store: b.store_name || b.store || "",
+        category: b.category || b.qa_mode || "",
+        img: b.cover_image || b.img || "/uploads/no-image.png",
+        desc: (b.summary || b.desc || "").toString(),
+        rating: (b.rating ?? (3.5 + Math.random()*1.5)).toString().slice(0,3)
+      };
+    }
+
     function renderGrid(list){
+      if(!Array.isArray(list) || !list.length){
+        grid.innerHTML = `<div class="col-span-full text-center text-gray-500">표시할 핫블로그가 없습니다.</div>`;
+        return;
+      }
       grid.innerHTML = list.map(item=>`
         <article class="neo-card overflow-hidden">
-          <div class="relative aspect-[4/3] overflow-hidden">
-            <img src="${item.img}" alt="${item.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
-            <div class="absolute bottom-3 left-3 text-white">
-              <h3 class="font-semibold">${item.title}</h3>
-              <p class="text-xs opacity-90">${item.store}</p>
+          <a href="hotblogdetail.html?id=${encodeURIComponent(item.id)}" class="block">
+            <div class="relative aspect-[4/3] overflow-hidden">
+              <img src="${item.img}" alt="${escapeHtml(item.title)}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
+              <div class="absolute bottom-3 left-3 text-white">
+                <h3 class="font-semibold">${escapeHtml(item.title)}</h3>
+                <p class="text-xs opacity-90">${escapeHtml(item.store)}</p>
+              </div>
             </div>
-          </div>
+          </a>
           <div class="p-4">
-            <p class="text-sm text-gray-600 line-clamp-2 mb-2">${item.desc}</p>
+            <p class="text-sm text-gray-600 line-clamp-2 mb-2">${escapeHtml(item.desc)}</p>
             <div class="flex justify-between items-center text-xs text-gray-500">
-              <span>${item.category}</span>
-              <span>⭐ ${item.rating}</span>
+              <span>${escapeHtml(item.category)}</span>
+              <span>⭐ ${escapeHtml(item.rating)}</span>
             </div>
             <div class="mt-4 flex gap-2">
-              <button class="neo-btn flex-1">자세히 보기</button>
-              <button class="glass-btn flex-1">관련 목록</button>
+              <a href="hotblogdetail.html?id=${encodeURIComponent(item.id)}" class="neo-btn flex-1 text-center">자세히 보기</a>
+              <button class="glass-btn flex-1" data-store="${encodeURIComponent(item.store)}">관련 목록</button>
             </div>
           </div>
         </article>
       `).join('');
     }
 
-    renderGrid(DEMO);
-
-    /* 카테고리 필터 */
-    filterBtns.forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        document.querySelector(".filter-btn.active")?.classList.remove("active");
-        btn.classList.add("active");
-        const cat = btn.dataset.cat;
-        const filtered = cat==="all" ? DEMO : DEMO.filter(v=>v.category===cat);
-        renderGrid(filtered);
-      });
-    });
-
-    /* Header/Footer 불러오기 */
+    // header/footer 불러오기
     Promise.all([
-      fetch('/components/header.html').then(r=>r.text()),
-      fetch('/components/footer.html').then(r=>r.text())
+      fetch('/components/header.html').then(r=>r.text()).catch(()=>"<div></div>"),
+      fetch('/components/footer.html').then(r=>r.text()).catch(()=>"<div></div>")
     ]).then(([h,f])=>{
       document.getElementById('header').innerHTML=h;
       document.getElementById('footer').innerHTML=f;
     });
-  </script>
+
+    // API 시도 목록 (순서대로)
+    const API_CANDIDATES = [
+      '/api/random-hotblog',   // single or {blog}
+      '/api/hotblogs',         // list
+      '/api/hotblog/list',     // list alt
+      '/api/hotblog?limit=20'  // query style
+    ];
+
+    async function fetchHotList() {
+      for (const ep of API_CANDIDATES) {
+        try {
+          const res = await fetch(ep);
+          if (!res.ok) continue;
+          const j = await res.json();
+          // 여러 포맷 처리
+          if (Array.isArray(j)) return j;
+          if (Array.isArray(j.blogs)) return j.blogs;
+          if (Array.isArray(j.data)) return j.data;
+          if (j.success && Array.isArray(j.blogList)) return j.blogList;
+          if (j.success && j.blog) return [j.blog];
+          if (j.blog) return Array.isArray(j.blog) ? j.blog : [j.blog];
+        } catch (e) { /* 다음 시도 */ }
+      }
+      return null;
+    }
+
+    (async function init() {
+      // 템플릿 플레이스홀더 제거(방어)
+      try {
+        const decoded = decodeURIComponent(location.search || "");
+        if (decoded.includes("{{store_id}}")) {
+          const cleaned = decoded.replace(/\{\{store_id\}\}/g, "");
+          history.replaceState(null, "", location.pathname + cleaned);
+        }
+      } catch (e) { /* ignore */ }
+
+      let list = await fetchHotList();
+      if (!list || !list.length) {
+        // API 실패 시 데모로 보여줌(개발용)
+        list = Array.from({length: 12}, (_,i)=>mapBlogToCard({
+          id: `demo-${i+1}`,
+          title: `샘플 핫블로그 ${i+1}`,
+          store_name: ["하늘식당","도쿄우동","밤비네일","루미에르헤어","강남동물병원"][i%5],
+          category: ["food","beauty","life","event"][i%4],
+          cover_image: `https://picsum.photos/seed/hybrid${i}/600/400`,
+          desc: "실제 데이터가 없어 샘플을 표시합니다."
+        })).map(mapBlogToCard);
+      } else {
+        list = list.map(mapBlogToCard);
+      }
+
+      renderGrid(list);
+
+      // 필터 버튼 동작: 기존 카테고리 속성 기준으로 필터
+      filterBtns.forEach(btn=>{
+        btn.addEventListener("click",()=>{
+          document.querySelector(".filter-btn.active")?.classList.remove("active");
+          btn.classList.add("active");
+          const cat = btn.dataset.cat;
+          const filtered = cat==="all" ? list : list.filter(v=>v.category === cat);
+          renderGrid(filtered);
+        });
+      });
+    })();
+   </script>
 </body>
 </html>
