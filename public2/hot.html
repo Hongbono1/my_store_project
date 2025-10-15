@@ -246,7 +246,7 @@
           <p class="text-gray-600 mb-4">
             {{theme_text}} <!-- DB에서 가져온 문구 -->
           </p>
-          <!-- 오늘의 테마 버튼: 항상 hotsubcategory로 이동하도록 id+강제 핸들러 추가 -->
+          <!-- 오늘의 테마 버튼: 항상 hotsubcategory로 이동하도록 id 부여(파일 내 이미 있으면 그대로 사용) -->
           <a id="today-theme-btn" href="/hotsubcategory.html?category=theme" class="inline-block px-3 py-1 bg-yellow-400 text-sm rounded">
             오늘의 테마
           </a>
@@ -502,7 +502,7 @@
   })();
 </script>
 <script>
-  // 오늘의 테마 버튼: 항상 hotsubcategory로 이동하도록 id+강제 핸들러 추가
+  // 오늘의 테마 버튼: 항상 hotsubcategory로 이동하도록 id 부여(파일 내 이미 있으면 그대로 사용)
   (function(){
     const btn = document.getElementById('today-theme-btn');
     if (!btn) return;
@@ -513,6 +513,39 @@
       e.preventDefault();
       location.href = "/hotsubcategory.html?category=theme";
     }, { passive: false });
+  })();
+</script>
+<!-- 아래 기존 여러 스크립트(플레이스홀더 치환 / 헬스체크 / 중복 핸들러 등)를 하나로 정리 -->
+<script>
+  (function(){
+    const TARGET = "/hotsubcategory.html?category=theme";
+    // 강제: 버튼이 반드시 서브카테고리로 이동
+    const btn = document.getElementById('today-theme-btn');
+    if (btn) {
+      btn.setAttribute('href', TARGET);
+      btn.removeAttribute('onclick');
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        location.href = TARGET;
+      }, { passive: false });
+    }
+
+    // 플레이스홀더가 남은 링크들 비활성화(방어)
+    document.querySelectorAll('a[href*="{{"]').forEach(a=>{
+      a.dataset._origHref = a.getAttribute('href');
+      a.removeAttribute('href');
+      a.classList.add('opacity-60', 'pointer-events-none');
+      a.title = "잘못된 링크(데이터 누락)";
+    });
+
+    // URL에 플레이스홀더가 남아있으면 제거
+    try {
+      if (location.search && location.search.includes("{{")) {
+        const cleaned = location.search.replace(/\{\{.*?\}\}/g, "");
+        history.replaceState(null, "", location.pathname + cleaned);
+        console.warn("Removed template placeholder from URL");
+      }
+    } catch(e){}
   })();
 </script>
 </body>
