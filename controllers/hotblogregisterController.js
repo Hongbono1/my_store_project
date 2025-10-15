@@ -110,7 +110,21 @@ export async function registerHotBlog(req, res) {
 export async function getHotBlog(req, res) {
     try {
         const { id } = req.params;
-        const result = await pool.query(`SELECT * FROM hotblogs WHERE id = $1`, [id]);
+        const raw = String(id ?? req.query.id ?? "");
+        if (!raw || /\{\{.+\}\}/.test(raw) || raw.trim() === "") {
+            console.warn("[getHotBlog] invalid id param, blocked:", raw);
+            return res.status(400).json({ success: false, message: "invalid id parameter" });
+        }
+
+        const idNum = parseInt(raw, 10);
+        const isNumeric = !Number.isNaN(idNum);
+
+        if (!isNumeric) {
+            console.warn("[getHotBlog] invalid id format:", raw);
+            return res.status(400).json({ success: false, message: "invalid id format" });
+        }
+
+        const result = await pool.query(`SELECT * FROM hotblogs WHERE id = $1`, [idNum]);
         if (result.rows.length === 0) return res.status(404).json({ success: false, error: "not_found" });
 
         const blog = result.rows[0];
