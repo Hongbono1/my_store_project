@@ -5,30 +5,41 @@ exports.getHotBlog = async (req, res) => {
   if (!param) return res.status(400).json({ success: false, message: 'id required' });
 
   try {
-    // 컬럼 존재 여부 확인
-    const col = await pool.query(
-      "SELECT 1 FROM information_schema.columns WHERE table_name='hotblogs' AND column_name='store_id'"
-    );
-    const hasStoreId = col.rowCount > 0;
+    // 숫자 파라미터인지 확인
+    const isNum = /^\d+$/.test(param);
 
     let rows;
-    if (/^\d+$/.test(param)) {
-      // 숫자 파라미터면 blog.id 또는 store_id로 시도
-      if (hasStoreId) {
+
+    if (isNum) {
+      // 1) 우선 blog.id 로 시도
+      rows = await pool.query(
+        `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id
+         FROM hotblogs WHERE id = $1 ORDER BY id DESC LIMIT 1`, [param]
+      );
+
+      // 2) 못 찾았으면, 같은 숫자를 가진 store가 있는지 찾아서 store_name 기준으로 검색
+      if (!rows.rows.length) {
+        const storeRow = await pool.query(`SELECT name FROM stores WHERE id = $1 LIMIT 1`, [param]);
+        if (storeRow.rowCount) {
+          const storeName = storeRow.rows[0].name;
+          rows = await pool.query(
+            `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id
+             FROM hotblogs WHERE store_name = $1 ORDER BY id DESC LIMIT 1`, [storeName]
+          );
+        }
+      }
+
+      // 3) 여전히 못 찾았으면 user_id(작성자 id)로도 시도
+      if (!rows.rows.length) {
         rows = await pool.query(
-          `SELECT id, store_id, title, cover_image, store_name, phone, url, qa, created_at
-           FROM hotblogs WHERE id = $1 OR store_id = $1 ORDER BY id DESC LIMIT 1`, [param]
-        );
-      } else {
-        rows = await pool.query(
-          `SELECT id, title, cover_image, store_name, phone, url, qa, created_at
-           FROM hotblogs WHERE id = $1 ORDER BY id DESC LIMIT 1`, [param]
+          `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id
+           FROM hotblogs WHERE user_id = $1 ORDER BY id DESC LIMIT 1`, [param]
         );
       }
     } else {
-      // 문자열이면 store_name으로 검색
+      // 문자열인 경우엔 store_name으로 검색
       rows = await pool.query(
-        `SELECT id, title, cover_image, store_name, phone, url, qa, created_at
+        `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id
          FROM hotblogs WHERE store_name = $1 ORDER BY id DESC LIMIT 1`, [param]
       );
     }
