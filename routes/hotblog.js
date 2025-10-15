@@ -1,10 +1,15 @@
-const express = require('express');
+// routes/hotsubcategory.js
+import express from "express";
+import { getHotSubcategories } from "../controllers/hotsubcategoryController.js";
+
 const router = express.Router();
-const ctrl = require('../controllers/hotblogController');
 
-router.get('/random-hotblog', ctrl.getRandomHotBlog);
-router.get('/list', ctrl.listHotBlogs);
-router.get('/', ctrl.listHotBlogs);
-router.get('/:id', ctrl.getHotBlog);
+/**
+ * GET /api/hotsubcategory
+ * @query category=food|beauty|life|event|all
+ * @query sort=latest|default
+ * @query search=검색어
+ */
+router.get("/", getHotSubcategories);
 
-module.exports = router;
+export default router;

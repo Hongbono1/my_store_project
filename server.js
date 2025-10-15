@@ -8,9 +8,8 @@ import { randomUUID } from "crypto";
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
-import hotblogRouter from "./routes/hotblog.js";
+import hotsubcategoryRouter from "./routes/hotblog.js";
 import ownerRouter from "./routes/owner.js";
-import { hotblog } from "./routes/hotblog";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +41,6 @@ app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/owner", ownerRouter);
-
 
 /* 사업자 인증 프록시 */
 app.post("/verify-biz", async (req, res) => {
@@ -102,8 +100,9 @@ app.use("/combined", ncombinedregister);
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
 
-console.log("[boot] mounting /api/hotblog -> hotblogregister");
-app.use("/api/hotblog", hotblogRouter);
+// hot subcategory 라우터 마운트
+console.log("[boot] mounting /api/hotsubcategory -> hotsubcategoryRouter");
+app.use("/api/hotsubcategory", hotsubcategoryRouter);
 
 /* 헬스체크 */
 app.get("/__ping", (_req, res) => res.json({ ok: true }));

@@ -1,91 +1,51 @@
-const pool = require('../db');
+// controllers/hotsubcategoryController.js
+import pool from "../db.js";
 
-async function hasColumn(table, column) {
-  const r = await pool.query(
-    `SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`,
-    [table, column]
-  );
-  return r.rowCount > 0;
-}
-
-exports.getHotBlog = async (req, res) => {
-  const param = req.params.id;
-  if (!param) return res.status(400).json({ success: false, message: 'id required' });
-
+/* =========================================================
+   📊 핫 서브카테고리 목록 조회 (hotblogs 테이블 기반)
+   ========================================================= */
+export async function getHotSubcategories(req, res) {
   try {
-    const isNum = /^\d+$/.test(param);
-    let rows = { rows: [] };
+    const { category = "all", sort = "latest", search = "" } = req.query;
 
-    if (isNum) {
-      // 1) hotblogs.id 우선
-      rows = await pool.query(
-        `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id, category
-         FROM hotblogs WHERE id = $1 ORDER BY id DESC LIMIT 1`, [param]
-      );
+    let query = `
+      SELECT id, title, store_name, category, cover_image, phone, url, address, qa_mode, qa, created_at
+      FROM hotblogs
+    `;
+    const params = [];
 
-      // 2) 없으면 stores.id 로 매핑 -> store_name 기준 검색
-      if (!rows.rows.length) {
-        const storeRow = await pool.query(`SELECT name FROM stores WHERE id = $1 LIMIT 1`, [param]);
-        if (storeRow.rowCount) {
-          const storeName = storeRow.rows[0].name;
-          rows = await pool.query(
-            `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id, category
-             FROM hotblogs WHERE store_name = $1 ORDER BY id DESC LIMIT 1`, [storeName]
-          );
-        }
-      }
-
-      // 3) user_id로 시도
-      if (!rows.rows.length) {
-        rows = await pool.query(
-          `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id, category
-           FROM hotblogs WHERE user_id = $1 ORDER BY id DESC LIMIT 1`, [param]
-        );
-      }
-    } else {
-      // 문자열이면 store_name으로 조회
-      rows = await pool.query(
-        `SELECT id, title, cover_image, store_name, phone, url, qa, created_at, user_id, category
-         FROM hotblogs WHERE store_name = $1 ORDER BY id DESC LIMIT 1`, [param]
-      );
+    // 🔹 카테고리 필터
+    if (category && category !== "all") {
+      params.push(category);
+      query += ` WHERE category = $${params.length}`;
     }
 
-    if (!rows.rows.length) return res.json({ success: false, message: 'not found' });
+    // 🔹 검색어 필터
+    if (search) {
+      const keyword = `%${search}%`;
+      if (params.length) query += " AND";
+      else query += " WHERE";
+      params.push(keyword);
+      query += ` (title ILIKE $${params.length} OR store_name ILIKE $${params.length})`;
+    }
 
-    const blog = rows.rows[0];
-    try { blog.qa = typeof blog.qa === 'string' ? JSON.parse(blog.qa) : blog.qa; } catch (e) { blog.qa = []; }
-    return res.json({ success: true, blog });
-  } catch (err) {
-    console.error('getHotBlog error', err);
-    return res.status(500).json({ success: false });
-  }
-};
+    // 🔹 정렬 조건
+    switch (sort) {
+      case "latest":
+        query += " ORDER BY created_at DESC";
+        break;
+      default:
+        query += " ORDER BY id DESC";
+    }
 
-exports.listHotBlogs = async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 50;
-    const { rows } = await pool.query(
-      `SELECT id, title, cover_image, store_name, category, created_at
-       FROM hotblogs ORDER BY created_at DESC LIMIT $1`, [limit]
-    );
-    return res.json({ success: true, blogs: rows });
+    const result = await pool.query(query, params);
+    res.json({ success: true, count: result.rowCount, data: result.rows });
   } catch (err) {
-    console.error('listHotBlogs error', err);
-    return res.status(500).json({ success: false });
+    console.error("🔥 [getHotSubcategories] 오류:", err);
+    res.status(500).json({
+      success: false,
+      message: "핫 서브카테고리 데이터를 불러오는 중 오류 발생",
+      error: err.message,
+    });
   }
-};
-
-exports.getRandomHotBlog = async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, title, cover_image, store_name, qa FROM hotblogs ORDER BY random() LIMIT 1`
-    );
-    if (!rows.length) return res.json({ success: false });
-    const blog = rows[0];
-    try { blog.qa = typeof blog.qa === 'string' ? JSON.parse(blog.qa) : blog.qa; } catch(e){ blog.qa = []; }
-    return res.json({ success: true, blog });
-  } catch (err) {
-    console.error('getRandomHotBlog error', err);
-    return res.status(500).json({ success: false });
-  }
-};
+}
