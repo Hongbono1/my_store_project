@@ -453,7 +453,7 @@
       let parent = a.closest('[data-store-id], [data-id]');
       if (parent) {
         const pid = parent.dataset.storeId || parent.dataset.id;
-        if (pid && !/^\{\{.+\}\}$/.test(pid)) {
+        if (pid && !/^\{\{.+\}$/.test(pid)) {
           a.href = a.href.replace(/\{\{store_id\}\}/g, encodeURIComponent(pid));
           return;
         }
@@ -476,3 +476,30 @@
     } catch (e) { /* ignore */ }
   })();
 </script>
+<script>
+  // 오늘의 테마 버튼 href를 안전하게 설정
+  (function(){
+    const el = document.querySelector('a[href*="hotsubcategory.html?category=theme"]');
+    if (!el) return;
+    // 백엔드(로컬 개발)는 보통 포트 3000에서 동작
+    const backendOrigin = "http://localhost:3000";
+
+    // 백엔드 헬스체크 시도 (빠르게)
+    fetch(`${backendOrigin}/__ping`, { method: "GET", mode: "cors", cache: "no-store" })
+      .then(r => {
+        if (r.ok) {
+          // 백엔드가 있으면 백엔드에서 제공하는 경로로 연결
+          el.href = `${backendOrigin}/hotsubcategory.html?category=theme`;
+        } else {
+          // 응답이 정상이 아니면 상대경로 사용
+          el.href = "/hotsubcategory.html?category=theme";
+        }
+      })
+      .catch(() => {
+        // 백엔드에 접근 불가하면 현재 호스트 기준(relative)로 연결
+        el.href = "/hotsubcategory.html?category=theme";
+      });
+  })();
+</script>
+</body>
+</html>
