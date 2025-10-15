@@ -1,51 +1,47 @@
-// controllers/hotsubcategoryController.js
+// controllers/hotblogController.js
 import pool from "../db.js";
 
-/* =========================================================
-   📊 핫 서브카테고리 목록 조회 (hotblogs 테이블 기반)
-   ========================================================= */
-export async function getHotSubcategories(req, res) {
-  try {
-    const { category = "all", sort = "latest", search = "" } = req.query;
+/* ================================
+   🔥 HOTBLOG CONTROLLER
+   ================================ */
 
-    let query = `
-      SELECT id, title, store_name, category, cover_image, phone, url, address, qa_mode, qa, created_at
+// 전체 핫블로그 목록 가져오기
+export async function getAllHotblogs(req, res) {
+  try {
+    const { category, limit } = req.query;
+    const params = [];
+    let sql = `
+      SELECT id, title, cover_image, store_name, category, phone, url, address, qa_mode, created_at
       FROM hotblogs
     `;
-    const params = [];
-
-    // 🔹 카테고리 필터
     if (category && category !== "all") {
+      sql += ` WHERE category = $1`;
       params.push(category);
-      query += ` WHERE category = $${params.length}`;
     }
+    sql += ` ORDER BY created_at DESC`;
+    if (limit) sql += ` LIMIT ${Number(limit) || 20}`;
 
-    // 🔹 검색어 필터
-    if (search) {
-      const keyword = `%${search}%`;
-      if (params.length) query += " AND";
-      else query += " WHERE";
-      params.push(keyword);
-      query += ` (title ILIKE $${params.length} OR store_name ILIKE $${params.length})`;
-    }
-
-    // 🔹 정렬 조건
-    switch (sort) {
-      case "latest":
-        query += " ORDER BY created_at DESC";
-        break;
-      default:
-        query += " ORDER BY id DESC";
-    }
-
-    const result = await pool.query(query, params);
-    res.json({ success: true, count: result.rowCount, data: result.rows });
+    const { rows } = await pool.query(sql, params);
+    return res.json(rows);
   } catch (err) {
-    console.error("🔥 [getHotSubcategories] 오류:", err);
-    res.status(500).json({
-      success: false,
-      message: "핫 서브카테고리 데이터를 불러오는 중 오류 발생",
-      error: err.message,
-    });
+    console.error("[getAllHotblogs]", err);
+    res.status(500).json({ ok: false, error: "internal_error" });
+  }
+}
+
+// 랜덤 1개 핫블로그 반환
+export async function getRandomHotblog(req, res) {
+  try {
+    const { rows } = await pool.query(`
+      SELECT id, title, cover_image, store_name, category, phone, url, address, qa_mode, created_at
+      FROM hotblogs
+      ORDER BY RANDOM()
+      LIMIT 1
+    `);
+    if (rows.length === 0) return res.json({ ok: false, message: "no data" });
+    return res.json({ ok: true, blog: rows[0] });
+  } catch (err) {
+    console.error("[getRandomHotblog]", err);
+    res.status(500).json({ ok: false, error: "internal_error" });
   }
 }

@@ -1,15 +1,13 @@
-// routes/hotsubcategory.js
+// routes/hotblog.js
 import express from "express";
-import { getHotSubcategories } from "../controllers/hotsubcategoryController.js";
+import { getAllHotblogs, getRandomHotblog } from "../controllers/hotblogController.js";
 
 const router = express.Router();
 
-/**
- * GET /api/hotsubcategory
- * @query category=food|beauty|life|event|all
- * @query sort=latest|default
- * @query search=검색어
- */
-router.get("/", getHotSubcategories);
+// 전체 목록
+router.get("/", getAllHotblogs);
+
+// 랜덤 1개
+router.get("/random-hotblog", getRandomHotblog);
 
 export default router;
