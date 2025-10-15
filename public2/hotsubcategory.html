@@ -186,145 +186,118 @@
   <div id="footer"></div>
 
   <script>
-    // API 기본 호스트: LiveServer(예: :5500)로 열었을 때 백엔드(3000)로 프록시하도록 자동 선택
-    // ✅ 배포 환경에서는 자동으로 www.hongbono1.com 연결
-    const API_BASE =
-      location.hostname.includes("localhost") || location.port === "5500"
-        ? "http://localhost:3000"
-        : "https://www.hongbono1.com";
+  // API 기본 경로: Live Server(5500)로 열면 백엔드(3000)로 프록시
+  const API_BASE = (location.port === "5500" || location.port === "5501") ? "http://localhost:3000" : "";
 
-    // 안전한 HTML 이스케이프 유틸 (escapeHtml 정의 누락으로 인한 ReferenceError 방지)
-    function escapeHtml(s) {
-      return String(s ?? "").replace(/[&<>"']/g, c =>
-        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-      );
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c =>
+      ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])
+    );
+  }
+
+  function ensureGrid() {
+    let grid = document.getElementById("grid");
+    if (!grid) {
+      const main = document.querySelector("main") || document.body;
+      grid = document.createElement("div");
+      grid.id = "grid";
+      grid.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto p-4";
+      main.appendChild(grid);
     }
+    return grid;
+  }
 
-    // DOM 레퍼런스 & 렌더 유틸 (없어서 발생한 ReferenceError 방지)
-    const grid = document.getElementById("grid");
-    const filterBtns = document.querySelectorAll(".filter-btn");
+  function mapBlogToCard(b) {
+    return {
+      id: b.id ?? b.blog_id ?? "",
+      title: b.title || b.store_name || "제목 없음",
+      store: b.store_name || b.store || "",
+      category: b.category || b.qa_mode || "",
+      img: b.cover_image || b.img || "/uploads/no-image.png",
+      desc: (b.summary || b.desc || "") + "",
+      rating: (b.rating ?? (3.5 + Math.random()*1.5)).toString().slice(0,3)
+    };
+  }
 
-    function mapBlogToCard(b) {
-      return {
-        id: b.id ?? (b.blog_id ?? ""),
-        title: b.title || b.store_name || "제목 없음",
-        store_name: b.store_name || b.store || "",
-        category: b.category || b.qa_mode || "",
-        cover_image: b.cover_image || b.img || "/uploads/no-image.png",
-        desc: (b.summary || b.desc || "") + "",
-        rating: (b.rating ?? (3.5 + Math.random() * 1.5)).toString().slice(0, 3)
-      };
+  function renderGrid(list) {
+    const grid = ensureGrid();
+    if (!Array.isArray(list) || !list.length) {
+      grid.innerHTML = `<div class="col-span-full text-center text-gray-500 p-8">표시할 항목이 없습니다.</div>`;
+      return;
     }
-
-    function renderGrid(list) {
-      if (!grid) return;
-      if (!Array.isArray(list) || !list.length) {
-        grid.innerHTML = `<div class="col-span-full text-center text-gray-500">표시할 핫블로그가 없습니다.</div>`;
-        return;
-      }
-      grid.innerHTML = list.map(item => {
-        const card = mapBlogToCard(item);
-        return `
-          <article class="neo-card overflow-hidden">
-            <a href="${API_BASE || ""}/hotblogdetail.html?id=${encodeURIComponent(card.id)}" class="block">
-              <div class="relative aspect-[4/3] overflow-hidden">
-                <img src="${escapeHtml(card.cover_image)}" alt="${escapeHtml(card.title)}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
-                <div class="absolute bottom-3 left-3 text-white">
-                  <h3 class="font-semibold">${escapeHtml(card.title)}</h3>
-                  <p class="text-xs opacity-90">${escapeHtml(card.store_name)}</p>
-                </div>
-              </div>
-            </a>
-            <div class="p-4">
-              <p class="text-sm text-gray-600 line-clamp-2 mb-2">${escapeHtml(card.desc)}</p>
-              <div class="flex justify-between items-center text-xs text-gray-500">
-                <span>${escapeHtml(card.category)}</span>
-                <span>⭐ ${escapeHtml(card.rating)}</span>
-              </div>
-              <div class="mt-4 flex gap-2">
-                <a href="${API_BASE || ""}/hotblogdetail.html?id=${encodeURIComponent(card.id)}" class="neo-btn flex-1 text-center">자세히 보기</a>
-                <button class="glass-btn flex-1" data-store="${encodeURIComponent(card.store_name)}">관련 목록</button>
-              </div>
+    grid.innerHTML = list.map(item => {
+      const c = mapBlogToCard(item);
+      return `
+        <article class="bg-white rounded shadow overflow-hidden">
+          <a href="${API_BASE || ''}/hotblogdetail.html?id=${encodeURIComponent(c.id)}" class="block">
+            <div class="h-44 bg-gray-100 overflow-hidden">
+              <img src="${escapeHtml(c.img)}" alt="${escapeHtml(c.title)}" class="w-full h-full object-cover">
             </div>
-          </article>
-        `;
-      }).join("");
-    }
+          </a>
+          <div class="p-3">
+            <h3 class="font-semibold text-lg">${escapeHtml(c.title)}</h3>
+            <p class="text-sm text-gray-600">${escapeHtml(c.store)}</p>
+            <p class="mt-2 text-sm text-gray-700 line-clamp-2">${escapeHtml(c.desc)}</p>
+            <div class="mt-3 flex justify-between items-center text-xs text-gray-500">
+              <span>${escapeHtml(c.category)}</span>
+              <span>⭐ ${escapeHtml(c.rating)}</span>
+            </div>
+          </div>
+        </article>`;
+    }).join("");
+  }
 
-    // header/footer 불러오기
-    Promise.all([
-      fetch(`${API_BASE}/components/header.html`).then(r => r.text()).catch(() => "<div></div>"),
-      fetch(`${API_BASE}/components/footer.html`).then(r => r.text()).catch(() => "<div></div>")
-    ]).then(([h, f]) => {
-      document.getElementById('header').innerHTML = h;
-      document.getElementById('footer').innerHTML = f;
-    });
-
-    // API 시도 목록 (순서대로)
-    const API_CANDIDATES = [
-      `${API_BASE}/api/random-hotblog`,
-      `${API_BASE}/api/hotblogs`,
-      `${API_BASE}/api/hotblog/list`,
-      `${API_BASE}/api/hotblog?limit=20`
+  async function fetchHotListByCategory(category) {
+    const q = category ? `?category=${encodeURIComponent(category)}` : "";
+    const endpoints = [
+      `${API_BASE}/api/hotsubcategory${q}`,
+      `${API_BASE}/api/hotblogs${q}`,
+      `${API_BASE}/api/hotblog/list${q}`,
+      `${API_BASE}/api/hotblog?limit=50${category ? `&category=${encodeURIComponent(category)}` : ""}`
     ];
-
-    async function fetchHotList() {
-      for (const ep of API_CANDIDATES) {
-        try {
-          const res = await fetch(ep);
-          if (!res.ok) continue;
-          const j = await res.json();
-          // 여러 포맷 처리
-          if (Array.isArray(j)) return j;
-          if (Array.isArray(j.blogs)) return j.blogs;
-          if (Array.isArray(j.data)) return j.data;
-          if (j.success && Array.isArray(j.blogList)) return j.blogList;
-          if (j.success && j.blog) return [j.blog];
-          if (j.blog) return Array.isArray(j.blog) ? j.blog : [j.blog];
-        } catch (e) { /* 다음 시도 */ }
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, { cache: "no-store" });
+        if (!res.ok) continue;
+        const j = await res.json();
+        if (Array.isArray(j)) return j;
+        if (Array.isArray(j.blogs)) return j.blogs;
+        if (Array.isArray(j.data)) return j.data;
+        if (j.success && Array.isArray(j.blogs)) return j.blogs;
+        if (j.success && j.blog) return [j.blog];
+        if (j.blog && Array.isArray(j.blog)) return j.blog;
+      } catch (e) {
+        // 다음 endpoint로 계속 시도
       }
-      return null;
+    }
+    return null;
+  }
+
+  (async function initSubcategory() {
+    // 헤더/푸터 로드 (API_BASE 필요할 수 있음)
+    try {
+      const headerHtml = await fetch(`${API_BASE || ""}/components/header.html`).then(r => r.ok ? r.text() : "<div></div>").catch(()=>"<div></div>");
+      document.getElementById("header")?.replaceWith(Object.assign(document.createElement("div"), { id: "header", innerHTML: headerHtml }));
+    } catch {}
+    try {
+      const footerHtml = await fetch(`${API_BASE || ""}/components/footer.html`).then(r => r.ok ? r.text() : "<div></div>").catch(()=>"<div></div>");
+      document.getElementById("footer")?.replaceWith(Object.assign(document.createElement("div"), { id: "footer", innerHTML: footerHtml }));
+    } catch {}
+
+    const params = new URLSearchParams(location.search);
+    const category = params.get("category") || params.get("qa_mode") || "";
+    if (category) {
+      document.title = `서브카테고리: ${category}`;
     }
 
-    (async function init() {
-      // 템플릿 플레이스홀더 제거(방어)
-      try {
-        const decoded = decodeURIComponent(location.search || "");
-        if (decoded.includes("{{store_id}}")) {
-          const cleaned = decoded.replace(/\{\{store_id\}\}/g, "");
-          history.replaceState(null, "", location.pathname + cleaned);
-        }
-      } catch (e) { /* ignore */ }
-
-      let list = await fetchHotList();
-      if (!list || !list.length) {
-        // API 실패 시 데모로 보여줌(개발용)
-        list = Array.from({ length: 12 }, (_, i) => mapBlogToCard({
-          id: `demo-${i + 1}`,
-          title: `샘플 핫블로그 ${i + 1}`,
-          store_name: ["하늘식당", "도쿄우동", "밤비네일", "루미에르헤어", "강남동물병원"][i % 5],
-          category: ["food", "beauty", "life", "event"][i % 4],
-          cover_image: `https://picsum.photos/seed/hybrid${i}/600/400`,
-          desc: "실제 데이터가 없어 샘플을 표시합니다."
-        })).map(mapBlogToCard);
-      } else {
-        list = list.map(mapBlogToCard);
-      }
-
+    const list = await fetchHotListByCategory(category);
+    if (list && list.length) {
       renderGrid(list);
-
-      // 필터 버튼 동작: 기존 카테고리 속성 기준으로 필터
-      filterBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-          document.querySelector(".filter-btn.active")?.classList.remove("active");
-          btn.classList.add("active");
-          const cat = btn.dataset.cat;
-          const filtered = cat === "all" ? list : list.filter(v => v.category === cat);
-          renderGrid(filtered);
-        });
-      });
-    })();
+    } else {
+      // API 실패 시 빈 목록 또는 개발용 데모 표시
+      renderGrid([]);
+    }
+  })();
   </script>
 </body>
 
