@@ -438,3 +438,41 @@
     });
   })();
 </script>
+<script>
+  // 페이지에 남은 "{{store_id}}" 플레이스홀더를 안전 처리
+  (function fixPlaceholderLinks(){
+    document.querySelectorAll('a[href*="{{store_id}}"]').forEach(a=>{
+      // 우선 data-store-id 또는 data-id가 있으면 그것으로 치환
+      const storeId = a.dataset.storeId || a.dataset.id || null;
+      if (storeId && !/^\{\{.+\}\}$/.test(storeId)) {
+        a.href = a.href.replace(/\{\{store_id\}\}/g, encodeURIComponent(storeId));
+        return;
+      }
+
+      // 주변 요소에 data-store-id 속성(카드 등)이 있으면 사용
+      let parent = a.closest('[data-store-id], [data-id]');
+      if (parent) {
+        const pid = parent.dataset.storeId || parent.dataset.id;
+        if (pid && !/^\{\{.+\}\}$/.test(pid)) {
+          a.href = a.href.replace(/\{\{store_id\}\}/g, encodeURIComponent(pid));
+          return;
+        }
+      }
+
+      // 치환할 값이 없으면 링크 비활성화(클릭 무시) — 잘못된 네비게이션 방지
+      a.dataset._origHref = a.getAttribute('href');
+      a.removeAttribute('href');
+      a.style.opacity = "0.6";
+      a.title = "링크 데이터가 없어 이동할 수 없습니다.";
+    });
+
+    // URL 자체에 플레이스홀더가 남아있으면 제거 (예: ?id={{store_id}})
+    try {
+      if (location.search && location.search.includes("{{store_id}}")) {
+        const cleaned = location.search.replace(/\{\{store_id\}\}/g, "");
+        history.replaceState(null, "", location.pathname + cleaned);
+        console.warn("Removed template placeholder from URL");
+      }
+    } catch (e) { /* ignore */ }
+  })();
+</script>
