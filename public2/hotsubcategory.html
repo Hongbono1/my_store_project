@@ -200,6 +200,58 @@
       );
     }
 
+    // DOM 레퍼런스 & 렌더 유틸 (없어서 발생한 ReferenceError 방지)
+    const grid = document.getElementById("grid");
+    const filterBtns = document.querySelectorAll(".filter-btn");
+
+    function mapBlogToCard(b) {
+      return {
+        id: b.id ?? (b.blog_id ?? ""),
+        title: b.title || b.store_name || "제목 없음",
+        store_name: b.store_name || b.store || "",
+        category: b.category || b.qa_mode || "",
+        cover_image: b.cover_image || b.img || "/uploads/no-image.png",
+        desc: (b.summary || b.desc || "") + "",
+        rating: (b.rating ?? (3.5 + Math.random() * 1.5)).toString().slice(0, 3)
+      };
+    }
+
+    function renderGrid(list) {
+      if (!grid) return;
+      if (!Array.isArray(list) || !list.length) {
+        grid.innerHTML = `<div class="col-span-full text-center text-gray-500">표시할 핫블로그가 없습니다.</div>`;
+        return;
+      }
+      grid.innerHTML = list.map(item => {
+        const card = mapBlogToCard(item);
+        return `
+          <article class="neo-card overflow-hidden">
+            <a href="${API_BASE || ""}/hotblogdetail.html?id=${encodeURIComponent(card.id)}" class="block">
+              <div class="relative aspect-[4/3] overflow-hidden">
+                <img src="${escapeHtml(card.cover_image)}" alt="${escapeHtml(card.title)}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
+                <div class="absolute bottom-3 left-3 text-white">
+                  <h3 class="font-semibold">${escapeHtml(card.title)}</h3>
+                  <p class="text-xs opacity-90">${escapeHtml(card.store_name)}</p>
+                </div>
+              </div>
+            </a>
+            <div class="p-4">
+              <p class="text-sm text-gray-600 line-clamp-2 mb-2">${escapeHtml(card.desc)}</p>
+              <div class="flex justify-between items-center text-xs text-gray-500">
+                <span>${escapeHtml(card.category)}</span>
+                <span>⭐ ${escapeHtml(card.rating)}</span>
+              </div>
+              <div class="mt-4 flex gap-2">
+                <a href="${API_BASE || ""}/hotblogdetail.html?id=${encodeURIComponent(card.id)}" class="neo-btn flex-1 text-center">자세히 보기</a>
+                <button class="glass-btn flex-1" data-store="${encodeURIComponent(card.store_name)}">관련 목록</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
     // header/footer 불러오기
     Promise.all([
       fetch(`${API_BASE}/components/header.html`).then(r => r.text()).catch(() => "<div></div>"),
