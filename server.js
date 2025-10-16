@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
-import hotsubcategoryRouter from "./routes/hotblog.js"; // 현재 routes/hotblog.js가 hotsubcategory용이면 이 경로 사용
+import hotsubcategoryRouter from "./routes/hotsubcategory.js"; 
 import ownerRouter from "./routes/owner.js";
 
 const __filename = fileURLToPath(import.meta.url);

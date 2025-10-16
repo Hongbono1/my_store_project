@@ -4,10 +4,11 @@ import { getHotSubcategories, getHotSubcategoryById } from "../controllers/hotsu
 
 const router = express.Router();
 
-// ✅ 전체 또는 카테고리별 서브카테고리 리스트
+// ✅ 전체 또는 카테고리별 목록
 router.get("/", getHotSubcategories);
 
-// ✅ 단일 상세조회
+// ✅ 단일 상세 조회
 router.get("/:id", getHotSubcategoryById);
 
 export default router;
+
