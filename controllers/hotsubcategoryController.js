@@ -51,32 +51,26 @@ export async function getHotSubcategories(req, res) {
 /** ✅ 단일 서브카테고리 (hotblog) 조회 */
 export async function getHotSubcategoryById(req, res) {
     try {
-        const { id } = req.params;
+        const rawId = req.params.id;
+        const id = Number.parseInt(rawId, 10);
+
+        if (!Number.isSafeInteger(id)) {
+            console.warn("[getHotSubcategoryById] invalid id:", rawId);
+            return res.status(400).json({ success: false, error: "invalid_id", id: rawId });
+        }
+
         const { rows } = await pool.query(
-            `
-        SELECT id, title, store_name, category, cover_image, phone, url, address, qa_mode, qa, created_at
-        FROM hotblogs
-        WHERE id = $1
-      `,
+            `SELECT * FROM hotblogs WHERE id = $1`,
             [id]
         );
 
         if (rows.length === 0)
             return res.status(404).json({ success: false, error: "not_found" });
 
-        // qa 컬럼이 문자열로 저장되어 있다면 JSON으로 파싱
-        const blog = rows[0];
-        if (blog.qa && typeof blog.qa === "string") {
-            try {
-                blog.qa = JSON.parse(blog.qa);
-            } catch {
-                blog.qa = [];
-            }
-        }
-
-        res.json({ success: true, data: blog });
+        res.json({ success: true, data: rows[0] });
     } catch (err) {
         console.error("[getHotSubcategoryById]", err);
         res.status(500).json({ success: false, error: "internal_error" });
     }
 }
+
