@@ -42,6 +42,13 @@ app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/owner", ownerRouter);
+/* ✅ HTML 직접 라우트 */
+app.get("/hotsubcategory", (req, res) => {
+  res.sendFile(path.join(__dirname, "public2", "hotsubcategory.html"));
+});
+app.get("/hotblogdetail", (req, res) => {
+  res.sendFile(path.join(__dirname, "public2", "hotblogdetail.html"));
+});
 
 
 /* 사업자 인증 프록시 */
