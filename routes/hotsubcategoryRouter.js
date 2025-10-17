@@ -1,7 +1,11 @@
 // routes/hotsubcategoryRouter.js
 import express from "express";
 import pool from "../db.js"; // PostgreSQL 연결 (Neon DB)
+import * as ctrl from "../controllers/hotsubcategoryController.js"; // ✅ 추가: 컨트롤러 연결
 const router = express.Router();
+
+// 핫 서브카테고리(테마) 전용 API
+router.get("/sub/theme", ctrl.getHotSubTheme);
 
 /* =====================================================
    📦 핫 서브카테고리 데이터 조회 API

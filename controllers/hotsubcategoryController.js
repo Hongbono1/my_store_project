@@ -1,22 +1,19 @@
 import pool from "../db.js";
 
-/* =========================================================
-   📘 핫 서브카테고리 - 오늘의 테마 목록 조회
-   ========================================================= */
+/** 오늘의 테마용 핫서브 데이터 반환 */
 export async function getHotSubTheme(req, res) {
   try {
-    const result = await pool.query(`
-      SELECT 
-        id, title, store_name AS store, category, qa_mode, 
-        thumbnail AS img, short_desc AS desc, rating, created_at
-      FROM hotblog
-      WHERE qa_mode = 'theme'
+    const q = `
+      SELECT id, title, category, thumbnail_url AS cover_image, description, created_at
+      FROM hotblogs
+      WHERE qa_mode = 'theme' OR category = 'theme'
       ORDER BY created_at DESC
-      LIMIT 30
-    `);
-    res.json({ ok: true, data: result.rows });
+      LIMIT 50
+    `;
+    const { rows } = await pool.query(q);
+    return res.json({ ok: true, blogs: rows });
   } catch (err) {
-    console.error("🔥 getHotSubTheme Error:", err);
-    res.status(500).json({ ok: false, error: "서버 오류" });
+    console.error("[getHotSubTheme] error", err);
+    return res.status(500).json({ ok: false, error: "서버 내부 오류" });
   }
 }
