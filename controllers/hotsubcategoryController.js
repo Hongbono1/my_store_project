@@ -4,7 +4,17 @@ import pool from "../db.js";
 export async function getHotSubTheme(req, res) {
   try {
     const q = `
-      SELECT id, title, store_name, category, cover_image, phone, url, address, qa_mode, created_at
+      SELECT
+        id,
+        title,
+        cover_image,
+        store_name,
+        category,
+        qa_mode,
+        phone,
+        url,
+        address,
+        created_at
       FROM hotblogs
       WHERE qa_mode = 'theme' OR category = 'theme'
       ORDER BY created_at DESC
@@ -13,8 +23,9 @@ export async function getHotSubTheme(req, res) {
     const { rows } = await pool.query(q);
     return res.json({ ok: true, blogs: rows });
   } catch (err) {
-    console.error("[getHotSubTheme] error", err);
-    return res.status(500).json({ ok: false, error: "internal" });
+    console.error("[getHotSubTheme] error:", err && err.message ? err.message : err);
+    // 상세 디버그 확인을 위해 에러 메시지 일부만 반환(운영 환경이면 "internal"로 변경)
+    return res.status(500).json({ ok: false, error: "데이터 오류", detail: String(err?.message || err) });
   }
 }
 
