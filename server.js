@@ -44,7 +44,7 @@ app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/owner", ownerRouter);
-app.use("/hotsubcategory", hotsubcategoryRouter);
+app.use("/api/hotsubcategory", hotsubcategoryRouter);
 
 /* ✅ HTML 직접 라우트 */
 app.get("/hotsubcategory", (req, res) => {
