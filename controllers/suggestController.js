@@ -5,22 +5,30 @@ export async function getSuggest(req, res) {
   const mood = (req.query.mood || "all").toString().trim().toLowerCase();
 
   try {
-    // 1) 우선 menus 테이블 시도
-    let sql, params;
-    if (mood === "all") {
-      sql = `SELECT id, store_id, menu_name, menu_image, menu_desc, mood, store_name FROM menus ORDER BY id DESC LIMIT 100`;
-      params = [];
-    } else {
-      sql = `SELECT id, store_id, menu_name, menu_image, menu_desc, mood, store_name
-             FROM menus
-             WHERE lower(mood) = $1 OR menu_name ILIKE $2 OR menu_desc ILIKE $2
-             ORDER BY id DESC LIMIT 100`;
-      params = [mood, `%${mood}%`];
+    let rows = [];
+
+    // 1) menus 테이블 시도 (테이블이 없거나 에러나면 폴백)
+    try {
+      let sql, params;
+      if (mood === "all") {
+        sql = `SELECT id, store_id, menu_name, menu_image, menu_desc, mood, store_name FROM menus ORDER BY id DESC LIMIT 100`;
+        params = [];
+      } else {
+        sql = `SELECT id, store_id, menu_name, menu_image, menu_desc, mood, store_name
+               FROM menus
+               WHERE lower(mood) = $1 OR menu_name ILIKE $2 OR menu_desc ILIKE $2
+               ORDER BY id DESC LIMIT 100`;
+        params = [mood, `%${mood}%`];
+      }
+      const r = await pool.query(sql, params);
+      rows = r.rows || [];
+    } catch (err) {
+      // menus 테이블이 없을 경우 등은 경고하고 폴백으로 진행
+      console.warn("[getSuggest] menus query failed, fallback to hotblogs:", err?.message || err);
+      rows = [];
     }
 
-    let { rows } = await pool.query(sql, params);
-
-    // 2) menus 결과 없거나 테이블이 없으면 hotblogs 폴백
+    // 2) menus 결과가 없으면 hotblogs 폴백
     if (!rows || rows.length === 0) {
       const qb = mood === "all"
         ? `SELECT id, id AS store_id, title AS menu_name, cover_image AS menu_image, '' AS menu_desc, qa_mode AS mood, store_name FROM hotblogs ORDER BY created_at DESC LIMIT 100`
@@ -35,8 +43,7 @@ export async function getSuggest(req, res) {
 
     return res.json({ ok: true, data: rows });
   } catch (err) {
-    console.error("[getSuggest] error:", err && err.message ? err.message : err);
-    // 디버깅용 detail 반환(운영시 삭제 권장)
+    console.error("[getSuggest] unexpected error:", err && err.message ? err.message : err);
     return res.status(500).json({ ok: false, error: "db_error", detail: String(err?.message || err) });
   }
 }
