@@ -204,96 +204,83 @@
     <!-- 스크립트 -->
     <script>
         /*
-async function loadStores() {
-    try {
-        const res = await fetch("/api/suggest");
-        const json = await res.json();
-        console.log("🔥 서버 응답:", json);
-
-        if (json.ok && json.data.length > 0) {
-            renderStores(json.data);
-        } else {
-            renderStores(); // 기본 박스 표시
+        async function loadStores() {
+            try {
+                const res = await fetch("/api/suggest");
+                const json = await res.json();
+                console.log("🔥 서버 응답:", json);
+        
+                if (json.ok && json.data.length > 0) {
+                    renderStores(json.data);
+                } else {
+                    renderStores(); // 기본 박스 표시
+                }
+            } catch (err) {
+                console.error("❌ [loadStores 오류]:", err);
+                renderStores(); // 서버 오류 → 기본 박스만 표시
+            }
         }
-    } catch (err) {
-        console.error("❌ [loadStores 오류]:", err);
-        renderStores(); // 서버 오류 → 기본 박스만 표시
-    }
-}
+        loadStores();
+        */
 
-loadStores();
-*/
-
-        /* (중략: 위쪽 DATA, header/footer, renderTop4 등 동일) */
-
+        // ==========================
+        // 😋 오늘 기분/상황별 추천
+        // ==========================
         const buttons = document.querySelectorAll(".mood-btn");
         const container = document.getElementById("mood-grid");
 
         buttons.forEach(btn => {
             btn.addEventListener("click", async () => {
                 const mood = btn.dataset.mood;
-                const res = await fetch(`/api/suggest?mood=${mood}`);
-                const data = await res.json();
 
-                container.innerHTML = ""; // 초기화
+                try {
+                    const res = await fetch(`/api/suggest?mood=${mood}`);
+                    const data = await res.json();
 
-                if (data.ok && data.data.length > 0) {
-                    data.data.forEach(item => {
-                        const card = document.createElement("div");
-                        card.className = "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition";
-                        card.innerHTML = `
-            <img src="${item.menu_image}" alt="${item.menu_name}" class="w-full h-48 object-cover">
-            <div class="p-4">
-              <h3 class="text-lg font-semibold mb-1">${item.menu_name}</h3>
-              <p class="text-gray-500 mb-3">${item.store_name}</p>
-              <a href="/detail.html?id=${item.store_id}" 
-                 class="inline-block bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
-                바로가기
-              </a>
-            </div>
-          `;
-                        container.appendChild(card);
-                    });
-                } else {
-                    container.innerHTML = `<p class="text-gray-400 text-center py-10">추천 결과가 없습니다.</p>`;
+                    console.log("🎯 mood 결과:", data);
+                    container.innerHTML = ""; // 초기화
+
+                    if (data.ok && data.data.length > 0) {
+                        data.data.forEach(item => {
+                            const card = document.createElement("div");
+                            card.className = "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition";
+                            card.innerHTML = `
+                        <img src="${item.thumbnail_url || '/uploads/default.jpg'}" 
+                             alt="${item.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="p-4">
+                            <h3 class="text-lg font-semibold mb-1">${item.title}</h3>
+                            <p class="text-gray-500 mb-3">
+                                ${item.store_name || item.description || '가게 정보 없음'}
+                            </p>
+                            <a href="/detail.html?id=${item.id}" 
+                               class="inline-block bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                                바로가기
+                            </a>
+                        </div>
+                    `;
+                            container.appendChild(card);
+                        });
+                    } else {
+                        container.innerHTML = `<p class="text-gray-400 text-center py-10">추천 결과가 없습니다.</p>`;
+                    }
+                } catch (err) {
+                    console.error("❌ mood fetch 오류:", err);
+                    container.innerHTML = `<p class="text-gray-400 text-center py-10">데이터를 불러오는 중 오류가 발생했습니다.</p>`;
                 }
             });
         });
 
-        /* 이벤트 */
-        document.getElementById('prevBtn').addEventListener('click', () => slide(-1));
-        document.getElementById('nextBtn').addEventListener('click', () => slide(1));
-        document.getElementById('prevPage').addEventListener('click', () => changePage(-1));
-        document.getElementById('nextPage').addEventListener('click', () => changePage(1));
-
-        // Mood 버튼 필터링
-        document.querySelectorAll('.mood-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelector('.mood-btn.active')?.classList.remove('active');
-                btn.classList.add('active');
-                const mood = btn.dataset.mood;
-                const grid = document.getElementById('mood-grid');
-                const list = mood === 'all' ? DATA.moods : DATA.moods.filter(v => v.mood === mood);
-                grid.innerHTML = list.slice(0, 8).map(v => `
-        <div class="card p-4 flex flex-col overflow-hidden">
-          <div class="w-full h-40 rounded-xl overflow-hidden">
-            <img src="${v.img}" alt="${v.title}" class="w-full h-full object-cover"/>
-          </div>
-          <h4 class="font-bold text-base sm:text-lg text-gray-900 mt-3 text-center">${v.title}</h4>
-          <p class="text-gray-500 text-sm text-center mb-4">${moodLabel(v.mood)}</p>
-          <a href="#" class="mt-auto inline-block text-center bg-gray-900 text-white font-medium px-4 py-2 rounded-full hover:bg-black transition">더보기</a>
-        </div>
-      `).join('');
-            });
-        });
-
-        /* 초기 실행 */
-        //renderTop4();
-        //renderSlider();
-        //renderBoxes();
-        //renderMood('all');
-        //changePage(0);
+        // ==========================
+        // 🔘 초기 실행 (주석 처리)
+        // ==========================
+        // renderTop4();
+        // renderSlider();
+        // renderBoxes();
+        // renderMood('all');
+        // changePage(0);
     </script>
+
 
 </body>
 
