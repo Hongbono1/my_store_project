@@ -1,7 +1,8 @@
 import express from "express";
-import { getSuggestionsByMood } from "../controllers/suggestController.js";
+import * as ctrl from "../controllers/suggestController.js";
 
 const router = express.Router();
-router.get("/", getSuggestionsByMood);
+
+router.get("/", ctrl.getSuggest);
 
 export default router;
