@@ -12,6 +12,8 @@ import hotblogRouter from "./routes/hotblogregister.js";
 import ownerRouter from "./routes/owner.js";
 import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
+import openregisterRouter from "./routes/openregisterRouter.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,8 +47,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
-
-
+app.use("/openregister", openregisterRouter);
 
 /* ✅ HTML 직접 라우트 */
 app.get("/hotsubcategory", (req, res) => {
