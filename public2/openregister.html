@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오픈예정 등록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 주소 검색 (다음 우편번호) -->
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+
+    <!-- 카카오 지도 SDK (서비스/지오코더 포함) -->
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+</head>
+
+<body class="bg-gray-50">
+
+    <!-- 전체 컨테이너 -->
+    <div class="max-w-3xl mx-auto px-4 mt-10">
+        <h2 class="text-3xl font-bold text-gray-800 text-center mb-8">오픈예정 등록</h2>
+
+        <!-- 등록 폼 -->
+        <form id="openForm" class="bg-white border-2 border-gray-200 p-6 rounded-lg flex flex-col gap-4">
+
+            <!-- 상호명 -->
+            <div>
+                <label class="block font-medium mb-1">상호명 <span class="text-red-500">*</span></label>
+                <input name="store_name" type="text" class="w-full border rounded px-3 py-2" required>
+            </div>
+
+            <!-- 오픈일 -->
+            <div>
+                <label class="block font-medium mb-1">오픈일 <span class="text-red-500">*</span></label>
+                <input name="open_date" type="date" class="w-full border rounded px-3 py-2" required>
+            </div>
+
+            <!-- 업종(카테고리) -->
+            <div>
+                <label class="block font-medium mb-1">업종(카테고리)</label>
+                <input name="category" type="text" class="w-full border rounded px-3 py-2" placeholder="예: 한식, 카페, 미용실 등">
+            </div>
+
+            <!-- 전화번호 -->
+            <div>
+                <label class="block font-medium mb-1">전화번호 <span class="text-red-500">*</span></label>
+                <input name="phone" type="text" class="w-full border rounded px-3 py-2" placeholder="010-0000-0000" required>
+            </div>
+
+            <!-- 설명 -->
+            <div>
+                <label class="block font-medium mb-1">설명</label>
+                <textarea name="description" class="w-full border rounded px-3 py-2"
+                    placeholder="가게 분위기, 컨셉, 대표 메뉴 등 자유롭게 작성해 주세요."></textarea>
+            </div>
+
+            <!-- 주소 -->
+            <div>
+                <label class="block font-medium mb-1">주소</label>
+                <div class="flex gap-2">
+                    <input id="address" name="address" type="text" class="flex-1 border rounded px-3 py-2" readonly>
+                    <button
+                        type="button"
+                        onclick="searchAddress()"
+                        class="px-3 py-2 bg-blue-500 text-white rounded w-24 text-sm font-medium hover:bg-blue-600">
+                        검색
+                    </button>
+                </div>
+            </div>
+
+            <!-- 지도 미리보기 -->
+            <div class="flex justify-center">
+                <div
+                    id="map"
+                    class="rounded border border-gray-300 my-4 shadow-sm"
+                    style="width:100%; min-width:180px; height:260px; max-width:480px;">
+                </div>
+            </div>
+
+            <!-- 좌표 hidden input -->
+            <input type="hidden" id="lat" name="lat">
+            <input type="hidden" id="lng" name="lng">
+
+            <!-- 대표 이미지 -->
+            <div>
+                <label class="block font-medium mb-1">대표 이미지</label>
+                <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+                <p class="text-xs text-gray-500 mt-1">간판 사진 / 인테리어 / 시그니처 메뉴 등 홍보용 이미지 1장</p>
+            </div>
+
+            <!-- 제출 버튼 -->
+            <button
+                type="submit"
+                class="mt-3 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow">
+                등록
+            </button>
+        </form>
+    </div>
+
+    <!-- 등록된 카드 리스트 (미리보기 용) -->
+    <div id="cardList" class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10 px-4"></div>
+
+    <script>
+        /* --------------------------------------------------
+         * 1. 폼 제출 이벤트
+         *    - 서버 /open 으로 전송 (파일 포함)
+         *    - 로컬스토리지에도 카드 푸시 (미리보기용)
+         *    - 성공 시 공개 페이지(/open.html)로 이동
+         * -------------------------------------------------- */
+        document.getElementById('openForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+
+            // 1) 서버로 전송
+            let serverOk = false;
+            try {
+                const res = await fetch("/open", {
+                    method: "POST",
+                    body: fd
+                });
+                const result = await res.json();
+                if (result.success) {
+                    serverOk = true;
+                    alert("서버 저장 성공!");
+                } else {
+                    alert("서버 저장 실패! " + (result.error || ""));
+                }
+            } catch (err) {
+                alert("서버 오류: " + err.message);
+            }
+
+            // 2) 이미지 미리보기용 base64 생성
+            let imgURL = "";
+            const file = fd.get("img");
+            if (file && file.size) {
+                imgURL = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => resolve(ev.target.result);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // 3) 로컬 카드 객체 생성
+            //    ★ 여기 이름을 input[name="..."] 과 맞춰서 저장한다
+            const card = {
+                store_name: fd.get("store_name") || "",
+                open_date: fd.get("open_date") || "",
+                category: fd.get("category") || "",
+                phone: fd.get("phone") || "",
+                description: fd.get("description") || "",
+                address: fd.get("address") || "",
+                lat: fd.get("lat") || "",
+                lng: fd.get("lng") || "",
+                img: imgURL
+            };
+
+            // 4) localStorage에 prepend
+            let cards = [];
+            try {
+                cards = JSON.parse(localStorage.getItem("openCards") || "[]");
+            } catch (_) { }
+            cards.unshift(card);
+            localStorage.setItem("openCards", JSON.stringify(cards));
+
+            // 5) 화면에도 즉시 렌더 (관리자 확인용 미리보기)
+            renderCards(cards);
+
+            // 6) 성공했다면 공개 페이지로 이동
+            if (serverOk) {
+                location.href = "/open.html";
+            }
+        });
+
+
+        /* --------------------------------------------------
+         * 2. 카드 리스트 렌더링 (로컬 미리보기)
+         * -------------------------------------------------- */
+        function renderCards(cards) {
+            const wrap = document.getElementById("cardList");
+            if (!wrap) return;
+
+            wrap.innerHTML = cards.map(card => {
+                return `
+                <div class="bg-white rounded-xl border border-gray-200 shadow p-4 flex flex-col">
+                    <div class="w-full h-40 bg-gray-100 rounded-md flex items-center justify-center overflow-hidden mb-4">
+                        ${card.img
+                        ? `<img src="${card.img}" class="w-full h-full object-cover" alt="preview" />`
+                        : `<span class="text-gray-400 text-sm">이미지 없음</span>`
+                    }
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <div class="text-lg font-bold text-gray-800">${card.store_name || "상호명 미정"}</div>
+                        <div class="text-sm text-gray-600">오픈일: ${card.open_date || "-"}</div>
+                        <div class="text-sm text-gray-600">카테고리: ${card.category || "-"}</div>
+                        <div class="text-sm text-gray-600">전화: ${card.phone || "-"}</div>
+                        <div class="text-sm text-gray-600 whitespace-pre-line">${card.description || ""}</div>
+                        <div class="text-xs text-gray-500 mt-2">${card.address || ""}</div>
+                    </div>
+                </div>
+                `;
+            }).join("");
+        }
+
+        // 새로고침해도 미리보기 유지
+        (function initLocalPreview() {
+            try {
+                const saved = JSON.parse(localStorage.getItem("openCards") || "[]");
+                renderCards(saved);
+            } catch (_) {
+                /* ignore */
+            }
+        })();
+
+
+        /* --------------------------------------------------
+         * 3. Kakao 지도 초기화
+         * -------------------------------------------------- */
+        window.map = null;
+        window.marker = null;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            kakao.maps.load(function () {
+                const mapContainer = document.getElementById("map");
+                if (!mapContainer) return;
+
+                // 기본 좌표: 서울시청 근처
+                const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
+
+                window.map = new kakao.maps.Map(mapContainer, {
+                    center: defaultPos,
+                    level: 3
+                });
+
+                window.marker = new kakao.maps.Marker({
+                    map: window.map,
+                    position: defaultPos
+                });
+            });
+        });
+
+
+        /* --------------------------------------------------
+         * 4. 주소 검색 팝업 (다음)
+         *    - 선택된 주소로 input 채우고
+         *    - 지도 위치/마커/위경도(lat,lng) 업데이트
+         * -------------------------------------------------- */
+        function searchAddress() {
+            const width = 500;
+            const height = 600;
+            const left = Math.ceil((window.screen.width - width) / 2);
+            const top = Math.ceil((window.screen.height - height) / 2);
+
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    const addr = data.address;
+                    document.getElementById("address").value = addr;
+                    updateMapByAddress(addr);
+                }
+            }).open({ left, top });
+        }
+        window.searchAddress = searchAddress; // 버튼 onclick용
+
+
+        /* --------------------------------------------------
+         * 5. 주소 → 좌표 변환 후 지도/마커 이동
+         * -------------------------------------------------- */
+        function updateMapByAddress(address) {
+            if (!window.map || !window.marker) return;
+
+            const geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(address, function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const lat = result[0].y;
+                    const lng = result[0].x;
+                    const loc = new kakao.maps.LatLng(lat, lng);
+
+                    window.map.setCenter(loc);
+                    window.marker.setPosition(loc);
+
+                    document.getElementById("lat").value = lat;
+                    document.getElementById("lng").value = lng;
+                }
+            });
+        }
+        window.updateMapByAddress = updateMapByAddress;
+
+
+        /* --------------------------------------------------
+         * 6. (옵션) 지도 리셋 함수 - 필요하면 호출해서 초기화 가능
+         * -------------------------------------------------- */
+        function resetMap() {
+            if (!window.map || !window.marker) return;
+
+            const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
+            window.map.setCenter(defaultPos);
+            window.marker.setPosition(defaultPos);
+
+            document.getElementById("lat").value = "";
+            document.getElementById("lng").value = "";
+            document.getElementById("address").value = "";
+        }
+        window.resetMap = resetMap;
+    </script>
+</body>
+
+</html>
