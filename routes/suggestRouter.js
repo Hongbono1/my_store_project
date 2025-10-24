@@ -26,13 +26,13 @@ router.get("/", async (req, res) => {
 
         // mood(테마)로 필터
         const query = `
-      SELECT sm.*, si.store_name AS store_name
-      FROM store_menu sm
-      LEFT JOIN store_info si ON sm.store_id = si.id
-      WHERE sm.theme ILIKE $1
-      ORDER BY sm.id DESC
-      LIMIT 8
-    `;
+  SELECT sm.*, si.business_name AS store_name
+  FROM store_menu sm
+  LEFT JOIN store_info si ON sm.store_id = si.id
+  WHERE sm.theme ILIKE $1
+  ORDER BY sm.id DESC
+  LIMIT 8
+`;
         const values = [`%${mood.trim()}%`];
         const { rows } = await pool.query(query, values);
 
