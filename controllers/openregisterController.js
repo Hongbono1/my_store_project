@@ -29,16 +29,19 @@ export async function createOpenRegister(req, res) {
             image_path = `/uploads/${path.basename(req.file.path)}`;
         }
 
+        // controllers/openregisterController.js
+
         // DB 저장
         const result = await pool.query(
-            `
-      INSERT INTO open_stores 
-      (store_name, open_date, category, phone, description, address, lat, lng, image_path, created_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
-      RETURNING id;
-      `,
+            `INSERT INTO open_stores
+  (store_name, open_date, category, phone, description, address, lat, lng, image_path, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+  RETURNING id;`,
             [store_name, open_date, category, phone, description, address, lat, lng, image_path]
         );
+
+        console.log("🧾 INSERT DEBUG:", { store_name, open_date, category, phone, address, lat, lng });
+
 
         res.json({ success: true, id: result.rows[0].id });
     } catch (err) {
