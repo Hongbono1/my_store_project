@@ -13,6 +13,8 @@ import ownerRouter from "./routes/owner.js";
 import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
 import openregisterRouter from "./routes/openregisterRouter.js";
+import openRouter from "./routes/openRouter.js";
+
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +50,8 @@ app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/openregister", openregisterRouter);
+app.use("/open", openRouter);
+
 
 /* ✅ HTML 직접 라우트 */
 app.get("/hotsubcategory", (req, res) => {

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오픈예정 - 곡선 배치 (10개 카드)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #cardContainer {
+      position: relative;
+      min-height: 700px;
+      /* 곡선 하단에 공간 확보 */
+    }
+
+    .curve-card {
+      position: absolute;
+      width: 220px;
+      height: 300px;
+      transition: transform 0.3s, box-shadow 0.3s;
+      z-index: 10;
+    }
+
+    .curve-card:hover {
+      transform: scale(1.07) rotate(-2deg);
+      z-index: 30;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.20);
+    }
+
+    /* 카드끼리 안겹치게 z-index 계단식 주기 (JS에서 할 수도 있음) */
+  </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen w-full">
+  <div id="header-container"></div>
+  <section class="bg-white shadow-lg rounded-2xl border-2 border-gray-200 max-w-screen-xl mx-auto p-8 mt-12 mb-8">
+    <div class="flex items-center justify-between mb-10">
+      <h2 class="text-4xl font-bold text-cyan-700">오픈예정</h2>
+      <button id="toggleFormBtn"
+        class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+        등록
+      </button>
+    </div>
+    <div id="cardContainer" class="relative mx-auto bg-white rounded-2xl shadow" style="width:1200px; height:850px;">
+    </div>
+    <div id="pagination" class="flex gap-2 flex-wrap justify-center my-8"></div>
+  </section>
+
+  <!-- 상세보기 모달 -->
+  <div id="detailModal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative" id="modalBox">
+      <button id="closeModalBtn"
+        class="absolute right-3 top-3 text-2xl text-gray-400 hover:text-gray-700">&times;</button>
+      <img id="modalImage" src="/assets/images/no-thumb.png" alt="대표 이미지"
+        class="w-80 h-80 object-cover mx-auto rounded-xl border border-gray-200 cursor-zoom-in transition-transform"
+        onclick="openImageModal(this.src)" />
+      <div class="my-5 border-t-4 border-red-500"></div>
+      <div class="text-center">
+        <div id="modalName" class="text-2xl font-bold mb-1">상호명</div>
+        <div id="modalOpenDate" class="text-lg font-semibold text-cyan-700 mb-2">오픈일자</div>
+        <div id="modalCategory" class="mb-1 text-gray-600 font-bold">카테고리</div>
+        <div id="modalPhone" class="mb-1">전화번호</div>
+        <div id="modalDesc" class="mb-2 whitespace-pre-line">설명</div>
+        <div id="modalAddress" class="mb-2">주소</div>
+        <a id="modalMapLink" href="#" target="_blank" class="text-blue-500 underline">지도 바로가기</a>
+      </div>
+      <div id="imageModal" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50">
+        <img id="fullImage" src="" class="max-w-full max-h-[90vh] rounded-2xl shadow-xl" />
+      </div>
+    </div>
+  </div>
+  <div id="detailOverlay" class="hidden fixed inset-0 bg-black bg-opacity-30 z-40"></div>
+  <div id="footer-container"></div>
+
+  <script>
+    function formatOpenDate(dateStr) {
+      if (!dateStr) return '';
+      const [year, month, day] = dateStr.split("T")[0].split("-");
+      return `${year.slice(-2)}. ${parseInt(month, 10)}. ${parseInt(day, 10)}`;
+    }
+    function shortAddress(addr) {
+      if (!addr) return "";
+      const tokens = addr.trim().replace(/\s+/g, " ").split(" ");
+      // 동, 읍, 면, 리 이하만 보이게 (3~4번째 토큰부터)
+      return tokens.slice(2, 5).join(" "); // [2,3,4]
+    }
+    async function loadComponent(url, containerId) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
+        const html = await response.text();
+        document.getElementById(containerId).innerHTML = html;
+      } catch (error) {
+        console.error('Error loading ' + url + ':', error);
+      }
+    }
+
+    let data = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadComponent("components/header.html", "header-container");
+      await loadComponent("components/footer.html", "footer-container");
+      data = await fetchOpenStores();
+
+      // 페이지네이션/카드 초기화
+      totalItems = data.length;
+      totalPages = Math.ceil(Math.max(1, totalItems / ITEMS_PER_PAGE));
+      init();
+
+      document.getElementById('toggleFormBtn').onclick = function () {
+        location.href = "/openregister.html";
+      };
+
+      document.getElementById("modalBox").addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+      document.getElementById("detailOverlay").onclick = closeModal;
+      document.getElementById("closeModalBtn").onclick = closeModal;
+      document.getElementById("imageModal").onclick = function () {
+        this.classList.add("hidden");
+        document.getElementById("fullImage").src = "";
+      };
+    });
+
+    // 실제 DB에서 데이터 fetch (컬럼명 그대로!)
+    async function fetchOpenStores() {
+      try {
+        const res = await fetch("/openregister");
+        if (!res.ok) throw new Error("데이터 조회 실패");
+        const rows = await res.json();
+        return rows.map(row => ({
+          store_name: row.store_name,
+          open_date: row.open_date,
+          category: row.category,
+          phone: row.phone,
+          description: row.description,
+          address: row.address,
+          thumbnail: row.image_path,
+          lat: row.lat,
+          lng: row.lng,
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+    }
+
+    const ITEMS_PER_PAGE = 10;
+    let currentPage = 1;
+    let totalItems = 0;
+    let totalPages = 1;
+
+    const cardContainer = document.getElementById("cardContainer");
+    const paginationContainer = document.getElementById("pagination");
+
+    // 카드 생성
+    function createCard(item, globalIndex) {
+      if (!item) {
+        const none = document.createElement("div");
+        none.className = "curve-card bg-gray-100 border-2 border-dashed border-gray-300 shadow rounded-lg p-6 flex flex-col items-center opacity-60 w-64 h-80 mx-auto";
+        none.innerHTML = `
+      <img src="https://placehold.co/400x200?text=정보+없음" class="w-full h-48 object-cover rounded mb-2" alt="정보 없음">
+      <div class="text-2xl font-bold text-gray-400 mb-1">정보 없음</div>
+      <div class="text-lg text-gray-300 text-center">아직 등록된 오픈예정 가게가 없습니다.</div>
+    `;
+        return none;
+      }
+
+      const cardDiv = document.createElement("div");
+      cardDiv.className = `
+    curve-card bg-yellow-50 text-black p-4 rounded-xl shadow-md flex flex-col items-center w-72 h-96 mx-auto
+    hover:scale-105 transition cursor-pointer
+  `;
+
+      cardDiv.innerHTML = `
+    <img
+      src="${item.thumbnail || 'https://placehold.co/400x200?text=No+Image'}"
+      alt="${item.store_name} 메인이미지"
+      class="w-full h-60 object-cover rounded-lg mb-3 shadow"
+    />
+    <div class="font-bold text-xl text-center leading-tight truncate w-full mb-1" title="${item.store_name || '-'}">
+      ${item.store_name || '-'}
+    </div>
+    <div class="text-lg text-cyan-700 font-semibold text-center leading-tight mb-1">
+      ${item.open_date ? "오픈 " + formatOpenDate(item.open_date) : ""}
+    </div>
+    <div class="text-lg text-gray-800 font-semibold text-center leading-tight truncate w-full mb-1" title="${shortAddress(item.address)}">
+      ${shortAddress(item.address)}
+    </div>
+    <div class="text-lg font-semibold text-center leading-tight">
+      업종: ${item.category || '-'}
+    </div>
+  `;
+
+      cardDiv.addEventListener("click", () => displayDetail(globalIndex));
+      return cardDiv;
+    }
+
+
+
+    // ★★★★★ 여기서 카드 배치를 곡선으로 ★★★★★
+    function renderPage(page) {
+      cardContainer.innerHTML = "";
+      const startIndex = (page - 1) * ITEMS_PER_PAGE;
+      let pageData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+      // 곡선 좌표 공식
+      // ... (생략)
+      const containerW = cardContainer.offsetWidth || 1200;
+      // ↓ 카드 크기만큼 여유 여백을 둠
+      const cx = containerW / 2;
+      const cy = 380;    // 살짝 아래로 내림 (ex. 340 → 380)
+      const r = 250;     // 반지름을 살짝 줄임 (ex. 300 → 250)
+      const cardWidth = 320, cardHeight = 400;
+      const angleStart = Math.PI * 1.15;
+      const angleEnd = Math.PI * 1.85;
+      const N = pageData.length;
+      const angleStep = (angleEnd - angleStart) / (N > 1 ? N - 1 : 1);
+
+      pageData.forEach((item, i) => {
+        const card = createCard(item, startIndex + i);
+        let theta = angleStart + i * angleStep;
+        let r2 = r + (Math.random() * 30 - 15); // 랜덤값 축소
+        let x = cx + Math.cos(theta) * r2 - cardWidth / 2;
+        let y = cy + Math.sin(theta) * r2 - cardHeight / 2;
+        // *** 경계 벗어나는 것 방지 ***
+        x = Math.max(0, Math.min(containerW - cardWidth, x));
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.style.zIndex = 10 + i;
+        cardContainer.appendChild(card);
+      });
+    }
+
+    function renderPagination() {
+      if (!paginationContainer) return;
+      paginationContainer.innerHTML = "";
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.className = "py-2 px-4 rounded bg-gray-800 text-white text-base hover:bg-gray-700 transition";
+        if (i === currentPage) btn.classList.add("bg-cyan-500");
+        btn.addEventListener("click", () => {
+          currentPage = i;
+          renderPage(currentPage);
+          renderPagination();
+          closeModal();
+        });
+        paginationContainer.appendChild(btn);
+      }
+    }
+
+    function init() {
+      renderPage(currentPage);
+      renderPagination();
+    }
+
+    function openImageModal(src) {
+      document.getElementById("fullImage").src = src;
+      document.getElementById("imageModal").classList.remove("hidden");
+    }
+
+    function displayDetail(index) {
+      const item = data[index];
+      if (!item) return;
+
+      // 대표 이미지 출력
+      const modalImage = document.getElementById("modalImage");
+      modalImage.src = item.thumbnail || "/assets/images/no-thumb.png";
+      modalImage.alt = (item.store_name || "-") + " 대표 이미지";
+      // 기존 onclick 제거(덮어쓰기)
+      modalImage.onclick = function () {
+        openImageModal(modalImage.src);
+      };
+
+      document.getElementById("modalName").textContent = item.store_name || "-";
+      document.getElementById("modalOpenDate").textContent =
+        item.open_date ? formatOpenDate(item.open_date) : "";
+      document.getElementById("modalCategory").textContent = item.category || "-";
+      document.getElementById("modalPhone").textContent = item.phone || "-";
+      document.getElementById("modalDesc").textContent = item.description || "-";
+      document.getElementById("modalAddress").textContent = item.address || "-";
+
+      const modalMapLink = document.getElementById("modalMapLink");
+      if (item.address) {
+        // 주소만 있을 때: 주소 검색 링크로 연결
+        modalMapLink.href = `https://map.kakao.com/?q=${encodeURIComponent(item.address)}`;
+        modalMapLink.target = "_blank";
+        modalMapLink.textContent = "지도 바로가기";
+        modalMapLink.classList.remove("pointer-events-none", "opacity-50");
+      } else {
+        // 주소 없으면 비활성화
+        modalMapLink.href = "#";
+        modalMapLink.textContent = "위치 정보 없음";
+        modalMapLink.classList.add("pointer-events-none", "opacity-50");
+      }
+
+      document.getElementById("detailModal").classList.remove("hidden");
+      document.getElementById("detailOverlay").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("detailModal").classList.add("hidden");
+      document.getElementById("detailOverlay").classList.add("hidden");
+    }
+
+  </script>
+</body>
+
+</html>
