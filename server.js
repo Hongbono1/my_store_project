@@ -14,6 +14,8 @@ import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
 import openregisterRouter from "./routes/openregisterRouter.js";
 import openRouter from "./routes/openRouter.js";
+import opendetailRouter from "./routes/opendetailRouter.js";
+
 
 
 
@@ -47,12 +49,16 @@ app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/openregister", openregisterRouter);
 app.use("/open", openRouter);
+app.use("/opendetail", opendetailRouter);
+
 
 /* 정적 파일 */
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+
 
 
 /* ✅ HTML 직접 라우트 */
