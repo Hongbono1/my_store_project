@@ -35,6 +35,13 @@ export async function getOpenList(req, res) {
 export async function getOpenById(req, res) {
     try {
         const { id } = req.params;
+        
+        // ID 유효성 검사
+        const numericId = parseInt(id, 10);
+        if (isNaN(numericId) || numericId <= 0) {
+            return res.status(400).json({ success: false, error: "유효하지 않은 ID입니다" });
+        }
+        
         const result = await pool.query(
             `
       SELECT 
@@ -51,14 +58,15 @@ export async function getOpenById(req, res) {
       FROM open_stores
       WHERE id = $1;
       `,
-            [id]
+            [numericId]
         );
 
         if (result.rowCount === 0) {
             return res.status(404).json({ success: false, error: "데이터 없음" });
         }
 
-        res.json(result.rows[0]);
+        // opendetail.html에서 기대하는 형태로 응답
+        res.json({ success: true, data: result.rows[0] });
     } catch (err) {
         console.error("❌ [getOpenById] Error:", err);
         res.status(500).json({ success: false, error: err.message });
