@@ -1,11 +1,13 @@
 import pool from "../db.js";
 
-/* 오픈예정 상세보기 컨트롤러 */
 export async function getOpenDetail(req, res) {
     try {
-        const storeId = parseInt(req.params.id, 10);
+        const idParam = req.params.id;
+        const storeId = parseInt(idParam, 10); // ← 정수로 변환
+
         if (isNaN(storeId)) {
-            return res.status(400).json({ success: false, message: "유효하지 않은 ID" });
+            console.error("❌ Invalid store ID:", idParam);
+            return res.status(400).json({ success: false, message: "유효하지 않은 ID입니다." });
         }
 
         const result = await pool.query(
@@ -14,11 +16,11 @@ export async function getOpenDetail(req, res) {
       FROM open_stores
       WHERE id = $1
       `,
-            [storeId]
+            [storeId] // ← 반드시 정수형으로 전달
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "해당 오픈정보를 찾을 수 없습니다." });
+            return res.status(404).json({ success: false, message: "데이터를 찾을 수 없습니다." });
         }
 
         res.json({ success: true, data: result.rows[0] });
