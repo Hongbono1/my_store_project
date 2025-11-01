@@ -16,9 +16,6 @@ import openregisterRouter from "./routes/openregisterRouter.js";
 import openRouter from "./routes/openRouter.js";
 import opendetailRouter from "./routes/opendetailRouter.js";
 
-
-
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -49,8 +46,7 @@ app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/openregister", openregisterRouter);
 app.use("/open", openRouter);
-app.use("/opendetail", opendetailRouter);
-
+app.use("/open", opendetailRouter);
 
 /* 정적 파일 */
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
