@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오픈예정 상세보기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
+
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: linear-gradient(135deg, #f8fafc, #e0e7ff);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow:
+                8px 8px 20px rgba(0, 0, 0, 0.08),
+                -8px -8px 20px rgba(255, 255, 255, 0.6);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow:
+                12px 12px 30px rgba(0, 0, 0, 0.12),
+                -8px -8px 20px rgba(255, 255, 255, 0.7);
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center py-10">
+
+    <!-- Header -->
+    <div id="header-container" class="w-full"></div>
+
+    <!-- Main Container -->
+    <main class="glass-card w-full max-w-5xl p-8 mt-10 shadow-lg">
+        <div id="imageContainer" class="w-full mb-6 overflow-hidden rounded-3xl">
+            <img id="storeImage" src="/assets/images/no-thumb.png" alt="대표 이미지"
+                class="w-full h-80 object-cover rounded-3xl shadow-md transition-transform duration-500 hover:scale-105" />
+        </div>
+
+        <div class="space-y-2 mb-8">
+            <h1 id="storeName" class="text-4xl font-extrabold gradient-text mb-2">상호명</h1>
+            <p id="category" class="text-lg text-gray-700">업종: -</p>
+            <p id="openDate" class="text-lg text-blue-600 font-semibold">오픈일: -</p>
+            <p id="phone" class="text-lg text-gray-700">전화번호: -</p>
+            <p id="address" class="text-gray-600">주소: -</p>
+        </div>
+
+        <div class="glass-card p-6 mb-8 shadow-inner">
+            <p id="description" class="text-gray-700 whitespace-pre-line leading-relaxed">
+                설명이 없습니다.
+            </p>
+        </div>
+
+        <div id="map" class="w-full h-80 rounded-3xl border border-gray-300 shadow-inner"></div>
+    </main>
+
+    <!-- Footer -->
+    <div id="footer-container" class="w-full mt-10"></div>
+
+    <script>
+        async function loadComponent(url, id) {
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    document.getElementById(id).innerHTML = await res.text();
+                }
+            } catch (err) {
+                console.error("컴포넌트 로드 실패:", err);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await loadComponent("/components/header.html", "header-container");
+            await loadComponent("/components/footer.html", "footer-container");
+
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get("id");
+            if (!id) {
+                alert("잘못된 접근입니다.");
+                location.href = "/open.html";
+                return;
+            }
+
+            fetchDetail(id);
+        });
+
+        async function fetchDetail(id) {
+            try {
+                const res = await fetch(`/open/${id}`);
+                const json = await res.json();
+                if (!json.success || !json.data) {
+                    alert("상세 정보를 불러올 수 없습니다.");
+                    return;
+                }
+
+                const store = json.data;
+                document.getElementById("storeImage").src = store.image_path || "/assets/images/no-thumb.png";
+                document.getElementById("storeName").textContent = store.store_name || "-";
+                document.getElementById("category").textContent = `업종: ${store.category || "-"}`;
+                document.getElementById("openDate").textContent = store.open_date ? `오픈일: ${store.open_date}` : "-";
+                document.getElementById("phone").textContent = `전화번호: ${store.phone || "-"}`;
+                document.getElementById("address").textContent = store.address || "-";
+                document.getElementById("description").textContent = store.description || "설명 없음";
+
+                if (store.lat && store.lng) {
+                    const lat = parseFloat(store.lat);
+                    const lng = parseFloat(store.lng);
+                    const mapContainer = document.getElementById("map");
+                    const map = new kakao.maps.Map(mapContainer, {
+                        center: new kakao.maps.LatLng(lat, lng),
+                        level: 3
+                    });
+                    new kakao.maps.Marker({
+                        map,
+                        position: new kakao.maps.LatLng(lat, lng)
+                    });
+                }
+            } catch (err) {
+                console.error("상세 정보 오류:", err);
+            }
+        }
+    </script>
+</body>
+
+</html>
