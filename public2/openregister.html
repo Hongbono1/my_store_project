@@ -193,19 +193,34 @@
                 <!-- ✏️ 에디터 툴바 -->
                 <div
                     class="flex flex-wrap items-center justify-center gap-3 mb-3 p-3 border border-gray-200 bg-white rounded-xl shadow-sm">
+
+                    <!-- 이미지 버튼을 맨 위로 -->
+                    <button id="insertImage" type="button" data-tip="이미지 넣기" class="tbtn">이미지</button>
+                    <input type="file" id="imageFile" accept="image/*" class="hidden" />
+
+                    <!-- 굵게 -->
                     <button data-cmd="bold" type="button" data-tip="굵게" class="tbtn">B</button>
+
+                    <!-- 밑줄 -->
                     <button data-cmd="underline" type="button" data-tip="밑줄" class="tbtn underline">U</button>
+
+                    <!-- 글머리 목록 -->
                     <button data-cmd="insertUnorderedList" type="button" data-tip="글머리 목록" class="tbtn">• 목록</button>
+
+                    <!-- 숫자 목록 -->
                     <button data-cmd="insertOrderedList" type="button" data-tip="숫자 목록" class="tbtn">1. 목록</button>
+
+                    <!-- 구분선 -->
                     <button data-cmd="insertHorizontalRule" type="button" data-tip="구분선" class="tbtn">─</button>
 
-                    <label class="flex items-center gap-2 text-sm" data-tip="글자 크기(px)">
+                    <!-- 글자 크기 (자동 적용, 버튼 없음) -->
+                    <label class="flex items-center gap-2 text-sm" data-tip="선택한 글자의 크기(px)">
                         <span>크기</span>
                         <input id="fontSizePx" type="number" min="8" max="72" value="16"
                             class="h-9 w-20 px-2 border border-gray-300 rounded-md bg-white">
-                        <button id="applyFont" type="button" class="tbtn">적용</button>
                     </label>
 
+                    <!-- 이미지 위치 선택 -->
                     <label class="flex items-center gap-2 text-sm" data-tip="이미지 위치 선택">
                         <span>사진</span>
                         <select id="imagePosition" class="h-9 border border-gray-300 rounded-md px-2 bg-white">
@@ -215,135 +230,128 @@
                             <option value="bottom">아래쪽</option>
                         </select>
                     </label>
-
-                    <button id="insertImage" type="button" data-tip="이미지 삽입" class="tbtn">🖼 삽입</button>
-                    <input type="file" id="imageFile" accept="image/*" class="hidden" />
                 </div>
 
+                <!-- ✏️ 에디터 영역 -->
                 <div id="editor" class="editor min-h-[400px] p-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
                     contenteditable="true" data-placeholder="여기에 설명을 입력하세요. (사진 위치 선택 후 삽입)">
                 </div>
                 <textarea id="descHtml" name="description" class="hidden"></textarea>
-            </div>
 
-            <button type="submit"
-                class="mt-2 py-2 px-6 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700">등록</button>
-        </form>
-    </main>
+                <button type="submit"
+                    class="mt-2 py-2 px-6 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700">
+                    등록
+                </button>
 
-    <script>
-        /* ==== 주소검색 + 지도 ==== */
-        function searchAddress() {
-            new daum.Postcode({
-                oncomplete: function (data) {
-                    const addr = data.address;
-                    document.getElementById("address").value = addr;
-                    updateMapByAddress(addr);
-                }
-            }).open();
-        }
-
-        window.map = null;
-        window.marker = null;
-        kakao.maps.load(function () {
-            const mapContainer = document.getElementById("map");
-            const pos = new kakao.maps.LatLng(37.5665, 126.9780);
-            window.map = new kakao.maps.Map(mapContainer, { center: pos, level: 3 });
-            window.marker = new kakao.maps.Marker({ map: window.map, position: pos });
-        });
-
-        function updateMapByAddress(address) {
-            const geocoder = new kakao.maps.services.Geocoder();
-            geocoder.addressSearch(address, function (result, status) {
-                if (status === kakao.maps.services.Status.OK) {
-                    const lat = result[0].y, lng = result[0].x;
-                    const loc = new kakao.maps.LatLng(lat, lng);
-                    window.map.setCenter(loc);
-                    window.marker.setPosition(loc);
-                }
-            });
-        }
-
-        /* ==== 에디터 ==== */
-        const editor = document.getElementById("editor");
-        const fontSizePx = document.getElementById("fontSizePx");
-        const imageFile = document.getElementById("imageFile");
-        const insertImage = document.getElementById("insertImage");
-        const imagePosition = document.getElementById("imagePosition");
-
-        /* 툴바 명령 (굵게, 밑줄, 목록 등) */
-        document.querySelectorAll("[data-cmd]").forEach((btn) => {
-            btn.addEventListener("mousedown", (e) => {
-                e.preventDefault(); // 선택 깨지는 거 방지
-                document.execCommand(btn.dataset.cmd, false, null);
-                editor.focus();
-            });
-        });
-
-        /* 글자 크기: 숫자 바꾸면 바로 적용 */
-        fontSizePx.addEventListener("input", (e) => {
-            const px = parseInt(e.target.value, 10);
-            if (!px) return;
-
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount) return;
-
-            const range = sel.getRangeAt(0);
-            if (range.collapsed) return; // 선택 없으면 적용 안 함
-
-            const span = document.createElement("span");
-            span.style.fontSize = px + "px";
-            span.appendChild(range.extractContents());
-            range.insertNode(span);
-
-            editor.focus();
-        });
-
-        /* 이미지 버튼 → 파일 선택 */
-        insertImage.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            imageFile.click();
-        });
-
-        /* 이미지 삽입 */
-        imageFile.addEventListener("change", (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = () => {
-                const pos = imagePosition.value;
-                const img = document.createElement("img");
-                img.src = reader.result;
-
-                if (pos === "top") {
-                    editor.insertAdjacentElement("afterbegin", img);
-                } else if (pos === "bottom") {
-                    editor.insertAdjacentElement("beforeend", img);
-                } else if (pos === "left" || pos === "right") {
-                    const wrapper = document.createElement("div");
-                    wrapper.className = "side-container";
-                    const textDiv = document.createElement("div");
-                    textDiv.className = "text";
-                    textDiv.contentEditable = "true";
-                    textDiv.innerHTML = "여기에 글을 입력하세요.";
-                    if (pos === "left") {
-                        wrapper.append(img, textDiv);
-                    } else {
-                        wrapper.append(textDiv, img);
+                <script>
+                    /* ==== 주소검색 + 지도 ==== */
+                    function searchAddress() {
+                        new daum.Postcode({
+                            oncomplete: function (data) {
+                                const addr = data.address;
+                                document.getElementById("address").value = addr;
+                                updateMapByAddress(addr);
+                            }
+                        }).open();
                     }
-                    editor.appendChild(wrapper);
-                }
-            };
-            reader.readAsDataURL(file);
-            e.target.value = "";
-        });
 
-        /* 폼 보낼 때 에디터 내용 담기 */
-        document.getElementById("openForm").addEventListener("submit", () => {
-            document.getElementById("descHtml").value = editor.innerHTML.trim();
-        });
-    </script>
+                    window.map = null;
+                    window.marker = null;
+                    kakao.maps.load(function () {
+                        const mapContainer = document.getElementById("map");
+                        const pos = new kakao.maps.LatLng(37.5665, 126.9780);
+                        window.map = new kakao.maps.Map(mapContainer, { center: pos, level: 3 });
+                        window.marker = new kakao.maps.Marker({ map: window.map, position: pos });
+                    });
+
+                    function updateMapByAddress(address) {
+                        const geocoder = new kakao.maps.services.Geocoder();
+                        geocoder.addressSearch(address, function (result, status) {
+                            if (status === kakao.maps.services.Status.OK) {
+                                const lat = result[0].y, lng = result[0].x;
+                                const loc = new kakao.maps.LatLng(lat, lng);
+                                window.map.setCenter(loc);
+                                window.marker.setPosition(loc);
+                            }
+                        });
+                    }
+
+                    /* ==== 에디터 ==== */
+                    const editor = document.getElementById("editor");
+                    const fontSizePx = document.getElementById("fontSizePx");
+                    const imageFile = document.getElementById("imageFile");
+                    const insertImage = document.getElementById("insertImage");
+                    const imagePosition = document.getElementById("imagePosition");
+
+                    document.querySelectorAll("[data-cmd]").forEach((btn) => {
+                        btn.addEventListener("mousedown", (e) => {
+                            e.preventDefault();
+                            document.execCommand(btn.dataset.cmd, false, null);
+                            editor.focus();
+                        });
+                    });
+
+                    /* 글자 크기: 숫자 바꾸면 바로 적용 */
+                    fontSizePx.addEventListener("input", (e) => {
+                        const px = parseInt(e.target.value, 10);
+                        if (!px) return;
+                        const sel = window.getSelection();
+                        if (!sel || !sel.rangeCount) return;
+                        const range = sel.getRangeAt(0);
+                        if (range.collapsed) return;
+
+                        const span = document.createElement("span");
+                        span.style.fontSize = px + "px";
+                        span.appendChild(range.extractContents());
+                        range.insertNode(span);
+                        editor.focus();
+                    });
+
+                    /* 이미지 버튼 → 파일 선택 */
+                    insertImage.addEventListener("mousedown", (e) => {
+                        e.preventDefault();
+                        imageFile.click();
+                    });
+
+                    /* 이미지 삽입 */
+                    imageFile.addEventListener("change", (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const pos = imagePosition.value;
+                            const img = document.createElement("img");
+                            img.src = reader.result;
+
+                            if (pos === "top") {
+                                editor.insertAdjacentElement("afterbegin", img);
+                            } else if (pos === "bottom") {
+                                editor.insertAdjacentElement("beforeend", img);
+                            } else if (pos === "left" || pos === "right") {
+                                const wrapper = document.createElement("div");
+                                wrapper.className = "side-container";
+                                const textDiv = document.createElement("div");
+                                textDiv.className = "text";
+                                textDiv.contentEditable = "true";
+                                textDiv.innerHTML = "여기에 글을 입력하세요.";
+                                if (pos === "left") {
+                                    wrapper.append(img, textDiv);
+                                } else {
+                                    wrapper.append(textDiv, img);
+                                }
+                                editor.appendChild(wrapper);
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = "";
+                    });
+
+                    /* 폼 보낼 때 에디터 내용 담기 */
+                    document.getElementById("openForm").addEventListener("submit", () => {
+                        document.getElementById("descHtml").value = editor.innerHTML.trim();
+                    });
+                </script>
 </body>
 
 </html>
