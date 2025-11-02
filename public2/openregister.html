@@ -2,313 +2,280 @@
 <html lang="ko">
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>에디터(경량) | MALL HANKOOK</title>
-    <meta name="color-scheme" content="light" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>오픈예정 등록 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
     <style>
-        /* placeholder for contenteditable */
+        body {
+            font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #f8fafc, #e0e7ff);
+            color: #111827;
+            min-height: 100vh;
+        }
+
+        .neo-card {
+            background: rgba(255, 255, 255, .65);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, .45);
+            border-radius: 1.25rem;
+            box-shadow: 8px 8px 24px rgba(0, 0, 0, .07);
+        }
+
         [contenteditable][data-placeholder]:empty:before {
             content: attr(data-placeholder);
-            color: rgb(156 163 175);
+            color: #9ca3af;
             pointer-events: none;
         }
 
-        /* simple focus outline for accessibility */
-        .focus-ring:focus-visible {
-            outline: 2px solid rgb(59 130 246);
-            outline-offset: 2px;
-            border-radius: .5rem;
+        .editor img {
+            display: block;
+            max-width: 100%;
+            border-radius: .75rem;
+            margin: .5rem 0;
+        }
+
+        .side-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .side-container img {
+            width: 45%;
+        }
+
+        .side-container .text {
+            flex: 1;
         }
     </style>
 </head>
 
-<body class="bg-gray-50 text-gray-800 antialiased">
-    <div class="max-w-4xl mx-auto py-6 px-4">
-        <!-- Header -->
-        <header class="mb-4">
-            <h1 class="text-2xl font-semibold">설명 작성 에디터</h1>
-            <p class="text-sm text-gray-500">네이버 블로그 느낌의 경량 에디터 (순수 Tailwind + JS)</p>
-        </header>
+<body class="flex flex-col items-center py-10">
+    <main class="w-full max-w-3xl p-8 neo-card mt-10">
+        <h1
+            class="text-3xl font-extrabold text-center mb-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-transparent bg-clip-text">
+            오픈 매장 등록
+        </h1>
 
-        <!-- Toolbar -->
-        <div class="sticky top-0 z-10 bg-white/80 backdrop-blur border border-gray-200 rounded-xl p-2 mb-3 shadow-sm">
-            <div class="flex flex-wrap items-center gap-2">
-
-                <!-- Bold -->
-                <button type="button" data-cmd="bold"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="굵게" title="굵게 (Bold)">
-                    <span class="font-bold">B</span>
-                </button>
-
-                <!-- Underline -->
-                <button type="button" data-cmd="underline"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="밑줄" title="밑줄 (Underline)">
-                    <span class="underline underline-offset-2">U</span>
-                </button>
-
-                <!-- Bullet List -->
-                <button type="button" data-cmd="insertUnorderedList"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="글머리기호" title="글머리기호 (• 목록)">
-                    • 목록
-                </button>
-
-                <!-- HR -->
-                <button type="button" data-cmd="insertHorizontalRule"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="구분선" title="구분선 (가로줄)">
-                    ──
-                </button>
-
-                <span class="mx-1 h-6 w-px bg-gray-200"></span>
-
-                <!-- Image (Upload) -->
-                <button type="button" id="btnImageUpload"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="이미지 삽입(업로드)" title="이미지 삽입 - 내 PC에서 업로드">
-                    🖼 업로드
-                </button>
-                <input type="file" id="imageFile" accept="image/*" class="hidden" />
-
-                <!-- Image (URL) -->
-                <button type="button" id="btnImageUrl"
-                    class="group focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    aria-label="이미지 삽입(URL)" title="이미지 삽입 - 이미지 주소로 추가">
-                    🌐 URL
-                </button>
-
-                <span class="mx-1 h-6 w-px bg-gray-200"></span>
-
-                <!-- Font Size (px) -->
-                <label class="flex items-center gap-2 text-sm">
-                    <span class="text-gray-600" title="선택 영역 글자 크기(px) 적용">글자크기</span>
-                    <input id="fontSizePx" type="number" min="8" max="96" step="1" value="16"
-                        class="focus-ring w-20 px-2 py-1 border border-gray-300 rounded-md bg-white" />
-                    <span class="text-gray-500">px</span>
-                    <button type="button" id="btnApplyFont"
-                        class="focus-ring px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                        title="선택한 글자에 픽셀 크기 적용">
-                        적용
-                    </button>
-                </label>
-
-                <div class="flex-1"></div>
-
-                <!-- View / Copy result -->
-                <button type="button" id="btnShowHtml"
-                    class="focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-                    title="현재 작성한 HTML을 미리보기로 확인">
-                    HTML 결과 보기
-                </button>
-                <button type="button" id="btnCopyHtml"
-                    class="focus-ring px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 shadow-sm"
-                    title="현재 작성한 HTML을 복사">
-                    복사하기
-                </button>
+        <form id="openForm" class="space-y-6" enctype="multipart/form-data">
+            <!-- 기본정보 -->
+            <div>
+                <label class="block font-semibold mb-1">상호명</label>
+                <input name="store_name" type="text" required
+                    class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
             </div>
-        </div>
 
-        <!-- Editor -->
-        <section class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <div id="editor" class="focus-ring min-h-[320px] leading-7 outline-none" contenteditable="true"
-                data-placeholder="여기에 설명을 작성하세요. (텍스트, 목록, 이미지, 구분선, 글자크기 px 적용 가능)">
-                <!-- 초기 콘텐츠가 필요하면 여기에 작성 -->
+            <div>
+                <label class="block font-semibold mb-1">오픈일</label>
+                <input name="open_date" type="date" required
+                    class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
             </div>
-        </section>
 
-        <!-- Live small preview (optional, lightweight) -->
-        <details class="mt-3">
-            <summary class="text-sm text-gray-600 cursor-pointer">간단 미리보기</summary>
-            <div id="livePreview" class="mt-2 p-3 border border-gray-200 rounded-xl bg-white"></div>
-        </details>
-
-        <!-- Footer helper -->
-        <p class="mt-6 text-xs text-gray-500">
-            * 결과 HTML은 나중에 <code>openregister.html</code> / <code>opendetail.html</code>의 <code>description</code>에 그대로
-            붙여넣어 재사용할 수 있습니다.
-        </p>
-    </div>
-
-    <!-- Modal: HTML 결과 보기 -->
-    <div id="modal" class="hidden fixed inset-0 z-20 items-center justify-center bg-black/40 p-4">
-        <div class="max-w-3xl w-full bg-white rounded-2xl shadow-xl border border-gray-200">
-            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-                <h2 class="text-lg font-semibold">HTML 결과</h2>
-                <button id="modalClose" class="focus-ring p-1.5 rounded-md hover:bg-gray-100" title="닫기">✕</button>
+            <div>
+                <label class="block font-semibold mb-1">업종(카테고리)</label>
+                <input name="category" type="text" placeholder="예: 한식, 카페, 병원 등"
+                    class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
             </div>
-            <div class="p-5 space-y-3">
-                <textarea id="resultHtml"
-                    class="w-full h-72 p-3 border border-gray-300 rounded-lg font-mono text-sm leading-6"
-                    readonly></textarea>
-                <div class="flex items-center justify-end gap-2">
-                    <button id="btnCopyInModal"
-                        class="focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm">
-                        복사하기
-                    </button>
-                    <button id="modalClose2"
-                        class="focus-ring px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 shadow-sm">
-                        닫기
-                    </button>
+
+            <div>
+                <label class="block font-semibold mb-1">전화번호</label>
+                <input name="phone" type="text" required placeholder="010-0000-0000"
+                    class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
+            </div>
+
+            <!-- 주소 -->
+            <div>
+                <label class="block font-semibold mb-1">주소</label>
+                <div class="flex gap-2">
+                    <input id="address" name="address" type="text" readonly
+                        class="flex-1 border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
+                    <button type="button" onclick="searchAddress()"
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">검색</button>
                 </div>
             </div>
-        </div>
-    </div>
+
+            <!-- ✅ 상세 주소 추가 -->
+            <div>
+                <label class="block font-semibold mb-1 mt-2">상세 주소</label>
+                <input id="detailAddress" name="detail_address" type="text" placeholder="예: 2층, 203호"
+                    class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
+            </div>
+
+            <!-- 지도 -->
+            <div class="flex justify-center">
+                <div id="map" class="rounded border border-gray-300 my-4 shadow-sm"
+                    style="width:100%; height:260px; max-width:480px;"></div>
+            </div>
+
+            <!-- 대표 이미지 -->
+            <div>
+                <label class="block font-semibold mb-1">대표 이미지</label>
+                <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2 text-gray-700" />
+            </div>
+
+            <!-- 설명 작성 (새 에디터) -->
+            <div>
+                <label class="block font-semibold mb-2">설명 (사진 포함, 자유 배치 가능)</label>
+
+                <!-- ✏️ 에디터 툴바 -->
+                <div
+                    class="flex flex-wrap items-center gap-2 mb-3 p-2 border border-gray-200 bg-white rounded-xl shadow-sm">
+                    <button data-cmd="bold" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm font-bold">B</button>
+                    <button data-cmd="underline" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm underline">U</button>
+
+                    <!-- 글머리 목록 -->
+                    <button data-cmd="insertUnorderedList" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm">• 목록</button>
+
+                    <!-- ✅ 숫자 목록 추가 -->
+                    <button data-cmd="insertOrderedList" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm">1. 목록</button>
+
+                    <button data-cmd="insertHorizontalRule" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm">─</button>
+
+                    <label class="flex items-center gap-2 text-sm ml-2">
+                        <span>글자크기</span>
+                        <input id="fontSizePx" type="number" min="8" max="72" value="16"
+                            class="w-20 px-2 py-1 border rounded-md bg-white">
+                        <span>px</span>
+                        <button id="applyFont" type="button"
+                            class="px-2 py-1 border rounded-md bg-white hover:bg-gray-100 shadow-sm">적용</button>
+                    </label>
+
+                    <span class="mx-2 h-6 w-px bg-gray-300"></span>
+
+                    <label class="flex items-center gap-2 text-sm">
+                        <span>사진 위치</span>
+                        <select id="imagePosition" class="border rounded-md px-2 py-1 bg-white">
+                            <option value="top">위쪽</option>
+                            <option value="left">왼쪽</option>
+                            <option value="right">오른쪽</option>
+                            <option value="bottom">아래쪽</option>
+                        </select>
+                    </label>
+
+                    <button id="insertImage" type="button"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-gray-100 shadow-sm">🖼 이미지 삽입</button>
+                    <input type="file" id="imageFile" accept="image/*" class="hidden" />
+                </div>
+
+
+                <div id="editor" class="editor min-h-[400px] p-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                    contenteditable="true" data-placeholder="여기에 설명을 입력하세요. (사진 위치 선택 후 삽입)">
+                </div>
+                <textarea id="descHtml" name="description" class="hidden"></textarea>
+            </div>
+
+            <button type="submit"
+                class="mt-2 py-2 px-6 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700">등록</button>
+        </form>
+    </main>
 
     <script>
-        // ------ helpers ------
-        const editor = document.getElementById('editor');
-        const livePreview = document.getElementById('livePreview');
-
-        // execCommand wrapper (deprecated but lightweight & widely supported for simple ops)
-        function doCmd(cmd, value = null) {
-            document.execCommand(cmd, false, value);
-            editor.focus();
-            refreshPreview();
+        /* ==== 주소검색 + 지도 ==== */
+        function searchAddress() {
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    const addr = data.address;
+                    document.getElementById("address").value = addr;
+                    updateMapByAddress(addr);
+                }
+            }).open();
         }
 
-        // Apply font size in px by wrapping selection in a <span style="font-size:NNpx">
-        function applyFontSizePx(px) {
-            px = parseInt(px, 10);
-            if (!px || px < 8 || px > 300) return;
+        window.map = null;
+        window.marker = null;
+        kakao.maps.load(function () {
+            const mapContainer = document.getElementById("map");
+            const pos = new kakao.maps.LatLng(37.5665, 126.9780);
+            window.map = new kakao.maps.Map(mapContainer, { center: pos, level: 3 });
+            window.marker = new kakao.maps.Marker({ map: window.map, position: pos });
+        });
 
+        function updateMapByAddress(address) {
+            const geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(address, function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const lat = result[0].y, lng = result[0].x;
+                    const loc = new kakao.maps.LatLng(lat, lng);
+                    window.map.setCenter(loc);
+                    window.marker.setPosition(loc);
+                }
+            });
+        }
+
+        /* ==== 에디터 ==== */
+        const editor = document.getElementById("editor");
+        const fontSizePx = document.getElementById("fontSizePx");
+        const applyFont = document.getElementById("applyFont");
+        const imageFile = document.getElementById("imageFile");
+        const insertImage = document.getElementById("insertImage");
+        const imagePosition = document.getElementById("imagePosition");
+
+        document.querySelectorAll("[data-cmd]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.execCommand(btn.dataset.cmd, false, null);
+                editor.focus();
+            });
+        });
+
+        applyFont.addEventListener("click", () => {
+            const px = parseInt(fontSizePx.value);
+            if (!px) return;
             const sel = window.getSelection();
-            if (!sel || sel.rangeCount === 0) return;
-
+            if (!sel.rangeCount) return;
             const range = sel.getRangeAt(0);
-            if (range.collapsed) {
-                // If collapsed, insert a span and place cursor inside
-                const span = document.createElement('span');
-                span.style.fontSize = px + 'px';
-                span.appendChild(document.createTextNode('\u200b')); // zero-width space
-                range.insertNode(span);
-
-                // move caret after the span
-                sel.removeAllRanges();
-                const newRange = document.createRange();
-                newRange.setStart(span.firstChild, 1);
-                newRange.collapse(true);
-                sel.addRange(newRange);
-            } else {
-                // wrap the selected contents
-                const span = document.createElement('span');
-                span.style.fontSize = px + 'px';
-                range.surroundContents(span);
-            }
+            const span = document.createElement("span");
+            span.style.fontSize = px + "px";
+            range.surroundContents(span);
             editor.focus();
-            refreshPreview();
-        }
+        });
 
-        // Insert image from a File -> dataURL
-        function insertImageFromFile(file) {
+        insertImage.addEventListener("click", () => imageFile.click());
+
+        imageFile.addEventListener("change", (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = () => {
-                doCmd('insertImage', reader.result);
+                const pos = imagePosition.value;
+                const img = document.createElement("img");
+                img.src = reader.result;
+
+                if (pos === "top") {
+                    editor.insertAdjacentElement("afterbegin", img);
+                } else if (pos === "bottom") {
+                    editor.insertAdjacentElement("beforeend", img);
+                } else if (pos === "left" || pos === "right") {
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "side-container";
+                    const textDiv = document.createElement("div");
+                    textDiv.className = "text";
+                    textDiv.contentEditable = "true";
+                    textDiv.innerHTML = "여기에 글을 입력하세요.";
+                    if (pos === "left") {
+                        wrapper.append(img, textDiv);
+                    } else {
+                        wrapper.append(textDiv, img);
+                    }
+                    editor.appendChild(wrapper);
+                }
             };
             reader.readAsDataURL(file);
-        }
-
-        // Insert image from URL (basic)
-        function insertImageFromUrl(url) {
-            if (!url) return;
-            doCmd('insertImage', url.trim());
-        }
-
-        // Live preview (super lightweight)
-        function refreshPreview() {
-            if (!livePreview) return;
-            livePreview.innerHTML = editor.innerHTML;
-        }
-
-        // ------ toolbar actions ------
-        document.querySelectorAll('[data-cmd]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const cmd = btn.getAttribute('data-cmd');
-                doCmd(cmd);
-            });
+            e.target.value = "";
         });
 
-        // Image upload
-        const btnImageUpload = document.getElementById('btnImageUpload');
-        const imageFile = document.getElementById('imageFile');
-        btnImageUpload.addEventListener('click', () => imageFile.click());
-        imageFile.addEventListener('change', (e) => {
-            const file = e.target.files?.[0];
-            if (file) insertImageFromFile(file);
-            imageFile.value = '';
+        document.getElementById('openForm').addEventListener('submit', (e) => {
+            document.getElementById('descHtml').value = editor.innerHTML.trim();
         });
-
-        // Image URL
-        const btnImageUrl = document.getElementById('btnImageUrl');
-        btnImageUrl.addEventListener('click', () => {
-            const url = prompt('이미지 URL을 입력하세요 (https://...)');
-            if (url) insertImageFromUrl(url);
-        });
-
-        // Font size apply
-        const fontSizePx = document.getElementById('fontSizePx');
-        const btnApplyFont = document.getElementById('btnApplyFont');
-        btnApplyFont.addEventListener('click', () => applyFontSizePx(fontSizePx.value));
-        fontSizePx.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') applyFontSizePx(fontSizePx.value);
-        });
-
-        // ------ show/copy HTML ------
-        const btnShowHtml = document.getElementById('btnShowHtml');
-        const btnCopyHtml = document.getElementById('btnCopyHtml');
-        const modal = document.getElementById('modal');
-        const resultHtml = document.getElementById('resultHtml');
-        const modalClose = document.getElementById('modalClose');
-        const modalClose2 = document.getElementById('modalClose2');
-        const btnCopyInModal = document.getElementById('btnCopyInModal');
-
-        btnShowHtml.addEventListener('click', () => {
-            resultHtml.value = editor.innerHTML.trim();
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            resultHtml.focus();
-            resultHtml.select();
-        });
-
-        function copyHtml() {
-            const html = editor.innerHTML.trim();
-            navigator.clipboard?.writeText(html).then(() => {
-                btnCopyHtml.textContent = '복사됨!';
-                setTimeout(() => (btnCopyHtml.textContent = '복사하기'), 1200);
-            }).catch(() => {
-                alert('클립보드 권한이 거부되었습니다. 수동 복사를 이용하세요.');
-            });
-        }
-        btnCopyHtml.addEventListener('click', copyHtml);
-
-        btnCopyInModal.addEventListener('click', () => {
-            const html = resultHtml.value;
-            navigator.clipboard?.writeText(html).then(() => {
-                btnCopyInModal.textContent = '복사됨!';
-                setTimeout(() => (btnCopyInModal.textContent = '복사하기'), 1200);
-            }).catch(() => alert('클립보드 권한이 거부되었습니다.'));
-        });
-
-        function closeModal() {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-        modalClose.addEventListener('click', closeModal);
-        modalClose2.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
-        });
-
-        // Keep preview synced
-        editor.addEventListener('input', refreshPreview);
-        editor.addEventListener('click', refreshPreview);
-        editor.addEventListener('keyup', refreshPreview);
-
-        // initial
-        refreshPreview();
     </script>
 </body>
 
