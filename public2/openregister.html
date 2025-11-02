@@ -290,10 +290,10 @@
                     const insertImage = document.getElementById("insertImage");
                     const imagePosition = document.getElementById("imagePosition");
 
-                    /* 지금부터 새로 입력할 글자의 기본 크기 */
+                    /* 앞으로 쓸 글자 크기만 저장하는 상태 */
                     let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
 
-                    /* 마지막 커서/선택 범위 */
+                    /* 마지막 커서/선택 위치 */
                     let lastRange = null;
 
                     function saveSelection() {
@@ -307,7 +307,7 @@
                     editor.addEventListener("keyup", saveSelection);
                     editor.addEventListener("mouseleave", saveSelection);
 
-                    /* 툴바 (굵게/밑줄/목록/숫자목록/구분선) */
+                    /* === 툴바 명령 (굵게/밑줄/목록/숫자목록/구분선) === */
                     document.querySelectorAll("[data-cmd]").forEach((btn) => {
                         btn.addEventListener("mousedown", (e) => {
                             e.preventDefault();
@@ -323,14 +323,16 @@
                     });
 
                     /* =========================================
-                       글자 크기 입력
-                       - input: 값만 바꿈 (포커스 뺏지 않음)
-                       - change: 실제 적용 (선택영역 / 현재 span / 새 span)
+                       글자 크기 바꾸기
+                       - input: 값만 바꾼다 (기존 글 건드리지 않음)
+                       - change: 드래그돼 있으면 그 부분만 적용
+                       - 선택이 없으면 → 새 span을 커서 자리에 박아두고 그다음부터 적용
                     ========================================== */
                     fontSizePx.addEventListener("input", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
-                        currentFontSize = px; // 상태만 교체
+                        currentFontSize = px;          // 앞으로 쓸 글자 크기만 바꿈
+                        // 기존에 써놓은 글은 그대로
                     });
 
                     fontSizePx.addEventListener("change", (e) => {
@@ -338,15 +340,18 @@
                         if (!px) return;
                         currentFontSize = px;
 
+                        // 에디터 안에 커서가 없으면 할 게 없음
                         if (!lastRange) return;
 
                         const sel = window.getSelection();
                         sel.removeAllRanges();
                         sel.addRange(lastRange);
 
-                        // 1) 드래그로 선택돼 있을 때: 그 영역만 즉시 px로
+                        // 1) 드래그로 선택돼 있을 때만 기존 글자를 실제로 바꾼다
                         if (!lastRange.collapsed) {
+                            // execCommand로 임시 사이즈 7을 넣고
                             document.execCommand("fontSize", false, "7");
+                            // 그걸 px로 교체
                             editor.querySelectorAll('font[size="7"]').forEach((el) => {
                                 el.removeAttribute("size");
                                 el.style.fontSize = px + "px";
@@ -355,29 +360,14 @@
                             return;
                         }
 
-                        // 2) 선택은 없는데 이미 어떤 span 안에 있음 → 그 span만 크기 바꾸기
-                        const node = lastRange.startContainer;
-                        let parent = node.nodeType === 3 ? node.parentElement : node;
-                        if (parent && parent !== editor && parent.style && parent.style.fontSize) {
-                            parent.style.fontSize = px + "px";
-
-                            const r = document.createRange();
-                            const textNode = parent.firstChild;
-                            const offset = (textNode && textNode.nodeType === 3) ? textNode.length : 1;
-                            r.setStart(textNode || parent, offset);
-                            r.collapse(true);
-                            sel.removeAllRanges();
-                            sel.addRange(r);
-                            lastRange = r;
-                            return;
-                        }
-
-                        // 3) 그 외 → 새 span 만들어서 그 안에 커서
+                        // 2) 선택이 없는 상태라면 → 지금까지 쓴 글은 건드리지 말고
+                        //    "이제부터 쓸 자리"에 새 span을 하나 꽂아둔다
                         const span = document.createElement("span");
                         span.style.fontSize = px + "px";
                         span.appendChild(document.createTextNode("\u200B"));
                         lastRange.insertNode(span);
 
+                        // 그 안으로 커서 옮기기
                         const r = document.createRange();
                         r.setStart(span.firstChild, 1);
                         r.collapse(true);
@@ -387,23 +377,23 @@
                     });
 
                     /* =========================================
-                       실제로 타이핑할 때: 상태에 있는 크기로 새 span 깔기
+                       실제 타이핑할 때
+                       - 지금 설정해둔 currentFontSize로만 입력되게
+                       - 이미 그 크기 span 안이면 그대로 둠
                     ========================================== */
                     editor.addEventListener("keydown", (e) => {
-                        // 방향키/엔터/백스페이스는 건너뜀
+                        // 엔터/방향키/백스페이스는 그냥 통과
                         const skip = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", "Tab"];
-                        if (skip.includes(e.key)) {
-                            return;
-                        }
+                        if (skip.includes(e.key)) return;
 
                         const sel = window.getSelection();
                         if (!sel || !sel.rangeCount) return;
                         const range = sel.getRangeAt(0);
 
-                        // 드래그 중이면 손대지 않음
+                        // 드래그 중이면 안 만짐
                         if (!range.collapsed) return;
 
-                        // 이미 같은 크기 span 안이면 그대로
+                        // 이미 어떤 span(글자크기 있는) 안에 있고, 그 크기가 현재 크기랑 같으면 안 깔아도 됨
                         const node = range.startContainer;
                         let parent = node.nodeType === 3 ? node.parentElement : node;
                         if (parent && parent !== editor && parent.style && parent.style.fontSize) {
@@ -413,7 +403,7 @@
                             }
                         }
 
-                        // 새로 깔기
+                        // 아니면 새 span을 깔고 그 안에 타이핑
                         const span = document.createElement("span");
                         span.style.fontSize = currentFontSize + "px";
                         span.appendChild(document.createTextNode("\u200B"));
@@ -471,13 +461,13 @@
                     });
 
                     /* =========================================
-                       전송 시 에디터 내용 숨은 textarea에 담기
+                       전송 시 에디터 내용 담기
                     ========================================== */
                     document.getElementById("openForm").addEventListener("submit", () => {
                         document.getElementById("descHtml").value = editor.innerHTML.trim();
                     });
                 </script>
-
+ 
 </body>
 
 </html>
