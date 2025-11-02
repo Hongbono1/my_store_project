@@ -283,37 +283,63 @@
                     const insertImage = document.getElementById("insertImage");
                     const imagePosition = document.getElementById("imagePosition");
 
+                    /* ✅ 마지막 선택 범위 저장용 */
+                    let lastRange = null;
+
+                    function saveSelection() {
+                        const sel = window.getSelection();
+                        if (sel && sel.rangeCount > 0) {
+                            lastRange = sel.getRangeAt(0);
+                        }
+                    }
+
+                    /* 에디터에서 선택이 바뀔 때마다 저장 */
+                    editor.addEventListener("mouseup", saveSelection);
+                    editor.addEventListener("keyup", saveSelection);
+                    editor.addEventListener("mouseleave", saveSelection);
+
+                    /* ✅ 굵게/밑줄/목록 버튼 */
                     document.querySelectorAll("[data-cmd]").forEach((btn) => {
                         btn.addEventListener("mousedown", (e) => {
                             e.preventDefault();
                             document.execCommand(btn.dataset.cmd, false, null);
                             editor.focus();
+                            saveSelection();
                         });
                     });
 
-                    /* 글자 크기: 숫자 바꾸면 바로 적용 */
+                    /* ✅ 글자 크기: 숫자 바꾸면 바로 */
                     fontSizePx.addEventListener("input", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
+
+                        // 저장된 선택이 없으면 적용 못 함
+                        if (!lastRange) return;
+
                         const sel = window.getSelection();
-                        if (!sel || !sel.rangeCount) return;
-                        const range = sel.getRangeAt(0);
-                        if (range.collapsed) return;
+                        sel.removeAllRanges();
+                        sel.addRange(lastRange);
+
+                        // 선택이 비어있으면 스킵
+                        if (lastRange.collapsed) return;
 
                         const span = document.createElement("span");
                         span.style.fontSize = px + "px";
-                        span.appendChild(range.extractContents());
-                        range.insertNode(span);
+                        span.appendChild(lastRange.extractContents());
+                        lastRange.insertNode(span);
+
+                        // 다시 선택 저장 (계속 바꿀 수 있게)
+                        saveSelection();
                         editor.focus();
                     });
 
-                    /* 이미지 버튼 → 파일 선택 */
+                    /* ✅ 이미지 버튼 → 파일 선택 */
                     insertImage.addEventListener("mousedown", (e) => {
                         e.preventDefault();
                         imageFile.click();
                     });
 
-                    /* 이미지 삽입 */
+                    /* ✅ 이미지 삽입 */
                     imageFile.addEventListener("change", (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -342,12 +368,13 @@
                                 }
                                 editor.appendChild(wrapper);
                             }
+                            saveSelection();
                         };
                         reader.readAsDataURL(file);
                         e.target.value = "";
                     });
 
-                    /* 폼 보낼 때 에디터 내용 담기 */
+                    /* ✅ 폼 제출 시 HTML 담기 */
                     document.getElementById("openForm").addEventListener("submit", () => {
                         document.getElementById("descHtml").value = editor.innerHTML.trim();
                     });
