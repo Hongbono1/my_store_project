@@ -93,6 +93,11 @@
             pointer-events: none;
             z-index: 20;
         }
+        .tbtn-active {
+        background: #2563eb !important;
+        color: #fff !important;
+        border-color: #1d4ed8 !important;
+    }
     </style>
 </head>
 
@@ -212,7 +217,6 @@
     </main>
 
     <script>
-
         /* =========================================
            1. 주소검색 + 지도
         ========================================== */
@@ -258,10 +262,22 @@
         const insertImage = document.getElementById("insertImage");
         const imagePosition = document.getElementById("imagePosition");
 
+        /* 굵게 버튼 따로 가져오기 */
+        const boldBtn = document.querySelector('[data-cmd="bold"]');
+
         let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
         let lastRange = null;
 
-        /* 현재 선택 저장 */
+        /* active 클래스 토글 함수 */
+        function setActive(btn, on) {
+            if (!btn) return;
+            if (on) {
+                btn.classList.add("tbtn-active");
+            } else {
+                btn.classList.remove("tbtn-active");
+            }
+        }
+
         function saveSelection() {
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
@@ -269,19 +285,30 @@
             }
         }
 
-        editor.addEventListener("mouseup", saveSelection);
-        editor.addEventListener("keyup", saveSelection);
+        editor.addEventListener("mouseup", () => {
+            saveSelection();
+            // 커서가 굵은 곳 안에 있으면 버튼도 굵게 보이게
+            if (boldBtn) {
+                const isBold = document.queryCommandState("bold");
+                setActive(boldBtn, isBold);
+            }
+        });
+        editor.addEventListener("keyup", () => {
+            saveSelection();
+            if (boldBtn) {
+                const isBold = document.queryCommandState("bold");
+                setActive(boldBtn, isBold);
+            }
+        });
         editor.addEventListener("mouseleave", saveSelection);
 
-        /* ✅ 툴바 버튼 (굵게/밑줄/목록/숫자목록/구분선) */
+        /* ✅ 툴바 버튼 */
         document.querySelectorAll("[data-cmd]").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.preventDefault();
 
-                // 에디터에 포커스 먼저
                 editor.focus();
 
-                // 저장된 선택이 에디터 안에 있으면 복원
                 if (lastRange && editor.contains(lastRange.commonAncestorContainer)) {
                     const sel = window.getSelection();
                     sel.removeAllRanges();
@@ -290,7 +317,6 @@
 
                 const cmd = btn.dataset.cmd;
 
-                // 구분선은 직접 넣기
                 if (cmd === "insertHorizontalRule") {
                     const hr = document.createElement("hr");
                     hr.style.border = "none";
@@ -307,6 +333,12 @@
                     document.execCommand(cmd, false, null);
                 }
 
+                // ✅ 굵게 버튼일 때는 상태 확인 후 색 바꿈
+                if (cmd === "bold") {
+                    const isBold = document.queryCommandState("bold");
+                    setActive(btn, isBold);
+                }
+
                 saveSelection();
             });
         });
@@ -318,7 +350,7 @@
             currentFontSize = px;
         });
 
-        /* 글자 크기 확정 시: 드래그된 부분만 바꾸고, 선택 없으면 다음 글부터 적용 */
+        /* 글자 크기 확정 시 */
         fontSizePx.addEventListener("change", (e) => {
             const px = parseInt(e.target.value, 10);
             if (!px) return;
@@ -330,7 +362,6 @@
             sel.removeAllRanges();
             sel.addRange(lastRange);
 
-            // ✅ 드래그돼 있으면 그 부분만 실제로 변경
             if (!lastRange.collapsed) {
                 document.execCommand("fontSize", false, "7");
                 editor.querySelectorAll('font[size="7"]').forEach((el) => {
@@ -341,7 +372,6 @@
                 return;
             }
 
-            // ✅ 선택이 없을 때는 이후 입력용 span 하나만 심어둠
             const span = document.createElement("span");
             span.style.fontSize = px + "px";
             span.appendChild(document.createTextNode("\u200B"));
@@ -364,10 +394,8 @@
             if (!sel || !sel.rangeCount) return;
             const range = sel.getRangeAt(0);
 
-            // 드래그 중이면 안 건드림
             if (!range.collapsed) return;
 
-            // 이미 같은 크기 span 안이면 패스
             const node = range.startContainer;
             let parent = node.nodeType === 3 ? node.parentElement : node;
             if (parent && parent !== editor && parent.style && parent.style.fontSize) {
@@ -377,7 +405,6 @@
                 }
             }
 
-            // 새 span 깔기
             const span = document.createElement("span");
             span.style.fontSize = currentFontSize + "px";
             span.appendChild(document.createTextNode("\u200B"));
