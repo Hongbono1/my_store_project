@@ -283,9 +283,8 @@
                     const insertImage = document.getElementById("insertImage");
                     const imagePosition = document.getElementById("imagePosition");
 
-                    /* ✅ 마지막 선택 범위 저장용 */
+                    /* ✅ 마지막 선택 범위 저장 */
                     let lastRange = null;
-
                     function saveSelection() {
                         const sel = window.getSelection();
                         if (sel && sel.rangeCount > 0) {
@@ -293,42 +292,51 @@
                         }
                     }
 
-                    /* 에디터에서 선택이 바뀔 때마다 저장 */
+                    /* 에디터 안에서 클릭/드래그할 때마다 선택 저장 */
                     editor.addEventListener("mouseup", saveSelection);
                     editor.addEventListener("keyup", saveSelection);
-                    editor.addEventListener("mouseleave", saveSelection);
 
                     /* ✅ 굵게/밑줄/목록 버튼 */
                     document.querySelectorAll("[data-cmd]").forEach((btn) => {
                         btn.addEventListener("mousedown", (e) => {
                             e.preventDefault();
+                            // 선택 복원
+                            if (lastRange) {
+                                const sel = window.getSelection();
+                                sel.removeAllRanges();
+                                sel.addRange(lastRange);
+                            }
                             document.execCommand(btn.dataset.cmd, false, null);
                             editor.focus();
                             saveSelection();
                         });
                     });
 
-                    /* ✅ 글자 크기: 숫자 바꾸면 바로 */
+                    /* ✅ 글자 크기: 숫자 바꾸면 바로 적용 (execCommand 방식) */
                     fontSizePx.addEventListener("input", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
 
-                        // 저장된 선택이 없으면 적용 못 함
-                        if (!lastRange) return;
+                        // 선택 영역 복원
+                        if (lastRange) {
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(lastRange);
+                        } else {
+                            // 선택이 아예 없으면 그냥 리턴
+                            return;
+                        }
 
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(lastRange);
+                        // 1) 임시로 font size=7 넣기
+                        document.execCommand("fontSize", false, "7");
 
-                        // 선택이 비어있으면 스킵
-                        if (lastRange.collapsed) return;
+                        // 2) 지금 에디터 안의 font[size="7"]만 px로 바꾸기
+                        editor.querySelectorAll('font[size="7"]').forEach((el) => {
+                            el.removeAttribute("size");
+                            el.style.fontSize = px + "px";
+                        });
 
-                        const span = document.createElement("span");
-                        span.style.fontSize = px + "px";
-                        span.appendChild(lastRange.extractContents());
-                        lastRange.insertNode(span);
-
-                        // 다시 선택 저장 (계속 바꿀 수 있게)
+                        // 다시 저장 (연속 변경 가능하게)
                         saveSelection();
                         editor.focus();
                     });
@@ -368,13 +376,15 @@
                                 }
                                 editor.appendChild(wrapper);
                             }
+
+                            // 이미지 넣고 나서도 선택 저장
                             saveSelection();
                         };
                         reader.readAsDataURL(file);
                         e.target.value = "";
                     });
 
-                    /* ✅ 폼 제출 시 HTML 담기 */
+                    /* ✅ 폼 보낼 때 에디터 내용 담기 */
                     document.getElementById("openForm").addEventListener("submit", () => {
                         document.getElementById("descHtml").value = editor.innerHTML.trim();
                     });
