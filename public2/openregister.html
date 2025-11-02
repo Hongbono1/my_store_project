@@ -53,37 +53,74 @@
             flex: 1;
         }
 
+        /* ✅ 에디터 툴바 버튼 */
         .tbtn {
-            @apply px-3 py-2 text-sm rounded-lg bg-white border border-black text-gray-800 font-semibold hover:bg-gray-100 hover:shadow-md transition-all duration-150 flex items-center justify-center h-9 relative;
-            /* ✅ 이 한 줄이 핵심! */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 2.25rem;
+            /* h-9 */
+            padding: 0.5rem 0.75rem;
+            /* px-3 py-2 */
+            background: #ffffff;
+            border: 1px solid #000;
+            /* 검정 테두리 */
+            border-radius: 0.5rem;
+            /* rounded-lg */
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #111827;
+            cursor: pointer;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            position: relative;
+            /* Tooltip 기준점 */
         }
 
-        /* Tooltip */
+        .tbtn:hover {
+            background: #f3f4f6;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ✅ Tooltip: 마우스 올리면 바로 옆에 표시 */
+        .tbtn[data-tip],
+        label[data-tip] {
+            position: relative;
+            /* 각 요소가 기준 */
+        }
+
         .tbtn[data-tip]:hover::after,
         label[data-tip]:hover::after {
             content: attr(data-tip);
             position: absolute;
             top: 50%;
             left: calc(100% + 8px);
-            /* 버튼 오른쪽 8px 옆 */
+            /* 버튼 오른쪽 */
             transform: translateY(-50%);
-            background: rgba(17, 24, 39, 0.9);
+            background: rgba(17, 24, 39, 0.95);
             color: #fff;
             font-size: 12px;
             padding: 4px 8px;
             border-radius: 6px;
             white-space: nowrap;
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            z-index: 10;
+            z-index: 50;
         }
 
-        .tbtn:hover::after,
-        label:hover::after {
-            opacity: 1;
+        /* 말풍선 화살표 (옵션) */
+        .tbtn[data-tip]:hover::before,
+        label[data-tip]:hover::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            transform: translateY(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: transparent transparent transparent rgba(17, 24, 39, 0.95);
+            z-index: 49;
         }
     </style>
+
 </head>
 
 <body class="flex flex-col items-center py-10">
@@ -155,24 +192,23 @@
 
                 <!-- ✏️ 에디터 툴바 -->
                 <div
-                    class="flex flex-wrap items-center justify-center gap-3 mb-3 p-3 border border-gray-300 bg-gray-50 rounded-xl shadow-inner">
-                    <button data-cmd="bold" type="button" data-tip="굵게 (Ctrl+B)" class="tbtn font-bold">B</button>
-                    <button data-cmd="underline" type="button" data-tip="밑줄 (Ctrl+U)" class="tbtn underline">U</button>
+                    class="flex flex-wrap items-center justify-center gap-3 mb-3 p-3 border border-gray-200 bg-white rounded-xl shadow-sm">
+                    <button data-cmd="bold" type="button" data-tip="굵게" class="tbtn">B</button>
+                    <button data-cmd="underline" type="button" data-tip="밑줄" class="tbtn underline">U</button>
                     <button data-cmd="insertUnorderedList" type="button" data-tip="글머리 목록" class="tbtn">• 목록</button>
                     <button data-cmd="insertOrderedList" type="button" data-tip="숫자 목록" class="tbtn">1. 목록</button>
                     <button data-cmd="insertHorizontalRule" type="button" data-tip="구분선" class="tbtn">─</button>
 
-                    <label class="flex items-center gap-2 text-sm ml-2" data-tip="글자 크기 변경">
+                    <label class="flex items-center gap-2 text-sm" data-tip="글자 크기(px)">
                         <span>크기</span>
                         <input id="fontSizePx" type="number" min="8" max="72" value="16"
-                            class="h-9 w-20 px-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-400">
+                            class="h-9 w-20 px-2 border border-gray-300 rounded-md bg-white">
                         <button id="applyFont" type="button" class="tbtn">적용</button>
                     </label>
 
                     <label class="flex items-center gap-2 text-sm" data-tip="이미지 위치 선택">
                         <span>사진</span>
-                        <select id="imagePosition"
-                            class="h-9 border border-gray-300 rounded-md px-2 bg-white focus:ring-2 focus:ring-blue-400">
+                        <select id="imagePosition" class="h-9 border border-gray-300 rounded-md px-2 bg-white">
                             <option value="top">위쪽</option>
                             <option value="left">왼쪽</option>
                             <option value="right">오른쪽</option>
@@ -183,7 +219,6 @@
                     <button id="insertImage" type="button" data-tip="이미지 삽입" class="tbtn">🖼 삽입</button>
                     <input type="file" id="imageFile" accept="image/*" class="hidden" />
                 </div>
-
 
                 <div id="editor" class="editor min-h-[400px] p-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
                     contenteditable="true" data-placeholder="여기에 설명을 입력하세요. (사진 위치 선택 후 삽입)">
@@ -237,30 +272,44 @@
         const insertImage = document.getElementById("insertImage");
         const imagePosition = document.getElementById("imagePosition");
 
-        document.querySelectorAll("[data-cmd]").forEach(btn => {
-            btn.addEventListener("click", () => {
+        /* 툴바 명령 (굵게, 밑줄, 목록 등) */
+        document.querySelectorAll("[data-cmd]").forEach((btn) => {
+            btn.addEventListener("mousedown", (e) => {
+                e.preventDefault();                 // 선택 깨지는 거 방지
                 document.execCommand(btn.dataset.cmd, false, null);
                 editor.focus();
             });
         });
 
-        applyFont.addEventListener("click", () => {
-            const px = parseInt(fontSizePx.value);
+        /* 글자 크기 적용 */
+        applyFont.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            const px = parseInt(fontSizePx.value, 10);
             if (!px) return;
+
             const sel = window.getSelection();
-            if (!sel.rangeCount) return;
+            if (!sel || !sel.rangeCount) return;
             const range = sel.getRangeAt(0);
+
             const span = document.createElement("span");
             span.style.fontSize = px + "px";
-            range.surroundContents(span);
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+
             editor.focus();
         });
 
-        insertImage.addEventListener("click", () => imageFile.click());
+        /* 이미지 버튼 → 파일 선택 */
+        insertImage.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            imageFile.click();
+        });
 
+        /* 이미지 삽입 */
         imageFile.addEventListener("change", (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+
             const reader = new FileReader();
             reader.onload = () => {
                 const pos = imagePosition.value;
@@ -290,8 +339,9 @@
             e.target.value = "";
         });
 
-        document.getElementById('openForm').addEventListener('submit', (e) => {
-            document.getElementById('descHtml').value = editor.innerHTML.trim();
+        /* 폼 보낼 때 에디터 내용 담기 */
+        document.getElementById("openForm").addEventListener("submit", () => {
+            document.getElementById("descHtml").value = editor.innerHTML.trim();
         });
     </script>
 </body>
