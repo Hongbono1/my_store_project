@@ -212,6 +212,7 @@
     </main>
 
     <script>
+
         /* =========================================
            1. 주소검색 + 지도
         ========================================== */
@@ -260,6 +261,7 @@
         let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
         let lastRange = null;
 
+        /* 현재 선택 저장 */
         function saveSelection() {
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
@@ -271,16 +273,40 @@
         editor.addEventListener("keyup", saveSelection);
         editor.addEventListener("mouseleave", saveSelection);
 
+        /* ✅ 툴바 버튼 (굵게/밑줄/목록/숫자목록/구분선) */
         document.querySelectorAll("[data-cmd]").forEach((btn) => {
-            btn.addEventListener("mousedown", (e) => {
+            btn.addEventListener("click", (e) => {
                 e.preventDefault();
-                if (lastRange) {
+
+                // 에디터에 포커스 먼저
+                editor.focus();
+
+                // 저장된 선택이 에디터 안에 있으면 복원
+                if (lastRange && editor.contains(lastRange.commonAncestorContainer)) {
                     const sel = window.getSelection();
                     sel.removeAllRanges();
                     sel.addRange(lastRange);
                 }
-                document.execCommand(btn.dataset.cmd, false, null);
-                editor.focus();
+
+                const cmd = btn.dataset.cmd;
+
+                // 구분선은 직접 넣기
+                if (cmd === "insertHorizontalRule") {
+                    const hr = document.createElement("hr");
+                    hr.style.border = "none";
+                    hr.style.borderTop = "1px solid #e5e7eb";
+                    hr.style.margin = "14px 0";
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                        const r = sel.getRangeAt(0);
+                        r.insertNode(hr);
+                    } else {
+                        editor.appendChild(hr);
+                    }
+                } else {
+                    document.execCommand(cmd, false, null);
+                }
+
                 saveSelection();
             });
         });
@@ -304,6 +330,7 @@
             sel.removeAllRanges();
             sel.addRange(lastRange);
 
+            // ✅ 드래그돼 있으면 그 부분만 실제로 변경
             if (!lastRange.collapsed) {
                 document.execCommand("fontSize", false, "7");
                 editor.querySelectorAll('font[size="7"]').forEach((el) => {
@@ -314,6 +341,7 @@
                 return;
             }
 
+            // ✅ 선택이 없을 때는 이후 입력용 span 하나만 심어둠
             const span = document.createElement("span");
             span.style.fontSize = px + "px";
             span.appendChild(document.createTextNode("\u200B"));
@@ -336,8 +364,10 @@
             if (!sel || !sel.rangeCount) return;
             const range = sel.getRangeAt(0);
 
+            // 드래그 중이면 안 건드림
             if (!range.collapsed) return;
 
+            // 이미 같은 크기 span 안이면 패스
             const node = range.startContainer;
             let parent = node.nodeType === 3 ? node.parentElement : node;
             if (parent && parent !== editor && parent.style && parent.style.fontSize) {
@@ -347,6 +377,7 @@
                 }
             }
 
+            // 새 span 깔기
             const span = document.createElement("span");
             span.style.fontSize = currentFontSize + "px";
             span.appendChild(document.createTextNode("\u200B"));
@@ -361,7 +392,7 @@
         });
 
         /* 이미지 버튼 → 파일 선택 */
-        insertImage.addEventListener("mousedown", (e) => {
+        insertImage.addEventListener("click", (e) => {
             e.preventDefault();
             imageFile.click();
         });
@@ -394,6 +425,8 @@
                         wrapper.append(textDiv, img);
                     }
                     editor.appendChild(wrapper);
+                } else {
+                    editor.appendChild(img);
                 }
 
                 saveSelection();
@@ -407,6 +440,7 @@
             document.getElementById("descHtml").value = editor.innerHTML.trim();
         });
     </script>
+
 </body>
 
 </html>
