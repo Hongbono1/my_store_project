@@ -9,6 +9,7 @@
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script
         src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+
     <style>
         body {
             font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
@@ -76,14 +77,12 @@
 </head>
 
 <body class="flex flex-col items-center py-10">
-    <!-- Header(옵션) -->
-    <div id="header-container" class="w-full"></div>
 
     <main class="w-full max-w-3xl p-8 neo-card mt-10">
         <h1 class="text-3xl font-extrabold text-center mb-8 gradient-text">오픈 매장 등록</h1>
 
         <form id="openForm" class="space-y-6" enctype="multipart/form-data">
-            <!-- 기본 정보 -->
+            <!-- 기본정보 -->
             <div>
                 <label class="block font-semibold mb-1">상호명</label>
                 <input name="store_name" type="text" required
@@ -114,8 +113,8 @@
                 <div class="flex gap-2">
                     <input id="address" name="address" type="text" readonly
                         class="flex-1 border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
-                    <button type="button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                        onclick="searchAddress()">검색</button>
+                    <button type="button" onclick="searchAddress()"
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">검색</button>
                 </div>
             </div>
 
@@ -126,47 +125,42 @@
                     class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" />
             </div>
 
-            <!-- 지도 (참고용) -->
+            <!-- 지도 -->
             <div class="flex justify-center">
                 <div id="map" class="rounded border border-gray-300 my-4 shadow-sm"
                     style="width:100%; min-width:180px; height:260px; max-width:480px;"></div>
             </div>
 
-            <!-- 대표 이미지 한 장 -->
+            <!-- 대표 이미지 -->
             <div>
                 <label class="block font-semibold mb-1">대표 이미지</label>
                 <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2 text-gray-700" />
                 <p class="text-xs text-gray-500 mt-1">한 장만 업로드합니다.</p>
             </div>
 
-            <!-- 🔹 자체 블로그형 에디터 -->
+            <!-- 자체 에디터 -->
             <div>
-                <label class="block font-semibold mb-2">설명 (사진 포함, 쉬운 편집)</label>
+                <label class="block font-semibold mb-2">설명 (사진 포함, 자유 배치 가능)</label>
 
                 <!-- 툴바 -->
                 <div class="toolbar mb-3">
                     <button class="tbtn" type="button" onclick="fmt('bold')">굵게</button>
                     <button class="tbtn" type="button" onclick="fmt('underline')">밑줄</button>
-
-                    <select id="fontSizeSelect" class="tbtn" onchange="setFontSize(this.value)">
-                        <option value="">글자 크기</option>
-                        <option value="16px">작게</option>
-                        <option value="18px">보통</option>
-                        <option value="22px">크게</option>
-                        <option value="28px">제목</option>
-                    </select>
-
+                    <input id="fontPx" type="number" min="10" max="60" step="1" placeholder="글자 px"
+                        class="w-24 border px-2 py-1 rounded" />
+                    <button class="tbtn" type="button" onclick="applyFontSize()">적용</button>
                     <button class="tbtn" type="button" onclick="insertHR()">구분선</button>
                     <button class="tbtn" type="button" onclick="fmt('insertUnorderedList')">글머리기호</button>
 
-                    <button class="tbtn" type="button" onclick="triggerImagePick()">사진 넣기</button>
+                    <!-- 이미지 관련 -->
+                    <button class="tbtn" type="button" onclick="triggerImagePick('normal')">일반 삽입</button>
+                    <button class="tbtn" type="button" onclick="triggerImagePick('left')">좌측 이미지</button>
+                    <button class="tbtn" type="button" onclick="triggerImagePick('double')">2장 나란히</button>
+
                     <input id="hiddenImage" type="file" accept="image/*" class="hidden" />
                 </div>
 
-                <!-- 편집 영역 -->
                 <div id="editor" class="editor" contenteditable="true" aria-label="설명 입력"></div>
-
-                <!-- 실제 전송용(HTML) -->
                 <textarea id="descHtml" name="description" class="hidden"></textarea>
             </div>
 
@@ -176,20 +170,8 @@
         </form>
     </main>
 
-    <!-- Footer(옵션) -->
-    <div id="footer-container" class="w-full mt-10"></div>
-
     <script>
-        /* ===== Header / Footer 로드 (옵션) ===== */
-        async function loadComponent(url, id) {
-            try { const r = await fetch(url); if (r.ok) document.getElementById(id).innerHTML = await r.text(); } catch (_) { }
-        }
-        document.addEventListener("DOMContentLoaded", async () => {
-            await loadComponent("/components/header.html", "header-container");
-            await loadComponent("/components/footer.html", "footer-container");
-        });
-
-        /* ===== 주소 검색 + 지도 ===== */
+        /* ==== 주소검색 + 지도 ==== */
         function searchAddress() {
             new daum.Postcode({
                 oncomplete: function (data) {
@@ -200,8 +182,6 @@
                 }
             }).open();
         }
-        window.searchAddress = searchAddress;
-
         window.map = null; window.marker = null;
         kakao.maps.load(function () {
             const mapContainer = document.getElementById("map");
@@ -221,45 +201,28 @@
             });
         }
 
-        /* ===== 간단 에디터 기능 ===== */
+        /* ==== 에디터 기능 ==== */
         function fmt(cmd) { document.execCommand(cmd, false, null); }
-        function setFontSize(px) {
-            if (!px) return;
-            wrapSelectionWithSpanStyle('font-size', px);
-            document.getElementById('fontSizeSelect').value = '';
-        }
         function insertHR() {
             const hr = document.createElement('hr');
             hr.style.border = 'none'; hr.style.borderTop = '1px solid #e5e7eb'; hr.style.margin = '16px 0';
             insertNodeAtCaret(hr);
         }
-        function triggerImagePick() { document.getElementById('hiddenImage').click(); }
-        document.getElementById('hiddenImage').addEventListener('change', async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            try {
-                const fd = new FormData(); fd.append('image', file);
-                const res = await fetch('/upload/image', { method: 'POST', body: fd });
-                const json = await res.json();
-                if (!json?.url) { alert('이미지 업로드 실패'); return; }
-                const img = document.createElement('img');
-                img.src = json.url; img.alt = '이미지'; img.className = 'img-thumb';
-                img.loading = 'lazy';
-                insertNodeAtCaret(img);
-            } catch (err) { console.error(err); alert('이미지 업로드 오류'); }
-            e.target.value = '';
-        });
-
-        /* 유틸: 선택영역에 노드 삽입/스타일 적용 */
         function insertNodeAtCaret(node) {
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) { document.getElementById('editor').appendChild(node); return; }
             const range = sel.getRangeAt(0); range.deleteContents(); range.insertNode(node);
             range.setStartAfter(node); range.setEndAfter(node); sel.removeAllRanges(); sel.addRange(range);
         }
-        function wrapSelectionWithSpanStyle(key, value) {
+        function applyFontSize() {
+            const px = document.getElementById('fontPx').value;
+            if (!px) return alert('크기를 입력하세요.');
+            wrapSelectionWithStyle('font-size', px + 'px');
+            document.getElementById('fontPx').value = '';
+        }
+        function wrapSelectionWithStyle(key, value) {
             const sel = window.getSelection();
-            if (!sel || sel.isCollapsed) { // 선택 없으면 빈 span 삽입
+            if (!sel || sel.isCollapsed) {
                 const span = document.createElement('span'); span.style[key] = value; span.textContent = '텍스트';
                 insertNodeAtCaret(span); return;
             }
@@ -269,27 +232,49 @@
             sel.removeAllRanges(); const r = document.createRange(); r.selectNodeContents(span); sel.addRange(r);
         }
 
-        /* ===== 제출: 에디터 HTML 저장 후 전송 ===== */
+        /* ==== 이미지 관련 ==== */
+        let currentMode = 'normal';
+        function triggerImagePick(mode) {
+            currentMode = mode;
+            document.getElementById('hiddenImage').click();
+        }
+        document.getElementById('hiddenImage').addEventListener('change', async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            try {
+                const fd = new FormData(); fd.append('image', file);
+                const res = await fetch('/upload/image', { method: 'POST', body: fd });
+                const json = await res.json();
+                if (!json?.url) return alert('이미지 업로드 실패');
+                if (currentMode === 'normal') {
+                    const img = document.createElement('img'); img.src = json.url; img.className = 'img-thumb'; insertNodeAtCaret(img);
+                } else if (currentMode === 'left') {
+                    const box = document.createElement('div');
+                    box.className = 'flex gap-4 items-start my-4';
+                    box.innerHTML = `<img src="${json.url}" class="w-1/2 rounded-lg shadow"><div class="w-1/2 text-gray-800">여기에 글을 작성하세요.</div>`;
+                    insertNodeAtCaret(box);
+                } else if (currentMode === 'double') {
+                    const box = document.createElement('div');
+                    box.className = 'grid grid-cols-2 gap-2 my-4';
+                    box.innerHTML = `<img src="${json.url}" class="rounded-lg shadow"><img src="https://placehold.co/400x300?text=두번째+이미지" class="rounded-lg shadow">`;
+                    insertNodeAtCaret(box);
+                }
+            } catch (err) { console.error(err); alert('이미지 업로드 오류'); }
+            e.target.value = '';
+        });
+
+        /* ==== 제출 ==== */
         document.getElementById('openForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const html = document.getElementById('editor').innerHTML.trim();
-            document.getElementById('descHtml').value = html;
-
+            document.getElementById('descHtml').value = document.getElementById('editor').innerHTML.trim();
             const fd = new FormData(e.target);
             try {
                 const res = await fetch('/openregister', { method: 'POST', body: fd });
                 const json = await res.json();
                 if (json.success) {
-                    alert('등록이 완료되었습니다!');
-                    e.target.reset();
-                    document.getElementById('editor').innerHTML = '';
-                } else {
-                    alert('등록 실패: ' + (json.message || '서버 오류'));
-                }
-            } catch (err) {
-                console.error(err);
-                alert('서버 통신 오류: ' + err.message);
-            }
+                    alert('등록 완료!');
+                    e.target.reset(); document.getElementById('editor').innerHTML = '';
+                } else alert('등록 실패: ' + (json.message || '서버 오류'));
+            } catch (err) { alert('서버 오류: ' + err.message); }
         });
     </script>
 </body>
