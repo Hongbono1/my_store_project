@@ -284,9 +284,9 @@
                     const insertImage = document.getElementById("insertImage");
                     const imagePosition = document.getElementById("imagePosition");
 
-                    /* 지금부터 쓸 기본 글자 크기 */
+                    /* 지금부터 새로 쓸 글자의 기본 크기 */
                     let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
-                    /* 마지막 선택 범위 */
+                    /* 마지막 커서/선택 위치 */
                     let lastRange = null;
 
                     function saveSelection() {
@@ -299,7 +299,7 @@
                     editor.addEventListener("mouseup", saveSelection);
                     editor.addEventListener("keyup", saveSelection);
 
-                    /* 굵게/밑줄/목록 버튼 */
+                    /* 굵게/밑줄/목록 */
                     document.querySelectorAll("[data-cmd]").forEach((btn) => {
                         btn.addEventListener("mousedown", (e) => {
                             e.preventDefault();
@@ -314,56 +314,66 @@
                         });
                     });
 
-                    /* ✅ 글자 크기 입력칸: 두 자리 입력할 수 있게 포커스 안 뺏기도록 수정 */
+                    /* ✅ 글자 크기: 입력(input)에서는 '값만' 바꾼다 (포커스 안 뺏음) */
                     fontSizePx.addEventListener("input", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
-
-                        // 1) 앞으로 쓸 기본 크기만 먼저 저장
-                        currentFontSize = px;
-
-                        // 2) 만약 "지금 뭔가 드래그로 선택된 상태"라면 그 부분만 즉시 바꿔줌
-                        if (lastRange && !lastRange.collapsed) {
-                            const sel = window.getSelection();
-                            sel.removeAllRanges();
-                            sel.addRange(lastRange);
-
-                            document.execCommand("fontSize", false, "7");
-                            editor.querySelectorAll('font[size="7"]').forEach((el) => {
-                                el.removeAttribute("size");
-                                el.style.fontSize = px + "px";
-                            });
-
-                            // 🔴 여기서 editor.focus() 안 함!
-                            // 사용자가 지금 숫자 치는 중인데 포커스 뺏어가면 24, 32가 안 들어감
-                            saveSelection();
-                        }
-                        // 선택이 없는 경우는 여기서 끝 → 아래 keydown에서 새로 치는 글자에 적용됨
+                        currentFontSize = px;     // 지금부터 쓸 기본 크기만 기억
+                        // DOM은 건드리지 않음 → 그래서 24, 32 두 자리 다 들어감
                     });
 
-                    /* ✅ 에디터에서 실제로 타이핑할 때: 현재 설정된 크기로 span 하나 깔아주기 */
+                    /* ✅ 글자 크기: 입력칸에서 손 뗐을 때(change) 실제로 커서를 새 크기 span으로 옮긴다 */
+                    fontSizePx.addEventListener("change", (e) => {
+                        const px = parseInt(e.target.value, 10);
+                        if (!px) return;
+                        currentFontSize = px;
+
+                        // 커서가 에디터 안에 있었던 적이 없으면 그냥 끝
+                        if (!lastRange) return;
+
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(lastRange);
+
+                        // 새 크기 span 만들어서 그 안에 커서 집어넣기
+                        const span = document.createElement("span");
+                        span.style.fontSize = px + "px";
+                        span.appendChild(document.createTextNode("\u200B"));
+                        lastRange.insertNode(span);
+
+                        // 커서를 span 안으로 이동
+                        const r = document.createRange();
+                        r.setStart(span.firstChild, 1);
+                        r.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(r);
+
+                        // 다음에 또 바꿀 수 있게 저장
+                        lastRange = r;
+                    });
+
+                    /* ✅ 타이핑할 때: 지금 currentFontSize로 쓸 수 있게 보정 */
                     editor.addEventListener("keydown", (e) => {
                         const sel = window.getSelection();
                         if (!sel || !sel.rangeCount) return;
                         const range = sel.getRangeAt(0);
 
-                        // 드래그로 선택돼 있으면 건들지 않음
+                        // 드래그 중이면 안 만짐
                         if (!range.collapsed) return;
 
-                        // 이미 font-size 있는 곳이면 그대로 씀
+                        // 이미 크기 있는 span이면 그대로
                         const node = range.startContainer;
                         let parent = node.nodeType === 3 ? node.parentElement : node;
                         if (parent && parent !== editor && parent.style && parent.style.fontSize) {
                             return;
                         }
 
-                        // 새 크기로 감싼 span을 만들어서 그 안에서 타이핑
+                        // 새 크기로 감싸서 그 안에서 타이핑
                         const span = document.createElement("span");
                         span.style.fontSize = currentFontSize + "px";
-                        span.appendChild(document.createTextNode("\u200B")); // 커서 자리
+                        span.appendChild(document.createTextNode("\u200B"));
                         range.insertNode(span);
 
-                        // 커서를 span 안으로 이동
                         const newRange = document.createRange();
                         newRange.setStart(span.firstChild, 1);
                         newRange.collapse(true);
@@ -373,13 +383,13 @@
                         lastRange = newRange;
                     });
 
-                    /* ✅ 이미지 버튼 → 파일 선택 */
+                    /* 이미지 버튼 → 파일 선택 */
                     insertImage.addEventListener("mousedown", (e) => {
                         e.preventDefault();
                         imageFile.click();
                     });
 
-                    /* ✅ 이미지 삽입 */
+                    /* 이미지 삽입 */
                     imageFile.addEventListener("change", (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -415,11 +425,12 @@
                         e.target.value = "";
                     });
 
-                    /* ✅ 폼 보낼 때 에디터 내용 담기 */
+                    /* 폼 전송 시 */
                     document.getElementById("openForm").addEventListener("submit", () => {
                         document.getElementById("descHtml").value = editor.innerHTML.trim();
                     });
                 </script>
+
 
 </body>
 
