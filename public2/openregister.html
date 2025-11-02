@@ -284,9 +284,9 @@
                     const insertImage = document.getElementById("insertImage");
                     const imagePosition = document.getElementById("imagePosition");
 
-                    /* 지금부터 새로 쓸 글자의 기본 크기 */
+                    /* 앞으로 쓸 기본 글자크기 */
                     let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
-                    /* 마지막 커서/선택 위치 */
+                    /* 마지막 커서 위치 */
                     let lastRange = null;
 
                     function saveSelection() {
@@ -299,7 +299,7 @@
                     editor.addEventListener("mouseup", saveSelection);
                     editor.addEventListener("keyup", saveSelection);
 
-                    /* 굵게/밑줄/목록 */
+                    /* 굵게/밑줄/목록 버튼 */
                     document.querySelectorAll("[data-cmd]").forEach((btn) => {
                         btn.addEventListener("mousedown", (e) => {
                             e.preventDefault();
@@ -314,82 +314,109 @@
                         });
                     });
 
-                    /* ✅ 글자 크기: 입력(input)에서는 '값만' 바꾼다 (포커스 안 뺏음) */
+                    /* ✅ 글자 크기 입력: 값만 바꿔두기 (포커스 안 뺏음) */
                     fontSizePx.addEventListener("input", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
-                        currentFontSize = px;     // 지금부터 쓸 기본 크기만 기억
-                        // DOM은 건드리지 않음 → 그래서 24, 32 두 자리 다 들어감
+                        currentFontSize = px;
                     });
 
-                    /* ✅ 글자 크기: 입력칸에서 손 뗐을 때(change) 실제로 커서를 새 크기 span으로 옮긴다 */
+                    /* ✅ 글자 크기 확정(change) 시점에 실제로 적용
+                       - 선택 영역 있으면 그 부분만
+                       - 선택 없고, 지금 커서가 기존 span 안에 있으면 그 span 크기만 바꿈 (⬆️ 이게 너가 말한 문제 해결)
+                       - 둘 다 아니면 새 span 만들어서 그 안에서 쓰게 함
+                    */
                     fontSizePx.addEventListener("change", (e) => {
                         const px = parseInt(e.target.value, 10);
                         if (!px) return;
                         currentFontSize = px;
 
-                        // 커서가 에디터 안에 있었던 적이 없으면 그냥 끝
                         if (!lastRange) return;
 
                         const sel = window.getSelection();
                         sel.removeAllRanges();
                         sel.addRange(lastRange);
 
-                        // 새 크기 span 만들어서 그 안에 커서 집어넣기
+                        // 1) 드래그로 선택돼 있으면 그 부분만 바로 바꿈
+                        if (!lastRange.collapsed) {
+                            document.execCommand("fontSize", false, "7");
+                            editor.querySelectorAll('font[size="7"]').forEach((el) => {
+                                el.removeAttribute("size");
+                                el.style.fontSize = px + "px";
+                            });
+                            saveSelection();
+                            return;
+                        }
+
+                        // 2) 선택은 없는데, 지금 커서가 기존 span 안에 있는 경우 → 그 span 크기만 바꾼다 (⬅️ 여기 때문에 "내리면 되는데 올리면 안 되는" 현상 해결)
+                        const node = lastRange.startContainer;
+                        let parent = node.nodeType === 3 ? node.parentElement : node;
+                        if (parent && parent !== editor && parent.style && parent.style.fontSize) {
+                            parent.style.fontSize = px + "px";
+
+                            // 커서 다시 그 안으로
+                            const r = document.createRange();
+                            const textNode = parent.firstChild;
+                            const offset = (textNode && textNode.nodeType === 3) ? textNode.length : 1;
+                            r.setStart(textNode || parent, offset);
+                            r.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(r);
+                            lastRange = r;
+                            return;
+                        }
+
+                        // 3) 그 외 → 새 span 만들어서 그 안에 커서 둠
                         const span = document.createElement("span");
                         span.style.fontSize = px + "px";
                         span.appendChild(document.createTextNode("\u200B"));
                         lastRange.insertNode(span);
 
-                        // 커서를 span 안으로 이동
                         const r = document.createRange();
                         r.setStart(span.firstChild, 1);
                         r.collapse(true);
                         sel.removeAllRanges();
                         sel.addRange(r);
-
-                        // 다음에 또 바꿀 수 있게 저장
                         lastRange = r;
                     });
 
-                    /* ✅ 타이핑할 때: 지금 currentFontSize로 쓸 수 있게 보정 */
+                    /* ✅ 실제 타이핑할 때 기본 크기 적용 */
                     editor.addEventListener("keydown", (e) => {
                         const sel = window.getSelection();
                         if (!sel || !sel.rangeCount) return;
                         const range = sel.getRangeAt(0);
 
-                        // 드래그 중이면 안 만짐
+                        // 드래그 중이면 패스
                         if (!range.collapsed) return;
 
-                        // 이미 크기 있는 span이면 그대로
+                        // 이미 크기 있는 span 안이면 그대로 입력
                         const node = range.startContainer;
                         let parent = node.nodeType === 3 ? node.parentElement : node;
                         if (parent && parent !== editor && parent.style && parent.style.fontSize) {
                             return;
                         }
 
-                        // 새 크기로 감싸서 그 안에서 타이핑
+                        // 새 span 깔고 그 안에서 입력
                         const span = document.createElement("span");
                         span.style.fontSize = currentFontSize + "px";
                         span.appendChild(document.createTextNode("\u200B"));
                         range.insertNode(span);
 
-                        const newRange = document.createRange();
-                        newRange.setStart(span.firstChild, 1);
-                        newRange.collapse(true);
+                        const r = document.createRange();
+                        r.setStart(span.firstChild, 1);
+                        r.collapse(true);
                         sel.removeAllRanges();
-                        sel.addRange(newRange);
-
-                        lastRange = newRange;
+                        sel.addRange(r);
+                        lastRange = r;
                     });
 
-                    /* 이미지 버튼 → 파일 선택 */
+                    /* ✅ 이미지 버튼 → 파일 선택 */
                     insertImage.addEventListener("mousedown", (e) => {
                         e.preventDefault();
                         imageFile.click();
                     });
 
-                    /* 이미지 삽입 */
+                    /* ✅ 이미지 삽입 */
                     imageFile.addEventListener("change", (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -425,7 +452,7 @@
                         e.target.value = "";
                     });
 
-                    /* 폼 전송 시 */
+                    /* 전송 시 에디터 내용 담기 */
                     document.getElementById("openForm").addEventListener("submit", () => {
                         document.getElementById("descHtml").value = editor.innerHTML.trim();
                     });
