@@ -721,46 +721,42 @@
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
                     // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
-                    document.execCommand('fontSize', false, '7'); // 임시로 큰 사이즈 적용
+                    const range = selection.getRangeAt(0);
+                    const selectedText = selection.toString();
                     
-                    // 모든 font size 7을 찾아서 실제 크기로 변경
-                    setTimeout(() => {
-                        const fontElements = customEditor.querySelectorAll('font[size="7"]');
-                        fontElements.forEach(font => {
-                            const span = document.createElement('span');
-                            span.style.fontSize = size;
-                            span.innerHTML = font.innerHTML;
-                            font.parentNode.replaceChild(span, font);
-                        });
-                    }, 10);
+                    // 선택된 텍스트를 삭제하고 새로운 span으로 교체
+                    range.deleteContents();
+                    
+                    const span = document.createElement('span');
+                    span.style.fontSize = size;
+                    span.textContent = selectedText;
+                    
+                    range.insertNode(span);
+                    
+                    // 커서를 span 뒤로 이동
+                    range.setStartAfter(span);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                     
                     console.log('선택된 텍스트에 글자 크기 적용:', size);
                 } else {
                     // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
                     currentFontSize = size;
                     
-                    // execCommand로 기본 글자 크기 설정
-                    document.execCommand('fontSize', false, '7');
+                    // 현재 커서 위치에 스타일이 적용된 span 삽입
+                    const span = document.createElement('span');
+                    span.style.fontSize = size;
+                    span.setAttribute('data-typing-style', 'true');
                     
-                    // 설정된 font 태그를 실제 크기로 변경
-                    setTimeout(() => {
-                        const fontElements = customEditor.querySelectorAll('font[size="7"]');
-                        fontElements.forEach(font => {
-                            if (font.innerHTML === '') {
-                                const span = document.createElement('span');
-                                span.style.fontSize = size;
-                                span.setAttribute('data-next-style', 'true');
-                                font.parentNode.replaceChild(span, font);
-                                
-                                // 커서를 span 안으로 이동
-                                const range = document.createRange();
-                                range.setStart(span, 0);
-                                range.collapse(true);
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                            }
-                        });
-                    }, 10);
+                    const range = selection.getRangeAt(0);
+                    range.insertNode(span);
+                    
+                    // 커서를 span 안으로 이동
+                    range.setStart(span, 0);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                     
                     console.log('앞으로 입력할 텍스트 글자 크기 설정:', size);
                     showStylePreview('글자 크기: ' + size);
@@ -774,12 +770,41 @@
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
                     // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
-                    document.execCommand('foreColor', false, color);
+                    const range = selection.getRangeAt(0);
+                    const selectedText = selection.toString();
+                    
+                    range.deleteContents();
+                    
+                    const span = document.createElement('span');
+                    span.style.color = color;
+                    span.textContent = selectedText;
+                    
+                    range.insertNode(span);
+                    
+                    range.setStartAfter(span);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
                     console.log('선택된 텍스트에 글자색 적용:', color);
                 } else {
                     // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
                     currentTextColor = color;
-                    document.execCommand('foreColor', false, color);
+                    
+                    // 현재 커서 위치에 스타일이 적용된 span 삽입
+                    const span = document.createElement('span');
+                    span.style.color = color;
+                    span.setAttribute('data-typing-style', 'true');
+                    
+                    const range = selection.getRangeAt(0);
+                    range.insertNode(span);
+                    
+                    // 커서를 span 안으로 이동
+                    range.setStart(span, 0);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
                     console.log('앞으로 입력할 텍스트 색상 설정:', color);
                     
                     const colorName = getColorName(color);
@@ -875,6 +900,61 @@
             // 키보드 입력 감지
             customEditor.addEventListener('input', function(e) {
                 updateToolbarState();
+                
+                // 스타일이 적용된 빈 span에서 타이핑하는 경우 처리
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const container = range.startContainer.parentElement;
+                    
+                    if (container && container.hasAttribute('data-typing-style') && container.innerHTML === '') {
+                        // 타이핑 중임을 표시하기 위해 attribute 제거
+                        container.removeAttribute('data-typing-style');
+                    }
+                }
+            });
+
+            // 키 입력 이벤트 처리 - Enter 키와 스타일 연속성
+            customEditor.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    
+                    const selection = window.getSelection();
+                    const range = selection.getRangeAt(0);
+                    
+                    // 새 줄 생성
+                    const br = document.createElement('br');
+                    range.insertNode(br);
+                    
+                    // 현재 스타일이 있다면 새 줄에도 적용
+                    if (currentFontSize && currentFontSize !== 'inherit' || 
+                        currentTextColor && currentTextColor !== 'inherit') {
+                        
+                        const newSpan = document.createElement('span');
+                        if (currentFontSize && currentFontSize !== 'inherit') {
+                            newSpan.style.fontSize = currentFontSize;
+                        }
+                        if (currentTextColor && currentTextColor !== 'inherit') {
+                            newSpan.style.color = currentTextColor;
+                        }
+                        newSpan.setAttribute('data-typing-style', 'true');
+                        
+                        range.setStartAfter(br);
+                        range.insertNode(newSpan);
+                        
+                        // 커서를 새 span 안으로 이동
+                        range.setStart(newSpan, 0);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    } else {
+                        // 스타일이 없으면 br 뒤로 커서 이동
+                        range.setStartAfter(br);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                }
             });
         });
 
