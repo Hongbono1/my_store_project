@@ -714,7 +714,7 @@
                 document.execCommand('justify' + alignment.charAt(0).toUpperCase() + alignment.slice(1), false, null);
             }
 
-            // 글자 크기 적용 - 가장 간단한 방식
+            // 글자 크기 적용 - 개별 텍스트만 적용되는 방식
             function applyFontSize(size) {
                 console.log('=== 글자 크기 적용 시작 ===');
                 console.log('요청된 크기:', size);
@@ -733,11 +733,10 @@
                 const range = selection.getRangeAt(0);
                 
                 if (!selection.isCollapsed) {
-                    // 텍스트가 선택된 경우
-                    console.log('✅ 선택된 텍스트에 적용');
+                    // 텍스트가 선택된 경우 - 선택된 부분만 크기 변경
+                    console.log('✅ 선택된 텍스트에만 적용');
                     const selectedText = selection.toString();
                     
-                    // 선택된 내용을 새로운 span으로 교체
                     const newSpan = document.createElement('span');
                     newSpan.style.fontSize = size;
                     newSpan.textContent = selectedText;
@@ -751,17 +750,28 @@
                     selection.removeAllRanges();
                     selection.addRange(range);
                     
-                    console.log('✅ 적용 완료 - 선택된 텍스트');
+                    console.log('✅ 선택된 텍스트만 크기 변경 완료');
                     
                 } else {
-                    // 텍스트가 선택되지 않은 경우 - CSS 스타일로 직접 적용
-                    console.log('🔄 미래 입력용 - CSS 직접 적용');
-                    
-                    // 에디터 전체에 글자 크기 스타일 적용
-                    editor.style.fontSize = size;
+                    // 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트용만
+                    console.log('🔄 새로 입력할 텍스트용 설정');
                     currentFontSize = size;
                     
-                    console.log('📝 에디터 전체 fontSize 설정:', size);
+                    // 보이지 않는 marker span 삽입
+                    const marker = document.createElement('span');
+                    marker.style.fontSize = size;
+                    marker.className = 'font-size-marker';
+                    marker.innerHTML = '&#8203;'; // Zero-width space
+                    
+                    range.insertNode(marker);
+                    
+                    // 커서를 marker 뒤로 이동
+                    range.setStartAfter(marker);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    console.log('📝 새 입력용 marker 설정:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
                 
@@ -891,10 +901,8 @@
                 editor.focus();
                 currentFontSize = null;
                 
-                // 에디터 전체 폰트 크기 초기화
-                editor.style.fontSize = '';
-                
-                console.log('✅ 글자크기 초기화 완료');
+                // 기존 방식 제거 - 에디터 전체 스타일 변경하지 않음
+                console.log('✅ 글자크기 초기화 완료 (기존 텍스트는 유지)');
                 showStylePreview('글자 크기: 기본');
             }
 
@@ -907,25 +915,50 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 키보드 입력 감지 - 개선된 방식
+            // 키보드 입력 감지 - marker 기반 스타일 적용
             customEditor.addEventListener('input', function(e) {
                 console.log('=== INPUT 이벤트 ===');
                 console.log('입력된 데이터:', e.data);
-                console.log('현재 선택:', window.getSelection().toString());
                 
                 const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const anchorNode = selection.anchorNode;
-                    const parentElement = anchorNode.parentElement;
+                if (selection.rangeCount > 0 && e.data) {
+                    const range = selection.getRangeAt(0);
+                    const previousSibling = range.startContainer.previousSibling;
                     
-                    console.log('anchorNode:', anchorNode);
-                    console.log('parentElement:', parentElement);
-                    console.log('parentElement tagName:', parentElement?.tagName);
-                    console.log('parentElement attributes:', parentElement?.attributes);
+                    console.log('previousSibling:', previousSibling);
                     
-                    if (parentElement && parentElement.hasAttribute('data-next-input')) {
-                        console.log('✅ 미래 입력용 span에서 타이핑 중 - attribute 제거');
-                        parentElement.removeAttribute('data-next-input');
+                    // 바로 앞에 font-size-marker가 있는지 확인
+                    if (previousSibling && 
+                        previousSibling.classList && 
+                        previousSibling.classList.contains('font-size-marker')) {
+                        
+                        console.log('✅ marker 발견! 새 입력 텍스트에 스타일 적용');
+                        
+                        const fontSize = previousSibling.style.fontSize;
+                        console.log('적용할 fontSize:', fontSize);
+                        
+                        // 새로 입력된 텍스트를 span으로 래핑
+                        const textNode = range.startContainer;
+                        if (textNode.nodeType === Node.TEXT_NODE) {
+                            const newSpan = document.createElement('span');
+                            newSpan.style.fontSize = fontSize;
+                            newSpan.textContent = textNode.textContent;
+                            
+                            textNode.parentNode.replaceChild(newSpan, textNode);
+                            
+                            // 커서를 span 끝으로 이동
+                            const newRange = document.createRange();
+                            newRange.setStart(newSpan.firstChild, newSpan.textContent.length);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                            
+                            console.log('✅ 새 텍스트를 span으로 래핑 완료');
+                        }
+                        
+                        // marker 제거
+                        previousSibling.remove();
+                        console.log('✅ marker 제거');
                     }
                 }
                 
