@@ -9,6 +9,10 @@
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script
         src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+    
+    <!-- Toast UI Editor (스마트에디터 ONE) -->
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
 
     <style>
         body {
@@ -173,43 +177,10 @@
 
             <!-- 설명 작성 -->
             <div>
-                <label class="block font-semibold mb-2">설명 (사진 포함, 자유 배치 가능)</label>
-
-                <!-- ✏️ 에디터 툴바 -->
-                <div
-                    class="flex flex-wrap items-center justify-center gap-3 mb-3 p-3 border border-gray-200 bg-white rounded-xl shadow-sm">
-                    <button data-cmd="bold" type="button" data-tip="굵게" class="tbtn">B</button>
-                    <button data-cmd="underline" type="button" data-tip="밑줄" class="tbtn underline">U</button>
-                    <button data-cmd="insertUnorderedList" type="button" data-tip="글머리 목록" class="tbtn">• 목록</button>
-                    <button data-cmd="insertOrderedList" type="button" data-tip="숫자 목록" class="tbtn">1. 목록</button>
-                    <button data-cmd="insertHorizontalRule" type="button" data-tip="구분선" class="tbtn">─</button>
-
-                    <!-- 글자크기 -->
-                    <label class="flex items-center gap-2 text-sm" data-tip="글자 크기(px)">
-                        <span>크기</span>
-                        <input id="fontSizePx" type="number" min="8" max="72" value="16"
-                            class="h-9 w-20 px-2 border border-gray-300 rounded-md bg-white">
-                    </label>
-
-                    <!-- ✅ 이미지 위치 먼저 -->
-                    <label class="flex items-center gap-2 text-sm" data-tip="이미지 위치 선택">
-                        <span>이미지 위치</span>
-                        <select id="imagePosition" class="h-9 border border-gray-300 rounded-md px-2 bg-white">
-                            <option value="top">위쪽</option>
-                            <option value="left">왼쪽</option>
-                            <option value="right">오른쪽</option>
-                            <option value="bottom">아래쪽</option>
-                        </select>
-                    </label>
-
-                    <!-- ✅ 그 다음 이미지 버튼 -->
-                    <button id="insertImage" type="button" data-tip="이미지 삽입" class="tbtn">🖼 이미지</button>
-                    <input type="file" id="imageFile" accept="image/*" class="hidden" />
-                </div>
-
-                <div id="editor" class="editor min-h-[400px] p-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
-                    contenteditable="true" data-placeholder="여기에 설명을 입력하세요. (이미지 위치 선택 후 이미지 버튼)">
-                </div>
+                <label class="block font-semibold mb-2">설명</label>
+                
+                <!-- Toast UI Editor (스마트에디터 ONE) -->
+                <div id="smartEditor" class="border border-gray-300 rounded-lg"></div>
                 <textarea id="descHtml" name="description" class="hidden"></textarea>
             </div>
 
@@ -261,299 +232,52 @@
         }
 
         /* =========================================
-           2. 에디터
+           2. 스마트에디터 ONE 초기화
         ========================================== */
-        const editor = document.getElementById("editor");
-        const fontSizePx = document.getElementById("fontSizePx");
-        const imageFile = document.getElementById("imageFile");
-        const insertImage = document.getElementById("insertImage");
-        const imagePosition = document.getElementById("imagePosition");
+        let smartEditor;
 
-        let currentFontSize = parseInt(fontSizePx.value, 10) || 16;
-        let lastRange = null;
-
-        function setActive(btn, on) {
-            if (!btn) return;
-            if (on) btn.classList.add("tbtn-active");
-            else btn.classList.remove("tbtn-active");
-        }
-
-        function saveSelection() {
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-                lastRange = sel.getRangeAt(0);
-            }
-        }
-
-        function restoreSelection() {
-            if (lastRange && editor.contains(lastRange.commonAncestorContainer)) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(lastRange);
-            }
-        }
-
-        // 에디터 이벤트 리스너
-        editor.addEventListener("mouseup", () => {
-            saveSelection();
-            updateToolbarState();
-        });
-        
-        editor.addEventListener("keyup", () => {
-            saveSelection();
-            updateToolbarState();
-        });
-        
-        editor.addEventListener("mouseleave", saveSelection);
-
-        function updateToolbarState() {
-            const boldBtn = document.querySelector('[data-cmd="bold"]');
-            const underlineBtn = document.querySelector('[data-cmd="underline"]');
-            
-            if (boldBtn) setActive(boldBtn, document.queryCommandState("bold"));
-            if (underlineBtn) setActive(underlineBtn, document.queryCommandState("underline"));
-        }
-
-        /* 툴바 버튼 처리 */
-        document.querySelectorAll("[data-cmd]").forEach((btn) => {
-            btn.addEventListener("click", (e) => {
-                e.preventDefault();
-                
-                editor.focus();
-                restoreSelection();
-
-                const cmd = btn.dataset.cmd;
-
-                if (cmd === "insertHorizontalRule") {
-                    const hr = document.createElement("hr");
-                    hr.style.border = "none";
-                    hr.style.borderTop = "1px solid #e5e7eb";
-                    hr.style.margin = "14px 0";
-                    
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                        const range = sel.getRangeAt(0);
-                        range.deleteContents();
-                        range.insertNode(hr);
+        // 에디터 초기화
+        document.addEventListener("DOMContentLoaded", function() {
+            smartEditor = new toastui.Editor({
+                el: document.querySelector('#smartEditor'),
+                height: '400px',
+                initialEditType: 'wysiwyg',
+                previewStyle: 'vertical',
+                language: 'ko-KR',
+                placeholder: '내용을 입력하세요.',
+                toolbarItems: [
+                    ['heading', 'bold', 'italic', 'strike'],
+                    ['hr', 'quote'],
+                    ['ul', 'ol', 'task', 'indent', 'outdent'],
+                    ['table', 'image', 'link'],
+                    ['code', 'codeblock'],
+                    ['scrollSync']
+                ],
+                hooks: {
+                    addImageBlobHook: function(blob, callback) {
+                        // 이미지 업로드 처리
+                        const formData = new FormData();
+                        formData.append('image', blob);
                         
-                        // 커서를 hr 뒤로 이동
-                        const newRange = document.createRange();
-                        newRange.setStartAfter(hr);
-                        newRange.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(newRange);
-                        lastRange = newRange;
-                    } else {
-                        editor.appendChild(hr);
+                        // 실제 서버에 업로드하는 대신 로컬 URL 생성
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            callback(e.target.result, 'image');
+                        };
+                        reader.readAsDataURL(blob);
                     }
-                } else {
-                    document.execCommand(cmd, false, null);
                 }
-
-                setTimeout(() => {
-                    updateToolbarState();
-                    saveSelection();
-                }, 10);
             });
-        });
-
-        /* 글자 크기 변경 */
-        fontSizePx.addEventListener("change", (e) => {
-            const px = parseInt(e.target.value, 10);
-            if (!px || px < 8 || px > 72) return;
-            
-            currentFontSize = px;
-            
-            editor.focus();
-            restoreSelection();
-            
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
-                // 선택된 텍스트가 있으면 해당 텍스트의 크기 변경
-                document.execCommand("fontSize", false, "7");
-                editor.querySelectorAll('font[size="7"]').forEach((el) => {
-                    el.removeAttribute("size");
-                    el.style.fontSize = px + "px";
-                });
-            }
-            
-            saveSelection();
-        });
-
-        /* 이미지 버튼 → 파일 선택 */
-        insertImage.addEventListener("click", (e) => {
-            e.preventDefault();
-            imageFile.click();
-        });
-
-        /* 이미지 삽입 */
-        imageFile.addEventListener("change", (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = () => {
-                const pos = imagePosition.value;
-                const img = document.createElement("img");
-                img.src = reader.result;
-                img.style.maxWidth = "100%";
-                img.style.height = "auto";
-                img.style.borderRadius = "8px";
-                img.style.margin = "8px 0";
-
-                editor.focus();
-                
-                if (pos === "top") {
-                    const firstChild = editor.firstChild;
-                    if (firstChild) {
-                        editor.insertBefore(img, firstChild);
-                    } else {
-                        editor.appendChild(img);
-                    }
-                } else if (pos === "bottom") {
-                    editor.appendChild(img);
-                } else if (pos === "left" || pos === "right") {
-                    const wrapper = document.createElement("div");
-                    wrapper.className = "side-container";
-                    wrapper.style.display = "flex";
-                    wrapper.style.alignItems = "flex-start";
-                    wrapper.style.gap = "1rem";
-                    wrapper.style.margin = "1rem 0";
-
-                    const textDiv = document.createElement("div");
-                    textDiv.className = "text";
-                    textDiv.contentEditable = "true";
-                    textDiv.style.flex = "1";
-                    textDiv.style.minHeight = "120px";
-                    textDiv.style.padding = "8px";
-                    textDiv.style.border = "1px dashed #d1d5db";
-                    textDiv.style.borderRadius = "8px";
-                    textDiv.innerHTML = "여기에 글을 입력하세요.";
-
-                    img.style.width = "42%";
-                    img.style.maxWidth = "280px";
-
-                    if (pos === "left") {
-                        wrapper.append(img, textDiv);
-                    } else {
-                        wrapper.append(textDiv, img);
-                    }
-
-                    editor.appendChild(wrapper);
-                    
-                    // 텍스트 영역에 포커스
-                    textDiv.focus();
-                } else {
-                    // 현재 커서 위치에 삽입
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                        const range = sel.getRangeAt(0);
-                        range.deleteContents();
-                        range.insertNode(img);
-                    } else {
-                        editor.appendChild(img);
-                    }
-                }
-
-                saveSelection();
-            };
-            reader.readAsDataURL(file);
-            e.target.value = "";
-        });
-
-        /* 입력 시 글자 크기 적용 */
-        editor.addEventListener("input", (e) => {
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount) return;
-            
-            const range = sel.getRangeAt(0);
-            if (!range.collapsed) return;
-            
-            const node = range.startContainer;
-            let parent = node.nodeType === 3 ? node.parentElement : node;
-            
-            // 현재 글자 크기 확인
-            if (parent && parent !== editor) {
-                const computedStyle = window.getComputedStyle(parent);
-                const currentSize = parseInt(computedStyle.fontSize, 10);
-                
-                if (currentSize !== currentFontSize) {
-                    // 새로운 span으로 감싸기
-                    const span = document.createElement("span");
-                    span.style.fontSize = currentFontSize + "px";
-                    
-                    const textNode = document.createTextNode("");
-                    span.appendChild(textNode);
-                    
-                    range.insertNode(span);
-                    range.setStart(textNode, 0);
-                    range.collapse(true);
-                    
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-            }
-        });
-
-        // Enter 키 처리 개선
-        editor.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault(); // 기본 Enter 동작 방지
-                
-                const sel = window.getSelection();
-                if (!sel || !sel.rangeCount) return;
-                
-                const range = sel.getRangeAt(0);
-                
-                // side-container 내부 텍스트 영역 확인
-                let inSideText = false;
-                let node = range.startContainer;
-                while (node && node !== editor) {
-                    if (node.classList && node.classList.contains("text")) {
-                        inSideText = true;
-                        break;
-                    }
-                    node = node.parentNode;
-                }
-                
-                if (inSideText) {
-                    // side-container 내부에서는 단순 줄바꿈
-                    const br = document.createElement("br");
-                    range.deleteContents();
-                    range.insertNode(br);
-                    
-                    // 커서를 br 뒤로 이동
-                    const newRange = document.createRange();
-                    newRange.setStartAfter(br);
-                    newRange.collapse(true);
-                    sel.removeAllRanges();
-                    sel.addRange(newRange);
-                    lastRange = newRange;
-                } else {
-                    // 일반 영역에서는 새로운 div 생성
-                    const newDiv = document.createElement("div");
-                    newDiv.innerHTML = "<br>"; // 빈 줄을 위한 br
-                    
-                    range.deleteContents();
-                    range.insertNode(newDiv);
-                    
-                    // 커서를 새 div 안으로 이동
-                    const newRange = document.createRange();
-                    newRange.setStart(newDiv, 0);
-                    newRange.collapse(true);
-                    sel.removeAllRanges();
-                    sel.addRange(newRange);
-                    lastRange = newRange;
-                }
-            }
         });
 
         /* 전송 시 description 담기 */
         document.getElementById("openForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             
-            // description HTML 저장
-            document.getElementById("descHtml").value = editor.innerHTML.trim();
+            // 스마트에디터 ONE에서 HTML 내용 가져오기
+            if (smartEditor) {
+                document.getElementById("descHtml").value = smartEditor.getHTML();
+            }
             
             // 주소 + 상세주소 결합
             const baseAddr = document.getElementById("address").value || "";
