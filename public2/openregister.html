@@ -372,6 +372,14 @@
             font-size: 12px;
             cursor: pointer;
         }
+
+        /* 스타일 미리보기 애니메이션 */
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            15% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
     </style>
 </head>
 
@@ -604,6 +612,10 @@
         document.addEventListener("DOMContentLoaded", function() {
             customEditor = document.getElementById('customEditor');
             
+            // 현재 스타일 상태 관리
+            let currentFontSize = null;
+            let currentTextColor = null;
+            
             // 기본 툴바 이벤트 처리
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
@@ -693,10 +705,10 @@
                 const selection = window.getSelection();
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                    // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
                     const range = selection.getRangeAt(0);
                     const selectedText = selection.toString();
                     
-                    // 선택된 텍스트를 삭제하고 새로운 span으로 교체
                     range.deleteContents();
                     
                     const span = document.createElement('span');
@@ -705,15 +717,20 @@
                     
                     range.insertNode(span);
                     
-                    // 커서를 span 뒤로 이동
                     range.setStartAfter(span);
                     range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
                     
-                    console.log('글자 크기 적용 완료:', size);
+                    console.log('선택된 텍스트에 글자 크기 적용:', size);
                 } else {
-                    alert('글자 크기를 변경하려면 먼저 텍스트를 선택해주세요!');
+                    // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
+                    currentFontSize = size;
+                    updateEditorStyle();
+                    console.log('앞으로 입력할 텍스트 글자 크기 설정:', size);
+                    
+                    // 시각적 피드백
+                    showStylePreview('글자 크기: ' + size);
                 }
             }
 
@@ -723,6 +740,7 @@
                 const selection = window.getSelection();
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                    // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
                     const range = selection.getRangeAt(0);
                     const selectedText = selection.toString();
                     
@@ -739,9 +757,16 @@
                     selection.removeAllRanges();
                     selection.addRange(range);
                     
-                    console.log('글자색 적용 완료:', color);
+                    console.log('선택된 텍스트에 글자색 적용:', color);
                 } else {
-                    alert('글자색을 변경하려면 먼저 텍스트를 선택해주세요!');
+                    // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
+                    currentTextColor = color;
+                    updateEditorStyle();
+                    console.log('앞으로 입력할 텍스트 색상 설정:', color);
+                    
+                    // 시각적 피드백
+                    const colorName = getColorName(color);
+                    showStylePreview('글자색: ' + colorName);
                 }
             }
 
@@ -758,6 +783,103 @@
                 document.querySelector('[data-action="italic"]').classList.toggle('active', document.queryCommandState('italic'));
                 document.querySelector('[data-action="underline"]').classList.toggle('active', document.queryCommandState('underline'));
             }
+
+            // 에디터 스타일 업데이트 (앞으로 입력할 텍스트용)
+            function updateEditorStyle() {
+                let style = '';
+                if (currentFontSize) style += `font-size: ${currentFontSize}; `;
+                if (currentTextColor) style += `color: ${currentTextColor}; `;
+                
+                // 현재 커서 위치에 보이지 않는 span 생성
+                if (style) {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const span = document.createElement('span');
+                        span.setAttribute('style', style);
+                        span.setAttribute('data-style-marker', 'true');
+                        
+                        range.insertNode(span);
+                        range.setStart(span, 0);
+                        range.setEnd(span, 0);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                }
+            }
+
+            // 스타일 미리보기 표시
+            function showStylePreview(text) {
+                // 기존 미리보기 제거
+                const existingPreview = document.getElementById('stylePreview');
+                if (existingPreview) {
+                    existingPreview.remove();
+                }
+                
+                // 새 미리보기 생성
+                const preview = document.createElement('div');
+                preview.id = 'stylePreview';
+                preview.textContent = text;
+                preview.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #3b82f6;
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    z-index: 1000;
+                    animation: fadeInOut 2s ease-in-out;
+                `;
+                
+                document.body.appendChild(preview);
+                
+                // 2초 후 자동 제거
+                setTimeout(() => {
+                    if (preview.parentNode) {
+                        preview.remove();
+                    }
+                }, 2000);
+            }
+
+            // 색상 이름 반환
+            function getColorName(color) {
+                const colorMap = {
+                    '#000000': '검정',
+                    '#FF0000': '빨강',
+                    '#0066CC': '파랑',
+                    '#008000': '초록',
+                    '#FF6600': '주황'
+                };
+                return colorMap[color] || color;
+            }
+
+            // 키보드 입력 감지 (스타일 적용)
+            customEditor.addEventListener('input', function(e) {
+                // 스타일 마커가 있는 span에서 입력된 경우
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    let container = range.startContainer;
+                    
+                    if (container.nodeType === Node.TEXT_NODE) {
+                        container = container.parentNode;
+                    }
+                    
+                    // data-style-marker가 있는 span 찾기
+                    while (container && container !== customEditor) {
+                        if (container.getAttribute && container.getAttribute('data-style-marker')) {
+                            // 스타일 마커 제거 (한 번만 사용)
+                            container.removeAttribute('data-style-marker');
+                            break;
+                        }
+                        container = container.parentNode;
+                    }
+                }
+                
+                updateToolbarState();
+            });
         });
 
         /* 전송 시 description 담기 */
