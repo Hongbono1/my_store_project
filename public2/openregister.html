@@ -497,6 +497,67 @@
             e.target.value = "";
         });
 
+        function findSideContainer(node) {
+            while (node && node !== editor) {
+                if (node.classList && node.classList.contains("side-container")) return node;
+                node = node.parentNode;
+            }
+            return null;
+        }
+
+        // ✅ Enter: 사진 옆 텍스트(.text) 안에서는 '그 자리에서 줄바꿈'
+        //    (블록 밖으로 나가지 않음)
+        editor.addEventListener("keydown", (e) => {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return;
+
+            const range = sel.getRangeAt(0);
+            const side = findSideContainer(range.startContainer);
+
+            // side-container 내부의 텍스트 영역인지 확인(.text)
+            let inSideText = false;
+            let n = range.startContainer.nodeType === 3 ? range.startContainer.parentNode : range.startContainer;
+            while (n && n !== editor) {
+                if (n.classList && n.classList.contains("text")) { inSideText = true; break; }
+                n = n.parentNode;
+            }
+
+            if (e.key === "Enter" && side && inSideText) {
+                // 기본 Enter 동작이 브라우저마다 <div> 또는 <br> 을 넣습니다.
+                // 줄바꿈을 확실하게 보장하려면 직접 <br> 삽입:
+                e.preventDefault();
+                const br = document.createElement("br");
+                range.deleteContents();
+                range.insertNode(br);
+
+                // 커서를 <br> 뒤로 옮기기
+                const r = document.createRange();
+                r.setStartAfter(br);
+                r.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(r);
+                lastRange = r;
+                return;
+            }
+
+            // 글자 크기 유지용 기존 로직이 있다면 아래처럼 이어서 동작(예: zero-width span 삽입 등)
+            const skip = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", "Tab"];
+            if (skip.includes(e.key)) return;
+
+            if (!range.collapsed) return;
+            const span = document.createElement("span");
+            span.style.fontSize = (parseInt(fontSizePx.value, 10) || 16) + "px";
+            span.appendChild(document.createTextNode("\u200B"));
+            range.insertNode(span);
+
+            const r2 = document.createRange();
+            r2.setStart(span.firstChild, 1);
+            r2.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r2);
+            lastRange = r2;
+        });
+
         /* 전송 시 description 담기 */
         document.getElementById("openForm").addEventListener("submit", () => {
             document.getElementById("descHtml").value = editor.innerHTML.trim();
