@@ -714,7 +714,7 @@
                 document.execCommand('justify' + alignment.charAt(0).toUpperCase() + alignment.slice(1), false, null);
             }
 
-            // 글자 크기 적용 - 간단하고 확실한 방식
+            // 글자 크기 적용 - 가장 간단한 방식
             function applyFontSize(size) {
                 console.log('=== 글자 크기 적용 시작 ===');
                 console.log('요청된 크기:', size);
@@ -726,7 +726,7 @@
                 console.log('선택 상태:', selection.toString());
                 
                 if (selection.rangeCount === 0) {
-                    console.log('선택 범위가 없습니다.');
+                    console.log('❌ 선택 범위가 없습니다.');
                     return;
                 }
                 
@@ -734,44 +734,34 @@
                 
                 if (!selection.isCollapsed) {
                     // 텍스트가 선택된 경우
-                    console.log('선택된 텍스트에 적용');
+                    console.log('✅ 선택된 텍스트에 적용');
                     const selectedText = selection.toString();
                     
                     // 선택된 내용을 새로운 span으로 교체
                     const newSpan = document.createElement('span');
                     newSpan.style.fontSize = size;
-                    newSpan.style.fontWeight = 'inherit';
-                    newSpan.style.color = 'inherit';
                     newSpan.textContent = selectedText;
                     
                     range.deleteContents();
                     range.insertNode(newSpan);
                     
-                    // 선택 해제
-                    selection.removeAllRanges();
-                    
-                    console.log('적용 완료 - 선택된 텍스트');
-                    console.log('생성된 span:', newSpan);
-                    
-                } else {
-                    // 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트용
-                    console.log('미래 입력용 스타일 설정');
-                    currentFontSize = size;
-                    
-                    // 현재 위치에 스타일 적용된 span 생성
-                    const styleSpan = document.createElement('span');
-                    styleSpan.style.fontSize = size;
-                    styleSpan.setAttribute('data-next-input', 'true');
-                    
-                    range.insertNode(styleSpan);
-                    
-                    // 커서를 span 내부로 이동
-                    range.setStart(styleSpan, 0);
+                    // 커서를 span 뒤로 이동
+                    range.setStartAfter(newSpan);
                     range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
                     
-                    console.log('미래 입력용 span 생성:', styleSpan);
+                    console.log('✅ 적용 완료 - 선택된 텍스트');
+                    
+                } else {
+                    // 텍스트가 선택되지 않은 경우 - CSS 스타일로 직접 적용
+                    console.log('🔄 미래 입력용 - CSS 직접 적용');
+                    
+                    // 에디터 전체에 글자 크기 스타일 적용
+                    editor.style.fontSize = size;
+                    currentFontSize = size;
+                    
+                    console.log('📝 에디터 전체 fontSize 설정:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
                 
@@ -896,10 +886,15 @@
 
             // 글자 크기 리셋
             function resetFontSize() {
-                customEditor.focus();
+                console.log('🔄 글자 크기 초기화');
+                const editor = document.getElementById('customEditor');
+                editor.focus();
                 currentFontSize = null;
-                document.execCommand('fontSize', false, '3'); // 기본 크기
-                console.log('글자 크기 초기화');
+                
+                // 에디터 전체 폰트 크기 초기화
+                editor.style.fontSize = '';
+                
+                console.log('✅ 글자크기 초기화 완료');
                 showStylePreview('글자 크기: 기본');
             }
 
@@ -912,20 +907,30 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 키보드 입력 감지 - 간단한 방식
+            // 키보드 입력 감지 - 개선된 방식
             customEditor.addEventListener('input', function(e) {
-                console.log('입력 이벤트 발생');
-                updateToolbarState();
+                console.log('=== INPUT 이벤트 ===');
+                console.log('입력된 데이터:', e.data);
+                console.log('현재 선택:', window.getSelection().toString());
                 
-                // 미래 입력용 span에서 타이핑하는 경우
                 const selection = window.getSelection();
                 if (selection.rangeCount > 0) {
-                    const container = selection.anchorNode?.parentElement;
-                    if (container && container.hasAttribute('data-next-input')) {
-                        console.log('미래 입력용 span에서 타이핑 중');
-                        container.removeAttribute('data-next-input');
+                    const anchorNode = selection.anchorNode;
+                    const parentElement = anchorNode.parentElement;
+                    
+                    console.log('anchorNode:', anchorNode);
+                    console.log('parentElement:', parentElement);
+                    console.log('parentElement tagName:', parentElement?.tagName);
+                    console.log('parentElement attributes:', parentElement?.attributes);
+                    
+                    if (parentElement && parentElement.hasAttribute('data-next-input')) {
+                        console.log('✅ 미래 입력용 span에서 타이핑 중 - attribute 제거');
+                        parentElement.removeAttribute('data-next-input');
                     }
                 }
+                
+                updateToolbarState();
+                console.log('=== INPUT 이벤트 완료 ===');
             });
 
             // 키 입력 이벤트 처리 - Enter 키와 스타일 연속성
