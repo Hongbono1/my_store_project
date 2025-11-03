@@ -607,14 +607,14 @@
            2. 커스텀 한글 특화 에디터 초기화
         ========================================== */
         let customEditor;
+        
+        // 현재 스타일 상태 관리 (전역 변수)
+        let currentFontSize = null;
+        let currentTextColor = null;
 
         // 에디터 초기화
         document.addEventListener("DOMContentLoaded", function() {
             customEditor = document.getElementById('customEditor');
-            
-            // 현재 스타일 상태 관리
-            let currentFontSize = null;
-            let currentTextColor = null;
             
             // 기본 툴바 이벤트 처리
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
@@ -786,26 +786,8 @@
 
             // 에디터 스타일 업데이트 (앞으로 입력할 텍스트용)
             function updateEditorStyle() {
-                let style = '';
-                if (currentFontSize) style += `font-size: ${currentFontSize}; `;
-                if (currentTextColor) style += `color: ${currentTextColor}; `;
-                
-                // 현재 커서 위치에 보이지 않는 span 생성
-                if (style) {
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        const span = document.createElement('span');
-                        span.setAttribute('style', style);
-                        span.setAttribute('data-style-marker', 'true');
-                        
-                        range.insertNode(span);
-                        range.setStart(span, 0);
-                        range.setEnd(span, 0);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                    }
-                }
+                // 현재 스타일 상태만 저장 (실제 적용은 keypress에서)
+                console.log('현재 스타일 상태:', { fontSize: currentFontSize, color: currentTextColor });
             }
 
             // 스타일 미리보기 표시
@@ -857,29 +839,63 @@
 
             // 키보드 입력 감지 (스타일 적용)
             customEditor.addEventListener('input', function(e) {
-                // 스타일 마커가 있는 span에서 입력된 경우
+                updateToolbarState();
+            });
+
+            // 키 입력 시 현재 스타일 적용
+            customEditor.addEventListener('keypress', function(e) {
+                if (currentFontSize || currentTextColor) {
+                    // 현재 커서 위치에서 입력될 문자에 스타일 적용
+                    setTimeout(() => {
+                        applyCurrentStyle();
+                    }, 10);
+                }
+            });
+
+            // 현재 설정된 스타일을 적용하는 함수
+            function applyCurrentStyle() {
                 const selection = window.getSelection();
                 if (selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
-                    let container = range.startContainer;
+                    const textNode = range.startContainer;
                     
-                    if (container.nodeType === Node.TEXT_NODE) {
-                        container = container.parentNode;
-                    }
-                    
-                    // data-style-marker가 있는 span 찾기
-                    while (container && container !== customEditor) {
-                        if (container.getAttribute && container.getAttribute('data-style-marker')) {
-                            // 스타일 마커 제거 (한 번만 사용)
-                            container.removeAttribute('data-style-marker');
-                            break;
+                    if (textNode.nodeType === Node.TEXT_NODE && textNode.textContent.length > 0) {
+                        const parent = textNode.parentNode;
+                        
+                        // 마지막 입력된 문자 찾기
+                        const text = textNode.textContent;
+                        const lastChar = text[text.length - 1];
+                        
+                        if (lastChar && lastChar !== ' ') {
+                            // 마지막 문자를 span으로 감싸기
+                            const beforeText = text.substring(0, text.length - 1);
+                            const span = document.createElement('span');
+                            
+                            if (currentFontSize) span.style.fontSize = currentFontSize;
+                            if (currentTextColor) span.style.color = currentTextColor;
+                            
+                            span.textContent = lastChar;
+                            
+                            // 텍스트 노드 분리
+                            textNode.textContent = beforeText;
+                            
+                            // span 삽입
+                            if (parent === customEditor) {
+                                parent.insertBefore(span, textNode.nextSibling);
+                            } else {
+                                parent.appendChild(span);
+                            }
+                            
+                            // 커서를 span 뒤로 이동
+                            const newRange = document.createRange();
+                            newRange.setStartAfter(span);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
                         }
-                        container = container.parentNode;
                     }
                 }
-                
-                updateToolbarState();
-            });
+            }
         });
 
         /* 전송 시 description 담기 */
