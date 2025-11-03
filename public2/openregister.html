@@ -513,9 +513,10 @@
 
                         <div class="border-l border-gray-300 h-6 mx-2"></div>
 
-                <!-- 글자 크기 -->
+                        <!-- 글자 크기 -->
                         <select class="korean-select" data-action="font-size">
                             <option value="">글자 크기 선택</option>
+                            <option value="reset">일반 크기로 되돌리기</option>
                             <option value="10px">매우 작게 (10px)</option>
                             <option value="12px">작게 (12px)</option>
                             <option value="14px">보통 (14px)</option>
@@ -523,17 +524,23 @@
                             <option value="18px">더 크게 (18px)</option>
                             <option value="20px">제목용 (20px)</option>
                             <option value="24px">큰 제목 (24px)</option>
-                        </select>
-
-                        <!-- 글자색 -->
+                        </select>                        <!-- 글자색 -->
                         <div class="color-group">
                             <span class="text-xs text-gray-600">색상:</span>
+                            <button type="button" class="color-btn" data-color="reset" style="background: linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%); background-size: 8px 8px;" title="기본색"></button>
                             <button type="button" class="color-btn" data-color="#000000" style="background: #000000" title="검정"></button>
                             <button type="button" class="color-btn" data-color="#FF0000" style="background: #FF0000" title="빨강"></button>
                             <button type="button" class="color-btn" data-color="#0066CC" style="background: #0066CC" title="파랑"></button>
                             <button type="button" class="color-btn" data-color="#008000" style="background: #008000" title="초록"></button>
                             <button type="button" class="color-btn" data-color="#FF6600" style="background: #FF6600" title="주황"></button>
                         </div>
+
+                        <div class="border-l border-gray-300 h-6 mx-2"></div>
+
+                        <!-- 스타일 초기화 -->
+                        <button type="button" class="korean-btn" onclick="resetAllStyles()" title="모든 스타일 초기화">
+                            <span>🔄</span>
+                        </button>
 
                         <div class="border-l border-gray-300 h-6 mx-2"></div>
 
@@ -644,11 +651,15 @@
                 });
             });
 
-            // 글자 크기 선택 - 완전히 새로운 방식
+            // 글자 크기 선택
             document.querySelector('[data-action="font-size"]').addEventListener('change', function() {
                 if (this.value) {
                     console.log('글자 크기 변경:', this.value);
-                    applyFontSize(this.value);
+                    if (this.value === 'reset') {
+                        resetFontSize();
+                    } else {
+                        applyFontSize(this.value);
+                    }
                     this.value = ''; // 선택 초기화
                 }
             });
@@ -658,7 +669,11 @@
                 btn.addEventListener('click', function() {
                     const color = this.getAttribute('data-color');
                     console.log('글자색 변경:', color);
-                    applyTextColor(color);
+                    if (color === 'reset') {
+                        resetTextColor();
+                    } else {
+                        applyTextColor(color);
+                    }
                 });
             });
 
@@ -839,11 +854,64 @@
                 return colorMap[color] || color;
             }
 
+            // 글자 크기 리셋
+            function resetFontSize() {
+                customEditor.focus();
+                currentFontSize = null;
+                document.execCommand('fontSize', false, '3'); // 기본 크기
+                console.log('글자 크기 초기화');
+                showStylePreview('글자 크기: 기본');
+            }
+
+            // 글자색 리셋
+            function resetTextColor() {
+                customEditor.focus();
+                currentTextColor = null;
+                document.execCommand('foreColor', false, '#000000'); // 기본 검정색
+                console.log('글자색 초기화');
+                showStylePreview('글자색: 기본');
+            }
+
             // 키보드 입력 감지
             customEditor.addEventListener('input', function(e) {
                 updateToolbarState();
             });
         });
+
+        // 전체 스타일 초기화 (전역 함수)
+        function resetAllStyles() {
+            currentFontSize = null;
+            currentTextColor = null;
+            
+            const editor = document.getElementById('customEditor');
+            editor.focus();
+            
+            // 모든 서식 제거
+            document.execCommand('removeFormat', false, null);
+            document.execCommand('fontSize', false, '3');
+            document.execCommand('foreColor', false, '#000000');
+            
+            console.log('모든 스타일 초기화');
+            
+            // 피드백 표시
+            const preview = document.createElement('div');
+            preview.textContent = '모든 스타일이 초기화되었습니다';
+            preview.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                z-index: 1000;
+                animation: fadeInOut 3s ease-in-out;
+            `;
+            
+            document.body.appendChild(preview);
+            setTimeout(() => preview.remove(), 3000);
+        }
 
         /* 전송 시 description 담기 */
         document.getElementById("openForm").addEventListener("submit", async (e) => {
