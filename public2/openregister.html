@@ -706,30 +706,48 @@
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
                     // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
-                    const range = selection.getRangeAt(0);
-                    const selectedText = selection.toString();
+                    document.execCommand('fontSize', false, '7'); // 임시로 큰 사이즈 적용
                     
-                    range.deleteContents();
-                    
-                    const span = document.createElement('span');
-                    span.style.fontSize = size;
-                    span.textContent = selectedText;
-                    
-                    range.insertNode(span);
-                    
-                    range.setStartAfter(span);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
+                    // 모든 font size 7을 찾아서 실제 크기로 변경
+                    setTimeout(() => {
+                        const fontElements = customEditor.querySelectorAll('font[size="7"]');
+                        fontElements.forEach(font => {
+                            const span = document.createElement('span');
+                            span.style.fontSize = size;
+                            span.innerHTML = font.innerHTML;
+                            font.parentNode.replaceChild(span, font);
+                        });
+                    }, 10);
                     
                     console.log('선택된 텍스트에 글자 크기 적용:', size);
                 } else {
                     // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
                     currentFontSize = size;
-                    updateEditorStyle();
-                    console.log('앞으로 입력할 텍스트 글자 크기 설정:', size);
                     
-                    // 시각적 피드백
+                    // execCommand로 기본 글자 크기 설정
+                    document.execCommand('fontSize', false, '7');
+                    
+                    // 설정된 font 태그를 실제 크기로 변경
+                    setTimeout(() => {
+                        const fontElements = customEditor.querySelectorAll('font[size="7"]');
+                        fontElements.forEach(font => {
+                            if (font.innerHTML === '') {
+                                const span = document.createElement('span');
+                                span.style.fontSize = size;
+                                span.setAttribute('data-next-style', 'true');
+                                font.parentNode.replaceChild(span, font);
+                                
+                                // 커서를 span 안으로 이동
+                                const range = document.createRange();
+                                range.setStart(span, 0);
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
+                        });
+                    }, 10);
+                    
+                    console.log('앞으로 입력할 텍스트 글자 크기 설정:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
             }
@@ -741,30 +759,14 @@
                 
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
                     // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
-                    const range = selection.getRangeAt(0);
-                    const selectedText = selection.toString();
-                    
-                    range.deleteContents();
-                    
-                    const span = document.createElement('span');
-                    span.style.color = color;
-                    span.textContent = selectedText;
-                    
-                    range.insertNode(span);
-                    
-                    range.setStartAfter(span);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    
+                    document.execCommand('foreColor', false, color);
                     console.log('선택된 텍스트에 글자색 적용:', color);
                 } else {
                     // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
                     currentTextColor = color;
-                    updateEditorStyle();
+                    document.execCommand('foreColor', false, color);
                     console.log('앞으로 입력할 텍스트 색상 설정:', color);
                     
-                    // 시각적 피드백
                     const colorName = getColorName(color);
                     showStylePreview('글자색: ' + colorName);
                 }
@@ -837,65 +839,10 @@
                 return colorMap[color] || color;
             }
 
-            // 키보드 입력 감지 (스타일 적용)
+            // 키보드 입력 감지
             customEditor.addEventListener('input', function(e) {
                 updateToolbarState();
             });
-
-            // 키 입력 시 현재 스타일 적용
-            customEditor.addEventListener('keypress', function(e) {
-                if (currentFontSize || currentTextColor) {
-                    // 현재 커서 위치에서 입력될 문자에 스타일 적용
-                    setTimeout(() => {
-                        applyCurrentStyle();
-                    }, 10);
-                }
-            });
-
-            // 현재 설정된 스타일을 적용하는 함수
-            function applyCurrentStyle() {
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    const textNode = range.startContainer;
-                    
-                    if (textNode.nodeType === Node.TEXT_NODE && textNode.textContent.length > 0) {
-                        const parent = textNode.parentNode;
-                        
-                        // 마지막 입력된 문자 찾기
-                        const text = textNode.textContent;
-                        const lastChar = text[text.length - 1];
-                        
-                        if (lastChar && lastChar !== ' ') {
-                            // 마지막 문자를 span으로 감싸기
-                            const beforeText = text.substring(0, text.length - 1);
-                            const span = document.createElement('span');
-                            
-                            if (currentFontSize) span.style.fontSize = currentFontSize;
-                            if (currentTextColor) span.style.color = currentTextColor;
-                            
-                            span.textContent = lastChar;
-                            
-                            // 텍스트 노드 분리
-                            textNode.textContent = beforeText;
-                            
-                            // span 삽입
-                            if (parent === customEditor) {
-                                parent.insertBefore(span, textNode.nextSibling);
-                            } else {
-                                parent.appendChild(span);
-                            }
-                            
-                            // 커서를 span 뒤로 이동
-                            const newRange = document.createRange();
-                            newRange.setStartAfter(span);
-                            newRange.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                        }
-                    }
-                }
-            }
         });
 
         /* 전송 시 description 담기 */
