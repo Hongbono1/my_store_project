@@ -498,12 +498,14 @@
         // Enter 키 처리 개선
         editor.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
+                e.preventDefault(); // 기본 Enter 동작 방지
+                
                 const sel = window.getSelection();
                 if (!sel || !sel.rangeCount) return;
                 
                 const range = sel.getRangeAt(0);
                 
-                // side-container 내부 텍스트 영역에서는 일반 줄바꿈
+                // side-container 내부 텍스트 영역 확인
                 let inSideText = false;
                 let node = range.startContainer;
                 while (node && node !== editor) {
@@ -515,26 +517,34 @@
                 }
                 
                 if (inSideText) {
-                    // side-container 내부에서는 기본 Enter 동작 허용
-                    return;
+                    // side-container 내부에서는 단순 줄바꿈
+                    const br = document.createElement("br");
+                    range.deleteContents();
+                    range.insertNode(br);
+                    
+                    // 커서를 br 뒤로 이동
+                    const newRange = document.createRange();
+                    newRange.setStartAfter(br);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    lastRange = newRange;
+                } else {
+                    // 일반 영역에서는 새로운 div 생성
+                    const newDiv = document.createElement("div");
+                    newDiv.innerHTML = "<br>"; // 빈 줄을 위한 br
+                    
+                    range.deleteContents();
+                    range.insertNode(newDiv);
+                    
+                    // 커서를 새 div 안으로 이동
+                    const newRange = document.createRange();
+                    newRange.setStart(newDiv, 0);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    lastRange = newRange;
                 }
-                
-                // 일반 영역에서는 p 태그로 감싸기
-                e.preventDefault();
-                
-                const p = document.createElement("p");
-                p.innerHTML = "<br>";
-                
-                range.deleteContents();
-                range.insertNode(p);
-                
-                const newRange = document.createRange();
-                newRange.setStart(p, 0);
-                newRange.collapse(true);
-                
-                sel.removeAllRanges();
-                sel.addRange(newRange);
-                lastRange = newRange;
             }
         });
 
