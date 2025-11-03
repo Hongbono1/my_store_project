@@ -599,21 +599,37 @@
                     if (this.value) {
                         console.log('글자 크기 변경 시도:', this.value);
                         
-                        // Toast UI Editor API 사용
                         const selection = window.getSelection();
                         if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                            // 선택된 텍스트가 있는 경우
+                            const range = selection.getRangeAt(0);
                             const selectedText = selection.toString();
+                            
+                            // Toast UI Editor의 방식으로 직접 HTML 삽입
                             const fontSize = this.value;
                             
-                            // HTML로 래핑해서 직접 삽입
-                            const styledHTML = `<span style="font-size: ${fontSize};">${selectedText}</span>`;
+                            // 선택된 내용을 삭제하고 새로운 span으로 교체
+                            range.deleteContents();
                             
-                            // execCommand 사용 (더 안정적)
-                            document.execCommand('delete');
-                            document.execCommand('insertHTML', false, styledHTML);
+                            const span = document.createElement('span');
+                            span.style.fontSize = fontSize;
+                            span.style.display = 'inline';
+                            span.textContent = selectedText;
+                            
+                            range.insertNode(span);
+                            
+                            // 커서를 span 뒤로 이동
+                            range.setStartAfter(span);
+                            range.setEndAfter(span);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
                             
                             console.log('글자 크기 적용됨:', fontSize, '텍스트:', selectedText);
+                            
+                            // Toast UI Editor에게 변경사항 알림
+                            const editorEl = document.querySelector('.toastui-editor-contents[contenteditable="true"]');
+                            if (editorEl) {
+                                editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
                         } else {
                             alert('글자 크기를 변경하려면 먼저 텍스트를 드래그해서 선택해주세요!');
                         }
@@ -630,17 +646,32 @@
                         
                         const selection = window.getSelection();
                         if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                            // 선택된 텍스트가 있는 경우
+                            const range = selection.getRangeAt(0);
                             const selectedText = selection.toString();
                             
-                            // HTML로 래핑해서 직접 삽입
-                            const styledHTML = `<span style="color: ${color};">${selectedText}</span>`;
+                            // 선택된 내용을 삭제하고 새로운 span으로 교체
+                            range.deleteContents();
                             
-                            // execCommand 사용
-                            document.execCommand('delete');
-                            document.execCommand('insertHTML', false, styledHTML);
+                            const span = document.createElement('span');
+                            span.style.color = color;
+                            span.style.display = 'inline';
+                            span.textContent = selectedText;
+                            
+                            range.insertNode(span);
+                            
+                            // 커서를 span 뒤로 이동
+                            range.setStartAfter(span);
+                            range.setEndAfter(span);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
                             
                             console.log('글자색 적용됨:', color, '텍스트:', selectedText);
+                            
+                            // Toast UI Editor에게 변경사항 알림
+                            const editorEl = document.querySelector('.toastui-editor-contents[contenteditable="true"]');
+                            if (editorEl) {
+                                editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
                         } else {
                             alert('글자색을 변경하려면 먼저 텍스트를 드래그해서 선택해주세요!');
                         }
