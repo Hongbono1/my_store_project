@@ -492,6 +492,13 @@
                             📷 이미지
                         </button>
                         <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
+                        
+                        <!-- 이미지 정렬 -->
+                        <select class="toolbar-select" id="imageAlignSelect" style="display: none;" title="이미지 정렬">
+                            <option value="left">← 왼쪽</option>
+                            <option value="center">↔ 가운데</option>
+                            <option value="right">→ 오른쪽</option>
+                        </select>
                     </div>
                 </div>
                 
@@ -776,8 +783,8 @@
                         console.log('📥 서버 응답:', result);
                         
                         if (result.success) {
-                            // 에디터에 이미지 삽입
-                            insertImageToEditor(result.imagePath);
+                            // 이미지 정렬 선택 표시
+                            showImageAlignOptions(result.imagePath);
                             console.log('✅ 이미지 업로드 성공:', result.imagePath);
                             console.log('🔗 최종 이미지 URL:', window.location.origin + result.imagePath);
                         } else {
@@ -794,9 +801,56 @@
                 });
             }
             
-            // 에디터에 이미지 삽입
-            function insertImageToEditor(imagePath) {
-                console.log('🖼️ 이미지 삽입 시작:', imagePath);
+            // 이미지 정렬 옵션 표시
+            function showImageAlignOptions(imagePath) {
+                // 정렬 선택 팝업 생성
+                const popup = document.createElement('div');
+                popup.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: white;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    padding: 20px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 1000;
+                `;
+                
+                popup.innerHTML = `
+                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">이미지 정렬 선택</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button id="alignLeft" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">← 왼쪽</button>
+                        <button id="alignCenter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">↔ 가운데</button>
+                        <button id="alignRight" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">→ 오른쪽</button>
+                    </div>
+                    <button id="cancelAlign" style="padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; float: right;">취소</button>
+                `;
+                
+                document.body.appendChild(popup);
+                
+                // 정렬 버튼 이벤트
+                popup.querySelector('#alignLeft').onclick = () => {
+                    insertImageToEditor(imagePath, 'left');
+                    document.body.removeChild(popup);
+                };
+                popup.querySelector('#alignCenter').onclick = () => {
+                    insertImageToEditor(imagePath, 'center');
+                    document.body.removeChild(popup);
+                };
+                popup.querySelector('#alignRight').onclick = () => {
+                    insertImageToEditor(imagePath, 'right');
+                    document.body.removeChild(popup);
+                };
+                popup.querySelector('#cancelAlign').onclick = () => {
+                    document.body.removeChild(popup);
+                };
+            }
+            
+            // 에디터에 이미지 삽입 (정렬 지원)
+            function insertImageToEditor(imagePath, alignment = 'left') {
+                console.log('🖼️ 이미지 삽입 시작:', imagePath, '정렬:', alignment);
                 customEditor.focus();
                 
                 const selection = window.getSelection();
@@ -810,6 +864,19 @@
                 img.style.margin = '10px 0';
                 img.style.borderRadius = '4px';
                 img.style.border = '1px solid #ddd'; // 디버깅용 경계선
+                
+                // 정렬 적용
+                if (alignment === 'center') {
+                    img.style.display = 'block';
+                    img.style.marginLeft = 'auto';
+                    img.style.marginRight = 'auto';
+                } else if (alignment === 'right') {
+                    img.style.float = 'right';
+                    img.style.marginLeft = '10px';
+                } else { // left
+                    img.style.float = 'left';
+                    img.style.marginRight = '10px';
+                }
                 
                 // 이미지 로드 이벤트 추가
                 img.onload = function() {
@@ -829,7 +896,7 @@
                 selection.removeAllRanges();
                 selection.addRange(range);
                 
-                console.log('✅ 이미지가 에디터에 삽입됨:', img);
+                console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + '):', img);
             }
 
             // 글자 크기 적용 - 개별 텍스트만 적용되는 방식
