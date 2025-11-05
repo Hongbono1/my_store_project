@@ -16,8 +16,37 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ 이미지 업로드 처리
+// ✅ 에디터용 이미지 업로드 처리
 router.post("/image", upload.single("image"), (req, res) => {
+  try {
+    console.log("📷 에디터 이미지 업로드 요청:", req.file);
+    
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "파일이 선택되지 않았습니다." 
+      });
+    }
+
+    const imagePath = `/uploads/${req.file.filename}`;
+    console.log("✅ 이미지 업로드 성공:", imagePath);
+    
+    res.json({ 
+      success: true, 
+      imagePath: imagePath,
+      fileName: req.file.filename 
+    });
+  } catch (err) {
+    console.error("❌ 에디터 이미지 업로드 오류:", err);
+    res.status(500).json({ 
+      success: false, 
+      error: "이미지 업로드 중 서버 오류가 발생했습니다." 
+    });
+  }
+});
+
+// ✅ 기존 이미지 업로드 처리 (호환성 유지)
+router.post("/", upload.single("image"), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: "파일이 없습니다." });
 

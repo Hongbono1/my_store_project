@@ -484,6 +484,14 @@
                         <button type="button" class="toolbar-btn" data-action="ol" title="번호 매기기">
                             1. 목록
                         </button>
+                        
+                        <div class="border-l border-gray-300 h-6 mx-2"></div>
+                        
+                        <!-- 이미지 삽입 -->
+                        <button type="button" class="toolbar-btn" id="imageUploadBtn" title="이미지 삽입">
+                            📷 이미지
+                        </button>
+                        <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
                     </div>
                 </div>
                 
@@ -623,11 +631,20 @@
         document.addEventListener("DOMContentLoaded", function() {
             customEditor = document.getElementById('customEditor');
             
+            // 이미지 업로드 기능 초기화
+            setupImageUpload();
+            
             // 기본 툴바 이벤트 처리
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const action = this.getAttribute('data-action');
-                    applyFormat(action);
+                    
+                    // 목록 처리
+                    if (action === 'ul' || action === 'ol') {
+                        applyListFormat(action);
+                    } else {
+                        applyFormat(action);
+                    }
                     updateToolbarState();
                 });
             });
@@ -712,6 +729,93 @@
             function applyTextAlign(alignment) {
                 customEditor.focus();
                 document.execCommand('justify' + alignment.charAt(0).toUpperCase() + alignment.slice(1), false, null);
+            }
+
+            // 목록 처리 함수
+            function applyListFormat(listType) {
+                console.log('목록 적용:', listType);
+                customEditor.focus();
+                
+                if (listType === 'ul') {
+                    document.execCommand('insertUnorderedList', false, null);
+                    console.log('✅ 글머리 기호 목록 적용');
+                } else if (listType === 'ol') {
+                    document.execCommand('insertOrderedList', false, null);
+                    console.log('✅ 번호 매기기 목록 적용');
+                }
+            }
+
+            // 이미지 업로드 처리
+            function setupImageUpload() {
+                const imageBtn = document.getElementById('imageUploadBtn');
+                const imageInput = document.getElementById('imageUploadInput');
+                
+                // 이미지 버튼 클릭 시 파일 선택 창 열기
+                imageBtn.addEventListener('click', function() {
+                    imageInput.click();
+                });
+                
+                // 파일 선택 시 업로드 처리
+                imageInput.addEventListener('change', async function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    console.log('이미지 업로드 시작:', file.name);
+                    
+                    try {
+                        // FormData로 이미지 전송
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        
+                        const response = await fetch('/upload/image', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 에디터에 이미지 삽입
+                            insertImageToEditor(result.imagePath);
+                            console.log('✅ 이미지 업로드 성공:', result.imagePath);
+                        } else {
+                            alert('이미지 업로드 실패: ' + result.error);
+                        }
+                    } catch (error) {
+                        console.error('이미지 업로드 오류:', error);
+                        alert('이미지 업로드 중 오류가 발생했습니다.');
+                    }
+                    
+                    // 파일 선택 초기화
+                    imageInput.value = '';
+                });
+            }
+            
+            // 에디터에 이미지 삽입
+            function insertImageToEditor(imagePath) {
+                customEditor.focus();
+                
+                const selection = window.getSelection();
+                const range = selection.getRangeAt(0);
+                
+                // img 태그 생성
+                const img = document.createElement('img');
+                img.src = imagePath;
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.margin = '10px 0';
+                img.style.borderRadius = '4px';
+                
+                // 현재 위치에 이미지 삽입
+                range.insertNode(img);
+                
+                // 커서를 이미지 뒤로 이동
+                range.setStartAfter(img);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                console.log('✅ 이미지가 에디터에 삽입됨');
             }
 
             // 글자 크기 적용 - 개별 텍스트만 적용되는 방식
