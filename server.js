@@ -55,7 +55,7 @@ app.use("/upload", uploadRouter);
 app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 
 

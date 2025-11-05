@@ -773,12 +773,15 @@
                         });
                         
                         const result = await response.json();
+                        console.log('📥 서버 응답:', result);
                         
                         if (result.success) {
                             // 에디터에 이미지 삽입
                             insertImageToEditor(result.imagePath);
                             console.log('✅ 이미지 업로드 성공:', result.imagePath);
+                            console.log('🔗 최종 이미지 URL:', window.location.origin + result.imagePath);
                         } else {
+                            console.error('❌ 업로드 실패:', result);
                             alert('이미지 업로드 실패: ' + result.error);
                         }
                     } catch (error) {
@@ -793,6 +796,7 @@
             
             // 에디터에 이미지 삽입
             function insertImageToEditor(imagePath) {
+                console.log('🖼️ 이미지 삽입 시작:', imagePath);
                 customEditor.focus();
                 
                 const selection = window.getSelection();
@@ -805,6 +809,16 @@
                 img.style.height = 'auto';
                 img.style.margin = '10px 0';
                 img.style.borderRadius = '4px';
+                img.style.border = '1px solid #ddd'; // 디버깅용 경계선
+                
+                // 이미지 로드 이벤트 추가
+                img.onload = function() {
+                    console.log('✅ 이미지 로드 성공:', imagePath);
+                };
+                img.onerror = function() {
+                    console.error('❌ 이미지 로드 실패:', imagePath);
+                    console.error('❌ 실제 URL:', this.src);
+                };
                 
                 // 현재 위치에 이미지 삽입
                 range.insertNode(img);
@@ -815,7 +829,7 @@
                 selection.removeAllRanges();
                 selection.addRange(range);
                 
-                console.log('✅ 이미지가 에디터에 삽입됨');
+                console.log('✅ 이미지가 에디터에 삽입됨:', img);
             }
 
             // 글자 크기 적용 - 개별 텍스트만 적용되는 방식
