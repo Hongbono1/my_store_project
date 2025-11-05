@@ -1070,7 +1070,7 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 타이핑 시 실시간 글자 크기 적용 - 안전한 방식
+            // 타이핑 시 실시간 글자 크기 적용 - 이어서 타이핑도 지원
             customEditor.addEventListener('input', function(e) {
                 // 한 글자씩 입력할 때만 처리 (복사/붙여넣기 제외)
                 if (e.inputType === 'insertText' && e.data && currentFontSize) {
@@ -1079,25 +1079,30 @@
                         const range = selection.getRangeAt(0);
                         const textNode = range.startContainer;
                         
-                        // 방금 입력된 텍스트 노드가 span에 감싸져 있지 않다면
-                        if (textNode.nodeType === Node.TEXT_NODE && 
-                            textNode.parentElement === customEditor) {
+                        if (textNode.nodeType === Node.TEXT_NODE) {
+                            const parentElement = textNode.parentElement;
                             
-                            // 새 span으로 감싸기
-                            const span = document.createElement('span');
-                            span.style.fontSize = currentFontSize;
-                            
-                            // 텍스트 노드를 span으로 감싸기
-                            textNode.parentNode.insertBefore(span, textNode);
-                            span.appendChild(textNode);
-                            
-                            // 커서 위치 유지
-                            range.setStart(textNode, range.startOffset);
-                            range.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            
-                            console.log('✅ 타이핑한 글자에 크기 적용:', currentFontSize);
+                            // 조건 1: customEditor 직속 자식이거나
+                            // 조건 2: 이미 span에 있지만 크기가 다르거나 크기가 없는 경우
+                            if (parentElement === customEditor || 
+                                (parentElement.tagName === 'SPAN' && parentElement.style.fontSize !== currentFontSize)) {
+                                
+                                // 새 span으로 감싸기
+                                const span = document.createElement('span');
+                                span.style.fontSize = currentFontSize;
+                                
+                                // 텍스트 노드를 span으로 감싸기
+                                textNode.parentNode.insertBefore(span, textNode);
+                                span.appendChild(textNode);
+                                
+                                // 커서 위치 유지
+                                range.setStart(textNode, range.startOffset);
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                console.log('✅ 타이핑한 글자에 크기 적용:', currentFontSize);
+                            }
                         }
                     }
                 }
