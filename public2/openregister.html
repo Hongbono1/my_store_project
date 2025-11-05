@@ -1070,7 +1070,7 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 타이핑 시 글자 크기 즉시 적용
+            // 타이핑 시 글자 크기 즉시 적용 - 새 글자만 적용
             customEditor.addEventListener('input', function(e) {
                 // 문자 입력이고 글자 크기가 설정되어 있으면
                 if (e.data && currentFontSize) {
@@ -1079,26 +1079,45 @@
                         const range = selection.getRangeAt(0);
                         const textNode = range.startContainer;
                         
-                        // 새로 입력된 문자가 있고, span에 감싸지지 않은 경우
+                        // 새로 입력된 문자가 있고, 텍스트 노드인 경우
                         if (textNode.nodeType === Node.TEXT_NODE) {
                             const parent = textNode.parentElement;
+                            const cursorOffset = range.startOffset;
                             
-                            // 이미 스타일이 적용된 span이 아니라면 새로 감싸기
-                            if (!parent.style.fontSize || parent.style.fontSize !== currentFontSize) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = currentFontSize;
+                            // 새로 입력된 문자만 분리해서 스타일 적용
+                            if (cursorOffset > 0) {
+                                const beforeText = textNode.textContent.substring(0, cursorOffset - 1);
+                                const newChar = textNode.textContent.substring(cursorOffset - 1, cursorOffset);
+                                const afterText = textNode.textContent.substring(cursorOffset);
                                 
-                                // 텍스트 노드를 새 span으로 감싸기
-                                textNode.parentNode.insertBefore(span, textNode);
-                                span.appendChild(textNode);
+                                // 기존 텍스트는 그대로 두고, 새 문자만 span으로 감싸기
+                                if (beforeText) {
+                                    const beforeNode = document.createTextNode(beforeText);
+                                    parent.insertBefore(beforeNode, textNode);
+                                }
                                 
-                                // 커서 위치 유지
-                                range.setStart(textNode, range.startOffset);
+                                // 새 문자를 스타일이 적용된 span으로 감싸기
+                                const newSpan = document.createElement('span');
+                                newSpan.style.fontSize = currentFontSize;
+                                newSpan.textContent = newChar;
+                                parent.insertBefore(newSpan, textNode);
+                                
+                                // 남은 텍스트 처리
+                                if (afterText) {
+                                    textNode.textContent = afterText;
+                                    // 커서를 남은 텍스트 시작 부분으로
+                                    range.setStart(textNode, 0);
+                                } else {
+                                    // 남은 텍스트가 없으면 원본 노드 제거하고 span 뒤로 커서 이동
+                                    parent.removeChild(textNode);
+                                    range.setStartAfter(newSpan);
+                                }
+                                
                                 range.collapse(true);
                                 selection.removeAllRanges();
                                 selection.addRange(range);
                                 
-                                console.log('✅ 타이핑 중 글자 크기 즉시 적용:', currentFontSize);
+                                console.log('✅ 새 문자만 글자 크기 적용:', newChar, currentFontSize);
                             }
                         }
                     }
