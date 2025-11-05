@@ -27,8 +27,9 @@ router.post("/", upload.single("img"), async (req, res) => {
          open_date,
          category,
          phone,
-         address,          // 주소 (기본 + 상세 합쳐진 것)
-         description       // HTML 에디터 내용 (descHtml 필드에서 전송됨)
+         address,          // 기본 주소
+         detail_address,   // 상세 주소  
+         description       // HTML 에디터 내용
       } = req.body;
 
       // 필수값 검사
@@ -47,14 +48,15 @@ router.post("/", upload.single("img"), async (req, res) => {
          phone,
          description: description ? description.substring(0, 100) + "..." : null,
          address,
+         detail_address,
          imagePath
       });
 
-      // PostgreSQL 저장 (위도/경도 제외)
+      // PostgreSQL 저장 (기본주소와 상세주소 분리)
       const result = await pool.query(
          `INSERT INTO open_stores 
-          (store_name, open_date, category, phone, description, address, image_path, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          (store_name, open_date, category, phone, description, address, detail_address, image_path, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
           RETURNING id`,
          [
             store_name,
@@ -63,6 +65,7 @@ router.post("/", upload.single("img"), async (req, res) => {
             phone,
             description || null,
             address || null,
+            detail_address || null,
             imagePath
          ]
       );
@@ -84,7 +87,7 @@ router.post("/", upload.single("img"), async (req, res) => {
 router.get("/", async (req, res) => {
    try {
       const result = await pool.query(
-         `SELECT id, store_name, open_date, category, phone, description, address, image_path, created_at
+         `SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path, created_at
           FROM open_stores 
           ORDER BY created_at DESC`
       );
@@ -101,7 +104,7 @@ router.get("/:id", async (req, res) => {
    try {
       const { id } = req.params;
       const result = await pool.query(
-         `SELECT id, store_name, open_date, category, phone, description, address, image_path, created_at
+         `SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path, created_at
           FROM open_stores 
           WHERE id = $1`,
          [id]
