@@ -1049,15 +1049,20 @@
         document.getElementById("openForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             
+            console.log("📝 폼 제출 시작");
+            
             // 커스텀 에디터에서 HTML 내용 가져오기
             if (customEditor) {
-                document.getElementById("descHtml").value = customEditor.innerHTML;
+                const editorContent = customEditor.innerHTML;
+                console.log("📄 에디터 내용:", editorContent.substring(0, 100) + "...");
+                document.getElementById("descHtml").value = editorContent;
             }
             
             // 주소 + 상세주소 결합
             const baseAddr = document.getElementById("address").value || "";
             const detailAddr = document.getElementById("detailAddress").value || "";
             const fullAddress = baseAddr + (detailAddr ? " " + detailAddr : "");
+            console.log("🏠 전체 주소:", fullAddress);
             
             // FormData 생성
             const formData = new FormData(e.target);
@@ -1065,22 +1070,39 @@
             // 완전한 주소로 교체
             formData.set("address", fullAddress);
             
+            // description 필드명을 서버에서 받을 수 있도록 설정
+            formData.set("description", document.getElementById("descHtml").value);
+            
+            // 전송할 데이터 로깅
+            console.log("📤 전송 데이터:");
+            for (let [key, value] of formData.entries()) {
+                if (key === 'description') {
+                    console.log(`${key}: ${typeof value === 'string' ? value.substring(0, 100) + "..." : value}`);
+                } else {
+                    console.log(`${key}: ${value}`);
+                }
+            }
+            
             try {
+                console.log("🚀 서버로 전송 중...");
                 const response = await fetch("/openregister", {
                     method: "POST",
                     body: formData
                 });
                 
                 const result = await response.json();
+                console.log("📥 서버 응답:", result);
                 
                 if (result.success) {
                     alert("등록이 완료되었습니다!");
+                    console.log("✅ 등록 성공 - ID:", result.id);
                     window.location.href = "/open.html";
                 } else {
-                    alert("등록 실패: " + (result.error || "알 수 없는 오류"));
+                    alert("등록 실패: " + (result.error || result.message || "알 수 없는 오류"));
+                    console.error("❌ 등록 실패:", result);
                 }
             } catch (err) {
-                console.error("등록 오류:", err);
+                console.error("❌ 서버 통신 오류:", err);
                 alert("서버 오류: " + err.message);
             }
         });
