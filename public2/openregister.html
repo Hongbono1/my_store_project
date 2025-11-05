@@ -899,7 +899,7 @@
                 console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + '):', img);
             }
 
-            // 글자 크기 적용 - 즉시 반영되는 간단한 방식
+            // 글자 크기 적용 - 안전한 방식
             function applyFontSize(size) {
                 console.log('글자 크기 적용:', size);
                 
@@ -928,7 +928,22 @@
                 } else {
                     // 선택된 텍스트가 없는 경우 - 다음 타이핑을 위해 설정
                     currentFontSize = size;
-                    console.log('✅ 다음 타이핑부터 적용할 글자 크기:', size);
+                    
+                    // 미리 span을 생성해서 커서를 그 안에 위치시키기
+                    const range = selection.getRangeAt(0);
+                    const span = document.createElement('span');
+                    span.style.fontSize = size;
+                    span.innerHTML = '&nbsp;'; // 공백으로 span 활성화
+                    
+                    range.insertNode(span);
+                    
+                    // 커서를 span 안에 위치
+                    range.setStart(span.firstChild, 1);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    console.log('✅ 글자 크기 설정:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
             }
@@ -1070,47 +1085,12 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 타이핑 시 글자 크기 적용 - 자연스러운 방식
-            customEditor.addEventListener('input', function(e) {
-                // 문자 입력이고 글자 크기가 설정되어 있으면
-                if (e.data && currentFontSize) {
-                    setTimeout(() => {
-                        const selection = window.getSelection();
-                        if (selection.rangeCount > 0) {
-                            const range = selection.getRangeAt(0);
-                            const textNode = range.startContainer;
-                            
-                            // 현재 커서가 있는 텍스트 노드가 span 안에 있지 않다면
-                            if (textNode.nodeType === Node.TEXT_NODE) {
-                                const parent = textNode.parentElement;
-                                
-                                // customEditor 직속 자식이거나 스타일이 없는 span이라면
-                                if (parent === customEditor || !parent.style.fontSize) {
-                                    // 새 span을 만들어서 현재 위치부터 감싸기
-                                    const span = document.createElement('span');
-                                    span.style.fontSize = currentFontSize;
-                                    
-                                    // 현재 커서 위치 저장
-                                    const cursorOffset = range.startOffset;
-                                    
-                                    // 텍스트 노드를 span으로 감싸기
-                                    parent.insertBefore(span, textNode);
-                                    span.appendChild(textNode);
-                                    
-                                    // 커서 위치 복원
-                                    range.setStart(textNode, cursorOffset);
-                                    range.collapse(true);
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                    
-                                    console.log('✅ 글자 크기 적용:', currentFontSize);
-                                }
-                            }
-                        }
-                    }, 0);
+            // 키보드 이벤트만 처리 - 안전한 방식
+            customEditor.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace') {
+                    // 백스페이스 처리
+                    updateToolbarState();
                 }
-                
-                updateToolbarState();
                 console.log('=== INPUT 이벤트 완료 ===');
             });
 
