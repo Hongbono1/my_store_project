@@ -899,7 +899,7 @@
                 console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + '):', img);
             }
 
-            // 글자 크기 적용 - 기존 span 처리 개선
+            // 글자 크기 적용 - 단순하고 안전한 방식
             function applyFontSize(size) {
                 console.log('글자 크기 적용:', size);
                 
@@ -926,46 +926,9 @@
                     selection.addRange(range);
                     
                 } else {
-                    // 선택된 텍스트가 없는 경우
+                    // 선택된 텍스트가 없는 경우 - 단순히 변수만 설정
                     currentFontSize = size;
-                    const range = selection.getRangeAt(0);
-                    
-                    // 현재 커서가 span 안에 있는지 확인
-                    let currentSpan = null;
-                    let container = range.startContainer;
-                    
-                    // 부모 요소 중에서 fontSize가 설정된 span 찾기
-                    while (container && container !== editor) {
-                        if (container.nodeType === Node.ELEMENT_NODE && 
-                            container.tagName === 'SPAN' && 
-                            container.style.fontSize) {
-                            currentSpan = container;
-                            break;
-                        }
-                        container = container.parentNode;
-                    }
-                    
-                    if (currentSpan) {
-                        // 기존 span이 있으면 크기만 변경
-                        currentSpan.style.fontSize = size;
-                        console.log('✅ 기존 span 크기 변경:', size);
-                    } else {
-                        // 새로운 span 생성
-                        const span = document.createElement('span');
-                        span.style.fontSize = size;
-                        span.innerHTML = '&nbsp;';
-                        
-                        range.insertNode(span);
-                        
-                        // 커서를 span 안에 위치
-                        range.setStart(span.firstChild, 1);
-                        range.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        
-                        console.log('✅ 새 span 생성:', size);
-                    }
-                    
+                    console.log('✅ 다음 타이핑부터 글자 크기 적용:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
             }
@@ -1106,6 +1069,41 @@
                 console.log('글자색 초기화');
                 showStylePreview('글자색: 기본');
             }
+
+            // 타이핑 시 실시간 글자 크기 적용 - 안전한 방식
+            customEditor.addEventListener('input', function(e) {
+                // 한 글자씩 입력할 때만 처리 (복사/붙여넣기 제외)
+                if (e.inputType === 'insertText' && e.data && currentFontSize) {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const textNode = range.startContainer;
+                        
+                        // 방금 입력된 텍스트 노드가 span에 감싸져 있지 않다면
+                        if (textNode.nodeType === Node.TEXT_NODE && 
+                            textNode.parentElement === customEditor) {
+                            
+                            // 새 span으로 감싸기
+                            const span = document.createElement('span');
+                            span.style.fontSize = currentFontSize;
+                            
+                            // 텍스트 노드를 span으로 감싸기
+                            textNode.parentNode.insertBefore(span, textNode);
+                            span.appendChild(textNode);
+                            
+                            // 커서 위치 유지
+                            range.setStart(textNode, range.startOffset);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            console.log('✅ 타이핑한 글자에 크기 적용:', currentFontSize);
+                        }
+                    }
+                }
+                
+                updateToolbarState();
+            });
 
             // 키보드 이벤트만 처리 - 안전한 방식
             customEditor.addEventListener('keydown', function(e) {
