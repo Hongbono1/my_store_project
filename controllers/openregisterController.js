@@ -14,8 +14,6 @@ export async function createOpenRegister(req, res) {
             phone,
             description,
             address,
-            lat,
-            lng,
         } = req.body;
 
         // 필수값 검사
@@ -29,19 +27,16 @@ export async function createOpenRegister(req, res) {
             image_path = `/uploads/${path.basename(req.file.path)}`;
         }
 
-        // controllers/openregisterController.js
-
-        // DB 저장
+        // DB 저장 (위도/경도 제외)
         const result = await pool.query(
             `INSERT INTO open_stores
-  (store_name, open_date, category, phone, description, address, lat, lng, image_path, created_at)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+  (store_name, open_date, category, phone, description, address, image_path, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
   RETURNING id;`,
-            [store_name, open_date, category, phone, description, address, lat, lng, image_path]
+            [store_name, open_date, category, phone, description, address, image_path]
         );
 
-        console.log("🧾 INSERT DEBUG:", { store_name, open_date, category, phone, address, lat, lng });
-
+        console.log("🧾 INSERT DEBUG:", { store_name, open_date, category, phone, address });
 
         res.json({ success: true, id: result.rows[0].id });
     } catch (err) {
@@ -57,7 +52,7 @@ export async function getOpenRegisters(req, res) {
     try {
         const result = await pool.query(
             `
-      SELECT id, store_name, open_date, category, phone, description, address, lat, lng, image_path
+      SELECT id, store_name, open_date, category, phone, description, address, image_path
       FROM open_stores
       ORDER BY id DESC;
       `
@@ -77,7 +72,7 @@ export async function getOpenRegisterById(req, res) {
         const { id } = req.params;
         const result = await pool.query(
             `
-      SELECT id, store_name, open_date, category, phone, description, address, lat, lng, image_path
+      SELECT id, store_name, open_date, category, phone, description, address, image_path
       FROM open_stores
       WHERE id=$1;
       `,

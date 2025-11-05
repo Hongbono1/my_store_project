@@ -50,7 +50,7 @@ router.post("/", upload.single("img"), async (req, res) => {
          imagePath
       });
 
-      // PostgreSQL 저장
+      // PostgreSQL 저장 (위도/경도 제외)
       const result = await pool.query(
          `INSERT INTO open_stores 
           (store_name, open_date, category, phone, description, address, image_path, created_at)
@@ -80,7 +80,7 @@ router.post("/", upload.single("img"), async (req, res) => {
    }
 });
 
-// ✅ 오픈예정 전체 조회 API
+// ✅ 오픈예정 전체 조회 API (위도/경도 제외)
 router.get("/", async (req, res) => {
    try {
       const result = await pool.query(
@@ -96,7 +96,7 @@ router.get("/", async (req, res) => {
    }
 });
 
-// ✅ 단일 조회 API
+// ✅ 단일 조회 API (위도/경도 제외)
 router.get("/:id", async (req, res) => {
    try {
       const { id } = req.params;
