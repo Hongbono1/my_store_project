@@ -899,7 +899,7 @@
                 console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + '):', img);
             }
 
-            // 글자 크기 적용 - 안전한 방식
+            // 글자 크기 적용 - 기존 span 처리 개선
             function applyFontSize(size) {
                 console.log('글자 크기 적용:', size);
                 
@@ -926,24 +926,46 @@
                     selection.addRange(range);
                     
                 } else {
-                    // 선택된 텍스트가 없는 경우 - 다음 타이핑을 위해 설정
+                    // 선택된 텍스트가 없는 경우
                     currentFontSize = size;
-                    
-                    // 미리 span을 생성해서 커서를 그 안에 위치시키기
                     const range = selection.getRangeAt(0);
-                    const span = document.createElement('span');
-                    span.style.fontSize = size;
-                    span.innerHTML = '&nbsp;'; // 공백으로 span 활성화
                     
-                    range.insertNode(span);
+                    // 현재 커서가 span 안에 있는지 확인
+                    let currentSpan = null;
+                    let container = range.startContainer;
                     
-                    // 커서를 span 안에 위치
-                    range.setStart(span.firstChild, 1);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
+                    // 부모 요소 중에서 fontSize가 설정된 span 찾기
+                    while (container && container !== editor) {
+                        if (container.nodeType === Node.ELEMENT_NODE && 
+                            container.tagName === 'SPAN' && 
+                            container.style.fontSize) {
+                            currentSpan = container;
+                            break;
+                        }
+                        container = container.parentNode;
+                    }
                     
-                    console.log('✅ 글자 크기 설정:', size);
+                    if (currentSpan) {
+                        // 기존 span이 있으면 크기만 변경
+                        currentSpan.style.fontSize = size;
+                        console.log('✅ 기존 span 크기 변경:', size);
+                    } else {
+                        // 새로운 span 생성
+                        const span = document.createElement('span');
+                        span.style.fontSize = size;
+                        span.innerHTML = '&nbsp;';
+                        
+                        range.insertNode(span);
+                        
+                        // 커서를 span 안에 위치
+                        range.setStart(span.firstChild, 1);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        
+                        console.log('✅ 새 span 생성:', size);
+                    }
+                    
                     showStylePreview('글자 크기: ' + size);
                 }
             }
