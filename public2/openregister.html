@@ -899,68 +899,38 @@
                 console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + '):', img);
             }
 
-            // 글자 크기 적용 - 개별 텍스트만 적용되는 방식
-            // 글자 크기 적용 - execCommand 방식으로 즉시 적용
+            // 글자 크기 적용 - 즉시 반영되는 간단한 방식
             function applyFontSize(size) {
-                console.log('=== 글자 크기 적용 시작 ===');
-                console.log('요청된 크기:', size);
+                console.log('글자 크기 적용:', size);
                 
                 const editor = document.getElementById('customEditor');
                 editor.focus();
                 
                 const selection = window.getSelection();
-                console.log('선택 상태:', selection.toString());
-                
-                if (selection.rangeCount === 0) {
-                    console.log('❌ 선택 범위가 없습니다.');
-                    return;
-                }
+                if (selection.rangeCount === 0) return;
                 
                 if (!selection.isCollapsed) {
-                    // 텍스트가 선택된 경우 - 선택된 부분만 크기 변경
-                    console.log('✅ 선택된 텍스트에만 적용');
-                    const selectedText = selection.toString();
-                    
-                    const newSpan = document.createElement('span');
-                    newSpan.style.fontSize = size;
-                    newSpan.textContent = selectedText;
-                    
-                    const range = selection.getRangeAt(0);
-                    range.deleteContents();
-                    range.insertNode(newSpan);
-                    
-                    // 커서를 span 뒤로 이동
-                    range.setStartAfter(newSpan);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    
-                    console.log('✅ 선택된 텍스트만 크기 변경 완료');
-                    
-                } else {
-                    // 텍스트가 선택되지 않은 경우 - 즉시 적용되는 방식
-                    console.log('🔄 실시간 글자 크기 적용');
-                    currentFontSize = size;
-                    
-                    // 현재 커서 위치에 스타일이 적용된 span 생성하고 즉시 입력 가능하게 설정
+                    // 선택된 텍스트가 있는 경우
                     const range = selection.getRangeAt(0);
                     const span = document.createElement('span');
                     span.style.fontSize = size;
-                    span.innerHTML = '&#8203;'; // Zero-width space로 span을 활성화
+                    span.textContent = selection.toString();
                     
+                    range.deleteContents();
                     range.insertNode(span);
                     
-                    // 커서를 span 끝으로 이동해서 바로 타이핑 가능하게
-                    range.setStart(span.firstChild, 1);
+                    // 커서를 span 뒤로 이동
+                    range.setStartAfter(span);
                     range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
                     
-                    console.log('✅ 실시간 글자 크기 설정 완료:', size);
+                } else {
+                    // 선택된 텍스트가 없는 경우 - 다음 타이핑을 위해 설정
+                    currentFontSize = size;
+                    console.log('✅ 다음 타이핑부터 적용할 글자 크기:', size);
                     showStylePreview('글자 크기: ' + size);
                 }
-                
-                console.log('=== 글자 크기 적용 완료 ===');
             }
 
             // 글자색 적용
@@ -1100,39 +1070,36 @@
                 showStylePreview('글자색: 기본');
             }
 
-            // 키보드 입력 감지 - marker 기반 스타일 적용
-            // 키보드 입력 감지 - 실시간 스타일 적용
+            // 타이핑 시 글자 크기 즉시 적용
             customEditor.addEventListener('input', function(e) {
-                console.log('=== INPUT 이벤트 ===');
-                console.log('입력된 데이터:', e.data);
-                
-                // 새로 입력된 문자가 있을 때만 처리
+                // 문자 입력이고 글자 크기가 설정되어 있으면
                 if (e.data && currentFontSize) {
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
-                        const container = range.startContainer;
+                        const textNode = range.startContainer;
                         
-                        // 현재 입력 중인 텍스트 노드가 span 안에 있지 않다면 래핑
-                        if (container.nodeType === Node.TEXT_NODE && 
-                            (!container.parentElement || !container.parentElement.style.fontSize)) {
+                        // 새로 입력된 문자가 있고, span에 감싸지지 않은 경우
+                        if (textNode.nodeType === Node.TEXT_NODE) {
+                            const parent = textNode.parentElement;
                             
-                            console.log('✅ 새 입력 텍스트에 글자 크기 적용:', currentFontSize);
-                            
-                            // 현재 텍스트 노드를 span으로 래핑
-                            const span = document.createElement('span');
-                            span.style.fontSize = currentFontSize;
-                            
-                            // 텍스트 노드를 span으로 감싸기
-                            const parent = container.parentNode;
-                            parent.insertBefore(span, container);
-                            span.appendChild(container);
-                            
-                            // 커서 위치 복원
-                            range.setStart(container, range.startOffset);
-                            range.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
+                            // 이미 스타일이 적용된 span이 아니라면 새로 감싸기
+                            if (!parent.style.fontSize || parent.style.fontSize !== currentFontSize) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = currentFontSize;
+                                
+                                // 텍스트 노드를 새 span으로 감싸기
+                                textNode.parentNode.insertBefore(span, textNode);
+                                span.appendChild(textNode);
+                                
+                                // 커서 위치 유지
+                                range.setStart(textNode, range.startOffset);
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                console.log('✅ 타이핑 중 글자 크기 즉시 적용:', currentFontSize);
+                            }
                         }
                     }
                 }
@@ -1141,7 +1108,7 @@
                 console.log('=== INPUT 이벤트 완료 ===');
             });
 
-            // 키 입력 이벤트 처리 - Enter 키와 스타일 연속성
+            // Enter 키 처리 - 글자 크기 유지
             customEditor.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -1149,28 +1116,28 @@
                     const selection = window.getSelection();
                     const range = selection.getRangeAt(0);
                     
-                    // 새 줄 생성
+                    // 줄바꿈 추가
                     const br = document.createElement('br');
                     range.insertNode(br);
                     
-                    // 현재 글자 크기가 설정되어 있다면 새 줄에도 적용
+                    // 글자 크기가 있으면 새 줄에도 적용
                     if (currentFontSize) {
-                        const newSpan = document.createElement('span');
-                        newSpan.style.fontSize = currentFontSize;
-                        newSpan.innerHTML = '&#8203;'; // Zero-width space
+                        const span = document.createElement('span');
+                        span.style.fontSize = currentFontSize;
+                        span.textContent = '';
                         
                         range.setStartAfter(br);
-                        range.insertNode(newSpan);
+                        range.insertNode(span);
                         
-                        // 커서를 새 span 끝으로 이동
-                        range.setStart(newSpan.firstChild, 1);
+                        // 커서를 새 span 안으로
+                        range.setStart(span, 0);
                         range.collapse(true);
                         selection.removeAllRanges();
                         selection.addRange(range);
                         
-                        console.log('✅ Enter: 새 줄에 글자 크기 유지:', currentFontSize);
+                        console.log('새 줄에 글자 크기 유지:', currentFontSize);
                     } else {
-                        // 글자 크기가 없으면 br 뒤로 커서 이동
+                        // 글자 크기 없으면 br 뒤로
                         range.setStartAfter(br);
                         range.collapse(true);
                         selection.removeAllRanges();
