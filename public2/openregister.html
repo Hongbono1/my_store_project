@@ -710,6 +710,61 @@
         let currentFontSize = null;
         let currentTextColor = null;
 
+        // 커서 튐 방지: 에디터가 실제로 포커스된 경우에만 포커스 유지
+        function focusIfEditor() {
+            if (document.activeElement === customEditor) return true;
+            return false;
+        }
+
+        // 유틸리티 함수들
+        function unwrapInlineStyle(styleName) {
+            // 에디터 내 해당 styleName을 가진 span을 모두 순회하며 스타일만 제거
+            const spans = customEditor.querySelectorAll('span[style]');
+            spans.forEach(s => {
+                const style = s.getAttribute('style');
+                if (!style) return;
+                const newStyle = style
+                    .split(';')
+                    .map(v => v.trim())
+                    .filter(Boolean)
+                    .filter(rule => rule.split(':')[0].trim() !== styleName)
+                    .join('; ');
+                if (newStyle) {
+                    s.setAttribute('style', newStyle);
+                } else {
+                    // 스타일이 사라지면 span을 해제
+                    while (s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
+                    s.remove();
+                }
+            });
+        }
+
+        function removeTypingSpan() {
+            customEditor.querySelectorAll('span[data-typing-span="1"]').forEach(s => {
+                if (!s.textContent) { s.remove(); return; }
+                s.removeAttribute('data-typing-span');
+            });
+        }
+
+        function removeTypingSpanIfEmpty() {
+            customEditor.querySelectorAll('span[data-typing-span="1"]').forEach(s => {
+                if (!s.textContent || /^\s*$/.test(s.textContent)) s.remove();
+            });
+        }
+
+        function placeCaretAtEnd(el) {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        }
+
         // 에디터 초기화
         document.addEventListener("DOMContentLoaded", function () {
             customEditor = document.getElementById('customEditor');
@@ -719,15 +774,12 @@
 
             // 기본 툴바 이벤트 처리
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
+                btn.addEventListener('click', function (e) {
+                    // 클릭 후 사용자가 다른 인풋으로 이동해도 커서가 튀지 않도록
+                    if (!focusIfEditor()) customEditor.focus();  // 툴바를 눌렀을 때만 에디터 포커스
                     const action = this.getAttribute('data-action');
-
-                    // 목록 처리
-                    if (action === 'ul' || action === 'ol') {
-                        applyListFormat(action);
-                    } else {
-                        applyFormat(action);
-                    }
+                    if (action === 'ul' || action === 'ol') applyListFormat(action);
+                    else applyFormat(action);
                     updateToolbarState();
                 });
             });
@@ -792,32 +844,32 @@
 
             // 기본 서식 적용 함수
             function applyFormat(command) {
-                customEditor.focus();
+                if (!focusIfEditor()) return;
                 document.execCommand(command, false, null);
             }
 
             // 제목 적용
             function applyHeading(tag) {
-                customEditor.focus();
+                if (!focusIfEditor()) return;
                 document.execCommand('formatBlock', false, tag);
             }
 
             // 제목 제거
             function removeHeading() {
-                customEditor.focus();
+                if (!focusIfEditor()) return;
                 document.execCommand('formatBlock', false, 'p');
             }
 
             // 텍스트 정렬
             function applyTextAlign(alignment) {
-                customEditor.focus();
+                if (!focusIfEditor()) return;
                 document.execCommand('justify' + alignment.charAt(0).toUpperCase() + alignment.slice(1), false, null);
             }
 
             // 목록 처리 함수
             function applyListFormat(listType) {
                 console.log('목록 적용:', listType);
-                customEditor.focus();
+                if (!focusIfEditor()) return;
 
                 if (listType === 'ul') {
                     document.execCommand('insertUnorderedList', false, null);
@@ -879,86 +931,122 @@
 
             // 이미지 정렬 옵션 표시
             function showImageAlignOptions(imagePath) {
-                // 정렬 선택 팝업 생성
+                console.log('🖼️ [Popup] 이미지 옵션 팝업 오픈:', imagePath);
+
                 const popup = document.createElement('div');
                 popup.style.cssText = `
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    background: white;
-                    border: 1px solid #ddd;
-                    border-radius: 8px;
-                    padding: 20px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    z-index: 1000;
-                `;
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; border: 1px solid #ddd; border-radius: 10px; padding: 18px 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.12); z-index: 1000; min-width: 320px;
+  `;
 
                 popup.innerHTML = `
-                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">이미지 정렬 선택</h3>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <button id="alignLeft" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">← 왼쪽</button>
-                        <button id="alignCenter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">↔ 가운데</button>
-                        <button id="alignRight" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">→ 오른쪽</button>
-                    </div>
-                    <button id="cancelAlign" style="padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; float: right;">취소</button>
-                `;
+    <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700;">이미지 옵션</h3>
+
+    <div style="font-size:12px; color:#555; margin-bottom:6px;">정렬</div>
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button data-align="left"   class="opt-btn">← 왼쪽</button>
+      <button data-align="center" class="opt-btn">↔ 가운데</button>
+      <button data-align="right"  class="opt-btn">→ 오른쪽</button>
+    </div>
+
+    <div style="font-size:12px; color:#555; margin-bottom:6px;">크기</div>
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button data-size="full"  class="opt-btn">본문 가득</button>
+      <button data-size="side"  class="opt-btn">사이드</button>
+      <button data-size="thumb" class="opt-btn">썸네일</button>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button id="confirmInsert" class="opt-cta">삽입</button>
+      <button id="cancelAlign"   class="opt-ghost">취소</button>
+    </div>
+  `;
+
+                // 버튼 스타일
+                popup.querySelectorAll('.opt-btn').forEach(b => {
+                    b.style.cssText = `padding:8px 12px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:white;`;
+                });
+                popup.querySelectorAll('.opt-cta, .opt-ghost').forEach(b => {
+                    b.style.cssText = `padding:8px 14px; border-radius:6px; cursor:pointer;`;
+                });
+                popup.querySelector('#confirmInsert').style.background = '#2563eb';
+                popup.querySelector('#confirmInsert').style.color = '#fff';
+                popup.querySelector('#confirmInsert').style.border = '1px solid #1d4ed8';
+                popup.querySelector('#cancelAlign').style.background = '#fff';
+                popup.querySelector('#cancelAlign').style.border = '1px solid #ddd';
 
                 document.body.appendChild(popup);
 
-                // 정렬 버튼 이벤트
-                popup.querySelector('#alignLeft').onclick = () => {
-                    insertImageToEditor(imagePath, 'left');
+                let chosen = { align: 'left', size: 'full' };
+                console.log('⚙️ [Popup] 초기 선택값:', chosen);
+
+                popup.querySelectorAll('[data-align]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        chosen.align = btn.getAttribute('data-align');
+                        popup.querySelectorAll('[data-align]').forEach(b => b.style.outline = 'none');
+                        btn.style.outline = '2px solid #2563eb';
+                        console.log('↔ [Popup] 정렬 선택:', chosen.align);
+                    });
+                });
+
+                popup.querySelectorAll('[data-size]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        chosen.size = btn.getAttribute('data-size');
+                        popup.querySelectorAll('[data-size]').forEach(b => b.style.outline = 'none');
+                        btn.style.outline = '2px solid #2563eb';
+                        console.log('🧩 [Popup] 크기 프리셋 선택:', chosen.size);
+                    });
+                });
+
+                popup.querySelector('#confirmInsert').onclick = () => {
+                    console.log('✅ [Popup] 삽입 실행 with:', chosen, 'imagePath:', imagePath);
+                    insertImageToEditor(imagePath, chosen.align, chosen.size);
                     document.body.removeChild(popup);
                 };
-                popup.querySelector('#alignCenter').onclick = () => {
-                    insertImageToEditor(imagePath, 'center');
-                    document.body.removeChild(popup);
-                };
-                popup.querySelector('#alignRight').onclick = () => {
-                    insertImageToEditor(imagePath, 'right');
-                    document.body.removeChild(popup);
-                };
+
                 popup.querySelector('#cancelAlign').onclick = () => {
+                    console.log('🚫 [Popup] 취소');
                     document.body.removeChild(popup);
                 };
             }
 
             // 에디터에 이미지 삽입 (정렬 지원) - 상대 경로 사용
-            function insertImageToEditor(imagePath, alignment = 'left') {
-                console.log('🖼️ 이미지 삽입 시작:', imagePath, '정렬:', alignment);
-                customEditor.focus();
+            function insertImageToEditor(imagePath, alignment = 'left', size = 'full') {
+                console.log('🖼️ [Insert] 이미지 삽입 시작:', { imagePath, alignment, size });
 
+                if (!focusIfEditor()) customEditor.focus();
                 const selection = window.getSelection();
+                if (!selection.rangeCount) {
+                    console.warn('⚠️ [Insert] range 없음. 커서가 에디터 안에 있는지 확인 필요');
+                    return;
+                }
                 const range = selection.getRangeAt(0);
 
-                // img 태그 생성
                 const img = document.createElement('img');
 
-                // 현재 접속 환경에 맞는 URL 생성
-                console.log('🌐 현재 location:', window.location.href);
-                console.log('🌐 현재 host:', window.location.host);
-
-                // 환경에 따른 이미지 URL 설정
-                let imageUrl;
-                if (window.location.host === 'localhost:3000') {
-                    // 로컬 개발 환경
-                    imageUrl = 'http://localhost:3000' + imagePath;
-                } else {
-                    // 배포 환경 (hongbono1.com)
-                    imageUrl = window.location.origin + imagePath;
-                }
+                // 환경별 URL 구성
+                const imageUrl = (window.location.host === 'localhost:3000')
+                    ? ('http://localhost:3000' + imagePath)
+                    : (window.location.origin + imagePath);
 
                 img.src = imageUrl;
-                console.log('🔗 설정된 이미지 URL:', imageUrl);
+                console.log('🔗 [Insert] 설정된 이미지 URL:', imageUrl);
 
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
+                // 👉 크기 프리셋 적용 (CSS: .img-full / .img-side / .img-thumb 사용)
+                img.classList.remove('img-full', 'img-side', 'img-thumb');
+                const presetClass = (size === 'side') ? 'img-side' : (size === 'thumb' ? 'img-thumb' : 'img-full');
+                img.classList.add(presetClass);
+                console.log('🧩 [Insert] 적용된 프리셋 클래스:', presetClass);
+
+                // 공통 스타일
                 img.style.margin = '10px 0';
                 img.style.borderRadius = '4px';
                 img.style.border = '1px solid #ddd';
 
                 // 정렬 적용
+                img.style.display = '';
+                img.style.float = '';
                 if (alignment === 'center') {
                     img.style.display = 'block';
                     img.style.marginLeft = 'auto';
@@ -966,158 +1054,109 @@
                 } else if (alignment === 'right') {
                     img.style.float = 'right';
                     img.style.marginLeft = '10px';
-                } else { // left
+                } else {
                     img.style.float = 'left';
                     img.style.marginRight = '10px';
                 }
+                console.log('↔ [Insert] 정렬 스타일 적용:', alignment);
 
-                // 이미지 로드 이벤트 추가
+                // 로드/에러 핸들러
                 img.onload = function () {
-                    console.log('✅ 이미지 로드 성공:', imageUrl);
+                    console.log('✅ [Insert] 이미지 로드 성공:', this.src, `(w:${this.naturalWidth}, h:${this.naturalHeight})`);
                 };
                 img.onerror = function () {
-                    console.error('❌ 이미지 로드 실패:', imageUrl);
-                    console.error('❌ 원본 경로:', imagePath);
-
-                    // 상대 경로로 재시도
-                    if (this.src !== imagePath) {
-                        console.log('🔄 상대 경로로 재시도:', imagePath);
+                    if (this.dataset.retried !== '1') {
+                        console.warn('🔄 [Insert] 최초 로드 실패, 상대경로 재시도:', imagePath);
+                        this.dataset.retried = '1';
                         this.src = imagePath;
+                    } else {
+                        console.error('❌ [Insert] 이미지 로드 최종 실패:', this.src);
                     }
                 };
-                img.onerror = function () {
-                    console.error('❌ 이미지 로드 실패:', imagePath);
-                    console.error('❌ 실제 src:', this.src);
-                    console.error('❌ 완전한 URL:', this.src);
-                };
 
-                // 현재 위치에 이미지 삽입
+                // 삽입 & 커서 복원
                 range.insertNode(img);
-
-                // 커서를 이미지 뒤로 이동
                 range.setStartAfter(img);
                 range.collapse(true);
                 selection.removeAllRanges();
                 selection.addRange(range);
 
-                console.log('✅ 이미지가 에디터에 삽입됨 (정렬: ' + alignment + ')');
-                console.log('🔗 이미지 경로:', imagePath);
+                console.log('🎯 [Insert] 이미지 삽입 완료');
             }
 
             // 글자 크기 적용 - 매우 간단한 방식
             // ✨ 커서/선택 상태에 즉시 적용되는 글자 크기 함수 (교체)
-            function applyFontSize(size) {
-                const editor = document.getElementById('customEditor');
-                editor.focus();
+            // 1) execCommand는 1~7 사이즈만 지원 → px 변환을 위해 insertHTML로 직접 래핑
+            // 2) selection이 없으면 "다음 입력"을 위해 data-typing-span을 삽입하지만 ZWSP 없음
+            function applyFontSize(sizePx) {
+                if (!focusIfEditor()) return;
+
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+
+                // 리셋
+                if (!sizePx || sizePx === 'reset') {
+                    currentFontSize = null;
+                    unwrapInlineStyle('font-size'); // 아래 유틸 참고
+                    showStylePreview('글자 크기: 기본');
+                    return;
+                }
+
+                const range = sel.getRangeAt(0);
+
+                // 선택된 텍스트가 있는 경우: 선택 범위만 래핑
+                if (!sel.isCollapsed) {
+                    const html = `<span style="font-size:${sizePx}">${range.toString()}</span>`;
+                    document.execCommand('insertHTML', false, html);
+                } else {
+                    // 선택이 없는 경우: 다음 입력에 적용할 타이핑 스팬 배치
+                    const html = `<span data-typing-span="1" style="font-size:${sizePx}"></span>`;
+                    document.execCommand('insertHTML', false, html);
+
+                    // 커서를 스팬 끝으로 이동
+                    const node = customEditor.querySelector('span[data-typing-span="1"]');
+                    if (node) placeCaretAtEnd(node);
+                }
+
+                currentFontSize = sizePx;
+                showStylePreview('글자 크기: ' + sizePx);
+            }
+
+            // 글자색 적용
+            function applyTextColor(color) {
+                if (!focusIfEditor()) return;
+
+                // 리셋
+                if (!color || color === 'reset') {
+                    currentTextColor = null;
+                    unwrapInlineStyle('color');
+                    removeTypingSpan();
+                    showStylePreview('글자색: 기본');
+                    return;
+                }
 
                 const sel = window.getSelection();
                 if (!sel.rangeCount) return;
                 const range = sel.getRangeAt(0);
 
-                // 리셋
-                if (!size || size === 'reset') {
-                    currentFontSize = null;
-                    document.execCommand('removeFormat', false, null);
-                    return;
-                }
-
-                // 1) 선택된 텍스트가 있으면 그 범위를 감쌈
                 if (!sel.isCollapsed) {
-                    const span = document.createElement('span');
-                    span.style.fontSize = size;
-                    try {
-                        range.surroundContents(span);
-                    } catch (e) {
-                        // surroundContents가 분할 불가 노드에 걸릴 수 있어 fallback
-                        const frag = range.extractContents();
-                        span.appendChild(frag);
-                        range.insertNode(span);
-                        sel.removeAllRanges();
-                        const after = document.createRange();
-                        after.setStartAfter(span);
-                        after.collapse(true);
-                        sel.addRange(after);
-                    }
-                    currentFontSize = size;
-                    return;
-                }
-
-                // 2) 선택이 없고 커서만 깜빡이면: 커서 위치에 스타일 span 삽입
-                const span = document.createElement('span');
-                span.style.fontSize = size;
-
-                // 입력 시작 지점을 만들기 위해 zero-width space 추가
-                const zwsp = document.createTextNode('\u200B');
-                span.appendChild(zwsp);
-
-                // 현재 커서 위치에 삽입
-                range.insertNode(span);
-
-                // 커서를 span 내부(zwsp 뒤)로 이동
-                const newRange = document.createRange();
-                newRange.setStart(zwsp, 1);
-                newRange.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(newRange);
-
-                currentFontSize = size;
-
-                console.log('✅ 다음 타이핑부터 적용할 글자 크기:', size);
-                showStylePreview('글자 크기: ' + size);
-            }
-
-            // 글자색 적용
-            function applyTextColor(color) {
-                customEditor.focus();
-                const selection = window.getSelection();
-
-                if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                    // 1. 텍스트가 선택된 경우 - 선택된 텍스트에 적용
-                    const range = selection.getRangeAt(0);
-                    const selectedText = selection.toString();
-
-                    range.deleteContents();
-
-                    const span = document.createElement('span');
-                    span.style.color = color;
-                    span.textContent = selectedText;
-
-                    range.insertNode(span);
-
-                    range.setStartAfter(span);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-
-                    console.log('선택된 텍스트에 글자색 적용:', color);
+                    const html = `<span style="color:${color}">${escapeHtml(range.toString())}</span>`;
+                    document.execCommand('insertHTML', false, html);
                 } else {
-                    // 2. 텍스트가 선택되지 않은 경우 - 앞으로 입력할 텍스트에 적용
-                    currentTextColor = color;
-
-                    // 현재 커서 위치에 스타일이 적용된 span 삽입
-                    const span = document.createElement('span');
-                    span.style.color = color;
-                    span.setAttribute('data-typing-style', 'true');
-
-                    const range = selection.getRangeAt(0);
-                    range.insertNode(span);
-
-                    // 커서를 span 안으로 이동
-                    range.setStart(span, 0);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-
-                    console.log('앞으로 입력할 텍스트 색상 설정:', color);
-
-                    const colorName = getColorName(color);
-                    showStylePreview('글자색: ' + colorName);
+                    // 다음 입력에 적용
+                    const html = `<span data-typing-span="1" style="color:${color}"></span>`;
+                    document.execCommand('insertHTML', false, html);
+                    const node = customEditor.querySelector('span[data-typing-span="1"]');
+                    if (node) placeCaretAtEnd(node);
                 }
+
+                currentTextColor = color;
+                showStylePreview('글자색: ' + getColorName(color));
             }
 
             // 특수문자 삽입
             function insertCharacter(char) {
-                customEditor.focus();
+                if (!focusIfEditor()) return;
                 document.execCommand('insertText', false, char);
             }
 
@@ -1184,22 +1223,18 @@
 
             // 글자 크기 리셋
             function resetFontSize() {
-                console.log('🔄 글자 크기 초기화');
-                const editor = document.getElementById('customEditor');
-                editor.focus();
                 currentFontSize = null;
-
-                // 기존 방식 제거 - 에디터 전체 스타일 변경하지 않음
-                console.log('✅ 글자크기 초기화 완료 (기존 텍스트는 유지)');
+                unwrapInlineStyle('font-size'); // 모든 font-size 인라인 제거
+                removeTypingSpan();
                 showStylePreview('글자 크기: 기본');
             }
 
+
             // 글자색 리셋
             function resetTextColor() {
-                customEditor.focus();
                 currentTextColor = null;
-                document.execCommand('foreColor', false, '#000000'); // 기본 검정색
-                console.log('글자색 초기화');
+                unwrapInlineStyle('color');   // 실제로 컬러 span 제거
+                removeTypingSpan();
                 showStylePreview('글자색: 기본');
             }
 
@@ -1243,79 +1278,49 @@
                 }
             });
 
-            // 키보드 이벤트 처리
-            customEditor.addEventListener('keydown', function (e) {
-                if (e.key === 'Backspace') {
-                    // 백스페이스 처리
-                    updateToolbarState();
-                }
-                console.log('=== INPUT 이벤트 완료 ===');
-            });
+        // 키보드 이벤트 처리
+        customEditor.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace') {
+                // 백스페이스 처리
+                updateToolbarState();
+            }
+            console.log('=== INPUT 이벤트 완료 ===');
+        });
 
-            // Enter 키 처리 - 글자 크기 유지
-            // ✨ Enter 시에도 현재 폰트 크기 이어받기 (교체/정리)
-            customEditor.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
+        // Enter 키 처리 간소화
+        // 보통 contenteditable에서는 Enter 기본 동작을 유지하는 편이 안정적
+        customEditor.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && document.activeElement === customEditor) {
+                // 기본 동작 허용
+                // 단, 타이핑 스팬이 있으면 block 경계에서 깨끗하게 빠지도록 제거
+                removeTypingSpanIfEmpty();
+            }
+        });
 
-                    const sel = window.getSelection();
-                    if (!sel.rangeCount) return;
-                    const range = sel.getRangeAt(0);
+        // 블러 시 잔여 타이핑 스팬/빈 스타일 제거
+        customEditor.addEventListener('blur', () => {
+            removeTypingSpanIfEmpty();
+        });
 
-                    // 줄바꿈
-                    const br = document.createElement('br');
-                    range.insertNode(br);
+        // 전체 스타일 초기화 (전역 함수)
+        function resetAllStyles() {
+            currentFontSize = null;
+            currentTextColor = null;
 
-                    // 커서를 br 뒤로
-                    range.setStartAfter(br);
-                    range.collapse(true);
+            const editor = document.getElementById('customEditor');
+            editor.focus();
 
-                    // 현재 폰트 크기가 있으면 다음 입력을 위한 span 삽입
-                    if (currentFontSize) {
-                        const span = document.createElement('span');
-                        span.style.fontSize = currentFontSize;
+            // 모든 서식 제거
+            document.execCommand('removeFormat', false, null);
+            document.execCommand('fontSize', false, '3');
+            document.execCommand('foreColor', false, '#000000');
 
-                        // 타이핑 시작 지점
-                        const zwsp = document.createTextNode('\u200B');
-                        span.appendChild(zwsp);
+            console.log('모든 스타일 초기화');
 
-                        range.insertNode(span);
-
-                        const newRange = document.createRange();
-                        newRange.setStart(zwsp, 1);
-                        newRange.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(newRange);
-                    } else {
-                        // 크기 지정이 없으면 그냥 커서만 이동 유지
-                        const newRange = document.createRange();
-                        newRange.setStartAfter(br);
-                        newRange.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(newRange);
-                    }
-                }
-            });
-
-            // 전체 스타일 초기화 (전역 함수)
-            function resetAllStyles() {
-                currentFontSize = null;
-                currentTextColor = null;
-
-                const editor = document.getElementById('customEditor');
-                editor.focus();
-
-                // 모든 서식 제거
-                document.execCommand('removeFormat', false, null);
-                document.execCommand('fontSize', false, '3');
-                document.execCommand('foreColor', false, '#000000');
-
-                console.log('모든 스타일 초기화');
-
-                // 피드백 표시
-                const preview = document.createElement('div');
-                preview.textContent = '모든 스타일이 초기화되었습니다';
-                preview.style.cssText = `
+            // 피드백 표시
+            const preview = document.createElement('div');
+            preview.textContent = '모든 스타일이 초기화되었습니다';
+            preview.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
@@ -1328,9 +1333,9 @@
                 animation: fadeInOut 3s ease-in-out;
             `;
 
-                document.body.appendChild(preview);
-                setTimeout(() => preview.remove(), 3000);
-            }
+            document.body.appendChild(preview);
+            setTimeout(() => preview.remove(), 3000);
+        }
 
         });  // DOMContentLoaded 이벤트 리스너 닫기
 
