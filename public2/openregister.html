@@ -313,164 +313,296 @@
             <div class="mt-6">
               <label for="customEditor" class="block font-semibold mb-2">설명(소개)</label>
               
-              <!-- ✅ 에디터 툴바 (설명 영역 위에 배치) -->
-              <div class="k-toolbar mb-2" id="k-toolbar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:12px;background:#f7f7fa;border:1px solid #e5e7eb;border-radius:12px 12px 0 0;">
-                <button type="button" id="btn-bold" data-cmd="bold"><b>굵게</b></button>
-                <button type="button" id="btn-italic" data-cmd="italic"><i>기울임</i></button>
-                <button type="button" id="btn-underline" data-cmd="underline"><u>밑줄</u></button>
-
-                <button type="button" id="btn-justifyLeft" data-cmd="justifyLeft">좌</button>
-                <button type="button" id="btn-justifyCenter" data-cmd="justifyCenter">중</button>
-                <button type="button" id="btn-justifyRight" data-cmd="justifyRight">우</button>
-
-                <button type="button" id="btn-unorderedList" data-cmd="insertUnorderedList">● 목록</button>
-                <button type="button" id="btn-orderedList" data-cmd="insertOrderedList">1. 목록</button>
-
-                <select id="font-size-selector">
-                  <option value="">글자 크기</option>
-                  <option value="14px">14</option>
-                  <option value="16px">16</option>
-                  <option value="18px">18</option>
-                  <option value="20px">20</option>
-                  <option value="24px">24</option>
-                  <option value="28px">28</option>
-                </select>
-
-                <input type="color" id="font-color-picker" title="글자색" />
-                <input type="file" id="image-input" accept="image/*" style="display:none" />
-                <button type="button" id="btn-image">이미지</button>
+              <!-- 새로운 마이크로 에디터 툴바 -->
+              <div id="editor-toolbar" style="border: 1px solid #e5e7eb; border-radius: 8px 8px 0 0; background: #f8fafc; padding: 8px; display: flex; gap: 8px; align-items: center;">
+                <div class="toolbar-group">
+                  <button type="button" class="format-btn" data-format="bold" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;"><b>B</b></button>
+                  <button type="button" class="format-btn" data-format="italic" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;"><i>I</i></button>
+                  <button type="button" class="format-btn" data-format="underline" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;"><u>U</u></button>
+                </div>
+                
+                <div class="toolbar-group">
+                  <button type="button" class="format-btn" data-format="alignLeft" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">◄</button>
+                  <button type="button" class="format-btn" data-format="alignCenter" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">◆</button>
+                  <button type="button" class="format-btn" data-format="alignRight" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">►</button>
+                </div>
+                
+                <div class="toolbar-group">
+                  <button type="button" class="format-btn" data-format="bulletList" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">• 목록</button>
+                  <button type="button" class="format-btn" data-format="numberList" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">1. 목록</button>
+                </div>
+                
+                <div class="toolbar-group">
+                  <div class="color-chips" style="display: flex; gap: 4px;">
+                    <div class="color-chip" data-color="#000000" style="width: 16px; height: 16px; background: #000000; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;"></div>
+                    <div class="color-chip" data-color="#dc2626" style="width: 16px; height: 16px; background: #dc2626; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;"></div>
+                    <div class="color-chip" data-color="#16a34a" style="width: 16px; height: 16px; background: #16a34a; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;"></div>
+                    <div class="color-chip" data-color="#2563eb" style="width: 16px; height: 16px; background: #2563eb; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;"></div>
+                    <div class="color-chip" data-color="#ca8a04" style="width: 16px; height: 16px; background: #ca8a04; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;"></div>
+                  </div>
+                </div>
+                
+                <div class="toolbar-group">
+                  <select id="fontSize" style="padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="">크기</option>
+                    <option value="small">소</option>
+                    <option value="medium">중</option>
+                    <option value="large">대</option>
+                  </select>
+                </div>
               </div>
 
 <script>
-(function () {
-  'use strict';
-
-  const editor  = document.getElementById('customEditor');
-  const toolbar = document.getElementById('k-toolbar');
-  const fsSel   = document.getElementById('font-size-selector');
-  const color   = document.getElementById('font-color-picker');
-  const imgIn   = document.getElementById('image-input');
-  const imgBtn  = document.getElementById('btn-image');
-
+document.addEventListener('DOMContentLoaded', function() {
+  const editor = document.getElementById('customEditor');
+  const toolbar = document.getElementById('editor-toolbar');
+  
   if (!editor || !toolbar) {
-    console.warn('[editor] customEditor 또는 k-toolbar 없음');
+    console.warn('에디터 또는 툴바를 찾을 수 없습니다.');
     return;
   }
 
-  // 1) 버튼 누를 때 포커스 유지
-  toolbar.addEventListener('mousedown', (e) => {
-    if (e.target.closest('button,select,input')) {
-      e.preventDefault();           // 포커스 도난 방지
-      editor.focus();
-    }
-  });
+  // 현재 스타일 상태 추적
+  let currentStyles = {
+    bold: false,
+    italic: false,
+    underline: false,
+    color: '#000000',
+    fontSize: 'medium',
+    align: 'left'
+  };
 
-  // 2) execCommand 계열 버튼(굵게/밑줄/정렬/목록)
-  toolbar.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-cmd]');
-    if (!btn) return;
-    const cmd = btn.dataset.cmd;
-    editor.focus();
-    try { document.execCommand('styleWithCSS', false, true); } catch(e){}
-    document.execCommand(cmd, false, null);
-  });
-
-  // 3) 인라인 스타일 적용 유틸 (크기/색)
-  function applyInlineStyle(styleObj) {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-
-    // 선택이 있으면 감싸기
-    if (!sel.isCollapsed) {
+  // 포맷 적용 함수
+  function applyFormat(format, value = null) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // 선택된 텍스트가 있는 경우
+    if (!range.collapsed) {
       const span = document.createElement('span');
-      Object.assign(span.style, styleObj);
+      
+      // 현재 스타일 복사
+      const currentStyle = {
+        fontWeight: currentStyles.bold ? 'bold' : 'normal',
+        fontStyle: currentStyles.italic ? 'italic' : 'normal',
+        textDecoration: currentStyles.underline ? 'underline' : 'none',
+        color: currentStyles.color,
+        fontSize: getSizeValue(currentStyles.fontSize),
+        textAlign: currentStyles.align
+      };
+      
+      // 새 스타일 적용
+      switch (format) {
+        case 'bold':
+          currentStyle.fontWeight = currentStyles.bold ? 'normal' : 'bold';
+          currentStyles.bold = !currentStyles.bold;
+          break;
+        case 'italic':
+          currentStyle.fontStyle = currentStyles.italic ? 'normal' : 'italic';
+          currentStyles.italic = !currentStyles.italic;
+          break;
+        case 'underline':
+          currentStyle.textDecoration = currentStyles.underline ? 'none' : 'underline';
+          currentStyles.underline = !currentStyles.underline;
+          break;
+        case 'color':
+          currentStyle.color = value;
+          currentStyles.color = value;
+          break;
+        case 'fontSize':
+          currentStyle.fontSize = getSizeValue(value);
+          currentStyles.fontSize = value;
+          break;
+        case 'alignLeft':
+        case 'alignCenter':
+        case 'alignRight':
+          const alignValue = format.replace('align', '').toLowerCase();
+          currentStyle.textAlign = alignValue;
+          currentStyles.align = alignValue;
+          break;
+      }
+      
+      Object.assign(span.style, currentStyle);
+      
       try {
         range.surroundContents(span);
-      } catch {
-        const frag = range.extractContents();
-        span.appendChild(frag);
+      } catch (e) {
+        const contents = range.extractContents();
+        span.appendChild(contents);
         range.insertNode(span);
       }
-      // 커서를 뒤로
-      const r = document.createRange();
-      r.setStartAfter(span);
-      r.collapse(true);
-      sel.removeAllRanges(); sel.addRange(r);
-      return;
+      
+      // 선택 해제
+      selection.removeAllRanges();
+      
+    } else {
+      // 선택된 텍스트가 없는 경우 - 커서 위치에 마커 삽입
+      insertStyleMarker(format, value);
     }
-
-    // 선택이 없으면 커서 위치에 스타일 span 생성
-    const span = document.createElement('span');
-    Object.assign(span.style, styleObj);
-    const tn = document.createTextNode('\u200B'); // ZWSP
-    span.appendChild(tn);
-    range.insertNode(span);
-
-    // 커서를 span 끝으로
-    const r = document.createRange();
-    r.setStart(tn, tn.length);
-    r.collapse(true);
-    sel.removeAllRanges(); sel.addRange(r);
+    
+    updateToolbarState();
   }
-
-  // 4) 글자 크기
-  fsSel && fsSel.addEventListener('change', function () {
-    if (!this.value) return;
-    editor.focus();
-    applyInlineStyle({ fontSize: this.value });
-  });
-
-  // 5) 글자색
-  color && color.addEventListener('input', function () {
-    if (!this.value) return;
-    editor.focus();
-    applyInlineStyle({ color: this.value });
-  });
-
-  // 6) 이미지
-  imgBtn && imgBtn.addEventListener('click', () => imgIn && imgIn.click());
-  imgIn && imgIn.addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) editor.focus();
-    const range = (window.getSelection() || {}).getRangeAt?.(0);
-    if (!range) return;
-    const img = document.createElement('img');
-    img.src = url;
-    img.style.maxWidth = '100%';
-    img.style.height = 'auto';
-    img.style.borderRadius = '8px';
-    img.style.margin = '8px 0';
-    range.insertNode(img);
-    range.setStartAfter(img); range.collapse(true);
-    sel.removeAllRanges(); sel.addRange(range);
-    imgIn.value = '';
-  });
-
-  // 7) 안전망: 강제 표시 및 위치 고정
-  function ensureToolbarVisible(){
-    toolbar.style.display   = 'flex';
-    toolbar.style.visibility= 'visible';
-    toolbar.style.opacity   = '1';
-    toolbar.style.position  = 'sticky';
-    toolbar.style.top       = '0';
-    toolbar.style.zIndex    = '50';
+  
+  // 스타일 마커 삽입
+  function insertStyleMarker(format, value) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    const marker = document.createElement('span');
+    marker.className = 'style-marker';
+    marker.textContent = '\u200B'; // 보이지 않는 문자
+    
+    // 현재 스타일 적용
+    switch (format) {
+      case 'bold':
+        currentStyles.bold = !currentStyles.bold;
+        break;
+      case 'italic':
+        currentStyles.italic = !currentStyles.italic;
+        break;
+      case 'underline':
+        currentStyles.underline = !currentStyles.underline;
+        break;
+      case 'color':
+        currentStyles.color = value;
+        break;
+      case 'fontSize':
+        currentStyles.fontSize = value;
+        break;
+    }
+    
+    const style = {
+      fontWeight: currentStyles.bold ? 'bold' : 'normal',
+      fontStyle: currentStyles.italic ? 'italic' : 'normal',
+      textDecoration: currentStyles.underline ? 'underline' : 'none',
+      color: currentStyles.color,
+      fontSize: getSizeValue(currentStyles.fontSize)
+    };
+    
+    Object.assign(marker.style, style);
+    
+    range.insertNode(marker);
+    range.setStartAfter(marker);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
   }
-  ensureToolbarVisible();
-  setInterval(ensureToolbarVisible, 800); // 숨겨져도 복구
-
-  console.log('✅ 에디터 재바인딩 완료:', { editor: !!editor, toolbar: !!toolbar });
-})();
+  
+  // 크기 값 변환
+  function getSizeValue(size) {
+    switch (size) {
+      case 'small': return '14px';
+      case 'medium': return '16px';
+      case 'large': return '20px';
+      default: return '16px';
+    }
+  }
+  
+  // 툴바 상태 업데이트
+  function updateToolbarState() {
+    const formatBtns = toolbar.querySelectorAll('.format-btn');
+    formatBtns.forEach(btn => {
+      const format = btn.dataset.format;
+      if (format && currentStyles[format]) {
+        btn.style.background = '#e5e7eb';
+      } else {
+        btn.style.background = 'white';
+      }
+    });
+  }
+  
+  // 툴바 이벤트 리스너
+  toolbar.addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    const formatBtn = e.target.closest('.format-btn');
+    const colorChip = e.target.closest('.color-chip');
+    
+    if (formatBtn) {
+      const format = formatBtn.dataset.format;
+      
+      if (format === 'bulletList') {
+        document.execCommand('insertUnorderedList', false, null);
+      } else if (format === 'numberList') {
+        document.execCommand('insertOrderedList', false, null);
+      } else {
+        applyFormat(format);
+      }
+    } else if (colorChip) {
+      const color = colorChip.dataset.color;
+      applyFormat('color', color);
+    }
+    
+    editor.focus();
+  });
+  
+  // 폰트 크기 변경
+  const fontSizeSelect = document.getElementById('fontSize');
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener('change', function() {
+      if (this.value) {
+        applyFormat('fontSize', this.value);
+        editor.focus();
+      }
+    });
+  }
+  
+  // 입력 이벤트 처리
+  editor.addEventListener('beforeinput', function(e) {
+    if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
+      const selection = window.getSelection();
+      if (selection.rangeCount) {
+        const range = selection.getRangeAt(0);
+        const marker = range.startContainer.parentElement;
+        
+        if (marker && marker.classList.contains('style-marker')) {
+          // 마커의 스타일을 새 텍스트에 적용
+          const span = document.createElement('span');
+          Object.assign(span.style, {
+            fontWeight: marker.style.fontWeight,
+            fontStyle: marker.style.fontStyle,
+            textDecoration: marker.style.textDecoration,
+            color: marker.style.color,
+            fontSize: marker.style.fontSize
+          });
+          
+          span.textContent = e.data;
+          
+          e.preventDefault();
+          range.deleteContents();
+          range.insertNode(span);
+          range.setStartAfter(span);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          
+          // 마커 제거
+          marker.remove();
+        }
+      }
+    }
+  });
+  
+  // 에디터 포커스 시 초기화
+  editor.addEventListener('focus', function() {
+    updateToolbarState();
+  });
+  
+  // 초기 상태 설정
+  updateToolbarState();
+  
+  console.log('마이크로 에디터가 초기화되었습니다.');
+});
 </script>
               
               <!-- 에디터 -->
               <div id="customEditor"
                    contenteditable="true"
-                   data-placeholder="가게 소개를 입력하세요…"
-                   style="padding:12px;min-height:220px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;line-height:1.6;word-break:break-word;outline:none;background:#fff;">
+                   data-placeholder="가게 소개를 입력하세요..."
+                   style="border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; padding: 16px; min-height: 200px; line-height: 1.6; outline: none; background: white; font-size: 16px;">
               </div>
 
               <!-- 제출용 히든 필드 (서버로 전송됨) -->
