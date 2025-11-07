@@ -18,12 +18,30 @@ export function createKEditor(options) {
     };
 
     // --- 유틸
-    function keepFocus(el) {
+    function keepEditorFocus(el) {
         if (!el) return;
+        // 버튼류만
         el.addEventListener("mousedown", (e) => {
-            e.preventDefault();           // selection 깨짐 방지
-            root.focus();
+            // 버튼은 클릭시 포커스가 에디터에서 나가도 상관없지만
+            // mousedown에서 preventDefault를 걸면 change가 막힐 수 있으니 버튼만 최소화
+            if (el.tagName === "BUTTON") {
+                e.preventDefault();
+                // 필요할 때만 포커스 회수
+                setTimeout(() => root.focus(), 0);
+            }
         });
+    }
+    
+    function placeCaretInside(node, atEnd = true) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        const target = (node.nodeType === Node.TEXT_NODE) ? node : node.lastChild || node;
+        if (!target) return;
+        const len = target.nodeType === Node.TEXT_NODE ? (target.nodeValue?.length ?? 0) : (target.childNodes.length ?? 0);
+        range.setStart(target, atEnd ? len : 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
     }
 
     function ensureRootHasBlock() {
@@ -69,11 +87,21 @@ export function createKEditor(options) {
     }
 
     function applyStyleToSpan(span, st = activeStyle) {
-        span.style.color = st.color || "";
-        span.style.fontSize = st.fontSize || "";
-        span.style.fontWeight = st.fontWeight || "";
-        span.style.fontStyle = st.fontStyle || "";
-        span.style.textDecoration = st.textDecoration || "";
+        // !important로 CSS 우선순위 이겨내기
+        if (st.color) span.style.setProperty("color", st.color, "important");
+        else span.style.removeProperty("color");
+        
+        if (st.fontSize) span.style.setProperty("font-size", st.fontSize, "important");
+        else span.style.removeProperty("font-size");
+        
+        if (st.fontWeight) span.style.setProperty("font-weight", st.fontWeight, "important");
+        else span.style.removeProperty("font-weight");
+        
+        if (st.fontStyle) span.style.setProperty("font-style", st.fontStyle, "important");
+        else span.style.removeProperty("font-style");
+        
+        if (st.textDecoration) span.style.setProperty("text-decoration", st.textDecoration, "important");
+        else span.style.removeProperty("text-decoration");
     }
 
     function createTypingSpan(initialText = "") {
@@ -275,12 +303,49 @@ export function createKEditor(options) {
 
     // --- 포맷(스타일) API
     function setFontSize(size) {
+        if (size === "reset") {
+            // 인라인 font-size 제거
+            root.querySelectorAll('span[style*="font-size"]').forEach(s => {
+                s.style.removeProperty("font-size");
+                if (!s.getAttribute("style")) s.removeAttribute("style");
+                if (s.getAttribute("data-typing") === "1" && s.textContent === "") s.remove();
+            });
+            activeStyle.fontSize = "";
+            console.log("[KEditor] font-size reset");
+            return;
+        }
         activeStyle.fontSize = size || "";
         updateTypingSpanStyle();
+        console.log("[KEditor] font-size:", size);
+        // 커서를 항상 끝으로
+        requestAnimationFrame(() => {
+            if (typingSpan && root.contains(typingSpan)) {
+                const t = typingSpan.lastChild ?? typingSpan;
+                placeCaretInside(t, true);
+            }
+        });
     }
     function setColor(color) {
+        if (color === "reset") {
+            // 인라인 color 제거
+            root.querySelectorAll('span[style*="color"]').forEach(s => {
+                s.style.removeProperty("color");
+                if (!s.getAttribute("style")) s.removeAttribute("style");
+                if (s.getAttribute("data-typing") === "1" && s.textContent === "") s.remove();
+            });
+            activeStyle.color = "";
+            console.log("[KEditor] color reset");
+            return;
+        }
         activeStyle.color = color || "";
         updateTypingSpanStyle();
+        console.log("[KEditor] color:", color);
+        requestAnimationFrame(() => {
+            if (typingSpan && root.contains(typingSpan)) {
+                const t = typingSpan.lastChild ?? typingSpan;
+                placeCaretInside(t, true);
+            }
+        });
     }
     function toggleBold() {
         activeStyle.fontWeight = activeStyle.fontWeight === "bold" ? "" : "bold";
@@ -314,13 +379,18 @@ export function createKEditor(options) {
     const buttons = tb.buttons || {};
     const selects = tb.selects || {};
     const colorButtons = tb.colorButtons || [];
+    // ✅ 버튼에만 적용
     [buttons.bold, buttons.italic, buttons.underline,
     buttons.ul, buttons.ol,
-    buttons.alignLeft, buttons.alignCenter, buttons.alignRight].forEach(keepFocus);
-    Object.values(selects).forEach(keepFocus);
-    colorButtons.forEach(keepFocus);
-    keepFocus(tb.imageButton);
-    keepFocus(tb.imageInput);
+    buttons.alignLeft, buttons.alignCenter, buttons.alignRight].forEach(keepEditorFocus);
+    
+    // ❌ 셀렉트에는 적용 금지 (드롭다운/체인지 막힘 원인)
+    // Object.values(selects).forEach(keepEditorFocus);
+    
+    // 색/특수문자 버튼만
+    colorButtons.forEach(keepEditorFocus);
+    keepEditorFocus(tb.imageButton);
+    keepEditorFocus(tb.imageInput);
 
     buttons?.bold && buttons.bold.addEventListener("click", () =>
         applyStyleToSelectionOrTyping(toggleBold));
