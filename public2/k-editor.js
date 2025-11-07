@@ -383,7 +383,11 @@ export function createKEditor(options) {
         if (this.value) {
             console.log("[KEditor] font-size select:", this.value);
             setFontSize(this.value);
-            this.value = "";
+            // reset인 경우에만 기본값으로 되돌리기
+            if (this.value === "reset") {
+                this.value = "";
+            }
+            // 다른 크기 선택 시에는 선택된 값 유지
         }
     });
 
