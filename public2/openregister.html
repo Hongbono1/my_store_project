@@ -162,6 +162,14 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
+        /* 🔧 툴바 강제 표시 (숨김 방지) */
+        #k-toolbar {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 100 !important;
+        }
+
         .char-btn {
             width: 28px;
             height: 28px;
@@ -443,11 +451,30 @@
 (function(){
   'use strict';
 
-  // DOM 요소 참조
+  // DOM 요소 참조 (null 체크 포함)
   var form = document.getElementById('openForm');
   var editor = document.getElementById('customEditor');
   var toolbar = document.getElementById('k-toolbar');
   var hidden = document.getElementById('descHtml');
+  
+  // 🔍 디버깅: 주요 요소들 존재 확인
+  console.log('🔧 에디터 초기화:', {
+    form: !!form,
+    editor: !!editor, 
+    toolbar: !!toolbar,
+    hidden: !!hidden
+  });
+
+  // 필수 요소가 없으면 조기 종료
+  if (!form || !editor || !toolbar || !hidden) {
+    console.error('❌ 필수 DOM 요소를 찾을 수 없습니다:', {
+      form: !!form,
+      editor: !!editor,
+      toolbar: !!toolbar, 
+      hidden: !!hidden
+    });
+    return;
+  }
   
   // 툴바 버튼들
   var fontSizeSelector = document.getElementById('font-size-selector');
@@ -548,25 +575,29 @@
   }
 
   // ✅ 툴바 이벤트 (폼 밖이므로 안전) - 커서 점프 방지
-  toolbar.addEventListener('mousedown', function(e){
-    var target = e.target || e.srcElement;
-    if (target && (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.type === 'color')) { 
-      e.preventDefault(); // 포커스 이동 방지
-      if (editor) editor.focus(); 
-    }
-  });
+  if (toolbar) {
+    toolbar.addEventListener('mousedown', function(e){
+      var target = e.target || e.srcElement;
+      if (target && (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.type === 'color')) { 
+        e.preventDefault(); // 포커스 이동 방지
+        if (editor) editor.focus(); 
+      }
+    });
+  }
 
-  toolbar.addEventListener('click', function(e){
-    var target = e.target || e.srcElement;
-    if (!target) return;
-    
-    var cmd = target.getAttribute('data-cmd');
-    if (cmd && !composing) {
-      try { document.execCommand('styleWithCSS', false, true); } catch(e){}
-      document.execCommand(cmd, false, null);
-      editor.focus();
-    }
-  });
+  if (toolbar) {
+    toolbar.addEventListener('click', function(e){
+      var target = e.target || e.srcElement;
+      if (!target) return;
+      
+      var cmd = target.getAttribute('data-cmd');
+      if (cmd && !composing) {
+        try { document.execCommand('styleWithCSS', false, true); } catch(e){}
+        document.execCommand(cmd, false, null);
+        if (editor) editor.focus();
+      }
+    });
+  }
 
   // IME 한글 조합 처리
   editor.addEventListener('compositionstart', function(){ composing = true; });
