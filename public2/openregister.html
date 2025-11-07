@@ -9,6 +9,8 @@
     <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script
         src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+    <!-- 2) TinyMCE CDN -->
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>
     <style>
         body {
             font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
@@ -106,6 +108,42 @@
         .color-btn:hover {
             border-color: #374151;
             transform: scale(1.1)
+        }
+
+        /* 커스텀 에디터 툴바 스타일 */
+        #tb button {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            color: #374151;
+            font-weight: 500;
+        }
+
+        #tb button:hover {
+            background: #e0e7ff;
+            border-color: #6366f1;
+            transform: translateY(-1px);
+        }
+
+        #tb select, #tb input[type="color"] {
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .editor img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin: 8px 0;
         }
 
         .char-btn {
@@ -236,127 +274,50 @@
                 <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2 text-gray-700" />
             </div>
 
-            <!-- 설명 (에디터) -->
-            <div>
-                <label class="block font-semibold mb-2">설명</label>
+            <!-- ▼ 설명(소개) 입력 영역: 커스텀 에디터 + 히든필드 -->
+            <section class="mt-6">
+              <label for="descHtml" style="display:block;margin:8px 0;font-weight:700;">설명(소개)</label>
 
-                <!-- 단순 툴바 예시 -->
-                <div class="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded" id="k-toolbar">
-                    <!-- 글자 크기 -->
-                    <select id="k-fontsize" class="border rounded px-2 py-1 text-sm">
-                        <option value="">글자 크기</option>
-                        <option value="14px">14px</option>
-                        <option value="16px">16px</option>
-                        <option value="18px">18px</option>
-                        <option value="20px">20px</option>
-                        <option value="24px">24px</option>
-                        <option value="reset">기본으로</option>
-                    </select>
+              <!-- 툴바 -->
+              <div id="tb" style="position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;background:#f7f7fa;border:1px solid #e5e7eb;border-radius:8px 8px 0 0;">
+                <button data-cmd="bold"><b>굵게</b></button>
+                <button data-cmd="italic"><i>기울임</i></button>
+                <button data-cmd="underline"><u>밑줄</u></button>
 
-                    <!-- 색상 버튼 -->
-                    <button type="button" class="px-2 py-1 border rounded text-xs bg-white" data-color="#000000">검정</button>
-                    <button type="button" class="px-2 py-1 border rounded text-xs bg-white" data-color="#ff0000">빨강</button>
-                    <button type="button" class="px-2 py-1 border rounded text-xs bg-white" data-color="#0059ff">파랑</button>
-                    <button type="button" class="px-2 py-1 border rounded text-xs bg-white" data-color="reset">기본색</button>
-                </div>
+                <button data-cmd="justifyLeft">좌</button>
+                <button data-cmd="justifyCenter">중</button>
+                <button data-cmd="justifyRight">우</button>
 
-                <!-- 기본 툴바 -->
-                <div class="editor-toolbar p-3 bg-white border border-gray-300 rounded-t-lg border-b-0">
-                    <div class="flex flex-wrap gap-1 items-center">
-                        <button type="button" class="toolbar-btn" id="btnBold"><strong>B</strong></button>
-                        <button type="button" class="toolbar-btn" id="btnItalic"><em>I</em></button>
-                        <button type="button" class="toolbar-btn" id="btnUnderline"><u>U</u></button>
+                <button data-cmd="insertUnorderedList">● 목록</button>
+                <button data-cmd="insertOrderedList">1. 목록</button>
 
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
+                <select id="fs">
+                  <option value="">글자 크기</option>
+                  <option value="14px">14</option>
+                  <option value="16px">16</option>
+                  <option value="18px">18</option>
+                  <option value="20px">20</option>
+                  <option value="24px">24</option>
+                  <option value="28px">28</option>
+                </select>
 
-                        <select class="toolbar-select" id="selHeading">
-                            <option value="">일반</option>
-                            <option value="h1">제목1</option>
-                            <option value="h2">제목2</option>
-                            <option value="h3">제목3</option>
-                        </select>
+                <input type="color" id="fc" title="글자색" />
+                <input type="file" id="img" accept="image/*" style="display:none" />
+                <button id="btnImg">이미지</button>
+              </div>
 
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
+              <!-- 에디터 -->
+              <div id="ed"
+                   class="editor"
+                   contenteditable="true"
+                   data-placeholder="가게 소개를 입력하세요…"
+                   style="padding:12px;min-height:220px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;line-height:1.6;word-break:break-word;outline:none;">
+              </div>
 
-                        <button type="button" class="toolbar-btn" id="btnUL">• 목록</button>
-                        <button type="button" class="toolbar-btn" id="btnOL">1. 목록</button>
-
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
-
-                        <button type="button" class="toolbar-btn" id="imageUploadBtn">📷 이미지</button>
-                        <input type="file" id="imageUploadInput" accept="image/*" style="display:none;" />
-                    </div>
-                </div>
-
-                <div id="customEditor" class="border border-gray-300 rounded-b-lg border-t-0 p-4" contenteditable="true"
-                    data-placeholder="내용을 입력하세요..."
-                    style="min-height: 400px; font-size: 14px; line-height: 1.6; outline: none; background: white;">
-                </div>
-
-                <!-- 한글 특화 추가 툴바 -->
-                <div class="korean-toolbar mt-2 p-3 bg-gray-50 rounded-lg border overflow-x-auto">
-                    <div class="flex gap-2 items-center" style="min-width: max-content;">
-                        <span class="text-sm font-semibold text-gray-700">한글 도구:</span>
-                        <div class="flex gap-1">
-                            <button type="button" class="korean-btn" id="btnAlignLeft">◀</button>
-                            <button type="button" class="korean-btn" id="btnAlignCenter">◆</button>
-                            <button type="button" class="korean-btn" id="btnAlignRight">▶</button>
-                        </div>
-
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
-
-                        <select class="korean-select" id="selFontSize">
-                            <option value="">글자 크기 선택</option>
-                            <option value="reset">일반 크기로 되돌리기</option>
-                            <option value="10px">매우 작게 (10px)</option>
-                            <option value="12px">작게 (12px)</option>
-                            <option value="14px">보통 (14px)</option>
-                            <option value="16px">크게 (16px)</option>
-                            <option value="18px">더 크게 (18px)</option>
-                            <option value="20px">제목용 (20px)</option>
-                            <option value="24px">큰 제목 (24px)</option>
-                        </select>
-
-                        <div class="flex items-center gap-1">
-                            <span class="text-xs text-gray-600">색상:</span>
-                            <button type="button" class="color-btn" data-color="reset"
-                                style="background: linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%); background-size: 8px 8px;"
-                                title="기본색"></button>
-                            <button type="button" class="color-btn" data-color="#000000" style="background:#000000"
-                                title="검정"></button>
-                            <button type="button" class="color-btn" data-color="#FF0000" style="background:#FF0000"
-                                title="빨강"></button>
-                            <button type="button" class="color-btn" data-color="#0066CC" style="background:#0066CC"
-                                title="파랑"></button>
-                            <button type="button" class="color-btn" data-color="#008000" style="background:#008000"
-                                title="초록"></button>
-                            <button type="button" class="color-btn" data-color="#FF6600" style="background:#FF6600"
-                                title="주황"></button>
-                        </div>
-
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
-
-                        <button type="button" class="korean-btn" id="btnResetAll" title="모든 스타일 초기화">🔄</button>
-
-                        <div class="border-l border-gray-300 h-6 mx-2"></div>
-
-                        <div class="flex items-center gap-1">
-                            <span class="text-xs text-gray-600">특수문자:</span>
-                            <button type="button" class="char-btn" data-char="·">·</button>
-                            <button type="button" class="char-btn" data-char="…">…</button>
-                            <button type="button" class="char-btn" data-char="※">※</button>
-                            <button type="button" class="char-btn" data-char="★">★</button>
-                            <button type="button" class="char-btn" data-char="①">①</button>
-                            <button type="button" class="char-btn" data-char="②">②</button>
-                            <button type="button" class="char-btn" data-char="③">③</button>
-                            <button type="button" class="char-btn" data-char="「">「</button>
-                            <button type="button" class="char-btn" data-char="」">」</button>
-                        </div>
-                    </div>
-                </div>
-
-                <textarea id="descHtml" name="description" class="hidden"></textarea>
-            </div>
+              <!-- 제출용 히든 필드 (서버로 전송됨) -->
+              <input type="hidden" name="descHtml" id="descHtml" />
+            </section>
+            <!-- ▲ 설명(소개) 입력 영역 끝 -->
 
             <!-- 등록 버튼 -->
             <div class="flex justify-center">
@@ -369,9 +330,7 @@
     </main>
 
     <!-- 페이지 전용 스크립트 -->
-    <script type="module">
-        import { createKEditor } from "/public2/k-editor.js";
-
+    <script>
         // 1) 주소 검색 + 지도
         const btnSearchAddr = document.getElementById("btnSearchAddr");
         btnSearchAddr.addEventListener("click", () => {
@@ -407,38 +366,41 @@
             });
         }
 
-        // 2) 에디터 초기화 (툴바 DOM 연결)
-        const editorRoot = document.getElementById("customEditor");
+        // 2) TinyMCE 초기화
+        tinymce.init({
+            selector: '#desc',
+            menubar: false,
+            branding: false,
+            height: 320,
+            // 네이버 식 기본 도구: 크기, 굵게/밑줄, 정렬, 글자색/배경색, 목록, 이미지
+            plugins: 'lists image link charmap codesample table',
+            toolbar: [
+                'fontsizeselect | bold underline | forecolor backcolor | ' +
+                'alignleft aligncenter alignright | bullist numlist | image link'
+            ].join(' '),
 
-        // 툴바 요소들 "참조만" 넘긴다. (click/change 핸들러는 모듈이 다 건다)
-        const toolbar = {
-            buttons: {
-                bold: document.getElementById("btnBold"),
-                italic: document.getElementById("btnItalic"),
-                underline: document.getElementById("btnUnderline"),
-                ul: document.getElementById("btnUL"),
-                ol: document.getElementById("btnOL"),
-                alignLeft: document.getElementById("btnAlignLeft"),
-                alignCenter: document.getElementById("btnAlignCenter"),
-                alignRight: document.getElementById("btnAlignRight"),
-            },
-            selects: {
-                heading: document.getElementById("selHeading"),
-                fontSize: document.getElementById("k-fontsize") || document.getElementById("selFontSize"), // 단순 툴바 우선
-            },
-            colorButtons: [
-                ...Array.from(document.querySelectorAll(".color-btn")), // 기존 색상 버튼들
-                ...Array.from(document.querySelectorAll('#k-toolbar [data-color]')) // 새로운 색상 버튼들
-            ],
-            charButtons: Array.from(document.querySelectorAll(".char-btn")),
-            imageButton: document.getElementById("imageUploadBtn"),
-            imageInput: document.getElementById("imageUploadInput"),
-        };
+            // 폰트 크기 옵션 (px 단위 권장)
+            fontsize_formats: '12px 14px 16px 18px 20px 24px 28px 32px',
 
-        const ke = createKEditor({
-            root: editorRoot,
-            toolbar,
-            uploadEndpoint: "/upload/image",
+            // IME(한글 조합) 안정 동작: TinyMCE가 기본적으로 처리함
+            // 폼 제출 시 HTML 보내기
+            setup(editor) {
+                const form = document.querySelector('form');
+                if (form) {
+                    form.addEventListener('submit', () => {
+                        // tinymce는 자동으로 textarea 값을 HTML로 동기화함
+                        // (별도 처리 불필요) 필요하면 확인용:
+                        // document.querySelector('#desc').value = editor.getContent();
+                    });
+                }
+            },
+
+            // 디자인 자연스럽게: 에디터 내부 기본 폰트/라인하이트
+            content_style: `
+                body { font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif; 
+                       line-height: 1.7; font-size: 16px; }
+                img { border-radius: 8px; }
+            `
         });
 
         // 3) 제출 시 HTML 싱크
@@ -446,8 +408,8 @@
             e.preventDefault();
 
             console.log("📝 폼 제출 시작");
-            document.getElementById("descHtml").value = ke.getHTML();
-            const editorHtml = ke.getHTML();
+            // TinyMCE는 자동으로 textarea에 HTML을 동기화하므로 별도 처리 불필요
+            const editorHtml = document.getElementById("desc").value;
             console.log("📄 에디터 내용:", editorHtml.substring(0, 120) + "...");
 
             const baseAddr = document.getElementById("address").value || "";
@@ -488,9 +450,186 @@
             }
         });
 
-        // 디버깅용 전역 노출(선택)
-        window.__KEDITOR__ = ke;
     </script>
+
+<script>
+(function(){
+  'use strict';
+
+  // ★ 폼 id 확인: 다르면 여기 바꿔줘.
+  var form = document.getElementById('openForm');
+  var ed   = document.getElementById('ed');
+  var tb   = document.getElementById('tb');
+  var fs   = document.getElementById('fs');
+  var fc   = document.getElementById('fc');
+  var img  = document.getElementById('img');
+  var btnImg = document.getElementById('btnImg');
+  var hidden = document.getElementById('descHtml');
+
+  var composing = false;
+  var typingSpan = null;
+  var ZWSP = '\u200B';
+
+  function getSel(){ return window.getSelection ? window.getSelection() : null; }
+  function newRange(){ return document.createRange ? document.createRange() : null; }
+
+  function placeCaretInside(node, atEnd){
+    if (atEnd === void 0) atEnd = true;
+    if (!node) return;
+    var r = newRange(); if (!r) return;
+    var s = getSel(); if (!s) return;
+    var target = (node.nodeType === 3) ? node : (node.lastChild || node.firstChild || node);
+    if (!target) return;
+    var len = (target.nodeType === 3 && target.nodeValue) ? target.nodeValue.length : 0;
+    try { r.setStart(target, atEnd ? len : 0); r.collapse(true); s.removeAllRanges(); s.addRange(r); } catch(e){}
+  }
+
+  function caretToTail(){
+    var s = getSel(); if (!s) return;
+    var r = newRange(); if (!r) return;
+    var node = ed;
+    while (node && node.lastChild) node = node.lastChild;
+    if (!node || node === ed) { var br = document.createElement('br'); ed.appendChild(br); node = br; }
+    if (node.nodeType === 3) {
+      var len = node.nodeValue ? node.nodeValue.length : 0;
+      r.setStart(node, len);
+    } else {
+      r.setStartAfter(node);
+    }
+    r.collapse(true); s.removeAllRanges(); s.addRange(r);
+  }
+
+  function applyInlineStyle(styleObj){
+    if (!styleObj) styleObj = {};
+    ed.focus();
+    var s = getSel(); if (!s || s.rangeCount === 0) return;
+
+    if (!s.isCollapsed) {
+      var r = s.getRangeAt(0);
+      var span = document.createElement('span');
+      for (var k in styleObj) if (styleObj.hasOwnProperty(k)) span.style[k] = styleObj[k];
+      try { r.surroundContents(span); }
+      catch(e){ var frag = r.extractContents(); span.appendChild(frag); r.insertNode(span); }
+      var after = newRange(); if (!after) return;
+      after.setStartAfter(span); after.collapse(true);
+      s.removeAllRanges(); s.addRange(after);
+      typingSpan = span;
+      return;
+    }
+
+    if (typingSpan && ed.contains(typingSpan)) {
+      for (var k2 in styleObj) if (styleObj.hasOwnProperty(k2)) typingSpan.style[k2] = styleObj[k2];
+      var endNode = typingSpan.lastChild || typingSpan;
+      placeCaretInside(endNode, true);
+      return;
+    }
+
+    caretToTail();
+    s = getSel(); if (!s || s.rangeCount === 0) return;
+    var r2 = s.getRangeAt(0);
+
+    var marker = document.createElement('span');
+    marker.style.display = 'inline-block'; marker.style.width = '0'; marker.style.height = '0';
+    marker.appendChild(document.createTextNode('\uFEFF'));
+    r2.insertNode(marker);
+
+    var span2 = document.createElement('span');
+    span2.setAttribute('data-typing-span', 'true');
+    for (var k3 in styleObj) if (styleObj.hasOwnProperty(k3)) span2.style[k3] = styleObj[k3];
+    var tn = document.createTextNode(ZWSP); span2.appendChild(tn);
+    if (marker.parentNode) marker.parentNode.insertBefore(span2, marker.nextSibling);
+    if (marker.parentNode) marker.parentNode.removeChild(marker);
+    placeCaretInside(tn, true);
+    typingSpan = span2;
+  }
+
+  // 툴바 포커스 훔치기 방지
+  tb.addEventListener('mousedown', function(e){
+    var t = e.target || e.srcElement;
+    if (t && t.tagName === 'BUTTON') { e.preventDefault(); ed.focus(); }
+  });
+
+  // IME 한글 조합 처리
+  ed.addEventListener('compositionstart', function(){ composing = true; });
+  ed.addEventListener('compositionend', function(){
+    composing = false;
+    if (typingSpan && ed.contains(typingSpan)) {
+      var t = typingSpan.lastChild || typingSpan.firstChild;
+      if (t && t.nodeType === 3) {
+        var v = t.nodeValue || '';
+        if (v.indexOf(ZWSP) === 0) t.nodeValue = v.replace(/\u200B/g, '');
+        placeCaretInside(t, true);
+      } else {
+        var tn2 = document.createTextNode('');
+        typingSpan.appendChild(tn2);
+        placeCaretInside(tn2, true);
+      }
+    }
+  });
+
+  ed.addEventListener('input', function(){
+    if (!typingSpan) return;
+    var t = typingSpan.firstChild;
+    if (t && t.nodeType === 3 && t.nodeValue && t.nodeValue.indexOf(ZWSP) === 0) {
+      t.nodeValue = t.nodeValue.replace(ZWSP, '');
+    }
+  });
+
+  // 기본 서식 버튼 (execCommand)
+  tb.addEventListener('click', function(e){
+    var t = e.target || e.srcElement; if (!t) return;
+    var cmd = t.getAttribute('data-cmd'); if (!cmd) return;
+    if (composing) return;
+    try { document.execCommand('styleWithCSS', false, true); } catch(e){}
+    document.execCommand(cmd, false, null);
+    ed.focus();
+  });
+
+  // 글자 크기 / 색
+  fs.addEventListener('change', function(){
+    if (composing) return;
+    var val = fs.value; if (!val) return;
+    applyInlineStyle({ fontSize: val }); ed.focus();
+  });
+  fc.addEventListener('input', function(){
+    if (composing) return;
+    var val = fc.value; if (!val) return;
+    applyInlineStyle({ color: val }); ed.focus();
+  });
+
+  // 이미지 삽입 (로컬 미리보기 방식)
+  btnImg.addEventListener('click', function(){ img.click(); });
+  img.addEventListener('change', function(e){
+    if (composing) return;
+    var file = (e.target && e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+    if (!file) return;
+    var url = (window.URL && window.URL.createObjectURL) ? window.URL.createObjectURL(file) : null;
+    if (!url) return;
+    insertImage(url);
+    img.value = '';
+  });
+
+  function insertImage(src){
+    ed.focus();
+    var s = getSel(); if (!s || s.rangeCount === 0) caretToTail();
+    s = getSel(); if (!s || s.rangeCount === 0) return;
+    var r = s.getRangeAt(0);
+    var image = document.createElement('img');
+    image.src = src; image.alt = 'image';
+    image.style.maxWidth = '100%'; image.style.height = 'auto'; image.style.margin = '8px 0';
+    r.insertNode(image);
+    r.setStartAfter(image); r.collapse(true);
+    s.removeAllRanges(); s.addRange(r);
+  }
+
+  // ★ 폼 제출 시 에디터 내용을 descHtml로 복사
+  if (form) {
+    form.addEventListener('submit', function(){
+      if (hidden) hidden.value = ed.innerHTML.replace(/\u200B/g, '');
+    });
+  }
+})();
+</script>
 </body>
 
 </html>
