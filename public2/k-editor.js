@@ -19,6 +19,7 @@ export function createKEditor(options) {
     // ===== 상태 =====
     let typingSpan = null;
     let isComposing = false;      // ← 추가
+    let composeTextNode = null; // ← 조합이 들어가는 텍스트 노드 추적
     const ZWSP = "\u200B";
 
     // ===== 내부 유틸 =====
@@ -29,25 +30,31 @@ export function createKEditor(options) {
     function placeCaretInside(node, atEnd = true) {
         const range = document.createRange();
         const sel = window.getSelection();
-        const target = (node.nodeType === Node.TEXT_NODE) ? node : node.firstChild || node;
+        const target = (node.nodeType === Node.TEXT_NODE) ? node : node.lastChild || node;
         if (!target) return;
-        range.setStart(target, atEnd ? (target.length ?? 0) : 0);
+        const len = target.nodeType === Node.TEXT_NODE ? (target.nodeValue?.length ?? 0) : (target.childNodes.length ?? 0);
+        range.setStart(target, atEnd ? len : 0);
         range.collapse(true);
         sel.removeAllRanges();
         sel.addRange(range);
     }
-    function ensureTypingSpan(styleObj = {}) {
+    function ensureTypingSpan(styleObj = {}, withZWSP = true) {
         if (typingSpan && root.contains(typingSpan)) return typingSpan;
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return null;
         const range = sel.getRangeAt(0);
+
         const span = document.createElement("span");
         span.setAttribute("data-typing-span", "true");
         Object.assign(span.style, styleObj);
-        const text = document.createTextNode(ZWSP);
+
+        // IME 중엔 ZWSP 금지 → 빈 텍스트 노드로 조합 받기
+        const text = document.createTextNode(withZWSP ? ZWSP : "");
         span.appendChild(text);
+
         range.insertNode(span);
         placeCaretInside(text, true);
+
         typingSpan = span;
         console.log("[KEditor] ensureTypingSpan created:", span.getAttribute("style"));
         return span;
@@ -201,19 +208,35 @@ export function createKEditor(options) {
     function ensureTypingSpanOrUpdate(styleObj = {}) {
         if (typingSpan && root.contains(typingSpan)) {
             Object.assign(typingSpan.style, styleObj);
-            // 커서를 typingSpan 끝으로
+            // 커서를 항상 끝으로
             const endNode = typingSpan.lastChild ?? typingSpan;
             placeCaretInside(endNode, true);
             return typingSpan;
         }
-        surroundOrInsertSpan(styleObj);
+        // IME 중이면 ZWSP 없이 span만 확보
+        ensureTypingSpan(styleObj, !isComposing);
         return typingSpan;
     }
 
     // ===== 공개 API: 포맷 =====
-    function applyBold() { document.execCommand("bold"); console.log("[KEditor] bold"); forceCaretToTail(); }
-    function applyItalic() { document.execCommand("italic"); console.log("[KEditor] italic"); forceCaretToTail(); }
-    function applyUnderline() { document.execCommand("underline"); console.log("[KEditor] underline"); forceCaretToTail(); }
+    function applyBold() { 
+        if (isComposing) return;
+        ensureTypingSpanOrUpdate({ fontWeight: 'bold' }); 
+        console.log("[KEditor] bold"); 
+        forceCaretToTail(); 
+    }
+    function applyItalic() { 
+        if (isComposing) return;
+        ensureTypingSpanOrUpdate({ fontStyle: 'italic' }); 
+        console.log("[KEditor] italic"); 
+        forceCaretToTail(); 
+    }
+    function applyUnderline() { 
+        if (isComposing) return;
+        ensureTypingSpanOrUpdate({ textDecoration: 'underline' }); 
+        console.log("[KEditor] underline"); 
+        forceCaretToTail(); 
+    }
 
     function applyHeading(tag) {
         root.focus();
@@ -431,30 +454,54 @@ export function createKEditor(options) {
     // ===== IME(한글 조합) 핸들러 =====
     root.addEventListener("compositionstart", () => {
         isComposing = true;
+
+        // 조합 시작 시 현재 위치에 typingSpan 확보(ZWSP 금지)
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+            ensureTypingSpanOrUpdate({});
+            // 조합을 받을 텍스트 노드 지정
+            if (!typingSpan.lastChild || typingSpan.lastChild.nodeType !== Node.TEXT_NODE) {
+                typingSpan.appendChild(document.createTextNode(""));
+            }
+            composeTextNode = typingSpan.lastChild;
+            placeCaretInside(composeTextNode, true);
+        }
+    });
+
+    root.addEventListener("compositionupdate", () => {
+        // 조합 중에는 커서를 항상 composeTextNode 끝으로
+        if (composeTextNode) placeCaretInside(composeTextNode, true);
     });
 
     root.addEventListener("compositionend", () => {
         isComposing = false;
-        // 조합 끝나면 ZWSP 정리 + 커서를 typingSpan 끝으로
+
+        // 조합 끝나면 ZWSP 정리 & 커서 끝 고정
         if (typingSpan && root.contains(typingSpan)) {
-            const t = typingSpan.firstChild;
-            if (t && t.nodeType === Node.TEXT_NODE) {
-                t.nodeValue = (t.nodeValue || "").replace(/\u200B/g, "");
-                placeCaretInside(t, true);
-            } else {
-                // 텍스트 노드가 없으면 하나 만들어 커서 고정
-                const tn = document.createTextNode("");
-                typingSpan.appendChild(tn);
-                placeCaretInside(tn, true);
+            // 모든 ZWSP 제거
+            const walker = document.createTreeWalker(typingSpan, NodeFilter.SHOW_TEXT);
+            let n;
+            while ((n = walker.nextNode())) {
+                if (n.nodeValue) n.nodeValue = n.nodeValue.replace(/\u200B/g, "");
             }
+            // 끝으로 고정
+            const endNode = typingSpan.lastChild ?? typingSpan;
+            placeCaretInside(endNode, true);
         }
+        composeTextNode = null;
+        // 조합 직후 스타일 버튼 눌러도 안전
+        forceCaretToTail();
     });
 
     root.addEventListener("input", () => {
         if (!typingSpan) return;
+        // 조합 중엔 건드리지 않음
+        if (isComposing) return;
+
+        // 조합 끝나고 남은 선행 ZWSP만 제거
         const t = typingSpan.firstChild;
         if (t && t.nodeType === Node.TEXT_NODE && t.nodeValue.startsWith(ZWSP)) {
-            t.nodeValue = t.nodeValue.replace(ZWSP, "");
+            t.nodeValue = t.nodeValue.replace(/^\u200B+/, "");
         }
     });
     ["mouseup", "keyup"].forEach(ev => {
