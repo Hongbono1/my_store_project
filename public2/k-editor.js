@@ -18,6 +18,7 @@ export function createKEditor(options) {
 
     // ===== 상태 =====
     let typingSpan = null;
+    let isComposing = false;      // ← 추가
     const ZWSP = "\u200B";
 
     // ===== 내부 유틸 =====
@@ -89,8 +90,28 @@ export function createKEditor(options) {
     function keepEditorFocus(el) {
         if (!el) return;
         el.addEventListener("mousedown", (e) => {
-            e.preventDefault();     // 포커스 이동 차단
-            root.focus();           // 에디터 포커스 유지
+            const tag = (el.tagName || "").toUpperCase();
+            const type = (el.type || "").toLowerCase();
+
+            // select, file, color 등은 기본 동작 유지(드롭다운/파일선택 필요)
+            if (tag === "SELECT" || type === "file" || type === "color") return;
+
+            e.preventDefault();
+            root.focus();
+        });
+    }
+    // 스타일 적용 직후, 다음 프레임에 커서를 tail로 강제
+    function forceCaretToTail() {
+        requestAnimationFrame(() => {
+            // IME 중에는 건드리지 않음
+            if (isComposing) return;
+            // typingSpan 있으면 그 끝으로, 없으면 루트 끝으로
+            if (typingSpan && root.contains(typingSpan)) {
+                const target = typingSpan.lastChild ?? typingSpan;
+                placeCaretInside(target, true);
+            } else {
+                placeCaretAtEndOfRoot();
+            }
         });
     }
 
@@ -114,14 +135,18 @@ export function createKEditor(options) {
 
     // ===== 명령(선택 감싸기) =====
     function surroundOrInsertSpan(styleObj) {
+        // IME 중이면 DOM 조작 금지 → 조합이 끝난 뒤에 버튼을 다시 누르거나,
+        // 아래 forceTail이 커서 위치만 유지하게 둔다.
+        if (isComposing) return;
+
         root.focus();
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return;
 
         const range = sel.getRangeAt(0);
 
-        // 선택이 있는 경우: 감싼 뒤 커서를 뒤로
         if (!sel.isCollapsed) {
+            // 선택이 있을 때: 감싸기
             const span = document.createElement("span");
             Object.assign(span.style, styleObj);
             try {
@@ -136,13 +161,12 @@ export function createKEditor(options) {
             after.setStartAfter(span);
             after.collapse(true);
             sel.addRange(after);
+            typingSpan = span; // 선택 후에도 typingSpan로 계속 타이핑
             return;
         }
 
-        // 선택이 없는 경우: 끝으로 이동
+        // 선택이 없을 때: 항상 "끝" 기준으로 안전 마커 → span → 커서 span 내부 끝
         placeCaretAtEndOfRoot();
-
-        // ★ 임시 마커 → 마커 뒤에 스타일 span 삽입 → 커서를 span 내부 끝으로
         const r = sel.getRangeAt(0);
 
         const marker = document.createElement("span");
@@ -156,14 +180,16 @@ export function createKEditor(options) {
         const span = document.createElement("span");
         span.setAttribute("data-typing-span", "true");
         Object.assign(span.style, styleObj);
-        const zw = document.createTextNode("\u200B");
+
+        // 텍스트 노드 하나 보장 (조합 중 아닌 상태에서 바로 타이핑 가능)
+        const zw = document.createTextNode(ZWSP);
         span.appendChild(zw);
 
         marker.parentNode.insertBefore(span, marker.nextSibling);
         marker.remove();
 
         const nr = document.createRange();
-        nr.setStart(zw, 1);   // 커서를 span 내부 "끝"으로
+        nr.setStart(zw, zw.nodeValue.length); // span 내부 "끝"
         nr.collapse(true);
         sel.removeAllRanges();
         sel.addRange(nr);
@@ -171,10 +197,23 @@ export function createKEditor(options) {
         typingSpan = span;
     }
 
+    // "이미 타이핑 중이면 새로 만들지 말고, 기존 span 스타일만 갱신"
+    function ensureTypingSpanOrUpdate(styleObj = {}) {
+        if (typingSpan && root.contains(typingSpan)) {
+            Object.assign(typingSpan.style, styleObj);
+            // 커서를 typingSpan 끝으로
+            const endNode = typingSpan.lastChild ?? typingSpan;
+            placeCaretInside(endNode, true);
+            return typingSpan;
+        }
+        surroundOrInsertSpan(styleObj);
+        return typingSpan;
+    }
+
     // ===== 공개 API: 포맷 =====
-    function applyBold() { document.execCommand("bold"); console.log("[KEditor] bold"); }
-    function applyItalic() { document.execCommand("italic"); console.log("[KEditor] italic"); }
-    function applyUnderline() { document.execCommand("underline"); console.log("[KEditor] underline"); }
+    function applyBold() { document.execCommand("bold"); console.log("[KEditor] bold"); forceCaretToTail(); }
+    function applyItalic() { document.execCommand("italic"); console.log("[KEditor] italic"); forceCaretToTail(); }
+    function applyUnderline() { document.execCommand("underline"); console.log("[KEditor] underline"); forceCaretToTail(); }
 
     function applyHeading(tag) {
         root.focus();
@@ -182,6 +221,7 @@ export function createKEditor(options) {
         if (!valid.includes(tag)) tag = "p";
         document.execCommand("formatBlock", false, tag);
         console.log("[KEditor] heading:", tag);
+        forceCaretToTail();
     }
     function clearHeading() { applyHeading("p"); }
 
@@ -190,6 +230,7 @@ export function createKEditor(options) {
         if (type === "ul") document.execCommand("insertUnorderedList");
         if (type === "ol") document.execCommand("insertOrderedList");
         console.log("[KEditor] list:", type);
+        forceCaretToTail();
     }
 
     function applyAlign(alignment) {
@@ -198,13 +239,15 @@ export function createKEditor(options) {
         const cmd = map[alignment] || "justifyLeft";
         document.execCommand(cmd);
         console.log("[KEditor] align:", alignment);
+        forceCaretToTail();
     }
 
     function setFontSize(size) {
         if (!size || size === "reset") return resetFontSize();
-        surroundOrInsertSpan({ fontSize: size });
+        ensureTypingSpanOrUpdate({ fontSize: size });   // ← 변경
         console.log("[KEditor] font-size:", size);
         showStylePreview("글자 크기: " + size);
+        forceCaretToTail();
     }
     function resetFontSize() {
         root.focus();
@@ -220,9 +263,10 @@ export function createKEditor(options) {
 
     function setColor(color) {
         if (!color || color === "reset") return resetColor();
-        surroundOrInsertSpan({ color });
+        ensureTypingSpanOrUpdate({ color });            // ← 변경
         console.log("[KEditor] color:", color);
         showStylePreview("글자색: " + color);
+        forceCaretToTail();
     }
     function resetColor() {
         root.focus();
@@ -376,6 +420,36 @@ export function createKEditor(options) {
     }
 
     // ===== 이벤트: 입력/클릭 이동/Enter 처리 =====
+    // IME 중간 입력 더 강하게 보호
+    root.addEventListener("beforeinput", (e) => {
+        if (e.isComposing || e.inputType === "insertCompositionText") {
+            // 한글 조합 중에는 DOM 건드리지 않음
+            return;
+        }
+    });
+
+    // ===== IME(한글 조합) 핸들러 =====
+    root.addEventListener("compositionstart", () => {
+        isComposing = true;
+    });
+
+    root.addEventListener("compositionend", () => {
+        isComposing = false;
+        // 조합 끝나면 ZWSP 정리 + 커서를 typingSpan 끝으로
+        if (typingSpan && root.contains(typingSpan)) {
+            const t = typingSpan.firstChild;
+            if (t && t.nodeType === Node.TEXT_NODE) {
+                t.nodeValue = (t.nodeValue || "").replace(/\u200B/g, "");
+                placeCaretInside(t, true);
+            } else {
+                // 텍스트 노드가 없으면 하나 만들어 커서 고정
+                const tn = document.createTextNode("");
+                typingSpan.appendChild(tn);
+                placeCaretInside(tn, true);
+            }
+        }
+    });
+
     root.addEventListener("input", () => {
         if (!typingSpan) return;
         const t = typingSpan.firstChild;
