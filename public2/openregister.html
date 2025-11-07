@@ -110,40 +110,58 @@
             transform: scale(1.1)
         }
 
-        /* 커스텀 에디터 툴바 스타일 */
-        #tb button {
-            padding: 6px 12px;
+        /* ✅ 폼 밖 툴바 스타일 */
+        .k-toolbar button {
+            padding: 8px 12px;
             border: 1px solid #d1d5db;
-            background: #fff;
-            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s;
+            font-size: 13px;
+            transition: all 0.2s ease;
             color: #374151;
             font-weight: 500;
+            backdrop-filter: blur(4px);
         }
 
-        #tb button:hover {
+        .k-toolbar button:hover {
             background: #e0e7ff;
             border-color: #6366f1;
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.2);
         }
 
-        #tb select, #tb input[type="color"] {
-            padding: 4px 8px;
+        .k-toolbar select, 
+        .k-toolbar input[type="color"] {
+            padding: 6px 10px;
             border: 1px solid #d1d5db;
-            border-radius: 6px;
-            background: #fff;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
             font-size: 12px;
             cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
         }
 
-        .editor img {
+        .k-toolbar select:hover,
+        .k-toolbar input[type="color"]:hover {
+            border-color: #6366f1;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+        }
+
+        /* 에디터 내 이미지 스타일 */
+        #customEditor img {
             max-width: 100%;
             height: auto;
             border: 1px solid #e5e7eb;
-            border-radius: 6px;
+            border-radius: 8px;
             margin: 8px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #customEditor:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
         .char-btn {
@@ -302,49 +320,20 @@
                 <input name="img" type="file" accept="image/*" class="w-full border rounded px-3 py-2 text-gray-700" />
             </div>
 
-            <!-- ▼ 설명(소개) 입력 영역: 커스텀 에디터 + 히든필드 -->
-            <section class="mt-6">
-              <label for="descHtml" style="display:block;margin:8px 0;font-weight:700;">설명(소개)</label>
-
-              <!-- 툴바 -->
-              <div id="tb" style="position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;background:#f7f7fa;border:1px solid #e5e7eb;border-radius:8px 8px 0 0;">
-                <button data-cmd="bold"><b>굵게</b></button>
-                <button data-cmd="italic"><i>기울임</i></button>
-                <button data-cmd="underline"><u>밑줄</u></button>
-
-                <button data-cmd="justifyLeft">좌</button>
-                <button data-cmd="justifyCenter">중</button>
-                <button data-cmd="justifyRight">우</button>
-
-                <button data-cmd="insertUnorderedList">● 목록</button>
-                <button data-cmd="insertOrderedList">1. 목록</button>
-
-                <select id="fs">
-                  <option value="">글자 크기</option>
-                  <option value="14px">14</option>
-                  <option value="16px">16</option>
-                  <option value="18px">18</option>
-                  <option value="20px">20</option>
-                  <option value="24px">24</option>
-                  <option value="28px">28</option>
-                </select>
-
-                <input type="color" id="fc" title="글자색" />
-                <input type="file" id="img" accept="image/*" style="display:none" />
-                <button id="btnImg">이미지</button>
-              </div>
-
-              <!-- 에디터 -->
-              <div id="ed"
-                   class="editor"
+            <!-- ▼ 설명(소개) 입력 영역: 커스텀 에디터 -->
+            <div class="mt-6">
+              <label for="customEditor" class="block font-semibold mb-2">설명(소개)</label>
+              
+              <!-- 에디터 (툴바는 폼 밖에 있음) -->
+              <div id="customEditor"
                    contenteditable="true"
                    data-placeholder="가게 소개를 입력하세요…"
-                   style="padding:12px;min-height:220px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;line-height:1.6;word-break:break-word;outline:none;">
+                   style="padding:12px;min-height:220px;border:1px solid #e5e7eb;border-radius:8px;line-height:1.6;word-break:break-word;outline:none;background:#fff;">
               </div>
 
               <!-- 제출용 히든 필드 (서버로 전송됨) -->
               <input type="hidden" name="descHtml" id="descHtml" />
-            </section>
+            </div>
             <!-- ▲ 설명(소개) 입력 영역 끝 -->
 
             <!-- 등록 버튼 -->
@@ -481,23 +470,27 @@
     </script>
 
 <script>
+// 🔹 커스텀 에디터 (툴바는 폼 밖에 분리됨)
 (function(){
   'use strict';
 
-  // ★ 폼 id 확인: 다르면 여기 바꿔줘.
+  // DOM 요소 참조
   var form = document.getElementById('openForm');
-  var ed   = document.getElementById('ed');
-  var tb   = document.getElementById('tb');
-  var fs   = document.getElementById('fs');
-  var fc   = document.getElementById('fc');
-  var img  = document.getElementById('img');
-  var btnImg = document.getElementById('btnImg');
+  var editor = document.getElementById('customEditor');
+  var toolbar = document.getElementById('k-toolbar');
   var hidden = document.getElementById('descHtml');
+  
+  // 툴바 버튼들
+  var fontSizeSelector = document.getElementById('font-size-selector');
+  var fontColorPicker = document.getElementById('font-color-picker');
+  var imageInput = document.getElementById('image-input');
+  var btnImage = document.getElementById('btn-image');
 
   var composing = false;
   var typingSpan = null;
   var ZWSP = '\u200B';
 
+  // 유틸리티 함수들
   function getSel(){ return window.getSelection ? window.getSelection() : null; }
   function newRange(){ return document.createRange ? document.createRange() : null; }
 
@@ -515,9 +508,9 @@
   function caretToTail(){
     var s = getSel(); if (!s) return;
     var r = newRange(); if (!r) return;
-    var node = ed;
+    var node = editor;
     while (node && node.lastChild) node = node.lastChild;
-    if (!node || node === ed) { var br = document.createElement('br'); ed.appendChild(br); node = br; }
+    if (!node || node === editor) { var br = document.createElement('br'); editor.appendChild(br); node = br; }
     if (node.nodeType === 3) {
       var len = node.nodeValue ? node.nodeValue.length : 0;
       r.setStart(node, len);
@@ -529,7 +522,7 @@
 
   function applyInlineStyle(styleObj){
     if (!styleObj) styleObj = {};
-    ed.focus();
+    editor.focus();
     var s = getSel(); if (!s || s.rangeCount === 0) return;
 
     if (!s.isCollapsed) {
@@ -545,7 +538,7 @@
       return;
     }
 
-    if (typingSpan && ed.contains(typingSpan)) {
+    if (typingSpan && editor.contains(typingSpan)) {
       for (var k2 in styleObj) if (styleObj.hasOwnProperty(k2)) typingSpan.style[k2] = styleObj[k2];
       var endNode = typingSpan.lastChild || typingSpan;
       placeCaretInside(endNode, true);
@@ -571,17 +564,46 @@
     typingSpan = span2;
   }
 
-  // 툴바 포커스 훔치기 방지
-  tb.addEventListener('mousedown', function(e){
-    var t = e.target || e.srcElement;
-    if (t && t.tagName === 'BUTTON') { e.preventDefault(); ed.focus(); }
+  function insertImage(src){
+    editor.focus();
+    var s = getSel(); if (!s || s.rangeCount === 0) caretToTail();
+    s = getSel(); if (!s || s.rangeCount === 0) return;
+    var r = s.getRangeAt(0);
+    var image = document.createElement('img');
+    image.src = src; image.alt = 'image';
+    image.style.maxWidth = '100%'; image.style.height = 'auto'; image.style.margin = '8px 0';
+    image.style.borderRadius = '6px';
+    r.insertNode(image);
+    r.setStartAfter(image); r.collapse(true);
+    s.removeAllRanges(); s.addRange(r);
+  }
+
+  // ✅ 툴바 이벤트 (폼 밖이므로 안전)
+  toolbar.addEventListener('mousedown', function(e){
+    var target = e.target || e.srcElement;
+    if (target && target.tagName === 'BUTTON') { 
+      e.preventDefault(); 
+      editor.focus(); 
+    }
+  });
+
+  toolbar.addEventListener('click', function(e){
+    var target = e.target || e.srcElement;
+    if (!target) return;
+    
+    var cmd = target.getAttribute('data-cmd');
+    if (cmd && !composing) {
+      try { document.execCommand('styleWithCSS', false, true); } catch(e){}
+      document.execCommand(cmd, false, null);
+      editor.focus();
+    }
   });
 
   // IME 한글 조합 처리
-  ed.addEventListener('compositionstart', function(){ composing = true; });
-  ed.addEventListener('compositionend', function(){
+  editor.addEventListener('compositionstart', function(){ composing = true; });
+  editor.addEventListener('compositionend', function(){
     composing = false;
-    if (typingSpan && ed.contains(typingSpan)) {
+    if (typingSpan && editor.contains(typingSpan)) {
       var t = typingSpan.lastChild || typingSpan.firstChild;
       if (t && t.nodeType === 3) {
         var v = t.nodeValue || '';
@@ -595,7 +617,7 @@
     }
   });
 
-  ed.addEventListener('input', function(){
+  editor.addEventListener('input', function(){
     if (!typingSpan) return;
     var t = typingSpan.firstChild;
     if (t && t.nodeType === 3 && t.nodeValue && t.nodeValue.indexOf(ZWSP) === 0) {
@@ -603,59 +625,66 @@
     }
   });
 
-  // 기본 서식 버튼 (execCommand)
-  tb.addEventListener('click', function(e){
-    var t = e.target || e.srcElement; if (!t) return;
-    var cmd = t.getAttribute('data-cmd'); if (!cmd) return;
-    if (composing) return;
-    try { document.execCommand('styleWithCSS', false, true); } catch(e){}
-    document.execCommand(cmd, false, null);
-    ed.focus();
-  });
-
-  // 글자 크기 / 색
-  fs.addEventListener('change', function(){
-    if (composing) return;
-    var val = fs.value; if (!val) return;
-    applyInlineStyle({ fontSize: val }); ed.focus();
-  });
-  fc.addEventListener('input', function(){
-    if (composing) return;
-    var val = fc.value; if (!val) return;
-    applyInlineStyle({ color: val }); ed.focus();
-  });
-
-  // 이미지 삽입 (로컬 미리보기 방식)
-  btnImg.addEventListener('click', function(){ img.click(); });
-  img.addEventListener('change', function(e){
-    if (composing) return;
-    var file = (e.target && e.target.files && e.target.files[0]) ? e.target.files[0] : null;
-    if (!file) return;
-    var url = (window.URL && window.URL.createObjectURL) ? window.URL.createObjectURL(file) : null;
-    if (!url) return;
-    insertImage(url);
-    img.value = '';
-  });
-
-  function insertImage(src){
-    ed.focus();
-    var s = getSel(); if (!s || s.rangeCount === 0) caretToTail();
-    s = getSel(); if (!s || s.rangeCount === 0) return;
-    var r = s.getRangeAt(0);
-    var image = document.createElement('img');
-    image.src = src; image.alt = 'image';
-    image.style.maxWidth = '100%'; image.style.height = 'auto'; image.style.margin = '8px 0';
-    r.insertNode(image);
-    r.setStartAfter(image); r.collapse(true);
-    s.removeAllRanges(); s.addRange(r);
-  }
-
-  // ★ 폼 제출 시 에디터 내용을 descHtml로 복사
-  if (form) {
-    form.addEventListener('submit', function(){
-      if (hidden) hidden.value = ed.innerHTML.replace(/\u200B/g, '');
+  // 글자 크기 / 색상
+  if (fontSizeSelector) {
+    fontSizeSelector.addEventListener('change', function(){
+      if (composing) return;
+      var val = fontSizeSelector.value;
+      if (!val) return;
+      applyInlineStyle({ fontSize: val });
+      editor.focus();
     });
   }
+
+  if (fontColorPicker) {
+    fontColorPicker.addEventListener('input', function(){
+      if (composing) return;
+      var val = fontColorPicker.value;
+      if (!val) return;
+      applyInlineStyle({ color: val });
+      editor.focus();
+    });
+  }
+
+  // 이미지 삽입
+  if (btnImage) {
+    btnImage.addEventListener('click', function(){ 
+      if (imageInput) imageInput.click(); 
+    });
+  }
+
+  if (imageInput) {
+    imageInput.addEventListener('change', function(e){
+      if (composing) return;
+      var file = (e.target && e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+      if (!file) return;
+      var url = (window.URL && window.URL.createObjectURL) ? window.URL.createObjectURL(file) : null;
+      if (!url) return;
+      insertImage(url);
+      imageInput.value = '';
+    });
+  }
+
+  // ✅ 폼 제출 직전 동기화 (안전한 방식)
+  if (form && editor && hidden) {
+    form.addEventListener('submit', function(){
+      hidden.value = editor.innerHTML.replace(/\u200B/g, '') || '';
+    });
+  }
+
+  // 에디터 전역 접근용 (디버깅/확장 가능)
+  window.keditor = {
+    getHTML: function() {
+      return editor ? editor.innerHTML.replace(/\u200B/g, '') : '';
+    },
+    setHTML: function(html) {
+      if (editor) editor.innerHTML = html || '';
+    },
+    focus: function() {
+      if (editor) editor.focus();
+    }
+  };
+
 })();
 </script>
 </body>
