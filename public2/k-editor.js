@@ -329,11 +329,19 @@ export function createKEditor(options) {
     buttons?.underline && buttons.underline.addEventListener("click", () =>
         applyStyleToSelectionOrTyping(toggleUnderline));
 
-    selects?.fontSize && selects.fontSize.addEventListener("change", function () {
-        const val = this.value;
-        applyStyleToSelectionOrTyping(() => setFontSize(val === "reset" ? "" : val));
-        if (val === "reset") this.value = "";
-    });
+    // fontSize select 처리 (단일 또는 배열)
+    if (selects?.fontSize) {
+        const fontSizeElements = Array.isArray(selects.fontSize) ? selects.fontSize : [selects.fontSize];
+        fontSizeElements.forEach(element => {
+            if (element) {
+                element.addEventListener("change", function () {
+                    const val = this.value;
+                    applyStyleToSelectionOrTyping(() => setFontSize(val === "reset" ? "" : val));
+                    if (val === "reset") this.value = "";
+                });
+            }
+        });
+    }
 
     // 프리셋 색상
     colorButtons.forEach(btn => {
