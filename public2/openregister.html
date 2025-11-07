@@ -340,6 +340,131 @@
                 <input type="file" id="image-input" accept="image/*" style="display:none" />
                 <button type="button" id="btn-image">이미지</button>
               </div>
+
+<script>
+(function () {
+  'use strict';
+
+  const editor  = document.getElementById('customEditor');
+  const toolbar = document.getElementById('k-toolbar');
+  const fsSel   = document.getElementById('font-size-selector');
+  const color   = document.getElementById('font-color-picker');
+  const imgIn   = document.getElementById('image-input');
+  const imgBtn  = document.getElementById('btn-image');
+
+  if (!editor || !toolbar) {
+    console.warn('[editor] customEditor 또는 k-toolbar 없음');
+    return;
+  }
+
+  // 1) 버튼 누를 때 포커스 유지
+  toolbar.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button,select,input')) {
+      e.preventDefault();           // 포커스 도난 방지
+      editor.focus();
+    }
+  });
+
+  // 2) execCommand 계열 버튼(굵게/밑줄/정렬/목록)
+  toolbar.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cmd]');
+    if (!btn) return;
+    const cmd = btn.dataset.cmd;
+    editor.focus();
+    try { document.execCommand('styleWithCSS', false, true); } catch(e){}
+    document.execCommand(cmd, false, null);
+  });
+
+  // 3) 인라인 스타일 적용 유틸 (크기/색)
+  function applyInlineStyle(styleObj) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+
+    // 선택이 있으면 감싸기
+    if (!sel.isCollapsed) {
+      const span = document.createElement('span');
+      Object.assign(span.style, styleObj);
+      try {
+        range.surroundContents(span);
+      } catch {
+        const frag = range.extractContents();
+        span.appendChild(frag);
+        range.insertNode(span);
+      }
+      // 커서를 뒤로
+      const r = document.createRange();
+      r.setStartAfter(span);
+      r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+      return;
+    }
+
+    // 선택이 없으면 커서 위치에 스타일 span 생성
+    const span = document.createElement('span');
+    Object.assign(span.style, styleObj);
+    const tn = document.createTextNode('\u200B'); // ZWSP
+    span.appendChild(tn);
+    range.insertNode(span);
+
+    // 커서를 span 끝으로
+    const r = document.createRange();
+    r.setStart(tn, tn.length);
+    r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+
+  // 4) 글자 크기
+  fsSel && fsSel.addEventListener('change', function () {
+    if (!this.value) return;
+    editor.focus();
+    applyInlineStyle({ fontSize: this.value });
+  });
+
+  // 5) 글자색
+  color && color.addEventListener('input', function () {
+    if (!this.value) return;
+    editor.focus();
+    applyInlineStyle({ color: this.value });
+  });
+
+  // 6) 이미지
+  imgBtn && imgBtn.addEventListener('click', () => imgIn && imgIn.click());
+  imgIn && imgIn.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) editor.focus();
+    const range = (window.getSelection() || {}).getRangeAt?.(0);
+    if (!range) return;
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.borderRadius = '8px';
+    img.style.margin = '8px 0';
+    range.insertNode(img);
+    range.setStartAfter(img); range.collapse(true);
+    sel.removeAllRanges(); sel.addRange(range);
+    imgIn.value = '';
+  });
+
+  // 7) 안전망: 강제 표시 및 위치 고정
+  function ensureToolbarVisible(){
+    toolbar.style.display   = 'flex';
+    toolbar.style.visibility= 'visible';
+    toolbar.style.opacity   = '1';
+    toolbar.style.position  = 'sticky';
+    toolbar.style.top       = '0';
+    toolbar.style.zIndex    = '50';
+  }
+  ensureToolbarVisible();
+  setInterval(ensureToolbarVisible, 800); // 숨겨져도 복구
+
+  console.log('✅ 에디터 재바인딩 완료:', { editor: !!editor, toolbar: !!toolbar });
+})();
+</script>
               
               <!-- 에디터 -->
               <div id="customEditor"
