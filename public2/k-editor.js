@@ -60,6 +60,31 @@ export function createKEditor(options) {
             typingSpan = null;
         }
     }
+    function placeCaretAtEndOfRoot() {
+        const range = document.createRange();
+        const sel = window.getSelection();
+
+        // 루트의 마지막 자식(텍스트/엘리먼트)을 찾아 끝에 커서 배치
+        let node = root;
+        while (node && node.lastChild) node = node.lastChild;
+
+        // 비어있으면 <br> 하나 만들어서 기준점 마련
+        if (!node || node === root) {
+            const br = document.createElement("br");
+            root.appendChild(br);
+            node = br;
+        }
+
+        // 텍스트 노드면 길이 끝, 아니면 마지막 자식 기준
+        if (node.nodeType === Node.TEXT_NODE) {
+            range.setStart(node, node.nodeValue?.length ?? 0);
+        } else {
+            range.setStartAfter(node);
+        }
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
 
     // ===== 스타일 미리보기(Toast) =====
     function showStylePreview(text) {
@@ -86,6 +111,8 @@ export function createKEditor(options) {
         if (!sel || !sel.rangeCount) return;
 
         const range = sel.getRangeAt(0);
+
+        // 선택이 있는 경우: 선택을 감싸고, 커서를 "선택 뒤"로
         if (!sel.isCollapsed) {
             const span = document.createElement("span");
             Object.assign(span.style, styleObj);
@@ -95,14 +122,17 @@ export function createKEditor(options) {
                 const frag = range.extractContents();
                 span.appendChild(frag);
                 range.insertNode(span);
-                sel.removeAllRanges();
-                const after = document.createRange();
-                after.setStartAfter(span);
-                after.collapse(true);
-                sel.addRange(after);
             }
+            sel.removeAllRanges();
+            const after = document.createRange();
+            after.setStartAfter(span);
+            after.collapse(true);
+            sel.addRange(after);
             return;
         }
+
+        // ★ 선택이 없는 경우: 에디터 "끝"으로 커서를 보낸 뒤 typingSpan 만들기
+        placeCaretAtEndOfRoot();
         ensureTypingSpan(styleObj);
     }
 
