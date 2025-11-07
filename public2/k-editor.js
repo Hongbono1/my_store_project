@@ -85,6 +85,14 @@ export function createKEditor(options) {
         sel.removeAllRanges();
         sel.addRange(range);
     }
+    // 툴바가 에디터 포커스를 훔치지 못하게
+    function keepEditorFocus(el) {
+        if (!el) return;
+        el.addEventListener("mousedown", (e) => {
+            e.preventDefault();     // 포커스 이동 차단
+            root.focus();           // 에디터 포커스 유지
+        });
+    }
 
     // ===== 스타일 미리보기(Toast) =====
     function showStylePreview(text) {
@@ -112,7 +120,7 @@ export function createKEditor(options) {
 
         const range = sel.getRangeAt(0);
 
-        // 선택이 있는 경우: 선택을 감싸고, 커서를 "선택 뒤"로
+        // 선택이 있는 경우: 감싼 뒤 커서를 뒤로
         if (!sel.isCollapsed) {
             const span = document.createElement("span");
             Object.assign(span.style, styleObj);
@@ -131,9 +139,36 @@ export function createKEditor(options) {
             return;
         }
 
-        // ★ 선택이 없는 경우: 에디터 "끝"으로 커서를 보낸 뒤 typingSpan 만들기
+        // 선택이 없는 경우: 끝으로 이동
         placeCaretAtEndOfRoot();
-        ensureTypingSpan(styleObj);
+
+        // ★ 임시 마커 → 마커 뒤에 스타일 span 삽입 → 커서를 span 내부 끝으로
+        const r = sel.getRangeAt(0);
+
+        const marker = document.createElement("span");
+        marker.id = "keditor-caret-marker";
+        marker.style.display = "inline-block";
+        marker.style.width = "0";
+        marker.style.height = "0";
+        marker.appendChild(document.createTextNode("\uFEFF")); // BOM
+        r.insertNode(marker);
+
+        const span = document.createElement("span");
+        span.setAttribute("data-typing-span", "true");
+        Object.assign(span.style, styleObj);
+        const zw = document.createTextNode("\u200B");
+        span.appendChild(zw);
+
+        marker.parentNode.insertBefore(span, marker.nextSibling);
+        marker.remove();
+
+        const nr = document.createRange();
+        nr.setStart(zw, 1);   // 커서를 span 내부 "끝"으로
+        nr.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(nr);
+
+        typingSpan = span;
     }
 
     // ===== 공개 API: 포맷 =====
@@ -388,6 +423,15 @@ export function createKEditor(options) {
 
     // ===== 툴바 바인딩(옵션) =====
     const toolbar = options?.toolbar || {};
+    
+    // 모든 툴바 요소에 포커스 보호 적용
+    Object.values(toolbar.buttons || {}).forEach(keepEditorFocus);
+    Object.values(toolbar.selects || {}).forEach(keepEditorFocus);
+    if (toolbar.colorButtons?.length) toolbar.colorButtons.forEach(keepEditorFocus);
+    if (toolbar.charButtons?.length)  toolbar.charButtons.forEach(keepEditorFocus);
+    if (toolbar.imageButton) keepEditorFocus(toolbar.imageButton);
+    if (toolbar.imageInput)  keepEditorFocus(toolbar.imageInput);
+    
     // 기본 서식 버튼
     toolbar.buttons?.bold && toolbar.buttons.bold.addEventListener("click", applyBold);
     toolbar.buttons?.italic && toolbar.buttons.italic.addEventListener("click", applyItalic);
