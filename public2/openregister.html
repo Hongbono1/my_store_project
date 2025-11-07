@@ -859,13 +859,22 @@
                 // img 태그 생성
                 const img = document.createElement('img');
                 
-                // 현재 접속 환경 확인하고 적절한 URL 생성
+                // 현재 접속 환경에 맞는 URL 생성
                 console.log('🌐 현재 location:', window.location.href);
                 console.log('🌐 현재 host:', window.location.host);
                 
-                // 단순하게 상대 경로만 사용
-                img.src = imagePath;
-                console.log('🔗 설정된 이미지 URL:', imagePath);
+                // 환경에 따른 이미지 URL 설정
+                let imageUrl;
+                if (window.location.host === 'localhost:3000') {
+                    // 로컬 개발 환경
+                    imageUrl = 'http://localhost:3000' + imagePath;
+                } else {
+                    // 배포 환경 (hongbono1.com)
+                    imageUrl = window.location.origin + imagePath;
+                }
+                
+                img.src = imageUrl;
+                console.log('🔗 설정된 이미지 URL:', imageUrl);
                 
                 img.style.maxWidth = '100%';
                 img.style.height = 'auto';
@@ -888,7 +897,18 @@
                 
                 // 이미지 로드 이벤트 추가
                 img.onload = function() {
-                    console.log('✅ 이미지 로드 성공:', imagePath);
+                    console.log('✅ 이미지 로드 성공:', imageUrl);
+                };
+                img.onerror = function() {
+                    console.error('❌ 이미지 로드 실패:', imageUrl);
+                    console.error('❌ 원본 경로:', imagePath);
+                    
+                    // 상대 경로로 재시도
+                    if (this.src !== imagePath) {
+                        console.log('🔄 상대 경로로 재시도:', imagePath);
+                        this.src = imagePath;
+                    }
+                };
                 };
                 img.onerror = function() {
                     console.error('❌ 이미지 로드 실패:', imagePath);
