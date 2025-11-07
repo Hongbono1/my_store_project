@@ -162,12 +162,23 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
-        /* 🔧 툴바 강제 표시 (숨김 방지) */
+        /* 🔧 툴바 강제 표시 (숨김 방지) - 최강 버전 */
         #k-toolbar {
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
             z-index: 100 !important;
+            position: sticky !important;
+            top: 0 !important;
+        }
+        
+        /* 🛡️ 추가 보호 - 숨김 클래스 무력화 */
+        #k-toolbar.hidden,
+        #k-toolbar.sr-only,
+        #k-toolbar.opacity-0 {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
 
         .char-btn {
@@ -687,6 +698,72 @@
 
 })();
 </script>
+
+<!-- 🚨 툴바 강제 복구 와치독 (최후의 보루) -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let watchdogCount = 0;
+  
+  function showToolbar() {
+    const tb = document.getElementById('k-toolbar');
+    if (!tb) {
+      console.warn('⚠️ 툴바 요소를 찾을 수 없습니다 (#k-toolbar)');
+      return;
+    }
+    
+    const prevDisplay = tb.style.display;
+    const prevVisibility = tb.style.visibility;
+    const prevOpacity = tb.style.opacity;
+    
+    tb.style.display = 'flex';
+    tb.style.visibility = 'visible';
+    tb.style.opacity = '1';
+    tb.style.position = 'sticky';
+    tb.style.top = '0';
+    tb.style.zIndex = '50';
+    
+    // 숨김 클래스들 제거
+    const removedClasses = [];
+    ['hidden', 'sr-only', 'opacity-0', 'invisible'].forEach(cls => {
+      if (tb.classList.contains(cls)) {
+        tb.classList.remove(cls);
+        removedClasses.push(cls);
+      }
+    });
+    
+    watchdogCount++;
+    
+    // 변경사항이 있으면 로그
+    if (prevDisplay !== 'flex' || prevVisibility !== 'visible' || prevOpacity !== '1' || removedClasses.length > 0) {
+      console.log(`🔧 툴바 복구 #${watchdogCount}:`, {
+        display: `${prevDisplay} → flex`,
+        visibility: `${prevVisibility} → visible`,
+        opacity: `${prevOpacity} → 1`,
+        removedClasses: removedClasses
+      });
+    }
+  }
+  
+  console.log('🛡️ 툴바 와치독 활성화 - 매 500ms 체크');
+  showToolbar();
+  
+  // 누가 display:none 주거나 DOM 이동해도 되살리기
+  window.__kToolbarWatchdog = setInterval(showToolbar, 500);
+  
+  // 10초 후 와치독 빈도 줄이기 (성능 최적화)
+  setTimeout(() => {
+    if (window.__kToolbarWatchdog) {
+      clearInterval(window.__kToolbarWatchdog);
+      window.__kToolbarWatchdog = setInterval(showToolbar, 2000);
+      console.log('🛡️ 툴바 와치독 - 2초 간격으로 변경 (성능 최적화)');
+    }
+  }, 10000);
+});
+</script>
+
+<style>
+  #k-toolbar { display:flex !important; }
+</style>
 </body>
 
 </html>
