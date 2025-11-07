@@ -388,39 +388,44 @@
         }
 
         // 2) 에디터 초기화 (툴바 DOM 연결)
-        const editor = createKEditor({
-            root: document.getElementById("customEditor"),
+        const editorRoot = document.getElementById("customEditor");
+
+        // 툴바 요소들 "참조만" 넘긴다. (click/change 핸들러는 모듈이 다 건다)
+        const toolbar = {
+            buttons: {
+                bold: document.getElementById("btnBold"),
+                italic: document.getElementById("btnItalic"),
+                underline: document.getElementById("btnUnderline"),
+                ul: document.getElementById("btnUL"),
+                ol: document.getElementById("btnOL"),
+                alignLeft: document.getElementById("btnAlignLeft"),
+                alignCenter: document.getElementById("btnAlignCenter"),
+                alignRight: document.getElementById("btnAlignRight"),
+            },
+            selects: {
+                heading: document.getElementById("selHeading"),
+                fontSize: document.getElementById("selFontSize"),
+            },
+            colorButtons: Array.from(document.querySelectorAll(".color-btn")),
+            charButtons: Array.from(document.querySelectorAll(".char-btn")),
+            imageButton: document.getElementById("imageUploadBtn"),
+            imageInput: document.getElementById("imageUploadInput"),
+        };
+
+        const ke = createKEditor({
+            root: editorRoot,
+            toolbar,
             uploadEndpoint: "/upload/image",
-            toolbar: {
-                buttons: {
-                    bold: document.getElementById("btnBold"),
-                    italic: document.getElementById("btnItalic"),
-                    underline: document.getElementById("btnUnderline"),
-                    ul: document.getElementById("btnUL"),
-                    ol: document.getElementById("btnOL"),
-                    alignLeft: document.getElementById("btnAlignLeft"),
-                    alignCenter: document.getElementById("btnAlignCenter"),
-                    alignRight: document.getElementById("btnAlignRight"),
-                },
-                selects: {
-                    heading: document.getElementById("selHeading"),
-                    fontSize: document.getElementById("selFontSize"),
-                },
-                colorButtons: Array.from(document.querySelectorAll(".color-btn")),
-                charButtons: Array.from(document.querySelectorAll(".char-btn")),
-                imageButton: document.getElementById("imageUploadBtn"),
-                imageInput: document.getElementById("imageUploadInput"),
-            }
         });
 
-        // 3) 제출 시 에디터 HTML 담아서 전송
+        // 3) 제출 시 HTML 싱크
         document.getElementById("openForm").addEventListener("submit", async (e) => {
             e.preventDefault();
 
             console.log("📝 폼 제출 시작");
-            const editorHtml = editor.getHTML();
+            document.getElementById("descHtml").value = ke.getHTML();
+            const editorHtml = ke.getHTML();
             console.log("📄 에디터 내용:", editorHtml.substring(0, 120) + "...");
-            document.getElementById("descHtml").value = editorHtml;
 
             const baseAddr = document.getElementById("address").value || "";
             const detailAddr = document.getElementById("detailAddress").value || "";
@@ -459,6 +464,9 @@
                 alert("서버 오류: " + err.message);
             }
         });
+
+        // 디버깅용 전역 노출(선택)
+        window.__KEDITOR__ = ke;
     </script>
 </body>
 
