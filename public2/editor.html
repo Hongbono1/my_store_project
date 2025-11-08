@@ -68,9 +68,20 @@
       </label>
 
       <div class="flex items-center gap-2">
-        <button data-align="left" title="왼쪽 정렬">⬅️</button>
-        <button data-align="center" title="가운데 정렬">↔️</button>
-        <button data-align="right" title="오른쪽 정렬">➡️</button>
+        <span class="text-xs text-gray-600">문단</span>
+        <button data-textalign="left" title="문단 왼쪽 정렬">⬅️</button>
+        <button data-textalign="center" title="문단 가운데 정렬">↔️</button>
+        <button data-textalign="right" title="문단 오른쪽 정렬">➡️</button>
+      </div>
+
+      <div class="border-l h-6"></div>
+
+      <!-- 이미지 정렬 전용 그룹 (새로 추가) -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-600">이미지</span>
+        <button data-imgalign="left" title="이미지 왼쪽 정렬" class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">⬅️</button>
+        <button data-imgalign="center" title="이미지 가운데 정렬" class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">↔️</button>
+        <button data-imgalign="right" title="이미지 오른쪽 정렬" class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">➡️</button>
       </div>
     </div>
 
@@ -201,9 +212,26 @@
       wrapSelection({ fontWeight: "bold" });
     });
 
-    // 밑줄
+    // 밑줄 토글: 현재 위치가 밑줄이면 해제, 아니면 적용
+    function isUnderlineActive() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return false;
+      const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+      if (!node) return false;
+      const el = node.closest('#editor *') || editor; // 에디터 내부 기준
+      const cs = window.getComputedStyle(el);
+      return cs.textDecorationLine.includes('underline');
+    }
+
     document.getElementById("underlineBtn").addEventListener("click", () => {
-      wrapSelection({ textDecoration: "underline" });
+      // 선택이 없으면 커서만 있는 자리 기준으로 토글
+      if (isUnderlineActive()) {
+        // 해제: 상속된 underline을 상쇄
+        wrapSelection({ textDecoration: "none" });
+      } else {
+        wrapSelection({ textDecoration: "underline" });
+      }
+      editor.focus();
     });
 
     // 4) 폰트/색/이미지 적용 전에 반드시 복원
@@ -245,18 +273,63 @@
       savedRange = range.cloneRange();
     });
 
-    // 이미지 정렬
-    document.querySelectorAll("[data-align]").forEach(btn => {
+    // 문단 정렬 로직
+    function closestBlock(node) {
+      if (!node) return editor;
+      let el = (node.nodeType === 1 ? node : node.parentElement);
+      while (el && el !== editor) {
+        const disp = window.getComputedStyle(el).display;
+        if (disp === 'block' || disp === 'list-item' || el.tagName === 'P' || el.tagName === 'DIV') return el;
+        el = el.parentElement;
+      }
+      return editor; // 못 찾으면 에디터에 적용
+    }
+
+    document.querySelectorAll("[data-textalign]").forEach(btn => {
       btn.addEventListener("click", () => {
-        const align = btn.dataset.align;
+        editor.focus();
+        restoreSelection();
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
-        const node = sel.anchorNode;
-        const img = node && node.nodeType === 1 && node.tagName === "IMG" ? node : node?.parentElement?.querySelector("img");
-        if (img) {
-          img.style.display = align === "center" ? "block" : "inline-block";
-          img.style.margin = align === "center" ? "auto" : "0";
-          img.style.float = align === "left" ? "left" : align === "right" ? "right" : "none";
+        const range = sel.getRangeAt(0);
+        const block = closestBlock(range.startContainer);
+        block.style.textAlign = btn.dataset.textalign; // 'left' | 'center' | 'right'
+      });
+    });
+
+    // 이미지 정렬 로직
+    function getSelectedImage() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return null;
+      const node = sel.anchorNode;
+      if (!node) return null;
+      if (node.nodeType === 1 && node.tagName === 'IMG') return node;
+      const el = (node.nodeType === 1 ? node : node.parentElement);
+      return el ? el.closest('#editor img') : null;
+    }
+
+    document.querySelectorAll("[data-imgalign]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        editor.focus();
+        restoreSelection();
+        const img = getSelectedImage();
+        if (!img) return; // 이미지가 선택되지 않았다면 무시
+
+        const align = btn.dataset.imgalign;
+        // float + margin 조합 (텍스트 감싸기 포함)
+        if (align === 'left') {
+          img.style.display = 'inline-block';
+          img.style.float = 'left';
+          img.style.margin = '0 0.75rem 0.5rem 0';
+        } else if (align === 'right') {
+          img.style.display = 'inline-block';
+          img.style.float = 'right';
+          img.style.margin = '0 0 0.5rem 0.75rem';
+        } else {
+          // center
+          img.style.float = 'none';
+          img.style.display = 'block';
+          img.style.margin = '0.5rem auto';
         }
       });
     });
