@@ -87,48 +87,103 @@
 
     const editor = document.getElementById("editor");
 
-    // 🔹 전역 변수로 커서 저장용 선언
+    // 1) 툴바 클릭 시 버튼에 한해서만 포커스 이동 방지
+    const toolbar = document.querySelector('.editor-toolbar');
+    toolbar.addEventListener('mousedown', (e) => {
+      const btn = e.target.closest('button');
+      if (btn) e.preventDefault(); // select, input[color]에는 적용 X
+    });
+
+    // 2) Selection이 에디터 내부일 때만 저장/복원
+    // 에디터 내부인지 판별
+    function isInEditor(node) {
+      if (!node) return false;
+      return node === editor || editor.contains(node);
+    }
+
+    // 커서 저장
     let savedRange = null;
-
-    // ✅ 1. 페이지 로드 후 바로 에디터 포커스 주기
-    window.addEventListener("load", () => editor.focus());
-
-    // 🔹 에디터 클릭/키입력 시마다 커서 저장
-    editor.addEventListener("mouseup", saveSelection);
-    editor.addEventListener("keyup", saveSelection);
-    editor.addEventListener("mouseleave", saveSelection);
-    // ✅ 3. 에디터 클릭 시마다 커서 자동 저장
-    editor.addEventListener("focus", saveSelection);
-
     function saveSelection() {
       const sel = window.getSelection();
       if (sel.rangeCount > 0) {
-        savedRange = sel.getRangeAt(0);
+        const r = sel.getRangeAt(0);
+        if (isInEditor(r.commonAncestorContainer)) {
+          savedRange = r.cloneRange();
+        }
       }
     }
 
-    // 🔹 커서 복원 함수
+    // 커서 복원 (실패 시 에디터 끝으로 이동)
     function restoreSelection() {
       const sel = window.getSelection();
-      if (savedRange) {
+      if (savedRange && isInEditor(savedRange.commonAncestorContainer)) {
         sel.removeAllRanges();
         sel.addRange(savedRange);
+        return true;
       }
+      placeCaretAtEnd(editor);
+      return false;
     }
 
-    // 🔹 wrapSelection 함수 수정
+    function placeCaretAtEnd(el) {
+      el.focus();
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      savedRange = r.cloneRange();
+    }
+
+    // selection 변화 추적 (툴바 클릭 중에도 최신 Range 유지)
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      // activeElement가 editor이거나, selection이 editor 안에 있을 때에만 저장
+      if (document.activeElement === editor || isInEditor(sel.anchorNode)) {
+        saveSelection();
+      }
+    });
+
+    // 에디터 이벤트에 저장 추가
+    editor.addEventListener('keyup', saveSelection);
+    editor.addEventListener('mouseup', saveSelection);
+    editor.addEventListener('input', saveSelection);
+    editor.addEventListener('focus', saveSelection);
+
+    // 초기 포커스
+    window.addEventListener('load', () => editor.focus());
+
+    // 3) 선택이 없어도(커서만) 스타일 적용되게 wrapSelection 교체
     function wrapSelection(styleObj = {}) {
-      // ✅ 2. 툴바 클릭 시 커서 복원 전 무조건 포커스 주기
       editor.focus();
-      restoreSelection(); // 버튼 클릭 시 저장된 커서 복원
+      restoreSelection();
+
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
-      const range = sel.getRangeAt(0);
-      if (range.collapsed) return;
+      let range = sel.getRangeAt(0);
 
-      const span = document.createElement("span");
+      // 선택이 없을 때: 스타일 span을 만들고 커서를 그 안으로 이동
+      if (range.collapsed) {
+        const span = document.createElement('span');
+        Object.assign(span.style, styleObj);
+        const zwsp = document.createTextNode('\u200B'); // zero-width space
+        span.appendChild(zwsp);
+        range.insertNode(span);
+
+        // 커서를 span 내부(zwsp 뒤)로 이동 → 이후 타이핑에 스타일 유지
+        range = document.createRange();
+        range.setStart(zwsp, 1);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        savedRange = range.cloneRange();
+        return;
+      }
+
+      // 선택이 있을 때: 선택 내용을 감싸기
+      const span = document.createElement('span');
       Object.assign(span.style, styleObj);
-
       const content = range.extractContents();
       span.appendChild(content);
       range.insertNode(span);
@@ -138,51 +193,56 @@
       range.collapse(true);
       sel.removeAllRanges();
       sel.addRange(range);
+      savedRange = range.cloneRange();
     }
 
     // 글자 굵게
     document.getElementById("boldBtn").addEventListener("click", () => {
       wrapSelection({ fontWeight: "bold" });
-      editor.focus();
     });
 
     // 밑줄
     document.getElementById("underlineBtn").addEventListener("click", () => {
       wrapSelection({ textDecoration: "underline" });
-      editor.focus();
     });
 
-    // 글자 크기
-    document.getElementById("fontSizeSelect").addEventListener("change", e => {
+    // 4) 폰트/색/이미지 적용 전에 반드시 복원
+    document.getElementById('fontSizeSelect').addEventListener('change', (e) => {
       const size = e.target.value;
-      if (size) {
-        wrapSelection({ fontSize: size });
-        e.target.value = "";
-      }
+      if (size) wrapSelection({ fontSize: size });
+      e.target.value = '';
       editor.focus();
     });
 
-    // 글자 색상
-    document.getElementById("fontColor").addEventListener("input", e => {
+    document.getElementById('fontColor').addEventListener('input', (e) => {
       wrapSelection({ color: e.target.value });
       editor.focus();
     });
 
-    // 이미지 삽입
-    const imageInput = document.getElementById("imageInput");
-    imageInput.addEventListener("change", e => {
+    const imageInput = document.getElementById('imageInput');
+    imageInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const url = URL.createObjectURL(file);
-      const img = document.createElement("img");
+      const img = document.createElement('img');
       img.src = url;
       img.alt = file.name;
-      img.style.display = "block";
-      img.style.margin = "auto";
+      img.style.display = 'block';
+      img.style.margin = 'auto';
 
-      const range = window.getSelection().getRangeAt(0);
-      range.insertNode(img);
       editor.focus();
+      restoreSelection();
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      range.insertNode(img);
+
+      // 커서를 이미지 뒤로
+      range.setStartAfter(img);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      savedRange = range.cloneRange();
     });
 
     // 이미지 정렬
