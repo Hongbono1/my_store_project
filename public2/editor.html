@@ -87,22 +87,46 @@
 
     const editor = document.getElementById("editor");
 
-    // 범위 감싸기 함수
+    // 🔹 전역 변수로 커서 저장용 선언
+    let savedRange = null;
+
+    // 🔹 에디터 클릭/키입력 시마다 커서 저장
+    editor.addEventListener("mouseup", saveSelection);
+    editor.addEventListener("keyup", saveSelection);
+    editor.addEventListener("mouseleave", saveSelection);
+
+    function saveSelection() {
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0) {
+        savedRange = sel.getRangeAt(0);
+      }
+    }
+
+    // 🔹 커서 복원 함수
+    function restoreSelection() {
+      const sel = window.getSelection();
+      if (savedRange) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+    }
+
+    // 🔹 wrapSelection 함수 수정
     function wrapSelection(styleObj = {}) {
+      restoreSelection(); // 버튼 클릭 시 저장된 커서 복원
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
       const range = sel.getRangeAt(0);
-      if (range.collapsed) return; // 선택 없으면 무시
+      if (range.collapsed) return;
 
       const span = document.createElement("span");
       Object.assign(span.style, styleObj);
 
-      // 기존 선택된 내용을 잘라서 span 안에 넣기 (안정형)
       const content = range.extractContents();
       span.appendChild(content);
       range.insertNode(span);
 
-      // 커서를 span 뒤로 이동 (다음 글자도 계속 입력 가능)
+      // 커서를 span 뒤로 이동
       range.setStartAfter(span);
       range.collapse(true);
       sel.removeAllRanges();
