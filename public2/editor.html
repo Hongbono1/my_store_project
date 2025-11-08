@@ -166,14 +166,28 @@
     function contextEl() {
       const sel = window.getSelection();
       if (!sel.rangeCount) return editor;
+      
       const n = sel.anchorNode;
-      const el = (n && n.nodeType === 1) ? n : n?.parentElement;
-      return inEditor(el) ? el : editor;
+      if (!n) return editor;
+      
+      let el = (n.nodeType === 1) ? n : n.parentElement;
+      
+      // 에디터 내부의 가장 가까운 스타일 요소 찾기
+      while (el && el !== editor) {
+        if (el.style && (el.style.fontWeight || el.style.textDecoration)) {
+          return el;
+        }
+        el = el.parentElement;
+      }
+      
+      return editor;
     }
     function isBoldActiveAtCaret() {
       const el = contextEl();
+      if (el === editor) return false; // 에디터 자체일 때는 false
       const fw = window.getComputedStyle(el).fontWeight;
-      return fw === 'bold' || parseInt(fw, 10) >= 600;
+      const numWeight = parseInt(fw, 10);
+      return fw === 'bold' || numWeight >= 600;
     }
     function isUnderlineActiveAtCaret() {
       const el = contextEl();
@@ -187,12 +201,18 @@
       isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
     }
 
-    // selection이 바뀔 때마다 저장 & 상태 업데이트
+    // selection이 바뀔 때마다 저장 & 상태 업데이트 (디바운스 적용)
+    let toolbarUpdateTimeout = null;
     document.addEventListener('selectionchange', () => {
       const sel = window.getSelection();
       if (document.activeElement === editor || inEditor(sel.anchorNode)) {
         saveSelection();
-        refreshToolbarState();
+        
+        // 디바운스: 연속된 선택 변경 시 마지막 것만 처리
+        clearTimeout(toolbarUpdateTimeout);
+        toolbarUpdateTimeout = setTimeout(() => {
+          refreshToolbarState();
+        }, 50); // 50ms 지연
       }
     });
 
@@ -264,16 +284,19 @@
       savedRange = range.cloneRange();
     }
 
-    // Bold 토글: 현재 위치가 굵으면 해제, 아니면 적용
-    document.getElementById("boldBtn").addEventListener("click", () => {
-      if (isBoldActiveAtCaret()) {
-        // 해제: 상속된 bold를 상쇄
-        wrapSelection({ fontWeight: "normal" });
-      } else {
-        // 적용
-        wrapSelection({ fontWeight: "bold" });
+    // Bold 토글: 버튼 클릭 시에만 작동 (자동 적용 방지)
+    document.getElementById("boldBtn").addEventListener("click", (e) => {
+      // 실제 사용자 클릭인지 확인 (자동 실행 방지)
+      if (e.isTrusted) {
+        if (isBoldActiveAtCaret()) {
+          // 해제: 상속된 bold를 상쇄
+          wrapSelection({ fontWeight: "normal" });
+        } else {
+          // 적용
+          wrapSelection({ fontWeight: "bold" });
+        }
+        setTimeout(() => refreshToolbarState(), 10); // 약간의 지연으로 안정성 확보
       }
-      refreshToolbarState();
       editor.focus();
     });
 
