@@ -205,8 +205,15 @@
       // 공통 명령
       function doCmd(cmd, value = null) {
         restoreSelection();
+        
+        // execCommand 실행
         document.execCommand(cmd, false, value);
-        updateState();
+        
+        // 강제로 상태 업데이트 (지연 실행으로 확실하게)
+        setTimeout(() => {
+          updateState();
+        }, 10);
+        
         editor.focus();
       }
 
@@ -419,25 +426,55 @@
         editor.focus();
       }
 
-      // 상태/토글 업데이트
+      // 상태/토글 업데이트 - 다중 서식 지원 강화
       function updateState() {
+        const sel = window.getSelection();
+        let bold = false, italic = false, underline = false, strikeThrough = false;
+        
+        // queryCommandState로 기본 확인
+        try {
+          bold = document.queryCommandState('bold');
+          italic = document.queryCommandState('italic');  
+          underline = document.queryCommandState('underline');
+          strikeThrough = document.queryCommandState('strikeThrough');
+        } catch (e) {
+          // queryCommandState 실패 시 DOM 직접 검사
+        }
+        
+        // DOM 직접 검사로 보완 (더 정확한 다중 서식 감지)
+        if (sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          let node = range.commonAncestorContainer;
+          if (node.nodeType === 3) node = node.parentNode; // 텍스트 노드면 부모로
+          
+          // 부모 노드들을 탐색하면서 스타일 확인
+          while (node && node !== editor) {
+            if (node.style) {
+              if (node.style.fontWeight === 'bold' || node.tagName === 'B' || node.tagName === 'STRONG') bold = true;
+              if (node.style.fontStyle === 'italic' || node.tagName === 'I' || node.tagName === 'EM') italic = true;
+              if (node.style.textDecoration && node.style.textDecoration.includes('underline') || node.tagName === 'U') underline = true;
+              if (node.style.textDecoration && node.style.textDecoration.includes('line-through') || node.tagName === 'S' || node.tagName === 'STRIKE') strikeThrough = true;
+            }
+            node = node.parentNode;
+          }
+        }
+
         const map = {
-          bold: document.queryCommandState('bold'),
-          italic: document.queryCommandState('italic'),
-          underline: document.queryCommandState('underline'),
-          strikeThrough: document.queryCommandState('strikeThrough'),
+          bold, italic, underline, strikeThrough,
           justifyLeft: document.queryCommandState('justifyLeft'),
           justifyCenter: document.queryCommandState('justifyCenter'),
           justifyRight: document.queryCommandState('justifyRight'),
           insertOrderedList: document.queryCommandState('insertOrderedList'),
           insertUnorderedList: document.queryCommandState('insertUnorderedList'),
         };
+        
         toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
           const c = btn.dataset.cmd;
           if (map[c]) btn.classList.add('active'); else btn.classList.remove('active');
         });
+        
         status.textContent =
-          `B:${map.bold ? 'on' : 'off'} I:${map.italic ? 'on' : 'off'} U:${map.underline ? 'on' : 'off'} · L:${map.justifyLeft ? 'on' : 'off'} C:${map.justifyCenter ? 'on' : 'off'} R:${map.justifyRight ? 'on' : 'off'}`;
+          `B:${map.bold ? 'ON' : 'off'} I:${map.italic ? 'ON' : 'off'} U:${map.underline ? 'ON' : 'off'} S:${map.strikeThrough ? 'ON' : 'off'}`;
       }
 
       // 초기화
