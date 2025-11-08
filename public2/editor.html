@@ -152,6 +152,8 @@
     <!-- Editor -->
     <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
       <p>여기에 입력하세요. (Ctrl/⌘+B/U/I 지원, 서식 토글 상태 유지)</p>
+      <p>이 텍스트로 <b>굵게</b>, <i>기울임</i>, <u>밑줄</u>, <s>취소선</s> 테스트하세요.</p>
+      <p>다중 서식도 테스트: <b><i><u>굵게+기울임+밑줄</u></i></b></p>
     </div>
 
     <div id="status" class="mt-2 text-xs text-slate-500">Ready</div>
@@ -426,39 +428,63 @@
         editor.focus();
       }
 
-      // 상태/토글 업데이트 - 다중 서식 지원 강화
+      // 상태/토글 업데이트 - 독립적인 다중 서식 지원
       function updateState() {
         const sel = window.getSelection();
         let bold = false, italic = false, underline = false, strikeThrough = false;
         
-        // queryCommandState로 기본 확인
+        // 1. queryCommandState로 기본 확인
         try {
           bold = document.queryCommandState('bold');
           italic = document.queryCommandState('italic');  
           underline = document.queryCommandState('underline');
           strikeThrough = document.queryCommandState('strikeThrough');
         } catch (e) {
-          // queryCommandState 실패 시 DOM 직접 검사
+          console.log('queryCommandState error:', e);
         }
         
-        // DOM 직접 검사로 보완 (더 정확한 다중 서식 감지)
+        // 2. DOM 직접 검사로 보완 - 더 정확한 다중 서식 감지
         if (sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
           let node = range.commonAncestorContainer;
           if (node.nodeType === 3) node = node.parentNode; // 텍스트 노드면 부모로
           
           // 부모 노드들을 탐색하면서 스타일 확인
-          while (node && node !== editor) {
-            if (node.style) {
-              if (node.style.fontWeight === 'bold' || node.tagName === 'B' || node.tagName === 'STRONG') bold = true;
-              if (node.style.fontStyle === 'italic' || node.tagName === 'I' || node.tagName === 'EM') italic = true;
-              if (node.style.textDecoration && node.style.textDecoration.includes('underline') || node.tagName === 'U') underline = true;
-              if (node.style.textDecoration && node.style.textDecoration.includes('line-through') || node.tagName === 'S' || node.tagName === 'STRIKE') strikeThrough = true;
+          while (node && node !== editor && node !== document.body) {
+            if (node.nodeType === 1) { // ELEMENT_NODE
+              const computedStyle = window.getComputedStyle(node);
+              const tagName = node.tagName;
+              
+              // 굵게 검사
+              if (!bold && (tagName === 'B' || tagName === 'STRONG' || 
+                  computedStyle.fontWeight === 'bold' || 
+                  parseInt(computedStyle.fontWeight) >= 700)) {
+                bold = true;
+              }
+              
+              // 기울임 검사  
+              if (!italic && (tagName === 'I' || tagName === 'EM' || 
+                  computedStyle.fontStyle === 'italic')) {
+                italic = true;
+              }
+              
+              // 밑줄 검사
+              if (!underline && (tagName === 'U' || 
+                  computedStyle.textDecoration.includes('underline'))) {
+                underline = true;
+              }
+              
+              // 취소선 검사
+              if (!strikeThrough && (tagName === 'S' || tagName === 'STRIKE' || 
+                  computedStyle.textDecoration.includes('line-through'))) {
+                strikeThrough = true;
+              }
             }
             node = node.parentNode;
           }
         }
 
+        // 3. 상태 맵 구성
         const map = {
           bold, italic, underline, strikeThrough,
           justifyLeft: document.queryCommandState('justifyLeft'),
@@ -468,14 +494,69 @@
           insertUnorderedList: document.queryCommandState('insertUnorderedList'),
         };
         
+        // 4. 버튼 상태 업데이트 - 시각적으로 명확하게
         toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
-          const c = btn.dataset.cmd;
-          if (map[c]) btn.classList.add('active'); else btn.classList.remove('active');
+          const cmd = btn.dataset.cmd;
+          if (map[cmd]) {
+            btn.classList.add('active');
+            btn.classList.add('bg-blue-200', 'border-blue-400');
+            btn.classList.remove('hover:bg-gray-100');
+          } else {
+            btn.classList.remove('active');
+            btn.classList.remove('bg-blue-200', 'border-blue-400');
+            btn.classList.add('hover:bg-gray-100');
+          }
         });
         
-        status.textContent =
-          `B:${map.bold ? 'ON' : 'off'} I:${map.italic ? 'ON' : 'off'} U:${map.underline ? 'ON' : 'off'} S:${map.strikeThrough ? 'ON' : 'off'}`;
+        // 5. 상태 표시 - 다중 선택 상태를 명확하게 표시
+        const activeFormats = [];
+        if (map.bold) activeFormats.push('굵게');
+        if (map.italic) activeFormats.push('기울임');
+        if (map.underline) activeFormats.push('밑줄');
+        if (map.strikeThrough) activeFormats.push('취소선');
+        
+        status.textContent = activeFormats.length > 0 
+          ? `활성 서식: ${activeFormats.join(' + ')}` 
+          : '서식 없음';
       }
+
+      // 키보드 단축키 지원
+      editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          switch (e.key.toLowerCase()) {
+            case 'b':
+              e.preventDefault();
+              doCmd('bold');
+              break;
+            case 'i':
+              e.preventDefault();
+              doCmd('italic');
+              break;
+            case 'u':
+              e.preventDefault();
+              doCmd('underline');
+              break;
+            case 's':
+              e.preventDefault();
+              doCmd('strikeThrough');
+              break;
+            case 'z':
+              if (e.shiftKey) {
+                e.preventDefault();
+                doCmd('redo');
+              } else {
+                e.preventDefault();
+                doCmd('undo');
+              }
+              break;
+          }
+        }
+      });
+
+      // 입력 후 상태 업데이트
+      editor.addEventListener('input', () => {
+        setTimeout(updateState, 50);
+      });
 
       // 초기화
       editor.focus();
