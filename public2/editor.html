@@ -4,78 +4,64 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>안정형 텍스트 에디터 (SE2 원칙)</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+  <title>안정형 에디터 (리셋-미니)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
-      font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
+      font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif
     }
 
-    .editor-content:focus {
-      outline: none;
+    .editor {
+      min-height: 360px
     }
 
-    .editor-content p {
-      margin: 0;
+    .editor:focus {
+      outline: none
     }
 
-    .toolbar-btn.active {
-      box-shadow: inset 0 0 0 2px rgb(59 130 246), 0 1px 0 rgba(0,0,0,0.02);
-      background-color: rgb(239 246 255);
-    }
-    .editor-toolbar { 
-      align-items: center; 
-    }
-    .editor-toolbar .toolbar-btn { 
-      min-width: 2.25rem; /* w-9와 동일: 가로폭 고정 */
-    }
-    /* 클릭 시 미세 이동 방지 (브라우저 기본 active 효과 무력화) */
-    .toolbar-btn:active {
-      transform: none;
+    .btn {
+      min-width: 2.25rem;
+      height: 2.25rem
     }
 
-    .dropdown:focus-within .dropdown-menu {
-      display: block;
+    /* 레이아웃 흔들림 방지: outline 대신 inset box-shadow */
+    .btn.active {
+      box-shadow: inset 0 0 0 2px rgb(59 130 246);
+      background: #eff6ff
     }
 
-    .dropdown-menu {
-      display: none;
-    }
-
-    /* 팔레트 버튼 활성 시 시각 강조 */
     .swatch {
-      box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .08);
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 1px solid #e5e7eb;
+      border-radius: .375rem
     }
 
-    .swatch.is-active {
-      outline: 2px solid rgb(59 130 246);
-      outline-offset: 2px;
+    .sep {
+      width: 1px;
+      height: 1.75rem;
+      background: #e5e7eb
     }
   </style>
 </head>
 
-<body class="bg-gradient-to-br from-slate-50 to-indigo-50 min-h-screen">
-  <div class="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-    <header class="mb-4">
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800">MALL HANKOOK — 안정형 텍스트 에디터</h1>
-      <p class="text-sm text-slate-500 mt-1">SE2 동작 원칙 준수 · 토글 유지 · 한국어 UI · 단축키: Ctrl/⌘ + B, U, I</p>
-    </header>
+<body class="bg-slate-50 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4">
+    <h1 class="text-xl font-bold mb-3">안정형 에디터 (리셋-미니)</h1>
 
-    <!-- 툴바 -->
+    <!-- Toolbar -->
     <div id="toolbar"
-      class="editor-toolbar sticky top-0 z-10 bg-white/80 backdrop-blur border rounded-2xl shadow-sm p-2 flex flex-wrap gap-2">
-      <!-- 글꼴/크기 -->
+      class="sticky top-0 z-10 bg-white/80 backdrop-blur border rounded-xl shadow-sm p-2 flex flex-wrap items-center gap-2">
+      <!-- 폰트/크기 -->
       <div class="flex items-center gap-2">
         <label class="text-xs text-slate-500">글꼴</label>
         <select id="fontName" class="h-9 px-2 border rounded-md bg-white">
           <option value="">기본</option>
           <option value="Pretendard">Pretendard</option>
-          <option value="'Nanum Gothic'">나눔고딕</option>
-          <option value="'Malgun Gothic'">맑은 고딕</option>
+          <option value="Malgun Gothic">맑은 고딕</option>
+          <option value="Nanum Gothic">나눔고딕</option>
           <option value="Arial">Arial</option>
-          <option value="'Times New Roman'">Times New Roman</option>
+          <option value="Times New Roman">Times New Roman</option>
         </select>
         <label class="text-xs text-slate-500">크기</label>
         <select id="fontSize" class="h-9 px-2 border rounded-md bg-white">
@@ -89,470 +75,225 @@
         </select>
       </div>
 
-      <div class="w-px h-7 bg-slate-200" aria-hidden="true"></div>
+      <div class="sep" aria-hidden="true"></div>
 
-      <!-- 기본 서식 -->
+      <!-- B I U S -->
       <div class="flex items-center gap-2">
-        <button data-cmd="bold" title="굵게 (Ctrl/⌘+B)"
-          class="toolbar-btn w-9 h-9 flex items-center justify-center border rounded-md bg-white hover:bg-slate-50"><span
-            class="font-bold">B</span></button>
-        <button data-cmd="italic" title="기울임 (Ctrl/⌘+I)"
-          class="toolbar-btn w-9 h-9 flex items-center justify-center border rounded-md bg-white hover:bg-slate-50"><span
-            class="italic">I</span></button>
-        <button data-cmd="underline" title="밑줄 (Ctrl/⌘+U)"
-          class="toolbar-btn w-9 h-9 flex items-center justify-center border rounded-md bg-white hover:bg-slate-50"><span
-            class="underline">U</span></button>
-        <button data-cmd="strikeThrough" title="취소선"
-          class="toolbar-btn w-9 h-9 flex items-center justify-center border rounded-md bg-white hover:bg-slate-50"><span
-            class="line-through">S</span></button>
+        <button data-cmd="bold" class="btn border rounded-md bg-white hover:bg-slate-50 font-bold">B</button>
+        <button data-cmd="italic" class="btn border rounded-md bg-white hover:bg-slate-50 italic">I</button>
+        <button data-cmd="underline" class="btn border rounded-md bg-white hover:bg-slate-50 underline">U</button>
+        <button data-cmd="strikeThrough"
+          class="btn border rounded-md bg-white hover:bg-slate-50 line-through">S</button>
       </div>
 
-      <div class="w-px h-7 bg-slate-200" aria-hidden="true"></div>
+      <div class="sep" aria-hidden="true"></div>
 
-      <!-- 색상 -->
+      <!-- Align / list / indent -->
       <div class="flex items-center gap-2">
-        <div class="dropdown relative">
-          <button title="글자색"
-            class="w-9 h-9 border rounded-md bg-white hover:bg-slate-50 flex items-center justify-center">A</button>
-          <div
-            class="dropdown-menu absolute left-0 mt-2 p-2 bg-white border rounded-xl shadow-lg grid grid-cols-8 gap-1">
-            <!-- 심플 팔레트 -->
-            <button data-forecolor="#111827" class="swatch w-6 h-6 rounded border" style="background:#111827"
-              title="#111827"></button>
-            <button data-forecolor="#374151" class="swatch w-6 h-6 rounded border" style="background:#374151"></button>
-            <button data-forecolor="#6b7280" class="swatch w-6 h-6 rounded border" style="background:#6b7280"></button>
-            <button data-forecolor="#9ca3af" class="swatch w-6 h-6 rounded border" style="background:#9ca3af"></button>
-            <button data-forecolor="#ef4444" class="swatch w-6 h-6 rounded border" style="background:#ef4444"></button>
-            <button data-forecolor="#f59e0b" class="swatch w-6 h-6 rounded border" style="background:#f59e0b"></button>
-            <button data-forecolor="#10b981" class="swatch w-6 h-6 rounded border" style="background:#10b981"></button>
-            <button data-forecolor="#3b82f6" class="swatch w-6 h-6 rounded border" style="background:#3b82f6"></button>
-          </div>
+        <button data-cmd="justifyLeft" class="btn border rounded-md bg-white hover:bg-slate-50">⟸</button>
+        <button data-cmd="justifyCenter" class="btn border rounded-md bg-white hover:bg-slate-50">⇔</button>
+        <button data-cmd="justifyRight" class="btn border rounded-md bg-white hover:bg-slate-50">⟹</button>
+        <button data-cmd="insertUnorderedList" class="btn border rounded-md bg-white hover:bg-slate-50">•</button>
+        <button data-cmd="insertOrderedList" class="btn border rounded-md bg-white hover:bg-slate-50">1.</button>
+        <button data-cmd="outdent" class="btn border rounded-md bg-white hover:bg-slate-50">⇤</button>
+        <button data-cmd="indent" class="btn border rounded-md bg-white hover:bg-slate-50">⇥</button>
+      </div>
+
+      <div class="sep" aria-hidden="true"></div>
+
+      <!-- Color (simple palette) -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-500">글자</span>
+        <div id="forePalette" class="flex gap-1">
+          <button class="swatch" data-fore="#111827" style="background:#111827" title="#111827"></button>
+          <button class="swatch" data-fore="#ef4444" style="background:#ef4444"></button>
+          <button class="swatch" data-fore="#f59e0b" style="background:#f59e0b"></button>
+          <button class="swatch" data-fore="#10b981" style="background:#10b981"></button>
+          <button class="swatch" data-fore="#3b82f6" style="background:#3b82f6"></button>
         </div>
-        <div class="dropdown relative">
-          <button title="배경색"
-            class="w-9 h-9 border rounded-md bg-white hover:bg-slate-50 flex items-center justify-center">Bg</button>
-          <div
-            class="dropdown-menu absolute left-0 mt-2 p-2 bg-white border rounded-xl shadow-lg grid grid-cols-8 gap-1">
-            <button data-backcolor="#ffffff" class="swatch w-6 h-6 rounded border" style="background:#ffffff"></button>
-            <button data-backcolor="#fef3c7" class="swatch w-6 h-6 rounded border" style="background:#fef3c7"></button>
-            <button data-backcolor="#fee2e2" class="swatch w-6 h-6 rounded border" style="background:#fee2e2"></button>
-            <button data-backcolor="#dcfce7" class="swatch w-6 h-6 rounded border" style="background:#dcfce7"></button>
-            <button data-backcolor="#e0e7ff" class="swatch w-6 h-6 rounded border" style="background:#e0e7ff"></button>
-            <button data-backcolor="#e5e7eb" class="swatch w-6 h-6 rounded border" style="background:#e5e7eb"></button>
-            <button data-backcolor="#fde68a" class="swatch w-6 h-6 rounded border" style="background:#fde68a"></button>
-            <button data-backcolor="#fca5a5" class="swatch w-6 h-6 rounded border" style="background:#fca5a5"></button>
-          </div>
+        <span class="text-xs text-slate-500 ml-2">배경</span>
+        <div id="backPalette" class="flex gap-1">
+          <button class="swatch" data-back="#ffffff" style="background:#ffffff"></button>
+          <button class="swatch" data-back="#fef3c7" style="background:#fef3c7"></button>
+          <button class="swatch" data-back="#fee2e2" style="background:#fee2e2"></button>
+          <button class="swatch" data-back="#dcfce7" style="background:#dcfce7"></button>
+          <button class="swatch" data-back="#e0e7ff" style="background:#e0e7ff"></button>
         </div>
       </div>
 
-      <div class="w-px h-7 bg-slate-200" aria-hidden="true"></div>
-
-      <!-- 정렬/목록/들여쓰기 -->
-      <div class="flex items-center gap-2">
-        <button data-cmd="justifyLeft" title="왼쪽 정렬"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⟸</button>
-        <button data-cmd="justifyCenter" title="가운데 정렬"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⇔</button>
-        <button data-cmd="justifyRight" title="오른쪽 정렬"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⟹</button>
-        <button data-cmd="insertUnorderedList" title="불릿 목록"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">•</button>
-        <button data-cmd="insertOrderedList" title="숫자 목록"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">1.</button>
-        <button data-cmd="outdent" title="내어쓰기"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⇤</button>
-        <button data-cmd="indent" title="들여쓰기"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⇥</button>
-      </div>
-
-      <div class="w-px h-7 bg-slate-200" aria-hidden="true"></div>
-
-      <!-- 줄간격/인용 -->
-      <div class="flex items-center gap-2">
-        <label class="text-xs text-slate-500">줄간격</label>
-        <select id="lineHeight" class="h-9 px-2 border rounded-md bg-white">
-          <option value="1">1.0</option>
-          <option value="1.2">1.2</option>
-          <option value="1.5">1.5</option>
-          <option value="1.8" selected>1.8</option>
-          <option value="2">2.0</option>
-        </select>
-        <button id="quoteBtn" title="인용구"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">❝</button>
-      </div>
-
-      <div class="ms-auto flex items-center gap-2">
-        <button id="linkBtn" title="하이퍼링크"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">🔗</button>
-        <button id="charBtn" title="특수문자"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">Ω</button>
-        <button id="tableBtn" title="표 삽입"
-          class="toolbar-btn w-9 h-9 border rounded-md bg-white hover:bg-slate-50">▦</button>
-        <button id="clearBtn" title="서식 제거" class="w-9 h-9 border rounded-md bg-white hover:bg-slate-50">⎚</button>
-        <button id="undoBtn" class="w-9 h-9 border rounded-md bg-white hover:bg-slate-50" title="되돌리기">↶</button>
-        <button id="redoBtn" class="w-9 h-9 border rounded-md bg-white hover:bg-slate-50" title="다시하기">↷</button>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="linkBtn" class="btn border rounded-md bg-white hover:bg-slate-50" title="링크">🔗</button>
+        <button id="clearBtn" class="btn border rounded-md bg-white hover:bg-slate-50" title="서식제거">⎚</button>
+        <button id="undoBtn" class="btn border rounded-md bg-white hover:bg-slate-50" title="되돌리기">↶</button>
+        <button id="redoBtn" class="btn border rounded-md bg-white hover:bg-slate-50" title="다시하기">↷</button>
       </div>
     </div>
 
-    <!-- 에디터 박스 -->
-    <div class="mt-3">
-      <div id="editor" class="editor-content min-h-[360px] p-5 bg-white border rounded-2xl shadow-sm"
-        contenteditable="true">
-
-      </div>
+    <!-- Editor -->
+    <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
+      <p>여기에 입력하세요. (Ctrl/⌘+B/U/I 지원, 서식 토글 상태 유지)</p>
     </div>
 
-    <!-- 상태바 -->
     <div id="status" class="mt-2 text-xs text-slate-500">Ready</div>
   </div>
 
-
   <script>
-    const editor = document.getElementById('editor');
-    const toolbar = document.getElementById('toolbar');
-    const status = document.getElementById('status');
+    (function () {
+      const editor = document.getElementById('editor');
+      const toolbar = document.getElementById('toolbar');
+      const status = document.getElementById('status');
+      const fontName = document.getElementById('fontName');
+      const fontSize = document.getElementById('fontSize');
 
-    // --- 선택 영역 저장/복원 ---
-    let savedRange = null;
+      // CSS 인라인 적용 강제
+      try { document.execCommand('styleWithCSS', false, true); } catch (_) { }
 
-    function saveSelection() {
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const r = sel.getRangeAt(0);
-      // contenteditable 내부 선택만 저장
-      if (editor.contains(r.commonAncestorContainer)) {
-        savedRange = r.cloneRange();
+      // === Selection Keeper (툴바 클릭에도 선택 유지) ===
+      let savedRange = null;
+      function saveSelection() {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        savedRange = sel.getRangeAt(0);
       }
-    }
-
-    function restoreSelection() {
-      if (!savedRange) return;
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(savedRange);
-    }
-
-    // 에디터에서 선택이 바뀌면 즉시 저장
-    editor.addEventListener('mouseup', saveSelection);
-    editor.addEventListener('keyup', saveSelection);
-    editor.addEventListener('mouseleave', saveSelection);
-    editor.addEventListener('input', saveSelection);
-
-    // 팔레트 토글 상태 추적 (같은 색 재클릭 시 해제)
-    let lastFC = null; // 마지막 글자색
-    let lastBC = null; // 마지막 배경색
-
-    // 버튼/셀렉트 누를 때 포커스 이동으로 선택이 날아가지 않도록 방지
-    toolbar.addEventListener('pointerdown', (e) => {
-      const target = e.target.closest('button, select');
-      if (!target) return;
-      // 현재 선택 저장 → 클릭 처리 시 복원
-      saveSelection();
-      // 기본 포커스/텍스트 선택 변경 방지
-      e.preventDefault();
-    });
-
-    // 클릭 처리 직전에 선택 복원 + 에디터 포커스 유지
-    function safeFocusAndRestore() {
-      editor.focus({ preventScroll: true });
-      restoreSelection();
-    }
-
-    function doCmd(cmd, value = null) {
-      safeFocusAndRestore();
-      try {
-        document.execCommand(cmd, false, value);
-      } catch (_) {
-        // 일부 브라우저/명령 이슈 무시
+      function restoreSelection() {
+        if (!savedRange) return;
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
       }
-      updateToolbarState();
-      editor.focus({ preventScroll: true });
-      saveSelection();
-    }
-
-    toolbar.addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-
-      const cmd = btn.dataset.cmd;
-      if (cmd) {
-        doCmd(cmd);
-        return;
-      }
-
-      if (btn.id === 'linkBtn') {
-        safeFocusAndRestore();
-        const url = prompt('링크 URL을 입력하세요', 'https://');
-        if (url) doCmd('createLink', url);
-        return;
-      }
-      if (btn.id === 'charBtn') {
-        safeFocusAndRestore();
-        const ch = prompt('특수문자 입력 (예: ★, ✓, ♥ 등)');
-        if (ch) document.execCommand('insertText', false, ch);
-        saveSelection();
-        return;
-      }
-      if (btn.id === 'tableBtn') {
-        safeFocusAndRestore();
-        const rows = Math.max(1, parseInt(prompt('행 수', '2') || '2', 10));
-        const cols = Math.max(1, parseInt(prompt('열 수', '2') || '2', 10));
-        const tbl = document.createElement('table');
-        tbl.className = 'w-full border border-slate-200 my-2';
-        tbl.style.borderCollapse = 'collapse';
-        for (let r = 0; r < rows; r++) {
-          const tr = document.createElement('tr');
-          for (let c = 0; c < cols; c++) {
-            const td = document.createElement('td');
-            td.className = 'border border-slate-200 p-2';
-            td.innerHTML = '&nbsp;';
-            tr.appendChild(td);
-          }
-          tr.appendChild(document.createComment(''));
-          tbl.appendChild(tr);
+      editor.addEventListener('keyup', saveSelection);
+      editor.addEventListener('mouseup', saveSelection);
+      document.addEventListener('selectionchange', () => {
+        if (document.activeElement === editor || editor.contains(document.activeElement)) {
+          saveSelection();
+          updateState();
         }
-        insertNodeAtCursor(tbl);
-        saveSelection();
-        return;
-      }
-      if (btn.id === 'clearBtn') {
-        doCmd('removeFormat');
-        doCmd('unlink');
-        return;
-      }
-      if (btn.id === 'undoBtn') return doCmd('undo');
-      if (btn.id === 'redoBtn') return doCmd('redo');
-    });
-
-    // 선택(또는 캐럿) 위치에 인라인 스타일 적용 헬퍼
-    function applyInlineStyle(prop, value) {
-      const sel = window.getSelection();
-      if (!sel.rangeCount) return;
-      const range = sel.getRangeAt(0);
-
-      // 선택이 존재(범위)하면 해당 컨텐츠를 감싸기
-      if (!range.collapsed) {
-        const span = document.createElement('span');
-        span.style[prop] = value;
-
-        try {
-          range.surroundContents(span);
-        } catch {
-          // 파편 범위면 extract → 감싸기
-          const frag = range.extractContents();
-          span.appendChild(frag);
-          range.insertNode(span);
-          // 커서를 span 뒤로 이동
-          sel.removeAllRanges();
-          const r = document.createRange();
-          r.setStartAfter(span);
-          r.collapse(true);
-          sel.addRange(r);
-        }
-        return;
-      }
-
-      // 캐럿만 있는 경우: 스타일 span 생성 후 커서를 그 안으로
-      const span = document.createElement('span');
-      span.style[prop] = value;
-      // 내용이 없으면 줄바꿈 시 사라질 수 있어, zero-width space 하나 넣음
-      span.appendChild(document.createTextNode('\u200B'));
-
-      range.insertNode(span);
-
-      // 커서를 span 내부(마지막)로 이동 → 이후 타이핑은 색 유지
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      newRange.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-
-    // 색상 팔레트(글자/배경) — 직접 span 래핑 방식으로 안정 적용
-    toolbar.addEventListener('click', (e) => {
-      const fc = e.target.getAttribute('data-forecolor');
-      const bc = e.target.getAttribute('data-backcolor');
-
-      if (!fc && !bc) return;
-
-      safeFocusAndRestore(); // ★ 선택 복원
-
-      if (fc) { 
-        applyInlineStyle('color', fc); 
-        updateToolbarState(); 
-        saveSelection(); 
-        return; 
-      }
-      if (bc) { 
-        applyInlineStyle('backgroundColor', bc); 
-        updateToolbarState(); 
-        saveSelection(); 
-        return; 
-      }
-    });
-
-    function clearSwatchActive() {
-      toolbar.querySelectorAll('.swatch').forEach(s => s.classList.remove('is-active'));
-    }
-    function markSwatchActive(attr, value, on) {
-      // 같은 팔레트 그룹 내에서만 상태 반영
-      const menu = document.querySelector(`[${attr}="${value}"]`)?.closest('.dropdown-menu');
-      if (!menu) return;
-      menu.querySelectorAll('.swatch').forEach(s => s.classList.remove('is-active'));
-      if (on) {
-        const btn = menu.querySelector(`[${attr}="${value}"]`);
-        btn && btn.classList.add('is-active');
-      }
-    }
-
-    document.getElementById('fontName').addEventListener('change', (e) => {
-      safeFocusAndRestore();
-      doCmd('fontName', e.target.value || ''); // (빈 값이면 기본)
-    });
-
-    document.getElementById('fontSize').addEventListener('change', (e) => {
-      safeFocusAndRestore();
-      doCmd('fontSize', e.target.value);
-    });
-
-    document.getElementById('lineHeight').addEventListener('change', (e) => {
-      safeFocusAndRestore();
-      wrapLineStyle('line-height', e.target.value);
-      updateToolbarState();
-      saveSelection();
-    });
-
-    // 인용구 토글: blockquote 래핑 (겹친 범위 안전 처리)
-    document.getElementById('quoteBtn').addEventListener('click', () => {
-      toggleBlock('blockquote', 'border-l-4 border-indigo-400 pl-3 text-slate-700');
-      updateToolbarState();
-    });
-
-    // 단축키 (Ctrl/⌘ + B/I/U)
-    editor.addEventListener('keydown', (e) => {
-      const meta = e.ctrlKey || e.metaKey;
-      if (!meta) return;
-      const k = e.key.toLowerCase();
-      if (k === 'b') { e.preventDefault(); doCmd('bold'); }
-      if (k === 'i') { e.preventDefault(); doCmd('italic'); }
-      if (k === 'u') { e.preventDefault(); doCmd('underline'); }
-    });
-
-    // 선택 변경 시 툴바 토글 상태 갱신
-    document.addEventListener('selectionchange', () => {
-      if (document.activeElement === editor || editor.contains(document.activeElement)) {
-        saveSelection();            // ★ 선택 저장
-        updateToolbarState();
-      }
-    });
-
-    function updateToolbarState() {
-      const map = {
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-        strikeThrough: document.queryCommandState('strikeThrough'),
-        justifyLeft: document.queryCommandState('justifyLeft'),
-        justifyCenter: document.queryCommandState('justifyCenter'),
-        justifyRight: document.queryCommandState('justifyRight'),
-        insertOrderedList: document.queryCommandState('insertOrderedList'),
-        insertUnorderedList: document.queryCommandState('insertUnorderedList'),
-      };
-      toolbar.querySelectorAll('[data-cmd]').forEach((btn) => {
-        const c = btn.dataset.cmd;
-        if (map[c]) btn.classList.add('active'); else btn.classList.remove('active');
       });
-      status.textContent = `B:${map.bold ? 'on' : 'off'} I:${map.italic ? 'on' : 'off'} U:${map.underline ? 'on' : 'off'} · 정렬 L:${map.justifyLeft ? 'on' : 'off'} C:${map.justifyCenter ? 'on' : 'off'} R:${map.justifyRight ? 'on' : 'off'}`;
-    }
 
-    // 블록 토글 유틸 (blockquote 등)
-    function toggleBlock(tag, extraClass = '') {
-      const sel = window.getSelection();
-      if (!sel.rangeCount) return;
-      const range = sel.getRangeAt(0);
-      let ancestor = range.commonAncestorContainer;
-      if (ancestor.nodeType === 3) ancestor = ancestor.parentNode;
-      const block = closestTag(ancestor, tag);
-      if (block) {
-        // 해제: block 내의 내용만 남기고 block 제거
-        const parent = block.parentNode;
-        while (block.firstChild) parent.insertBefore(block.firstChild, block);
-        parent.removeChild(block);
-      } else {
-        const wr = document.createElement(tag);
-        if (extraClass) wr.className = extraClass;
-        try {
-          range.surroundContents(wr);
-        } catch (e) {
-          // 파편 범위일 때 안전 래핑
-          const frag = range.extractContents();
-          wr.appendChild(frag);
-          range.insertNode(wr);
-          placeCaretAtEnd(wr);
+      // 툴바가 포커스를 뺏지 않도록
+      toolbar.addEventListener('mousedown', (e) => {
+        const t = e.target.closest('button,select');
+        if (!t) return;
+        e.preventDefault();
+        restoreSelection();
+      });
+
+      // 공통 명령
+      function doCmd(cmd, value = null) {
+        restoreSelection();
+        document.execCommand(cmd, false, value);
+        updateState();
+        editor.focus();
+      }
+
+      // 버튼 클릭 처리
+      toolbar.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        const cmd = btn.dataset.cmd;
+        if (cmd) { doCmd(cmd); return; }
+
+        if (btn.id === 'linkBtn') {
+          const url = prompt('링크 URL', 'https://');
+          if (url) doCmd('createLink', url);
+          return;
         }
-      }
-    }
+        if (btn.id === 'clearBtn') {
+          doCmd('removeFormat'); doCmd('unlink');
+          return;
+        }
+        if (btn.id === 'undoBtn') { doCmd('undo'); return; }
+        if (btn.id === 'redoBtn') { doCmd('redo'); return; }
+      });
 
-    function closestTag(node, tag) {
-      tag = tag.toUpperCase();
-      while (node && node !== editor) {
-        if (node.nodeName === tag) return node;
-        node = node.parentNode;
-      }
-      return null;
-    }
+      // 팔레트 (글자/배경)
+      document.getElementById('forePalette').addEventListener('click', (e) => {
+        const color = e.target.getAttribute('data-fore');
+        if (!color) return;
+        applyInlineStyle('color', color);
+      });
+      document.getElementById('backPalette').addEventListener('click', (e) => {
+        const color = e.target.getAttribute('data-back');
+        if (!color) return;
+        applyInlineStyle('backgroundColor', color);
+      });
 
-    // 현재 라인을 span으로 묶고 스타일 적용
-    function wrapLineStyle(prop, value) {
-      const sel = window.getSelection();
-      if (!sel.rangeCount) return;
-      const range = sel.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style[prop] = value;
-      try {
-        range.surroundContents(span);
-      } catch (e) {
+      // 글꼴/크기
+      fontName.addEventListener('change', (e) => {
+        const val = e.target.value;
+        // execCommand 시도 → 실패 대비 span 스타일
+        try { doCmd('fontName', val); } finally { applyInlineStyle('fontFamily', val || null, true); }
+      });
+      fontSize.addEventListener('change', (e) => {
+        const v = e.target.value;
+        try { doCmd('fontSize', v); } finally { /* 브라우저별 <font size> 처리 그대로 허용 */ }
+      });
+
+      // 단축키 Ctrl/⌘ + B/I/U
+      editor.addEventListener('keydown', (e) => {
+        const meta = e.ctrlKey || e.metaKey;
+        if (!meta) return;
+        const k = e.key.toLowerCase();
+        if (k === 'b') { e.preventDefault(); doCmd('bold'); }
+        if (k === 'i') { e.preventDefault(); doCmd('italic'); }
+        if (k === 'u') { e.preventDefault(); doCmd('underline'); }
+      });
+
+      // 인라인 스타일 적용(선택 영역에 span 래핑)
+      function applyInlineStyle(prop, value, allowNull) {
+        restoreSelection();
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        if (range.collapsed) return;
+
+        // 기존 내용 추출 → span에 넣고 스타일 적용 → 다시 삽입
         const frag = range.extractContents();
+        const span = document.createElement('span');
+        if (value || allowNull) {
+          if (value) span.style[prop] = value;
+        }
         span.appendChild(frag);
         range.insertNode(span);
+
+        // 커서 뒤로 이동
         sel.removeAllRanges();
         const r = document.createRange();
         r.selectNodeContents(span);
         r.collapse(false);
         sel.addRange(r);
+        saveSelection();
+        updateState();
+        editor.focus();
       }
-    }
 
-    // 커서 위치에 노드 삽입
-    function insertNodeAtCursor(node) {
-      const sel = window.getSelection();
-      if (!sel.rangeCount) {
-        editor.appendChild(node);
-        return;
+      // 상태/토글 업데이트
+      function updateState() {
+        const map = {
+          bold: document.queryCommandState('bold'),
+          italic: document.queryCommandState('italic'),
+          underline: document.queryCommandState('underline'),
+          strikeThrough: document.queryCommandState('strikeThrough'),
+          justifyLeft: document.queryCommandState('justifyLeft'),
+          justifyCenter: document.queryCommandState('justifyCenter'),
+          justifyRight: document.queryCommandState('justifyRight'),
+          insertOrderedList: document.queryCommandState('insertOrderedList'),
+          insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+        };
+        toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
+          const c = btn.dataset.cmd;
+          if (map[c]) btn.classList.add('active'); else btn.classList.remove('active');
+        });
+        status.textContent =
+          `B:${map.bold ? 'on' : 'off'} I:${map.italic ? 'on' : 'off'} U:${map.underline ? 'on' : 'off'} · L:${map.justifyLeft ? 'on' : 'off'} C:${map.justifyCenter ? 'on' : 'off'} R:${map.justifyRight ? 'on' : 'off'}`;
       }
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(node);
-    }
-    function insertNodeAfter(refNode, newNode) {
-      if (refNode.nextSibling) {
-        refNode.parentNode.insertBefore(newNode, refNode.nextSibling);
-      } else {
-        refNode.parentNode.appendChild(newNode);
-      }
-    }
-    function placeCaretAtEnd(node) {
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(node);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
 
-    // 초기 상태
-    editor.focus();
-    updateToolbarState();
+      // 초기화
+      editor.focus();
+      saveSelection();
+      updateState();
+    })();
   </script>
 </body>
 
