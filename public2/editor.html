@@ -105,6 +105,11 @@
       if (btn) e.preventDefault(); // select, input[color]에는 적용 X
     });
 
+    // 툴바 버튼이 포커스를 빼앗지 못하게(색 선택기는 예외)
+    document.querySelectorAll('.editor-toolbar button').forEach(btn => {
+      btn.addEventListener('mousedown', e => e.preventDefault());
+    });
+
     // 2) Selection이 에디터 내부일 때만 저장/복원
     // 에디터 내부인지 판별
     function isInEditor(node) {
@@ -147,12 +152,41 @@
       savedRange = r.cloneRange();
     }
 
-    // selection 변화 추적 (툴바 클릭 중에도 최신 Range 유지)
+    // B/U 버튼 시각적 토글을 위한 상태 계산 함수들
+    function inEditor(node) {
+      if (!node) return false;
+      return node === editor || editor.contains(node);
+    }
+    function contextEl() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return editor;
+      const n = sel.anchorNode;
+      const el = (n && n.nodeType === 1) ? n : n?.parentElement;
+      return inEditor(el) ? el : editor;
+    }
+    function isBoldActiveAtCaret() {
+      const el = contextEl();
+      const fw = window.getComputedStyle(el).fontWeight;
+      return fw === 'bold' || parseInt(fw, 10) >= 600;
+    }
+    function isUnderlineActiveAtCaret() {
+      const el = contextEl();
+      const td = window.getComputedStyle(el).textDecorationLine || '';
+      return td.includes('underline');
+    }
+    function refreshToolbarState() {
+      const boldBtn = document.getElementById('boldBtn');
+      const underlineBtn = document.getElementById('underlineBtn');
+      isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
+      isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
+    }
+
+    // selection이 바뀔 때마다 저장 & 상태 업데이트
     document.addEventListener('selectionchange', () => {
       const sel = window.getSelection();
-      // activeElement가 editor이거나, selection이 editor 안에 있을 때에만 저장
-      if (document.activeElement === editor || isInEditor(sel.anchorNode)) {
+      if (document.activeElement === editor || inEditor(sel.anchorNode)) {
         saveSelection();
+        refreshToolbarState();
       }
     });
 
@@ -162,8 +196,11 @@
     editor.addEventListener('input', saveSelection);
     editor.addEventListener('focus', saveSelection);
 
-    // 초기 포커스
-    window.addEventListener('load', () => editor.focus());
+    // 초기 포커스 및 툴바 상태 설정
+    window.addEventListener('load', () => {
+      editor.focus();
+      refreshToolbarState();
+    });
 
     // 3) 선택이 없어도(커서만) 스타일 적용되게 wrapSelection 교체
     function wrapSelection(styleObj = {}) {
@@ -207,9 +244,11 @@
       savedRange = range.cloneRange();
     }
 
-    // 글자 굵게
+    // B/U 클릭 후에도 상태 즉시 갱신
     document.getElementById("boldBtn").addEventListener("click", () => {
       wrapSelection({ fontWeight: "bold" });
+      refreshToolbarState();
+      editor.focus();
     });
 
     // 밑줄 토글: 현재 위치가 밑줄이면 해제, 아니면 적용
@@ -231,6 +270,7 @@
       } else {
         wrapSelection({ textDecoration: "underline" });
       }
+      refreshToolbarState();
       editor.focus();
     });
 
@@ -242,9 +282,42 @@
       editor.focus();
     });
 
-    document.getElementById('fontColor').addEventListener('input', (e) => {
-      wrapSelection({ color: e.target.value });
+    // 헬퍼: 선택/커서에 인라인 스타일 적용 (선택 없으면 커서에 span 생성)
+    function applyInlineStyle(styleObj = {}) {
       editor.focus();
+      restoreSelection();
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      let range = sel.getRangeAt(0);
+
+      if (range.collapsed) {
+        const span = document.createElement('span');
+        Object.assign(span.style, styleObj);
+        const zw = document.createTextNode('\u200B');
+        span.appendChild(zw);
+        range.insertNode(span);
+        // 커서를 span 안에 유지 → 이후 타이핑도 같은 스타일
+        range = document.createRange();
+        range.setStart(zw, 1);
+        range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+        savedRange = range.cloneRange();
+      } else {
+        const span = document.createElement('span');
+        Object.assign(span.style, styleObj);
+        const frag = range.extractContents();
+        span.appendChild(frag);
+        range.insertNode(span);
+        range.setStartAfter(span);
+        range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+        savedRange = range.cloneRange();
+      }
+    }
+
+    // ✅ 글자 색상: 즉시 적용
+    document.getElementById("fontColor").addEventListener("input", (e) => {
+      applyInlineStyle({ color: e.target.value });
     });
 
     const imageInput = document.getElementById('imageInput');
@@ -297,39 +370,32 @@
       });
     });
 
-    // 이미지 정렬 로직
-    function getSelectedImage() {
-      const sel = window.getSelection();
-      if (!sel.rangeCount) return null;
-      const node = sel.anchorNode;
-      if (!node) return null;
-      if (node.nodeType === 1 && node.tagName === 'IMG') return node;
-      const el = (node.nodeType === 1 ? node : node.parentElement);
-      return el ? el.closest('#editor img') : null;
-    }
+    // 이미지 선택 및 정렬 로직
+    let selectedImage = null;
 
+    // 에디터에서 이미지 클릭 시 현재 선택 이미지로 등록
+    editor.addEventListener('click', (e) => {
+      selectedImage = (e.target && e.target.tagName === 'IMG') ? e.target : null;
+    });
+
+    // 이미지 정렬 버튼 동작
     document.querySelectorAll("[data-imgalign]").forEach(btn => {
       btn.addEventListener("click", () => {
-        editor.focus();
-        restoreSelection();
-        const img = getSelectedImage();
-        if (!img) return; // 이미지가 선택되지 않았다면 무시
+        if (!selectedImage) return; // 이미지 선택 안 했으면 무시
+        const a = btn.dataset.imgalign;
 
-        const align = btn.dataset.imgalign;
-        // float + margin 조합 (텍스트 감싸기 포함)
-        if (align === 'left') {
-          img.style.display = 'inline-block';
-          img.style.float = 'left';
-          img.style.margin = '0 0.75rem 0.5rem 0';
-        } else if (align === 'right') {
-          img.style.display = 'inline-block';
-          img.style.float = 'right';
-          img.style.margin = '0 0 0.5rem 0.75rem';
-        } else {
-          // center
-          img.style.float = 'none';
-          img.style.display = 'block';
-          img.style.margin = '0.5rem auto';
+        if (a === 'left') {
+          selectedImage.style.float   = 'left';
+          selectedImage.style.display = 'inline-block';
+          selectedImage.style.margin  = '0 12px 8px 0';
+        } else if (a === 'right') {
+          selectedImage.style.float   = 'right';
+          selectedImage.style.display = 'inline-block';
+          selectedImage.style.margin  = '0 0 8px 12px';
+        } else { // center
+          selectedImage.style.float   = 'none';
+          selectedImage.style.display = 'block';
+          selectedImage.style.margin  = '8px auto';
         }
       });
     });
