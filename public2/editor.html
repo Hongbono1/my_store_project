@@ -169,11 +169,11 @@
 
     <!-- Editor -->
     <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
-      <p>📝 3가지 색상 시나리오 테스트:</p>
-      <p>1️⃣ 색 버튼 클릭 → 바로 타자치기</p>
-      <p>2️⃣ 타자 다 치고 → 선택 → 색 변경</p>
-      <p>3️⃣ 타자 치는 도중 → 색 변경 → 계속 타자</p>
-      <p><span style="color:#ef4444;">빨간글자</span> <span style="background-color:#fef3c7;">노란배경</span> <span style="color:#3b82f6; background-color:#e0e7ff;">파란글자+파란배경</span></p>
+      <p>📝 한글 입력 + 색상 테스트:</p>
+      <p>🌺 무궁화 삼천리 화려강산 대한사람 대한으로 길이 보전하세</p>
+      <p>1️⃣ 색 클릭 → 한글 입력: <span style="color:#ef4444;">안녕하세요</span></p>
+      <p>2️⃣ 한글 입력 → 선택 → 색 변경: <span style="background-color:#fef3c7;">무궁화꽃이피었습니다</span></p>
+      <p>3️⃣ 한글 입력 도중 색 변경: 안녕<span style="color:#3b82f6;">하세요</span></p>
     </div>
 
     <div id="status" class="mt-2 text-xs text-slate-500">Ready</div>
@@ -507,6 +507,9 @@
 
       // 전역 스타일 상태 (커서 위치에서 적용할 스타일)
       let pendingStyles = {};
+      
+      // IME 상태 추적
+      let isComposing = false;
 
       // 인라인 스타일 적용 - 모든 시나리오 지원
       function applyInlineStyle(prop, value, allowNull) {
@@ -788,11 +791,17 @@
         }
       });
 
-      // 입력 전 스타일 적용 (beforeinput) - 개선된 버전
+      // 입력 전 스타일 적용 (beforeinput) - IME 호환 버전
       editor.addEventListener('beforeinput', (e) => {
-        console.log('beforeinput event:', e.inputType, e.data, 'pendingStyles:', pendingStyles);
+        console.log('beforeinput event:', e.inputType, e.data, 'isComposing:', isComposing, 'pendingStyles:', pendingStyles);
         
-        if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
+        // IME 조합 중이면 처리하지 않음 (한글, 일본어, 중국어 등)
+        if (isComposing || e.inputType === 'insertCompositionText') {
+          console.log('Skipping beforeinput during IME composition');
+          return;
+        }
+        
+        if (e.inputType === 'insertText') {
           // 예약된 스타일이 있거나, 현재 위치의 스타일과 다른 경우 처리
           const sel = window.getSelection();
           if (!sel.rangeCount) return;
@@ -866,10 +875,77 @@
         }
       });
 
+      // IME 조합 시작/진행/종료 추적
+      editor.addEventListener('compositionstart', () => {
+        isComposing = true;
+        console.log('IME composition started');
+      });
+      
+      editor.addEventListener('compositionupdate', (e) => {
+        isComposing = true;
+        console.log('IME composition updating:', e.data);
+      });
+      
+      editor.addEventListener('compositionend', (e) => {
+        console.log('IME composition ended:', e.data);
+        
+        // 조합 완료 후 스타일 적용
+        if (Object.keys(pendingStyles).length > 0 && e.data) {
+          setTimeout(() => {
+            applyPendingStylesToComposedText(e.data);
+            isComposing = false; // 스타일 적용 후 상태 변경
+          }, 10);
+        } else {
+          isComposing = false;
+        }
+      });
+
       // 입력 후 상태 업데이트
       editor.addEventListener('input', () => {
         setTimeout(updateState, 50);
       });
+
+      // IME 조합 완료 후 스타일 적용
+      function applyPendingStylesToComposedText(composedText) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount || Object.keys(pendingStyles).length === 0) return;
+        
+        console.log('Applying pending styles to composed text:', composedText, pendingStyles);
+        
+        // 방금 입력된 텍스트 찾기
+        const range = sel.getRangeAt(0);
+        const textLength = composedText.length;
+        
+        try {
+          // 커서 앞의 텍스트가 조합된 텍스트와 일치하는지 확인
+          range.setStart(range.endContainer, Math.max(0, range.endOffset - textLength));
+          
+          const selectedText = range.toString();
+          if (selectedText === composedText) {
+            // 텍스트를 추출하고 스타일 적용
+            const fragment = range.extractContents();
+            const span = document.createElement('span');
+            
+            Object.keys(pendingStyles).forEach(prop => {
+              span.style[prop] = pendingStyles[prop];
+            });
+            
+            span.appendChild(fragment);
+            range.insertNode(span);
+            
+            // 커서를 span 뒤로 이동
+            range.setStartAfter(span);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            
+            saveSelection();
+            console.log('Successfully applied styles to composed text');
+          }
+        } catch (e) {
+          console.log('Could not apply styles to composed text:', e);
+        }
+      }
 
       // 초기화
       editor.focus();
