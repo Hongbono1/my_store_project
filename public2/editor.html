@@ -75,15 +75,23 @@
           </div>
         </div>
         <label class="text-xs text-slate-500">크기</label>
-        <select id="fontSize" class="h-9 px-2 border rounded-md bg-white">
-          <option value="3">기본(3)</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-        </select>
+        <div class="relative">
+          <button id="fontSizeBtn" class="h-9 px-3 border rounded-md bg-white hover:bg-slate-50 flex items-center gap-2">
+            <span id="fontSizeLabel">기본(3)</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <div id="fontSizeMenu" class="absolute top-full left-0 mt-1 bg-white border rounded-md shadow-lg z-20 min-w-[120px] hidden">
+            <button data-size="1" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-xs">1 (매우 작게)</button>
+            <button data-size="2" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-sm">2 (작게)</button>
+            <button data-size="3" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-base">3 (기본)</button>
+            <button data-size="4" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-lg">4 (크게)</button>
+            <button data-size="5" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-xl">5 (더 크게)</button>
+            <button data-size="6" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 text-2xl">6 (매우 크게)</button>
+            <button data-size="7" class="w-full px-3 py-2 text-left hover:bg-slate-50 text-3xl">7 (최대)</button>
+          </div>
+        </div>
       </div>
 
       <div class="sep" aria-hidden="true"></div>
@@ -156,7 +164,9 @@
       const fontNameBtn = document.getElementById('fontNameBtn');
       const fontNameMenu = document.getElementById('fontNameMenu');
       const fontNameLabel = document.getElementById('fontNameLabel');
-      const fontSize = document.getElementById('fontSize');
+      const fontSizeBtn = document.getElementById('fontSizeBtn');
+      const fontSizeMenu = document.getElementById('fontSizeMenu');
+      const fontSizeLabel = document.getElementById('fontSizeLabel');
 
       // CSS 인라인 적용 강제
       try { document.execCommand('styleWithCSS', false, true); } catch (_) { }
@@ -299,10 +309,75 @@
       // 메뉴 바깥 클릭시 닫기
       document.addEventListener('click', () => {
         fontNameMenu.classList.add('hidden');
+        fontSizeMenu.classList.add('hidden');
       });
-      fontSize.addEventListener('change', (e) => {
-        const v = e.target.value;
-        try { doCmd('fontSize', v); } finally { /* 브라우저별 <font size> 처리 그대로 허용 */ }
+      // 글꼴 크기 버튼 드롭다운
+      fontSizeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fontSizeMenu.classList.toggle('hidden');
+      });
+
+      // 글꼴 크기 메뉴 항목 클릭
+      fontSizeMenu.addEventListener('click', (e) => {
+        const sizeBtn = e.target.closest('[data-size]');
+        if (!sizeBtn) return;
+        
+        const sizeValue = sizeBtn.getAttribute('data-size');
+        const sizeDisplay = sizeBtn.textContent;
+        
+        // 라벨 업데이트
+        fontSizeLabel.textContent = sizeDisplay;
+        
+        // 글꼴 크기 적용 - 직접적인 방법
+        restoreSelection();
+        
+        const sel = window.getSelection();
+        if (sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          
+          // HTML font size를 픽셀 크기로 변환 (대략적인 매핑)
+          const sizeMap = {
+            '1': '10px',
+            '2': '13px', 
+            '3': '16px',
+            '4': '18px',
+            '5': '24px',
+            '6': '32px',
+            '7': '48px'
+          };
+          
+          const pixelSize = sizeMap[sizeValue] || '16px';
+          
+          if (range.collapsed) {
+            // 커서만 있을 때: 이후 타이핑에 적용될 span 생성
+            const span = document.createElement('span');
+            span.style.fontSize = pixelSize;
+            span.appendChild(document.createTextNode('\u200B')); // zero-width space
+            range.insertNode(span);
+            
+            // 커서를 span 안으로 이동
+            const newRange = document.createRange();
+            newRange.setStart(span.firstChild, 1);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          } else {
+            // 텍스트가 선택된 경우: 선택된 텍스트를 span으로 감싸기
+            const span = document.createElement('span');
+            span.style.fontSize = pixelSize;
+            
+            try {
+              range.surroundContents(span);
+            } catch {
+              const contents = range.extractContents();
+              span.appendChild(contents);
+              range.insertNode(span);
+            }
+          }
+        }
+        
+        // 메뉴 닫기
+        fontSizeMenu.classList.add('hidden');
       });
 
       // 단축키 Ctrl/⌘ + B/I/U
