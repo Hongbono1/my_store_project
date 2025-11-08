@@ -84,6 +84,7 @@
   </div>
 
   <script>
+
     const editor = document.getElementById("editor");
 
     // 범위 감싸기 함수
@@ -91,13 +92,21 @@
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
       const range = sel.getRangeAt(0);
-
-      // 선택된 텍스트가 없으면 무시
-      if (range.collapsed) return;
+      if (range.collapsed) return; // 선택 없으면 무시
 
       const span = document.createElement("span");
       Object.assign(span.style, styleObj);
-      range.surroundContents(span);
+
+      // 기존 선택된 내용을 잘라서 span 안에 넣기 (안정형)
+      const content = range.extractContents();
+      span.appendChild(content);
+      range.insertNode(span);
+
+      // 커서를 span 뒤로 이동 (다음 글자도 계속 입력 가능)
+      range.setStartAfter(span);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
 
     // 글자 굵게
