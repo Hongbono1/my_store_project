@@ -183,22 +183,86 @@
       return editor;
     }
     function isBoldActiveAtCaret() {
-      const el = contextEl();
-      if (el === editor) return false; // 에디터 자체일 때는 false
-      const fw = window.getComputedStyle(el).fontWeight;
-      const numWeight = parseInt(fw, 10);
-      return fw === 'bold' || numWeight >= 600;
+      const el = getActualStyledElement();
+      if (!el || el === editor) return false; // 실제 스타일 요소가 없으면 false
+      
+      // 인라인 스타일 먼저 확인
+      if (el.style.fontWeight) {
+        const inlineWeight = el.style.fontWeight;
+        return inlineWeight === 'bold' || parseInt(inlineWeight, 10) >= 600;
+      }
+      
+      // 계산된 스타일 확인 (단, 실제 내용이 있는 경우만)
+      if (el.textContent.trim()) {
+        const fw = window.getComputedStyle(el).fontWeight;
+        const numWeight = parseInt(fw, 10);
+        return fw === 'bold' || numWeight >= 600;
+      }
+      
+      return false;
     }
     function isUnderlineActiveAtCaret() {
-      const el = contextEl();
-      const td = window.getComputedStyle(el).textDecorationLine || '';
-      return td.includes('underline');
+      const el = getActualStyledElement();
+      if (!el || el === editor) return false; // 실제 스타일 요소가 없으면 false
+      
+      // 인라인 스타일 먼저 확인
+      if (el.style.textDecoration || el.style.textDecorationLine) {
+        const inlineDecor = el.style.textDecoration || el.style.textDecorationLine || '';
+        return inlineDecor.includes('underline');
+      }
+      
+      // 계산된 스타일 확인 (단, 실제 내용이 있는 경우만)
+      if (el.textContent.trim()) {
+        const td = window.getComputedStyle(el).textDecorationLine || '';
+        return td.includes('underline');
+      }
+      
+      return false;
     }
     function refreshToolbarState() {
+      // 실제 텍스트가 선택되었거나, 스타일이 적용된 요소 내부에 커서가 있을 때만 상태 업데이트
+      const sel = window.getSelection();
       const boldBtn = document.getElementById('boldBtn');
       const underlineBtn = document.getElementById('underlineBtn');
-      isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
-      isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
+      
+      // 선택된 텍스트가 있거나, 실제 스타일 요소 내부에 있을 때만 활성화
+      if (sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+        // 텍스트가 선택된 경우에만 상태 확인
+        isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
+        isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
+      } else {
+        // 커서만 있는 경우: 실제 스타일 요소 내부인지 확인
+        const contextEl = getActualStyledElement();
+        if (contextEl && contextEl !== editor) {
+          isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
+          isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
+        } else {
+          // 빈 영역이면 버튼 비활성화
+          boldBtn.classList.remove('active');
+          underlineBtn.classList.remove('active');
+        }
+      }
+    }
+    
+    // 실제 스타일이 적용된 요소만 반환 (빈 영역 제외)
+    function getActualStyledElement() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return null;
+      
+      const n = sel.anchorNode;
+      if (!n) return null;
+      
+      let el = (n.nodeType === 1) ? n : n.parentElement;
+      
+      // 실제 인라인 스타일이나 내용이 있는 요소만 반환
+      while (el && el !== editor) {
+        if (el.style && (el.style.fontWeight || el.style.textDecoration) && el.textContent.trim()) {
+          return el;
+        }
+        el = el.parentElement;
+      }
+      
+      return null;
     }
 
     // selection이 바뀔 때마다 저장 & 상태 업데이트 (디바운스 적용)
