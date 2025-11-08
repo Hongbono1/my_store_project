@@ -1,60 +1,301 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>커스텀 텍스트 에디터</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>오픈 레지스터 — 에디터 포함</title>
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
-  <h1 class="text-2xl font-bold mb-4">커스텀 에디터 ✍️</h1>
-
-  <!-- 툴바 -->
-  <div class="flex flex-wrap gap-2 mb-4">
-    <button onclick="format('bold')" class="btn">B</button>
-    <button onclick="format('italic')" class="btn italic">I</button>
-    <button onclick="format('underline')" class="btn underline">U</button>
-    <button onclick="setColor()" class="btn text-red-500">A</button>
-    <button onclick="insertImage()" class="btn">🖼 이미지</button>
-    <button onclick="clearFormat()" class="btn text-gray-600">❌ 서식 제거</button>
-  </div>
-
-  <!-- 에디터 -->
-  <div id="editor" contenteditable="true"
-    class="w-full max-w-3xl h-[400px] bg-white rounded-md shadow p-4 border border-gray-300 overflow-auto focus:outline-none"
-    placeholder="여기에 글을 입력하세요...">
-  </div>
-
   <style>
-    .btn {
-      @apply px-3 py-1 rounded bg-white border border-gray-300 shadow-sm hover:bg-gray-100;
+    /* 간단한 에디터 스타일 */
+    .editor-toolbar button {
+      @apply px-2 py-1 rounded hover:bg-gray-100;
+    }
+
+    .editor-toolbar .active {
+      box-shadow: inset 0 -2px 0 0 #111827;
+    }
+
+    .editor-area {
+      min-height: 220px;
+      max-height: 700px;
+      overflow: auto;
+      padding: 1rem;
+      border-radius: .5rem;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: white;
+    }
+
+    .editor-area img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: .5rem 0;
+    }
+
+    /* 모바일에서 툴바 스크롤 */
+    .toolbar-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
   </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 p-6">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-semibold mb-4">오픈 레지스터 — 설명(에디터)</h1>
+
+    <!-- 간단한 예시 폼: 기존 register 폼 안에 이 부분을 끼워넣으시면 됩니다 -->
+    <form id="openForm" class="space-y-4 bg-white p-6 rounded shadow-sm" method="post" action="/store"
+      enctype="multipart/form-data">
+      <!-- 다른 입력들(상호명/주소 등)은 원래대로 유지) -->
+      <div>
+        <label class="block text-sm font-medium mb-1">상호명</label>
+        <input name="businessName" class="w-full border rounded px-3 py-2" placeholder="가게명을 입력하세요" />
+      </div>
+
+      <!-- ---- 설명 에디터 섹션 ---- -->
+      <div>
+        <label class="block text-sm font-medium mb-2">가게 설명 / 소개</label>
+
+        <!-- 툴바 -->
+        <div class="editor-toolbar toolbar-scroll flex gap-1 items-center mb-2 border rounded bg-white p-2">
+          <!-- 스타일 -->
+          <button type="button" data-cmd="bold" title="굵게 (Ctrl+B)">B</button>
+          <button type="button" data-cmd="italic" title="기울임 (Ctrl+I)"><em>I</em></button>
+          <button type="button" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-cmd="strikeThrough" title="취소선">S̶</button>
+
+          <div class="border-l h-6 mx-2"></div>
+
+          <!-- 정렬 -->
+          <button type="button" data-cmd="justifyLeft" title="왼쪽 정렬">⟵</button>
+          <button type="button" data-cmd="justifyCenter" title="가운데 정렬">≡</button>
+          <button type="button" data-cmd="justifyRight" title="오른쪽 정렬">⟶</button>
+
+          <div class="border-l h-6 mx-2"></div>
+
+          <!-- 리스트 -->
+          <button type="button" data-cmd="insertUnorderedList" title="글머리표">• 목록</button>
+          <button type="button" data-cmd="insertOrderedList" title="번호 목록">1. 목록</button>
+
+          <div class="border-l h-6 mx-2"></div>
+
+          <!-- 크기 -->
+          <select id="fontSizeSelect" class="border rounded px-2 py-1 text-sm" title="글자 크기">
+            <option value="">크기</option>
+            <option value="14">작게 (14px)</option>
+            <option value="16">기본 (16px)</option>
+            <option value="18">약간 큼 (18px)</option>
+            <option value="22">크게 (22px)</option>
+            <option value="28">아주 크게 (28px)</option>
+          </select>
+
+          <!-- 색상 -->
+          <input id="colorPicker" type="color" class="w-9 h-9 p-0 border rounded ml-2" title="글자 색상" />
+
+          <div class="border-l h-6 mx-2"></div>
+
+          <!-- 링크 -->
+          <button type="button" id="createLinkBtn" title="링크 삽입">🔗 링크</button>
+
+          <!-- 이미지 업로드 (파일 입력) -->
+          <label class="flex items-center gap-2 cursor-pointer bg-gray-50 px-2 py-1 rounded border">
+            <input id="imageInput" type="file" accept="image/*" multiple style="display:none" />
+            <span>🖼 이미지 추가</span>
+          </label>
+
+          <div class="ml-auto text-xs text-gray-500">작성 완료 후 제출 버튼을 누르면 설명 HTML과 이미지 파일이 함께 전송됩니다.</div>
+        </div>
+
+        <!-- 에디터 영역 -->
+        <div id="editor" class="editor-area" contenteditable="true" spellcheck="true"
+          placeholder="가게 소개글을 작성하세요. (이미지 삽입 가능)"></div>
+
+        <!-- 이미지 미리보기(선택 파일 목록) -->
+        <div id="imageList" class="mt-2 grid grid-cols-3 gap-2"></div>
+
+        <!-- 숨은 input: 서버로 보낼 설명 HTML -->
+        <textarea id="description" name="description" class="hidden"></textarea>
+      </div>
+
+      <!-- 버튼 -->
+      <div class="flex gap-2">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded shadow">저장(제출)</button>
+        <button type="button" id="clearBtn" class="px-4 py-2 bg-gray-100 rounded">초기화</button>
+      </div>
+    </form>
+  </div>
 
   <script>
-    function format(command) {
-      document.execCommand(command, false, null);
-    }
+    (function () {
+      const editor = document.getElementById('editor');
+      const form = document.getElementById('openForm');
+      const descriptionInput = document.getElementById('description');
+      const imageInput = document.getElementById('imageInput');
+      const imageList = document.getElementById('imageList');
+      const fontSizeSelect = document.getElementById('fontSizeSelect');
+      const colorPicker = document.getElementById('colorPicker');
+      const createLinkBtn = document.getElementById('createLinkBtn');
+      const clearBtn = document.getElementById('clearBtn');
 
-    function setColor() {
-      const color = prompt("글자 색상 입력 (예: red, #ff0000)");
-      if (color) {
-        document.execCommand("foreColor", false, color);
+      // 선택된 이미지 파일들(파일 객체)을 저장해서 submit 시 FormData에 추가
+      const selectedImages = [];
+
+      // 툴바 버튼 처리 (data-cmd 사용)
+      document.querySelectorAll('[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cmd = btn.getAttribute('data-cmd');
+          // 일부 명령은 value 필요 없음
+          document.execCommand(cmd, false, null);
+          editor.focus();
+        });
+      });
+
+      // font size: 직접 span으로 감싸서 인라인 스타일 적용
+      fontSizeSelect.addEventListener('change', e => {
+        const size = e.target.value;
+        if (!size) return;
+        const html = `<span style="font-size: ${size}px;">` + getSelectionHtml() + '</span>';
+        document.execCommand('insertHTML', false, html);
+        fontSizeSelect.value = '';
+        editor.focus();
+      });
+
+      // color picker
+      colorPicker.addEventListener('input', e => {
+        const color = e.target.value;
+        if (!color) return;
+        document.execCommand('foreColor', false, color);
+        editor.focus();
+      });
+
+      // 링크 삽입
+      createLinkBtn.addEventListener('click', () => {
+        const url = prompt('링크 URL을 입력하세요 (예: https://example.com)');
+        if (!url) return;
+        // 선택 영역을 a태그로 감싸기
+        document.execCommand('createLink', false, url);
+        editor.focus();
+      });
+
+      // 이미지 파일 선택 -> 브라우저 미리보기 + 에디터에 이미지 삽입 + selectedImages 배열에 추가
+      imageInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        for (const file of files) {
+          // 파일유형 확인
+          if (!file.type.startsWith('image/')) continue;
+          // 추가 저장
+          selectedImages.push(file);
+
+          // 미리보기 엘리먼트
+          const url = URL.createObjectURL(file);
+          // 에디터에 이미지 삽입
+          document.execCommand('insertHTML', false, `<img src="${url}" alt="${escapeHtml(file.name)}" />`);
+
+          // 리스트에 썸네일(삭제 버튼 포함)
+          const card = document.createElement('div');
+          card.className = 'relative border rounded overflow-hidden';
+          card.innerHTML = `
+            <img src="${url}" class="w-full h-24 object-cover" />
+            <button type="button" class="absolute top-1 right-1 bg-white/80 rounded px-1 text-xs">삭제</button>
+          `;
+          const delBtn = card.querySelector('button');
+          delBtn.addEventListener('click', () => {
+            // 에디터 내에 같은 blob src 이미지 제거 (간단: 모든 <img> 중 src===url이면 제거)
+            document.querySelectorAll('#editor img').forEach(img => {
+              if (img.src === url) img.remove();
+            });
+            // selectedImages에서 제거
+            const idx = selectedImages.indexOf(file);
+            if (idx > -1) selectedImages.splice(idx, 1);
+            card.remove();
+            URL.revokeObjectURL(url);
+          });
+          imageList.appendChild(card);
+        }
+        // reset input so same file can be reselected if needed
+        e.target.value = '';
+      });
+
+      // Submit 처리: 에디터 HTML을 숨은 textarea에 넣고 FormData에 이미지 파일들을 추가
+      form.addEventListener('submit', (ev) => {
+        // 기본 제출을 막고 fetch로 보내는 예시(선택). 현재는 폼 제출으로 동작하지만
+        // FormData에 descriptionImages[]를 추가하려면 fetch로 보내는 편이 낫습니다.
+        // 여기서는 기본 동작을 사용하되, 설명 HTML을 넣고, 
+        // 만약 서버가 multipart/form-data를 기대하면 아래 예시 fetch 코드 주석 해제 후 사용하세요.
+
+        // (1) description 채우기
+        descriptionInput.value = editor.innerHTML;
+
+        // Option A: 기본 폼 제출(브라우저가 FormData 생성해서 보낼 때 textarea 포함됨)
+        // 단, 이미 선택한 이미지 파일들을 기본 HTML form submit으로 같이 보내려면
+        // <input type="file" name="descriptionImages[]" multiple> 가 필요합니다.
+        // 우리는 JS로 파일들을 동적으로 추가해서 보내는 방식(fetch 사용)을 권장합니다.
+        // 여기서는 fetch 방식으로 보내는 코드로 대체하여 안전하게 파일 전송합니다.
+
+        ev.preventDefault();
+        const fd = new FormData(form); // form의 다른 필드들 포함
+        // description 이미 들어 있음 (textarea)
+        // add images
+        selectedImages.forEach((file, idx) => {
+          fd.append('descriptionImages[]', file, file.name);
+        });
+
+        // 예시: fetch로 전송
+        fetch(form.action, {
+          method: form.method || 'POST',
+          body: fd
+        })
+          .then(async r => {
+            if (!r.ok) {
+              const text = await r.text();
+              alert('전송 실패: ' + r.status + '\n' + text);
+              console.error('서버 응답', r, text);
+            } else {
+              alert('저장 완료');
+              // 필요시 리다이렉트
+              // location.href = '/somewhere'
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            alert('전송 중 오류가 발생했습니다.');
+          });
+      });
+
+      // 초기화 버튼
+      clearBtn.addEventListener('click', () => {
+        if (!confirm('에디터 내용을 초기화할까요?')) return;
+        editor.innerHTML = '';
+        descriptionInput.value = '';
+        selectedImages.length = 0;
+        imageList.innerHTML = '';
+      });
+
+      // 유틸: 선택된 HTML 얻기
+      function getSelectionHtml() {
+        let sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+          let container = document.createElement("div");
+          for (let i = 0, len = sel.rangeCount; i < len; ++i) {
+            container.appendChild(sel.getRangeAt(i).cloneContents());
+          }
+          return container.innerHTML;
+        }
+        return '';
       }
-    }
 
-    function insertImage() {
-      const url = prompt("이미지 URL을 입력하세요");
-      if (url) {
-        document.execCommand("insertImage", false, url);
+      // escape HTML for alt text 안전 처리
+      function escapeHtml(str) {
+        return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
       }
-    }
 
-    function clearFormat() {
-      document.execCommand("removeFormat", false, null);
-    }
+      // placeholder 동작 (간단)
+      editor.addEventListener('focus', () => editor.classList.remove('placeholder'));
+      editor.addEventListener('blur', () => editor.classList.remove('placeholder'));
+    })();
   </script>
 </body>
 
