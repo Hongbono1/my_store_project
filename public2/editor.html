@@ -220,28 +220,32 @@
       return false;
     }
     function refreshToolbarState() {
-      // 실제 텍스트가 선택되었거나, 스타일이 적용된 요소 내부에 커서가 있을 때만 상태 업데이트
       const sel = window.getSelection();
       const boldBtn = document.getElementById('boldBtn');
       const underlineBtn = document.getElementById('underlineBtn');
       
-      // 선택된 텍스트가 있거나, 실제 스타일 요소 내부에 있을 때만 활성화
+      // 오직 텍스트가 선택되었을 때만 상태 확인 (커서만 있을 때는 상태 변경 안 함)
       if (sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
-        // 텍스트가 선택된 경우에만 상태 확인
-        isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
-        isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
-      } else {
-        // 커서만 있는 경우: 실제 스타일 요소 내부인지 확인
-        const contextEl = getActualStyledElement();
-        if (contextEl && contextEl !== editor) {
-          isBoldActiveAtCaret() ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
-          isUnderlineActiveAtCaret() ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
-        } else {
-          // 빈 영역이면 버튼 비활성화
-          boldBtn.classList.remove('active');
-          underlineBtn.classList.remove('active');
+        // 선택된 텍스트의 스타일 확인
+        const range = sel.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        const element = container.nodeType === 1 ? container : container.parentElement;
+        
+        if (element && inEditor(element)) {
+          const computedStyle = window.getComputedStyle(element);
+          
+          // Bold 상태 확인
+          const fontWeight = computedStyle.fontWeight;
+          const isBold = fontWeight === 'bold' || parseInt(fontWeight, 10) >= 600;
+          isBold ? boldBtn.classList.add('active') : boldBtn.classList.remove('active');
+          
+          // Underline 상태 확인
+          const textDecoration = computedStyle.textDecorationLine || computedStyle.textDecoration || '';
+          const isUnderline = textDecoration.includes('underline');
+          isUnderline ? underlineBtn.classList.add('active') : underlineBtn.classList.remove('active');
         }
       }
+      // 텍스트 선택이 없으면 버튼 상태를 변경하지 않음 (현재 상태 유지)
     }
     
     // 실제 스타일이 적용된 요소만 반환 (빈 영역 제외)
@@ -265,18 +269,17 @@
       return null;
     }
 
-    // selection이 바뀔 때마다 저장 & 상태 업데이트 (디바운스 적용)
-    let toolbarUpdateTimeout = null;
+    // selection이 바뀔 때마다 저장만 (상태 업데이트는 실제 텍스트 선택 시에만)
     document.addEventListener('selectionchange', () => {
       const sel = window.getSelection();
       if (document.activeElement === editor || inEditor(sel.anchorNode)) {
         saveSelection();
         
-        // 디바운스: 연속된 선택 변경 시 마지막 것만 처리
-        clearTimeout(toolbarUpdateTimeout);
-        toolbarUpdateTimeout = setTimeout(() => {
+        // 오직 텍스트가 실제로 선택되었을 때만 버튼 상태 업데이트
+        if (sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+          // 텍스트 선택 시에만 상태 업데이트
           refreshToolbarState();
-        }, 50); // 50ms 지연
+        }
       }
     });
 
@@ -286,10 +289,9 @@
     editor.addEventListener('input', saveSelection);
     editor.addEventListener('focus', saveSelection);
 
-    // 초기 포커스 및 툴바 상태 설정
+    // 초기 포커스만 설정 (버튼 상태는 초기화하지 않음)
     window.addEventListener('load', () => {
       editor.focus();
-      refreshToolbarState();
     });
 
     // 3) 선택이 없어도(커서만) 스타일 적용되게 wrapSelection 교체
@@ -348,34 +350,42 @@
       savedRange = range.cloneRange();
     }
 
-    // Bold 토글: 버튼 클릭 시에만 작동 (자동 적용 방지)
+    // Bold 토글: 버튼 클릭 시에만 작동
     document.getElementById("boldBtn").addEventListener("click", (e) => {
-      // 실제 사용자 클릭인지 확인 (자동 실행 방지)
       if (e.isTrusted) {
-        if (isBoldActiveAtCaret()) {
-          // 해제: 상속된 bold를 상쇄
+        const boldBtn = document.getElementById('boldBtn');
+        const isCurrentlyActive = boldBtn.classList.contains('active');
+        
+        if (isCurrentlyActive) {
+          // 해제
           wrapSelection({ fontWeight: "normal" });
+          boldBtn.classList.remove('active');
         } else {
           // 적용
           wrapSelection({ fontWeight: "bold" });
+          boldBtn.classList.add('active');
         }
-        setTimeout(() => refreshToolbarState(), 10); // 약간의 지연으로 안정성 확보
       }
       editor.focus();
     });
 
 
 
-    document.getElementById("underlineBtn").addEventListener("click", () => {
-      // 현재 커서/선택 위치 기준으로 토글
-      if (isUnderlineActiveAtCaret()) {
-        // 해제: 상속된 underline을 상쇄
-        wrapSelection({ textDecoration: "none" });
-      } else {
-        // 적용
-        wrapSelection({ textDecoration: "underline" });
+    document.getElementById("underlineBtn").addEventListener("click", (e) => {
+      if (e.isTrusted) {
+        const underlineBtn = document.getElementById('underlineBtn');
+        const isCurrentlyActive = underlineBtn.classList.contains('active');
+        
+        if (isCurrentlyActive) {
+          // 해제
+          wrapSelection({ textDecoration: "none" });
+          underlineBtn.classList.remove('active');
+        } else {
+          // 적용
+          wrapSelection({ textDecoration: "underline" });
+          underlineBtn.classList.add('active');
+        }
       }
-      refreshToolbarState();
       editor.focus();
     });
 
