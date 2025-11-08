@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>기본 에디터 | MALL HANKOOK</title>
+  <title>안정형 텍스트 에디터 | MALL HANKOOK</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
@@ -12,12 +12,12 @@
     }
 
     .editor-toolbar button {
-      @apply px-3 py-1 rounded hover:bg-gray-100 transition-colors;
+      @apply w-10 h-10 flex items-center justify-center border rounded-md bg-white shadow-sm hover:bg-gray-100 transition;
     }
 
     .editor-toolbar button.active {
       background-color: #2563eb;
-      /* Tailwind: bg-blue-600 */
+      /* 파랑 */
       color: white;
     }
 
@@ -39,25 +39,16 @@
 
 <body class="bg-slate-50 text-gray-800 p-6">
   <div class="max-w-3xl mx-auto bg-white p-5 rounded-lg shadow">
-    <h1 class="text-2xl font-semibold mb-4 text-center">기본 텍스트 에디터</h1>
+    <h1 class="text-2xl font-semibold mb-4 text-center">안정형 텍스트 에디터</h1>
 
     <!-- 툴바 -->
     <div
       class="editor-toolbar flex flex-wrap items-center justify-center gap-4 mb-4 border p-3 rounded bg-gray-50 shadow-sm">
-      <!-- 글자 스타일 -->
-      <button type="button" data-cmd="bold" title="굵게"
-        class="w-10 h-10 flex items-center justify-center border rounded-md bg-white shadow-sm hover:bg-gray-100 active:bg-blue-600 active:text-white transition">
-        <span class="font-bold text-lg">B</span>
-      </button>
-
-      <button type="button" data-cmd="underline" title="밑줄"
-        class="w-10 h-10 flex items-center justify-center border rounded-md bg-white shadow-sm hover:bg-gray-100 active:bg-blue-600 active:text-white transition">
-        <span class="underline text-lg">U</span>
-      </button>
+      <button id="boldBtn" title="굵게"><span class="font-bold text-lg">B</span></button>
+      <button id="underlineBtn" title="밑줄"><span class="underline text-lg">U</span></button>
 
       <div class="border-l h-6"></div>
 
-      <!-- 글자 크기 -->
       <select id="fontSizeSelect" class="border rounded px-2 py-1 text-sm">
         <option value="">글자 크기</option>
         <option value="14px">작게</option>
@@ -66,34 +57,28 @@
         <option value="26px">아주 크게</option>
       </select>
 
-      <!-- 글자 색상 -->
       <input type="color" id="fontColor" class="border rounded w-8 h-8 p-0 cursor-pointer" title="글자 색상 선택" />
 
       <div class="border-l h-6"></div>
 
-      <!-- 이미지 삽입 -->
       <label
         class="flex items-center gap-1 cursor-pointer bg-gray-100 border px-3 py-2 rounded-md hover:bg-gray-200 shadow-sm">
-        <input id="imageInput" type="file" accept="image/*" hidden>
+        <input id="imageInput" type="file" accept="image/*" hidden />
         <span>🖼 이미지 삽입</span>
       </label>
 
-      <!-- 이미지 정렬 -->
       <div class="flex items-center gap-2">
-        <button type="button" data-align="left" title="이미지 왼쪽 정렬"
-          class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">⬅️</button>
-        <button type="button" data-align="center" title="이미지 중앙 정렬"
-          class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">↔️</button>
-        <button type="button" data-align="right" title="이미지 오른쪽 정렬"
-          class="w-8 h-8 flex items-center justify-center border rounded-md bg-white hover:bg-gray-100 shadow-sm">➡️</button>
+        <button data-align="left" title="왼쪽 정렬">⬅️</button>
+        <button data-align="center" title="가운데 정렬">↔️</button>
+        <button data-align="right" title="오른쪽 정렬">➡️</button>
       </div>
     </div>
 
-    <!-- 에디터 영역 -->
+    <!-- 에디터 -->
     <div id="editor" class="editor-area" contenteditable="true" spellcheck="true">
+      여기에 내용을 입력하세요...
     </div>
 
-    <!-- 제출 예시 -->
     <button id="saveBtn" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded">저장</button>
     <textarea id="result" class="w-full mt-3 border rounded p-2 text-sm" rows="5"
       placeholder="저장된 HTML 미리보기"></textarea>
@@ -102,68 +87,45 @@
   <script>
     const editor = document.getElementById("editor");
 
-    // 커서 위치 저장/복원용
-    let savedRange = null;
-    function saveSelection() {
+    // 범위 감싸기 함수
+    function wrapSelection(styleObj = {}) {
       const sel = window.getSelection();
-      if (sel.rangeCount > 0) {
-        savedRange = sel.getRangeAt(0);
-      }
-    }
-    function restoreSelection() {
-      const sel = window.getSelection();
-      if (savedRange) {
-        sel.removeAllRanges();
-        sel.addRange(savedRange);
-      }
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+
+      // 선택된 텍스트가 없으면 무시
+      if (range.collapsed) return;
+
+      const span = document.createElement("span");
+      Object.assign(span.style, styleObj);
+      range.surroundContents(span);
     }
 
-    // Bold & Underline 버튼
-    document.querySelectorAll("[data-cmd]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        saveSelection(); // 현재 커서 저장
-        document.execCommand(btn.dataset.cmd, false, null);
-        restoreSelection(); // 커서 복원
-        editor.focus();
-        setTimeout(updateActiveButtons, 50);
-      });
+    // 글자 굵게
+    document.getElementById("boldBtn").addEventListener("click", () => {
+      wrapSelection({ fontWeight: "bold" });
+      editor.focus();
     });
 
-    // 에디터 내에서 커서 이동/선택 변화 시 활성화 상태 갱신
-    editor.addEventListener("keyup", updateActiveButtons);
-    editor.addEventListener("mouseup", updateActiveButtons);
-    editor.addEventListener("focus", updateActiveButtons);
+    // 밑줄
+    document.getElementById("underlineBtn").addEventListener("click", () => {
+      wrapSelection({ textDecoration: "underline" });
+      editor.focus();
+    });
 
-    function updateActiveButtons() {
-      document.querySelectorAll("[data-cmd]").forEach(btn => {
-        const cmd = btn.dataset.cmd;
-        const state = document.queryCommandState(cmd);
-        if (state) {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-      });
-    }
-
-    // Font size (정상 작동 버전)
+    // 글자 크기
     document.getElementById("fontSizeSelect").addEventListener("change", e => {
       const size = e.target.value;
       if (size) {
-        document.execCommand("fontSize", false, "7");
-        const fontElements = editor.querySelectorAll("font[size='7']");
-        fontElements.forEach(el => {
-          el.removeAttribute("size");
-          el.style.fontSize = size;
-        });
+        wrapSelection({ fontSize: size });
         e.target.value = "";
-        editor.focus();
       }
+      editor.focus();
     });
 
-    // Font color
+    // 글자 색상
     document.getElementById("fontColor").addEventListener("input", e => {
-      document.execCommand("foreColor", false, e.target.value);
+      wrapSelection({ color: e.target.value });
       editor.focus();
     });
 
@@ -171,21 +133,27 @@
     const imageInput = document.getElementById("imageInput");
     imageInput.addEventListener("change", e => {
       const file = e.target.files[0];
-      if (file && file.type.startsWith("image/")) {
-        const url = URL.createObjectURL(file);
-        const img = `<img src="${url}" alt="${file.name}" style="display:block;margin:auto;">`;
-        document.execCommand("insertHTML", false, img);
-        e.target.value = "";
-      }
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = file.name;
+      img.style.display = "block";
+      img.style.margin = "auto";
+
+      const range = window.getSelection().getRangeAt(0);
+      range.insertNode(img);
+      editor.focus();
     });
 
-    // 이미지 정렬 버튼
+    // 이미지 정렬
     document.querySelectorAll("[data-align]").forEach(btn => {
       btn.addEventListener("click", () => {
         const align = btn.dataset.align;
-        const selection = window.getSelection();
-        const node = selection.anchorNode;
-        const img = node && node.parentElement && node.parentElement.querySelector("img");
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const node = sel.anchorNode;
+        const img = node && node.nodeType === 1 && node.tagName === "IMG" ? node : node?.parentElement?.querySelector("img");
         if (img) {
           img.style.display = align === "center" ? "block" : "inline-block";
           img.style.margin = align === "center" ? "auto" : "0";
@@ -194,10 +162,10 @@
       });
     });
 
-    // 저장 버튼
+    // 저장
     document.getElementById("saveBtn").addEventListener("click", () => {
       document.getElementById("result").value = editor.innerHTML;
-      alert("에디터 내용이 HTML 형태로 저장되었습니다.");
+      alert("저장 완료");
     });
   </script>
 </body>
