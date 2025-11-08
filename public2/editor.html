@@ -55,14 +55,22 @@
       <!-- 폰트/크기 -->
       <div class="flex items-center gap-2">
         <label class="text-xs text-slate-500">글꼴</label>
-        <select id="fontName" class="h-9 px-2 border rounded-md bg-white">
-          <option value="">기본</option>
-          <option value="Pretendard">Pretendard</option>
-          <option value="Malgun Gothic">맑은 고딕</option>
-          <option value="Nanum Gothic">나눔고딕</option>
-          <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
-        </select>
+        <div class="relative">
+          <button id="fontNameBtn" class="h-9 px-3 border rounded-md bg-white hover:bg-slate-50 flex items-center gap-2">
+            <span id="fontNameLabel">기본</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <div id="fontNameMenu" class="absolute top-full left-0 mt-1 bg-white border rounded-md shadow-lg z-20 min-w-[160px] hidden">
+            <button data-font="" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100">기본</button>
+            <button data-font="Pretendard" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100" style="font-family: Pretendard">Pretendard</button>
+            <button data-font="'Malgun Gothic'" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100" style="font-family: 'Malgun Gothic'">맑은 고딕</button>
+            <button data-font="'Nanum Gothic'" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100" style="font-family: 'Nanum Gothic'">나눔고딕</button>
+            <button data-font="Arial" class="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100" style="font-family: Arial">Arial</button>
+            <button data-font="'Times New Roman'" class="w-full px-3 py-2 text-left hover:bg-slate-50" style="font-family: 'Times New Roman'">Times New Roman</button>
+          </div>
+        </div>
         <label class="text-xs text-slate-500">크기</label>
         <select id="fontSize" class="h-9 px-2 border rounded-md bg-white">
           <option value="3">기본(3)</option>
@@ -142,7 +150,9 @@
       const editor = document.getElementById('editor');
       const toolbar = document.getElementById('toolbar');
       const status = document.getElementById('status');
-      const fontName = document.getElementById('fontName');
+      const fontNameBtn = document.getElementById('fontNameBtn');
+      const fontNameMenu = document.getElementById('fontNameMenu');
+      const fontNameLabel = document.getElementById('fontNameLabel');
       const fontSize = document.getElementById('fontSize');
 
       // CSS 인라인 적용 강제
@@ -219,11 +229,40 @@
         applyInlineStyle('backgroundColor', color);
       });
 
-      // 글꼴/크기
-      fontName.addEventListener('change', (e) => {
-        const val = e.target.value;
-        // execCommand 시도 → 실패 대비 span 스타일
-        try { doCmd('fontName', val); } finally { applyInlineStyle('fontFamily', val || null, true); }
+      // 글꼴 버튼 드롭다운
+      fontNameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fontNameMenu.classList.toggle('hidden');
+      });
+
+      // 글꼴 메뉴 항목 클릭
+      fontNameMenu.addEventListener('click', (e) => {
+        const fontBtn = e.target.closest('[data-font]');
+        if (!fontBtn) return;
+        
+        const fontValue = fontBtn.getAttribute('data-font');
+        const fontDisplay = fontBtn.textContent;
+        
+        // 라벨 업데이트
+        fontNameLabel.textContent = fontDisplay;
+        
+        // 글꼴 적용
+        if (fontValue) {
+          try { doCmd('fontName', fontValue); } 
+          finally { applyInlineStyle('fontFamily', fontValue, true); }
+        } else {
+          // 기본 글꼴로 리셋
+          try { doCmd('removeFormat'); }
+          finally { applyInlineStyle('fontFamily', null, true); }
+        }
+        
+        // 메뉴 닫기
+        fontNameMenu.classList.add('hidden');
+      });
+
+      // 메뉴 바깥 클릭시 닫기
+      document.addEventListener('click', () => {
+        fontNameMenu.classList.add('hidden');
       });
       fontSize.addEventListener('change', (e) => {
         const v = e.target.value;
