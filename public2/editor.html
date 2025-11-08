@@ -47,6 +47,16 @@
       text-decoration-style: none !important;
       text-decoration-color: transparent !important;
     }
+    
+    /* 강제 밑줄 해제 클래스 */
+    .editor-area .no-underline-force,
+    .editor-area .no-underline-force * {
+      text-decoration: none !important;
+      text-decoration-line: none !important;
+      text-decoration-style: none !important;
+      text-decoration-color: transparent !important;
+      text-underline-offset: 0 !important;
+    }
   </style>
 </head>
 
@@ -290,15 +300,74 @@
       }
     });
 
-    // 에디터 이벤트에 저장 추가
-    editor.addEventListener('keyup', saveSelection);
+    // 에디터 이벤트에 저장 추가 (엔터 키 예외 처리)
+    editor.addEventListener('keyup', (e) => {
+      // 엔터 키일 때는 커서 저장만 하고 스타일 적용 방지
+      if (e.key === 'Enter') {
+        saveSelection();
+        return;
+      }
+      saveSelection();
+    });
     editor.addEventListener('mouseup', saveSelection);
     editor.addEventListener('input', saveSelection);
     editor.addEventListener('focus', saveSelection);
+    
+    // 엔터 키 입력 시 스타일 상속 방지
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        // 현재 스타일 상태를 초기화
+        const boldBtn = document.getElementById('boldBtn');
+        const underlineBtn = document.getElementById('underlineBtn');
+        
+        // 엔터 후 새 라인에서는 스타일 초기화
+        setTimeout(() => {
+          if (boldBtn.classList.contains('active') || underlineBtn.classList.contains('active')) {
+            // 새 라인에 일반 텍스트 span 삽입
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              const span = document.createElement('span');
+              span.style.fontWeight = 'normal';
+              span.style.textDecoration = 'none';
+              span.style.setProperty('font-weight', 'normal', 'important');
+              span.style.setProperty('text-decoration', 'none', 'important');
+              
+              const br = document.createElement('br');
+              span.appendChild(br);
+              range.insertNode(span);
+              
+              // 커서를 span 뒤로 이동
+              range.setStartAfter(span);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          }
+        }, 10);
+      }
+    });
 
-    // 초기 포커스만 설정 (버튼 상태는 초기화하지 않음)
+    // 초기 포커스 및 엔터 키 스타일 방지 설정
     window.addEventListener('load', () => {
       editor.focus();
+      
+      // 엔터 키로 생성된 새 라인의 스타일 상속 방지
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach((node) => {
+              if (node.nodeType === 1 && node.tagName === 'DIV') {
+                // 새로 생성된 div에 스타일 초기화
+                node.style.fontWeight = 'normal';
+                node.style.textDecoration = 'none';
+              }
+            });
+          }
+        });
+      });
+      
+      observer.observe(editor, { childList: true, subtree: true });
     });
 
     // 3) 선택이 없어도(커서만) 스타일 적용되게 wrapSelection 교체
@@ -401,13 +470,8 @@
         const underlineBtn = document.getElementById('underlineBtn');
         
         if (underlineBtn.classList.contains('active')) {
-          // 해제: 가장 강력한 해제 방법
-          wrapSelection({ 
-            textDecoration: "none",
-            textDecorationLine: "none",
-            textDecorationStyle: "none",
-            textDecorationColor: "transparent"
-          });
+          // 해제: 완전히 새로운 방법 - 기존 요소 제거하고 새로 생성
+          removeUnderlineCompletely();
           underlineBtn.classList.remove('active');
         } else {
           // 적용
@@ -417,6 +481,46 @@
       }
       editor.focus();
     });
+    
+    // 밑줄 완전 제거 함수
+    function removeUnderlineCompletely() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      
+      let range = sel.getRangeAt(0);
+      
+      if (range.collapsed) {
+        // 커서만 있을 때: 밑줄 없는 span 생성
+        const span = document.createElement('span');
+        span.style.cssText = 'text-decoration: none !important; text-decoration-line: none !important;';
+        span.className = 'no-underline-force';
+        
+        const zwsp = document.createTextNode('\u200B');
+        span.appendChild(zwsp);
+        range.insertNode(span);
+        
+        range = document.createRange();
+        range.setStart(zwsp, 1);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        savedRange = range.cloneRange();
+      } else {
+        // 선택된 텍스트: 내용을 추출해서 새로운 밑줄 없는 span으로 감싸기
+        const content = range.extractContents();
+        const span = document.createElement('span');
+        span.style.cssText = 'text-decoration: none !important; text-decoration-line: none !important;';
+        span.className = 'no-underline-force';
+        span.appendChild(content);
+        range.insertNode(span);
+        
+        range.setStartAfter(span);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        savedRange = range.cloneRange();
+      }
+    }
 
     // 4) 폰트/색/이미지 적용 전에 반드시 복원
     document.getElementById('fontSizeSelect').addEventListener('change', (e) => {
