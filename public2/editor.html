@@ -207,8 +207,20 @@
         sel.removeAllRanges();
         sel.addRange(savedRange);
       }
-      editor.addEventListener('keyup', saveSelection);
-      editor.addEventListener('mouseup', saveSelection);
+      editor.addEventListener('keyup', (e) => {
+        // 화살표 키나 클릭으로 커서 이동 시 예약된 스타일 초기화
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+          pendingStyles = {};
+        }
+        saveSelection();
+      });
+      
+      editor.addEventListener('mouseup', () => {
+        // 마우스 클릭으로 커서 이동 시 예약된 스타일 초기화
+        pendingStyles = {};
+        saveSelection();
+      });
+      
       document.addEventListener('selectionchange', () => {
         if (document.activeElement === editor || editor.contains(document.activeElement)) {
           saveSelection();
@@ -266,38 +278,58 @@
         if (!target) return;
         
         const color = target.getAttribute('data-fore');
+        
+        // 클릭 효과와 상태 표시
+        target.style.transform = 'scale(0.9)';
+        target.style.boxShadow = '0 0 0 2px #3b82f6';
+        
+        setTimeout(() => {
+          target.style.transform = 'scale(1)';
+          target.style.boxShadow = '';
+        }, 150);
+        
         if (color === 'remove') {
           // 글자색 제거
           removeInlineStyle('color');
+          status.textContent = '글자색 제거됨';
         } else {
           // 글자색 적용
           applyInlineStyle('color', color);
+          status.textContent = `글자색 적용: ${color}`;
         }
         
-        // 버튼 클릭 효과
-        target.style.transform = 'scale(0.9)';
         setTimeout(() => {
-          target.style.transform = 'scale(1)';
-        }, 100);
+          updateState();
+        }, 200);
       });
       document.getElementById('backPalette').addEventListener('click', (e) => {
         const target = e.target.closest('[data-back]');
         if (!target) return;
         
         const color = target.getAttribute('data-back');
+        
+        // 클릭 효과와 상태 표시
+        target.style.transform = 'scale(0.9)';
+        target.style.boxShadow = '0 0 0 2px #3b82f6';
+        
+        setTimeout(() => {
+          target.style.transform = 'scale(1)';
+          target.style.boxShadow = '';
+        }, 150);
+        
         if (color === 'remove') {
           // 배경색 제거
           removeInlineStyle('backgroundColor');
+          status.textContent = '배경색 제거됨';
         } else {
           // 배경색 적용
           applyInlineStyle('backgroundColor', color);
+          status.textContent = `배경색 적용: ${color}`;
         }
         
-        // 버튼 클릭 효과
-        target.style.transform = 'scale(0.9)';
         setTimeout(() => {
-          target.style.transform = 'scale(1)';
-        }, 100);
+          updateState();
+        }, 200);
       });
 
       // 글꼴 버튼 드롭다운
@@ -448,30 +480,48 @@
         if (k === 'u') { e.preventDefault(); doCmd('underline'); }
       });
 
-      // 인라인 스타일 적용(선택 영역에 span 래핑)
+      // 전역 스타일 상태 (커서 위치에서 적용할 스타일)
+      let pendingStyles = {};
+
+      // 인라인 스타일 적용(선택 영역에 span 래핑 또는 커서 위치에서 스타일 예약)
       function applyInlineStyle(prop, value, allowNull) {
         restoreSelection();
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
+        
         const range = sel.getRangeAt(0);
-        if (range.collapsed) return;
+        
+        // 선택 영역이 있는 경우: 즉시 적용
+        if (!range.collapsed) {
+          // 기존 내용 추출 → span에 넣고 스타일 적용 → 다시 삽입
+          const frag = range.extractContents();
+          const span = document.createElement('span');
+          if (value || allowNull) {
+            if (value) span.style[prop] = value;
+          }
+          span.appendChild(frag);
+          range.insertNode(span);
 
-        // 기존 내용 추출 → span에 넣고 스타일 적용 → 다시 삽입
-        const frag = range.extractContents();
-        const span = document.createElement('span');
-        if (value || allowNull) {
-          if (value) span.style[prop] = value;
+          // 커서 뒤로 이동
+          sel.removeAllRanges();
+          const r = document.createRange();
+          r.selectNodeContents(span);
+          r.collapse(false);
+          sel.addRange(r);
+          saveSelection();
+          updateState();
+          editor.focus();
+          return;
         }
-        span.appendChild(frag);
-        range.insertNode(span);
-
-        // 커서 뒤로 이동
-        sel.removeAllRanges();
-        const r = document.createRange();
-        r.selectNodeContents(span);
-        r.collapse(false);
-        sel.addRange(r);
-        saveSelection();
+        
+        // 선택 영역이 없는 경우 (커서만 있음): 다음 입력에 적용할 스타일 예약
+        if (value) {
+          pendingStyles[prop] = value;
+        } else if (allowNull) {
+          delete pendingStyles[prop];
+        }
+        
+        // 즉시 상태 표시 업데이트
         updateState();
         editor.focus();
       }
@@ -481,8 +531,16 @@
         restoreSelection();
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
+        
         const range = sel.getRangeAt(0);
-        if (range.collapsed) return;
+        
+        // 선택 영역이 없는 경우: 예약된 스타일에서 제거
+        if (range.collapsed) {
+          delete pendingStyles[prop];
+          updateState();
+          editor.focus();
+          return;
+        }
 
         // 선택된 텍스트의 부모 요소들을 찾아서 해당 스타일 제거
         const fragment = range.extractContents();
@@ -609,9 +667,24 @@
         if (map.underline) activeFormats.push('밑줄');
         if (map.strikeThrough) activeFormats.push('취소선');
         
-        status.textContent = activeFormats.length > 0 
-          ? `활성 서식: ${activeFormats.join(' + ')}` 
-          : '서식 없음';
+        // 예약된 스타일 표시
+        const pendingFormats = [];
+        if (pendingStyles.color) pendingFormats.push(`글자색:${pendingStyles.color}`);
+        if (pendingStyles.backgroundColor) pendingFormats.push(`배경색:${pendingStyles.backgroundColor}`);
+        
+        let statusText = '';
+        if (activeFormats.length > 0) {
+          statusText += `활성 서식: ${activeFormats.join(' + ')}`;
+        }
+        if (pendingFormats.length > 0) {
+          if (statusText) statusText += ' | ';
+          statusText += `다음 입력: ${pendingFormats.join(', ')}`;
+        }
+        if (!statusText) {
+          statusText = '서식 없음';
+        }
+        
+        status.textContent = statusText;
       }
 
       // 키보드 단축키 지원
@@ -643,6 +716,44 @@
                 doCmd('undo');
               }
               break;
+          }
+        }
+      });
+
+      // 입력 전 스타일 적용 (beforeinput)
+      editor.addEventListener('beforeinput', (e) => {
+        console.log('beforeinput event:', e.inputType, e.data, 'pendingStyles:', pendingStyles);
+        
+        if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
+          if (Object.keys(pendingStyles).length > 0) {
+            e.preventDefault();
+            
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            
+            // 스타일이 적용된 span 요소 생성
+            const span = document.createElement('span');
+            Object.keys(pendingStyles).forEach(prop => {
+              span.style[prop] = pendingStyles[prop];
+              console.log(`Applied ${prop}: ${pendingStyles[prop]} to span`);
+            });
+            
+            // 입력된 텍스트를 span에 넣기
+            span.textContent = e.data || '';
+            
+            // 현재 위치에 삽입
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(span);
+            
+            // 커서를 span 뒤로 이동
+            range.setStartAfter(span);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            
+            saveSelection();
+            console.log('Styled text inserted:', span);
           }
         }
       });
