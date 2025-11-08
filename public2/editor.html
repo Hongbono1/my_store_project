@@ -169,11 +169,11 @@
 
     <!-- Editor -->
     <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
-      <p>여기에 입력하세요. (Ctrl/⌘+B/U/I 지원, 서식 토글 상태 유지)</p>
-      <p>이 텍스트로 <b>굵게</b>, <i>기울임</i>, <u>밑줄</u>, <s>취소선</s> 테스트하세요.</p>
-      <p>다중 서식도 테스트: <b><i><u>굵게+기울임+밑줄</u></i></b></p>
-      <p><span style="color:#ef4444;">빨간 글자</span>와 <span style="background-color:#fef3c7;">노란 배경</span> 테스트</p>
-      <p><span style="color:#3b82f6; background-color:#e0e7ff;">파란 글자에 연한 파란 배경</span> 조합 테스트</p>
+      <p>📝 3가지 색상 시나리오 테스트:</p>
+      <p>1️⃣ 색 버튼 클릭 → 바로 타자치기</p>
+      <p>2️⃣ 타자 다 치고 → 선택 → 색 변경</p>
+      <p>3️⃣ 타자 치는 도중 → 색 변경 → 계속 타자</p>
+      <p><span style="color:#ef4444;">빨간글자</span> <span style="background-color:#fef3c7;">노란배경</span> <span style="color:#3b82f6; background-color:#e0e7ff;">파란글자+파란배경</span></p>
     </div>
 
     <div id="status" class="mt-2 text-xs text-slate-500">Ready</div>
@@ -208,16 +208,41 @@
         sel.addRange(savedRange);
       }
       editor.addEventListener('keyup', (e) => {
-        // 화살표 키나 클릭으로 커서 이동 시 예약된 스타일 초기화
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        // 화살표 키로 커서 이동 시에만 예약된 스타일 초기화
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
           pendingStyles = {};
+          console.log('Cursor moved, cleared pending styles');
         }
+        // Enter, Space, Backspace 등은 스타일 유지
         saveSelection();
       });
       
-      editor.addEventListener('mouseup', () => {
-        // 마우스 클릭으로 커서 이동 시 예약된 스타일 초기화
-        pendingStyles = {};
+      editor.addEventListener('mouseup', (e) => {
+        // 마우스 클릭으로 다른 위치로 이동 시에만 예약된 스타일 초기화
+        // 툴바 클릭은 제외 (이미 toolbar mousedown에서 preventDefault 처리됨)
+        if (e.target === editor || editor.contains(e.target)) {
+          setTimeout(() => {
+            // 클릭 위치에서 기존 스타일을 감지해서 pendingStyles에 반영
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              const currentElement = range.startContainer.nodeType === Node.TEXT_NODE 
+                ? range.startContainer.parentElement 
+                : range.startContainer;
+              
+              // 현재 위치의 스타일을 pendingStyles에 반영
+              if (currentElement && currentElement.tagName === 'SPAN') {
+                pendingStyles = {};
+                if (currentElement.style.color) pendingStyles.color = currentElement.style.color;
+                if (currentElement.style.backgroundColor) pendingStyles.backgroundColor = currentElement.style.backgroundColor;
+                console.log('Inherited styles from current position:', pendingStyles);
+              } else {
+                pendingStyles = {};
+                console.log('Clicked on unstyled area, cleared pending styles');
+              }
+            }
+          }, 10);
+        }
         saveSelection();
       });
       
@@ -483,7 +508,7 @@
       // 전역 스타일 상태 (커서 위치에서 적용할 스타일)
       let pendingStyles = {};
 
-      // 인라인 스타일 적용(선택 영역에 span 래핑 또는 커서 위치에서 스타일 예약)
+      // 인라인 스타일 적용 - 모든 시나리오 지원
       function applyInlineStyle(prop, value, allowNull) {
         restoreSelection();
         const sel = window.getSelection();
@@ -491,9 +516,8 @@
         
         const range = sel.getRangeAt(0);
         
-        // 선택 영역이 있는 경우: 즉시 적용
+        // 시나리오 2: 선택 영역이 있는 경우 (타자 다 치고 선택 후 색 변경)
         if (!range.collapsed) {
-          // 기존 내용 추출 → span에 넣고 스타일 적용 → 다시 삽입
           const frag = range.extractContents();
           const span = document.createElement('span');
           if (value || allowNull) {
@@ -502,26 +526,70 @@
           span.appendChild(frag);
           range.insertNode(span);
 
-          // 커서 뒤로 이동
+          // 커서를 span 뒤로 이동하고 스타일 예약도 설정
           sel.removeAllRanges();
           const r = document.createRange();
           r.selectNodeContents(span);
           r.collapse(false);
           sel.addRange(r);
+          
+          // 선택 후 색 변경시에도 이후 입력에 같은 색 적용되도록 예약
+          if (value) {
+            pendingStyles[prop] = value;
+          } else if (allowNull) {
+            delete pendingStyles[prop];
+          }
+          
           saveSelection();
           updateState();
           editor.focus();
           return;
         }
         
-        // 선택 영역이 없는 경우 (커서만 있음): 다음 입력에 적용할 스타일 예약
+        // 시나리오 1,3: 커서만 있는 경우 (색 클릭 후 타자 OR 타자 도중 색 변경)
         if (value) {
           pendingStyles[prop] = value;
         } else if (allowNull) {
           delete pendingStyles[prop];
         }
         
-        // 즉시 상태 표시 업데이트
+        // 현재 커서가 스타일 있는 span 안에 있다면 그 span을 분할
+        const currentNode = range.startContainer;
+        if (currentNode.nodeType === Node.TEXT_NODE && currentNode.parentElement.tagName === 'SPAN') {
+          const span = currentNode.parentElement;
+          const offset = range.startOffset;
+          
+          if (offset > 0) {
+            // 텍스트가 있는 경우 분할
+            const beforeText = currentNode.textContent.substring(0, offset);
+            const afterText = currentNode.textContent.substring(offset);
+            
+            // 이전 부분
+            const beforeSpan = span.cloneNode(false);
+            beforeSpan.textContent = beforeText;
+            
+            // 이후 부분은 새로운 스타일로
+            const afterSpan = document.createElement('span');
+            Object.keys(pendingStyles).forEach(key => {
+              afterSpan.style[key] = pendingStyles[key];
+            });
+            afterSpan.textContent = afterText;
+            
+            // DOM 교체
+            span.parentNode.insertBefore(beforeSpan, span);
+            span.parentNode.insertBefore(afterSpan, span);
+            span.parentNode.removeChild(span);
+            
+            // 커서를 afterSpan의 시작으로 이동
+            const newRange = document.createRange();
+            newRange.setStart(afterSpan.firstChild || afterSpan, 0);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            saveSelection();
+          }
+        }
+        
         updateState();
         editor.focus();
       }
@@ -669,16 +737,16 @@
         
         // 예약된 스타일 표시
         const pendingFormats = [];
-        if (pendingStyles.color) pendingFormats.push(`글자색:${pendingStyles.color}`);
-        if (pendingStyles.backgroundColor) pendingFormats.push(`배경색:${pendingStyles.backgroundColor}`);
+        if (pendingStyles.color) pendingFormats.push('글자:' + pendingStyles.color);
+        if (pendingStyles.backgroundColor) pendingFormats.push('배경:' + pendingStyles.backgroundColor);
         
         let statusText = '';
         if (activeFormats.length > 0) {
-          statusText += `활성 서식: ${activeFormats.join(' + ')}`;
+          statusText += '서식: ' + activeFormats.join('+');
         }
         if (pendingFormats.length > 0) {
           if (statusText) statusText += ' | ';
-          statusText += `다음 입력: ${pendingFormats.join(', ')}`;
+          statusText += '입력색상: ' + pendingFormats.join('+');
         }
         if (!statusText) {
           statusText = '서식 없음';
@@ -720,40 +788,80 @@
         }
       });
 
-      // 입력 전 스타일 적용 (beforeinput)
+      // 입력 전 스타일 적용 (beforeinput) - 개선된 버전
       editor.addEventListener('beforeinput', (e) => {
         console.log('beforeinput event:', e.inputType, e.data, 'pendingStyles:', pendingStyles);
         
         if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
-          if (Object.keys(pendingStyles).length > 0) {
+          // 예약된 스타일이 있거나, 현재 위치의 스타일과 다른 경우 처리
+          const sel = window.getSelection();
+          if (!sel.rangeCount) return;
+          
+          const range = sel.getRangeAt(0);
+          const hasNewStyles = Object.keys(pendingStyles).length > 0;
+          
+          if (hasNewStyles) {
             e.preventDefault();
             
-            const sel = window.getSelection();
-            if (!sel.rangeCount) return;
+            // 현재 커서가 어디에 있는지 확인
+            let insertPoint = range.startContainer;
+            let insertOffset = range.startOffset;
             
-            // 스타일이 적용된 span 요소 생성
+            // 텍스트 노드가 아닌 경우 처리
+            if (insertPoint.nodeType !== Node.TEXT_NODE) {
+              // 빈 텍스트 노드 생성해서 삽입점 만들기
+              const textNode = document.createTextNode('');
+              if (insertPoint.childNodes[insertOffset]) {
+                insertPoint.insertBefore(textNode, insertPoint.childNodes[insertOffset]);
+              } else {
+                insertPoint.appendChild(textNode);
+              }
+              insertPoint = textNode;
+              insertOffset = 0;
+            }
+            
+            // 새로운 스타일 span 생성
             const span = document.createElement('span');
             Object.keys(pendingStyles).forEach(prop => {
               span.style[prop] = pendingStyles[prop];
-              console.log(`Applied ${prop}: ${pendingStyles[prop]} to span`);
+              console.log('Applied ' + prop + ': ' + pendingStyles[prop] + ' to new span');
             });
             
-            // 입력된 텍스트를 span에 넣기
+            // 입력 텍스트를 span에 추가
             span.textContent = e.data || '';
             
-            // 현재 위치에 삽입
-            const range = sel.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(span);
+            // 현재 텍스트 노드를 분할하고 span 삽입
+            if (insertPoint.nodeType === Node.TEXT_NODE) {
+              const beforeText = insertPoint.textContent.substring(0, insertOffset);
+              const afterText = insertPoint.textContent.substring(insertOffset);
+              
+              // 이전 텍스트
+              if (beforeText) {
+                insertPoint.textContent = beforeText;
+                insertPoint.parentNode.insertBefore(span, insertPoint.nextSibling);
+              } else {
+                insertPoint.parentNode.insertBefore(span, insertPoint);
+                insertPoint.parentNode.removeChild(insertPoint);
+              }
+              
+              // 이후 텍스트
+              if (afterText) {
+                const afterNode = document.createTextNode(afterText);
+                insertPoint.parentNode.insertBefore(afterNode, span.nextSibling);
+              }
+            } else {
+              range.insertNode(span);
+            }
             
-            // 커서를 span 뒤로 이동
-            range.setStartAfter(span);
-            range.collapse(true);
+            // 커서를 span 뒤로 이동 (다음 입력도 같은 스타일로 계속)
+            const newRange = document.createRange();
+            newRange.setStartAfter(span);
+            newRange.collapse(true);
             sel.removeAllRanges();
-            sel.addRange(range);
+            sel.addRange(newRange);
             
             saveSelection();
-            console.log('Styled text inserted:', span);
+            console.log('Styled text inserted with new system:', span);
           }
         }
       });
