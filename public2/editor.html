@@ -305,44 +305,69 @@
       if (btn.id === 'redoBtn') return doCmd('redo');
     });
 
-    // 색상 팔레트(글자/배경) + 토글
+    // 선택(또는 캐럿) 위치에 인라인 스타일 적용 헬퍼
+    function applyInlineStyle(prop, value) {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+
+      // 선택이 존재(범위)하면 해당 컨텐츠를 감싸기
+      if (!range.collapsed) {
+        const span = document.createElement('span');
+        span.style[prop] = value;
+
+        try {
+          range.surroundContents(span);
+        } catch {
+          // 파편 범위면 extract → 감싸기
+          const frag = range.extractContents();
+          span.appendChild(frag);
+          range.insertNode(span);
+          // 커서를 span 뒤로 이동
+          sel.removeAllRanges();
+          const r = document.createRange();
+          r.setStartAfter(span);
+          r.collapse(true);
+          sel.addRange(r);
+        }
+        return;
+      }
+
+      // 캐럿만 있는 경우: 스타일 span 생성 후 커서를 그 안으로
+      const span = document.createElement('span');
+      span.style[prop] = value;
+      // 내용이 없으면 줄바꿈 시 사라질 수 있어, zero-width space 하나 넣음
+      span.appendChild(document.createTextNode('\u200B'));
+
+      range.insertNode(span);
+
+      // 커서를 span 내부(마지막)로 이동 → 이후 타이핑은 색 유지
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      newRange.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }
+
+    // 색상 팔레트(글자/배경) — 직접 span 래핑 방식으로 안정 적용
     toolbar.addEventListener('click', (e) => {
       const fc = e.target.getAttribute('data-forecolor');
       const bc = e.target.getAttribute('data-backcolor');
 
-      if (fc || bc) {
-        // 팔레트 클릭 시 기존 선택 복구 후 실행
-        restoreSelection();
-      }
+      if (!fc && !bc) return;
+
+      // 드롭다운 클릭 시 포커스 뺏기지 않도록, 기존 선택 복구
+      restoreSelection();
 
       if (fc) {
-        // CSS 인라인로 적용되도록 보조 옵션(브라우저별 차이 보완)
-        try { document.execCommand('styleWithCSS', false, true); } catch {}
-        
-        // 동일 색 재클릭 시 기본색으로 해제
-        if (lastFC === fc) {
-          doCmd('foreColor', '#111827');
-          lastFC = null;
-        } else {
-          doCmd('foreColor', fc);
-          lastFC = fc;
-        }
-        markSwatchActive('data-forecolor', fc, lastFC !== null);
+        applyInlineStyle('color', fc);
+        updateToolbarState();
+        return;
       }
-
       if (bc) {
-        try { document.execCommand('styleWithCSS', false, true); } catch {}
-        
-        // 동일 색 재클릭 시 흰색으로 해제 (transparent 호환 이슈 회피)
-        if (lastBC === bc) {
-          doCmd('hiliteColor', '#ffffff');
-          lastBC = null;
-        } else {
-          // Chrome 계열은 hiliteColor 권장
-          doCmd('hiliteColor', bc);
-          lastBC = bc;
-        }
-        markSwatchActive('data-backcolor', bc, lastBC !== null);
+        applyInlineStyle('backgroundColor', bc);
+        updateToolbarState();
+        return;
       }
     });
 
