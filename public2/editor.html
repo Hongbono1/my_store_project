@@ -12,7 +12,13 @@
     }
 
     .editor-toolbar button {
-      @apply px-3 py-1 rounded hover:bg-gray-100;
+      @apply px-3 py-1 rounded hover:bg-gray-100 transition-colors;
+    }
+
+    .editor-toolbar button.active {
+      background-color: #2563eb;
+      /* Tailwind: bg-blue-600 */
+      color: white;
     }
 
     .editor-area {
@@ -83,13 +89,31 @@
   <script>
     const editor = document.getElementById("editor");
 
-    // Bold & Underline
+    // Bold & Underline 버튼
     document.querySelectorAll("[data-cmd]").forEach(btn => {
       btn.addEventListener("click", () => {
         document.execCommand(btn.dataset.cmd, false, null);
         editor.focus();
+        updateActiveButtons();
       });
     });
+
+    // 에디터 내에서 커서 이동/선택 변화 시 활성화 상태 갱신
+    editor.addEventListener("keyup", updateActiveButtons);
+    editor.addEventListener("mouseup", updateActiveButtons);
+    editor.addEventListener("focus", updateActiveButtons);
+
+    function updateActiveButtons() {
+      document.querySelectorAll("[data-cmd]").forEach(btn => {
+        const cmd = btn.dataset.cmd;
+        const state = document.queryCommandState(cmd);
+        if (state) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+    }
 
     // Font size
     document.getElementById("fontSizeSelect").addEventListener("change", e => {
