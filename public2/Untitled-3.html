@@ -115,7 +115,7 @@
                 <div class="mt-3 flex justify-end">
                     <a id="kakaoDirBtn" href="#" target="_blank" rel="noopener"
                         class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-sm">
-                        카카오맵에서 길찾기
+                        길찾기
                     </a>
                 </div>
             </div>
@@ -158,18 +158,35 @@
         }
 
         function updateMapByAddress(address, storeName) {
-            if (!geocoder) geocoder = new kakao.maps.services.Geocoder();
+            if (!geocoder) {
+                geocoder = new kakao.maps.services.Geocoder();
+            }
+            
+            console.log("🔍 주소 검색 시작:", address);
             geocoder.addressSearch(address, function (result, status) {
-                if (status === kakao.maps.services.Status.OK) {
-                    const lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
+                console.log("📍 지오코딩 결과:", { status, result });
+                
+                if (status === kakao.maps.services.Status.OK && result.length > 0) {
+                    const lat = parseFloat(result[0].y);
+                    const lng = parseFloat(result[0].x);
                     const loc = new kakao.maps.LatLng(lat, lng);
+                    
+                    console.log("✅ 좌표 설정:", { lat, lng });
                     map.setCenter(loc);
                     marker.setPosition(loc);
 
-                    // 길찾기 버튼 링크
+                    // 길찾기 버튼 링크 설정
                     const dir = document.getElementById('kakaoDirBtn');
                     const label = encodeURIComponent(storeName || '목적지');
-                    dir.href = `https://map.kakao.com/link/to/${label},${lat},${lng}`;
+                    const dirUrl = `https://map.kakao.com/link/to/${label},${lat},${lng}`;
+                    dir.href = dirUrl;
+                    console.log("🔗 길찾기 링크:", dirUrl);
+                } else {
+                    console.error("❌ 주소 검색 실패:", { address, status });
+                    // 기본 길찾기 링크 (주소로 검색)
+                    const dir = document.getElementById('kakaoDirBtn');
+                    const encodedAddr = encodeURIComponent(address);
+                    dir.href = `https://map.kakao.com/link/search/${encodedAddr}`;
                 }
             });
         }
@@ -239,9 +256,15 @@
 
             // Kakao 지도 로딩 → 주소 반영
             kakao.maps.load(function () {
+                console.log("🗺️ 카카오맵 로드 완료");
                 const seoul = new kakao.maps.LatLng(37.5665, 126.9780);
                 initMap(seoul);
-                if (fullAddr) updateMapByAddress(fullAddr, storeName);
+                if (fullAddr && fullAddr.trim()) {
+                    console.log("📍 주소 검색:", fullAddr);
+                    updateMapByAddress(fullAddr, storeName);
+                } else {
+                    console.log("⚠️ 주소 정보 없음");
+                }
             });
 
             // 전화번호 링크 설정
