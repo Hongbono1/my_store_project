@@ -47,6 +47,54 @@ app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 
+// ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
+app.get("/admin/check-table", async (req, res) => {
+  try {
+    const { default: pool } = await import("./db.js");
+    
+    // 현재 테이블 구조 확인
+    const columns = await pool.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'open_stores' 
+      ORDER BY ordinal_position;
+    `);
+    
+    // detail_address 컬럼 존재 여부 확인
+    const hasDetailAddress = columns.rows.some(col => col.column_name === 'detail_address');
+    
+    if (!hasDetailAddress) {
+      console.log("📝 detail_address 컬럼 추가 중...");
+      await pool.query(`ALTER TABLE open_stores ADD COLUMN detail_address TEXT`);
+      console.log("✅ detail_address 컬럼이 추가되었습니다!");
+      
+      // 업데이트된 구조 재조회
+      const updatedColumns = await pool.query(`
+        SELECT column_name, data_type, is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'open_stores' 
+        ORDER BY ordinal_position;
+      `);
+      
+      res.json({
+        success: true,
+        message: "detail_address 컬럼이 추가되었습니다",
+        columns: updatedColumns.rows
+      });
+    } else {
+      res.json({
+        success: true,
+        message: "detail_address 컬럼이 이미 존재합니다",
+        columns: columns.rows
+      });
+    }
+    
+  } catch (error) {
+    console.error("❌ 테이블 구조 확인 오류:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ✅ 새로운 명확한 API 엔드포인트
 app.use("/open/register", openregisterRouter); // POST /open/register
 app.use("/open", openRouter);                   // GET /open (목록)
