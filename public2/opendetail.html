@@ -183,6 +183,22 @@
                     console.log("🔗 길찾기 링크:", dirUrl);
                 } else {
                     console.error("❌ 주소 검색 실패:", { address, status });
+                    
+                    // 주소에 따른 기본 위치 설정
+                    let fallbackLat, fallbackLng;
+                    if (address.includes('의정부')) {
+                        fallbackLat = 37.7381; fallbackLng = 127.0342; // 의정부시청
+                    } else if (address.includes('서울')) {
+                        fallbackLat = 37.5665; fallbackLng = 126.9780; // 서울시청
+                    } else {
+                        fallbackLat = 37.5665; fallbackLng = 126.9780; // 기본: 서울
+                    }
+                    
+                    const fallbackLoc = new kakao.maps.LatLng(fallbackLat, fallbackLng);
+                    map.setCenter(fallbackLoc);
+                    marker.setPosition(fallbackLoc);
+                    console.log("📍 기본 위치로 설정:", { lat: fallbackLat, lng: fallbackLng });
+                    
                     // 기본 길찾기 링크 (주소로 검색)
                     const dir = document.getElementById('kakaoDirBtn');
                     const encodedAddr = encodeURIComponent(address);
@@ -257,13 +273,20 @@
             // Kakao 지도 로딩 → 주소 반영
             kakao.maps.load(function () {
                 console.log("🗺️ 카카오맵 로드 완료");
-                const seoul = new kakao.maps.LatLng(37.5665, 126.9780);
-                initMap(seoul);
+                
                 if (fullAddr && fullAddr.trim()) {
                     console.log("📍 주소 검색:", fullAddr);
+                    // 주소가 있으면 주소 기준으로 지도 초기화
+                    const defaultCenter = fullAddr.includes('의정부') ? 
+                        new kakao.maps.LatLng(37.7381, 127.0342) : // 의정부 중심좌표
+                        new kakao.maps.LatLng(37.5665, 126.9780);   // 서울 중심좌표
+                    
+                    initMap(defaultCenter);
                     updateMapByAddress(fullAddr, storeName);
                 } else {
-                    console.log("⚠️ 주소 정보 없음");
+                    console.log("⚠️ 주소 정보 없음 - 서울 중심으로 초기화");
+                    const seoul = new kakao.maps.LatLng(37.5665, 126.9780);
+                    initMap(seoul);
                 }
             });
 
