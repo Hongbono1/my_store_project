@@ -29,8 +29,12 @@ router.post("/", upload.single("img"), async (req, res) => {
          phone,
          address,          // 기본 주소
          detail_address,   // 상세 주소  
-         description       // HTML 에디터 내용
+         description,      // 일반 텍스트 (구버전 호환)
+         descHtml          // 리치 텍스트 HTML (새 버전)
       } = req.body;
+
+      // 리치 텍스트 HTML 우선 사용, 없으면 일반 텍스트
+      const finalDescription = descHtml || description || "";
 
       // 필수값 검사
       if (!store_name || !open_date || !phone) {
@@ -46,7 +50,7 @@ router.post("/", upload.single("img"), async (req, res) => {
          open_date, 
          category,
          phone,
-         description: description ? description.substring(0, 100) + "..." : null,
+         finalDescription: finalDescription ? finalDescription.substring(0, 100) + "..." : null,
          address,
          detail_address,
          imagePath
@@ -63,7 +67,7 @@ router.post("/", upload.single("img"), async (req, res) => {
             open_date,
             category || null,
             phone,
-            description || null,
+            finalDescription || null,
             address || null,
             detail_address || null,
             imagePath
