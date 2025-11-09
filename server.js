@@ -34,6 +34,10 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const ms = Date.now() - started;
     console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
+    // ✅ POST 요청 특별 로깅
+    if (req.method === 'POST') {
+      console.log(`🔥 POST 요청 상세: ${req.originalUrl} | Content-Type: ${req.get('content-type') || 'none'}`);
+    }
   });
   next();
 });
@@ -106,7 +110,17 @@ app.use("/openregister", openregisterRouter);  // 구버전 지원
 app.use("/upload", uploadRouter);
 
 /* 정적 파일 */
-app.use(express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
+// ✅ HTML 파일은 캐시 방지 (항상 최신 버전 로드)
+app.use(express.static(path.join(__dirname, "public2"), { 
+  extensions: ["html"],
+  setHeaders: (res, path) => {
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
