@@ -101,6 +101,8 @@ app.get("/admin/check-table", async (req, res) => {
 
 // ✅ 새로운 명확한 API 엔드포인트
 app.use("/api/open/register", openregisterRouter); // POST /api/open/register (API)
+app.use("/api/open", openRouter);               // GET /api/open (목록 API)
+app.use("/api/open", opendetailRouter);         // GET /api/open/:id (상세 API)
 app.use("/open/register", openregisterRouter); // POST /open/register (호환성)
 app.use("/open", openRouter);                   // GET /open (목록)
 app.use("/open", opendetailRouter);             // GET /open/:id (상세)
