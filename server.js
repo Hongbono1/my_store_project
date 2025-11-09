@@ -46,9 +46,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
-app.use("/openregister", openregisterRouter);
-app.use("/open", openRouter);
-app.use("/open", opendetailRouter);
+
+// ✅ 새로운 명확한 API 엔드포인트
+app.use("/open/register", openregisterRouter); // POST /open/register
+app.use("/open", openRouter);                   // GET /open (목록)
+app.use("/open", opendetailRouter);             // GET /open/:id (상세)
+
+// ✅ 기존 호환성 유지 (단계적 마이그레이션)
+app.use("/openregister", openregisterRouter);  // 구버전 지원
 app.use("/upload", uploadRouter);
 
 /* 정적 파일 */
