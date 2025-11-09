@@ -169,12 +169,12 @@
 
     <!-- Editor -->
     <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
-      <p>📝 전체 선택 + 색상 테스트:</p>
-      <p>🎯 <strong>Ctrl+A</strong>로 전체 선택 후 색상 버튼 클릭해보세요!</p>
+      <p>📝 배경색 테스트:</p>
+      <p>🎯 <strong>배경색 버튼</strong> 클릭 후 바로 타자치기 테스트!</p>
       <p>🌺 무궁화 삼천리 화려강산 대한사람 대한으로 길이 보전하세</p>
-      <p>1️⃣ 색 클릭 → 한글 입력: <span style="color:#ef4444;">안녕하세요</span></p>
-      <p>2️⃣ 한글 입력 → 선택 → 색 변경: <span style="background-color:#fef3c7;">무궁화꽃이피었습니다</span></p>
-      <p>3️⃣ 한글 입력 도중 색 변경: 안녕<span style="color:#3b82f6;">하세요</span></p>
+      <p>1️⃣ 배경색 클릭 → 한글 입력</p>
+      <p>2️⃣ 텍스트 선택 → 배경색 적용: <span style="background-color:#fef3c7;">무궁화꽃이피었습니다</span></p>
+      <p>3️⃣ Ctrl+A 전체 선택 → 배경색 적용</p>
     </div>
 
     <div id="status" class="mt-2 text-xs text-slate-500">Ready</div>
@@ -356,9 +356,20 @@
           removeInlineStyle('backgroundColor');
           status.textContent = '배경색 제거됨';
         } else {
-          // 배경색 적용
+          // 배경색 적용 (디버깅 강화)
+          console.log('Trying to apply background color:', color);
           applyInlineStyle('backgroundColor', color);
           status.textContent = '배경색 적용: ' + color;
+          
+          // 즉시 확인 - 실제로 적용되었는지 체크
+          setTimeout(() => {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              const container = range.commonAncestorContainer;
+              console.log('Background color check - container:', container, 'parent:', container.parentElement);
+            }
+          }, 100);
         }
         
         setTimeout(() => {
@@ -522,6 +533,7 @@
 
       // 인라인 스타일 적용 - 모든 시나리오 지원
       function applyInlineStyle(prop, value, allowNull) {
+        console.log('applyInlineStyle called:', prop, value, allowNull);
         restoreSelection();
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
@@ -538,6 +550,7 @@
             
             // 기존 스타일을 보존하면서 새 스타일 추가하는 함수
             function applyStyleToFragment(fragment, property, newValue) {
+              console.log('applyStyleToFragment called:', property, newValue);
               const walker = document.createTreeWalker(
                 fragment,
                 NodeFilter.SHOW_ALL,
@@ -551,31 +564,55 @@
                 nodesToProcess.push(node);
               }
               
+              console.log('Nodes to process:', nodesToProcess.length);
+              
               // 텍스트 노드들을 span으로 감싸고 스타일 적용
               nodesToProcess.forEach(node => {
                 if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                  console.log('Processing text node:', node.textContent);
                   const span = document.createElement('span');
-                  if (newValue) span.style[property] = newValue;
+                  if (newValue) {
+                    // CSS 속성 적용 - 배경색은 특별 처리
+                    if (property === 'backgroundColor') {
+                      span.style.setProperty('background-color', newValue, 'important');
+                    } else {
+                      span.style[property] = newValue;
+                    }
+                    console.log('Applied style to span:', property, newValue, span.style.cssText);
+                  }
                   
                   // 기존 부모의 스타일도 복사 (다른 스타일 보존)
                   const parent = node.parentElement;
                   if (parent && parent.tagName === 'SPAN') {
                     // 기존 스타일 복사하되 현재 적용하려는 속성은 새 값으로
-                    Object.keys(parent.style).forEach(key => {
-                      if (parent.style[key] && key !== property) {
+                    for (let i = 0; i < parent.style.length; i++) {
+                      const key = parent.style[i];
+                      if (key !== property) {
                         span.style[key] = parent.style[key];
                       }
-                    });
+                    }
                   }
                   
                   span.textContent = node.textContent;
                   node.parentNode.replaceChild(span, node);
                 } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN') {
                   // 기존 span 요소에 스타일 추가
+                  console.log('Processing existing span:', node);
                   if (newValue) {
-                    node.style[property] = newValue;
+                    // CSS 속성 적용 - 배경색은 특별 처리
+                    if (property === 'backgroundColor') {
+                      node.style.setProperty('background-color', newValue, 'important');
+                    } else {
+                      node.style[property] = newValue;
+                    }
+                    console.log('Updated existing span style:', property, newValue, node.style.cssText);
                   } else if (allowNull) {
-                    node.style.removeProperty(property);
+                    if (property === 'backgroundColor') {
+                      node.style.removeProperty('background-color');
+                    } else {
+                      node.style.removeProperty(property);
+                    }
+                    console.log('Removed property from span:', property);
                   }
                 }
               });
@@ -658,7 +695,12 @@
             // 이후 부분은 새로운 스타일로
             const afterSpan = document.createElement('span');
             Object.keys(pendingStyles).forEach(key => {
-              afterSpan.style[key] = pendingStyles[key];
+              // 배경색은 특별 처리
+              if (key === 'backgroundColor') {
+                afterSpan.style.setProperty('background-color', pendingStyles[key], 'important');
+              } else {
+                afterSpan.style[key] = pendingStyles[key];
+              }
             });
             afterSpan.textContent = afterText;
             
@@ -920,8 +962,13 @@
             // 새로운 스타일 span 생성
             const span = document.createElement('span');
             Object.keys(pendingStyles).forEach(prop => {
-              span.style[prop] = pendingStyles[prop];
-              console.log('Applied ' + prop + ': ' + pendingStyles[prop] + ' to new span');
+              // 배경색은 특별 처리
+              if (prop === 'backgroundColor') {
+                span.style.setProperty('background-color', pendingStyles[prop], 'important');
+              } else {
+                span.style[prop] = pendingStyles[prop];
+              }
+              console.log('Applied ' + prop + ': ' + pendingStyles[prop] + ' to new span, cssText:', span.style.cssText);
             });
             
             // 입력 텍스트를 span에 추가
