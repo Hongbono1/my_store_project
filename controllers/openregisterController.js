@@ -13,8 +13,12 @@ export async function createOpenRegister(req, res) {
             category,
             phone,
             description,
+            descHtml,
             address,
         } = req.body;
+
+        // 리치 텍스트 HTML 우선 사용, 없으면 일반 텍스트
+        const finalDescription = descHtml || description || "";
 
         // 필수값 검사
         if (!store_name || !open_date || !phone) {
@@ -33,7 +37,7 @@ export async function createOpenRegister(req, res) {
   (store_name, open_date, category, phone, description, address, image_path, created_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
   RETURNING id;`,
-            [store_name, open_date, category, phone, description, address, image_path]
+            [store_name, open_date, category, phone, finalDescription, address, image_path]
         );
 
         console.log("🧾 INSERT DEBUG:", { store_name, open_date, category, phone, address });
