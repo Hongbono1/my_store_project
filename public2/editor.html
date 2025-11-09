@@ -169,7 +169,8 @@
 
     <!-- Editor -->
     <div id="editor" class="editor bg-white border rounded-xl shadow-sm p-4 mt-3" contenteditable="true">
-      <p>📝 한글 입력 + 색상 테스트:</p>
+      <p>📝 전체 선택 + 색상 테스트:</p>
+      <p>🎯 <strong>Ctrl+A</strong>로 전체 선택 후 색상 버튼 클릭해보세요!</p>
       <p>🌺 무궁화 삼천리 화려강산 대한사람 대한으로 길이 보전하세</p>
       <p>1️⃣ 색 클릭 → 한글 입력: <span style="color:#ef4444;">안녕하세요</span></p>
       <p>2️⃣ 한글 입력 → 선택 → 색 변경: <span style="background-color:#fef3c7;">무궁화꽃이피었습니다</span></p>
@@ -304,6 +305,10 @@
         
         const color = target.getAttribute('data-fore');
         
+        // 현재 선택 상태 로깅
+        const sel = window.getSelection();
+        console.log('Font color click:', color, 'Selection:', sel.toString(), 'Range collapsed:', sel.rangeCount > 0 ? sel.getRangeAt(0).collapsed : 'no range');
+        
         // 클릭 효과와 상태 표시
         target.style.transform = 'scale(0.9)';
         target.style.boxShadow = '0 0 0 2px #3b82f6';
@@ -320,7 +325,7 @@
         } else {
           // 글자색 적용
           applyInlineStyle('color', color);
-          status.textContent = `글자색 적용: ${color}`;
+          status.textContent = '글자색 적용: ' + color;
         }
         
         setTimeout(() => {
@@ -332,6 +337,10 @@
         if (!target) return;
         
         const color = target.getAttribute('data-back');
+        
+        // 현재 선택 상태 로깅
+        const sel = window.getSelection();
+        console.log('Background color click:', color, 'Selection:', sel.toString(), 'Range collapsed:', sel.rangeCount > 0 ? sel.getRangeAt(0).collapsed : 'no range');
         
         // 클릭 효과와 상태 표시
         target.style.transform = 'scale(0.9)';
@@ -349,7 +358,7 @@
         } else {
           // 배경색 적용
           applyInlineStyle('backgroundColor', color);
-          status.textContent = `배경색 적용: ${color}`;
+          status.textContent = '배경색 적용: ' + color;
         }
         
         setTimeout(() => {
@@ -521,32 +530,107 @@
         
         // 시나리오 2: 선택 영역이 있는 경우 (타자 다 치고 선택 후 색 변경)
         if (!range.collapsed) {
-          const frag = range.extractContents();
-          const span = document.createElement('span');
-          if (value || allowNull) {
-            if (value) span.style[prop] = value;
-          }
-          span.appendChild(frag);
-          range.insertNode(span);
+          console.log('Applying style to selected range:', range.toString());
+          
+          try {
+            // 선택된 내용 추출
+            const frag = range.extractContents();
+            
+            // 기존 스타일을 보존하면서 새 스타일 추가하는 함수
+            function applyStyleToFragment(fragment, property, newValue) {
+              const walker = document.createTreeWalker(
+                fragment,
+                NodeFilter.SHOW_ALL,
+                null,
+                false
+              );
+              
+              const nodesToProcess = [];
+              let node;
+              while (node = walker.nextNode()) {
+                nodesToProcess.push(node);
+              }
+              
+              // 텍스트 노드들을 span으로 감싸고 스타일 적용
+              nodesToProcess.forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                  const span = document.createElement('span');
+                  if (newValue) span.style[property] = newValue;
+                  
+                  // 기존 부모의 스타일도 복사 (다른 스타일 보존)
+                  const parent = node.parentElement;
+                  if (parent && parent.tagName === 'SPAN') {
+                    // 기존 스타일 복사하되 현재 적용하려는 속성은 새 값으로
+                    Object.keys(parent.style).forEach(key => {
+                      if (parent.style[key] && key !== property) {
+                        span.style[key] = parent.style[key];
+                      }
+                    });
+                  }
+                  
+                  span.textContent = node.textContent;
+                  node.parentNode.replaceChild(span, node);
+                } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN') {
+                  // 기존 span 요소에 스타일 추가
+                  if (newValue) {
+                    node.style[property] = newValue;
+                  } else if (allowNull) {
+                    node.style.removeProperty(property);
+                  }
+                }
+              });
+            }
+            
+            // 스타일 적용
+            if (value || allowNull) {
+              applyStyleToFragment(frag, prop, value);
+            }
+            
+            // 수정된 내용을 다시 삽입
+            range.insertNode(frag);
 
-          // 커서를 span 뒤로 이동하고 스타일 예약도 설정
-          sel.removeAllRanges();
-          const r = document.createRange();
-          r.selectNodeContents(span);
-          r.collapse(false);
-          sel.addRange(r);
-          
-          // 선택 후 색 변경시에도 이후 입력에 같은 색 적용되도록 예약
-          if (value) {
-            pendingStyles[prop] = value;
-          } else if (allowNull) {
-            delete pendingStyles[prop];
+            // 커서를 삽입된 내용 뒤로 이동
+            sel.removeAllRanges();
+            const newRange = document.createRange();
+            newRange.setStartAfter(frag.lastChild || frag);
+            newRange.collapse(true);
+            sel.addRange(newRange);
+            
+            // 선택 후 색 변경시에도 이후 입력에 같은 색 적용되도록 예약
+            if (value) {
+              pendingStyles[prop] = value;
+            } else if (allowNull) {
+              delete pendingStyles[prop];
+            }
+            
+            saveSelection();
+            updateState();
+            editor.focus();
+            console.log('Successfully applied style to selection');
+            return;
+            
+          } catch (error) {
+            console.error('Error applying style to selection:', error);
+            
+            // 폴백: 간단한 span 래핑
+            const frag = range.extractContents();
+            const span = document.createElement('span');
+            if (value) span.style[prop] = value;
+            span.appendChild(frag);
+            range.insertNode(span);
+            
+            sel.removeAllRanges();
+            const r = document.createRange();
+            r.setStartAfter(span);
+            r.collapse(true);
+            sel.addRange(r);
+            
+            if (value) pendingStyles[prop] = value;
+            saveSelection();
+            updateState();
+            editor.focus();
+            return;
           }
-          
-          saveSelection();
-          updateState();
-          editor.focus();
-          return;
         }
         
         // 시나리오 1,3: 커서만 있는 경우 (색 클릭 후 타자 OR 타자 도중 색 변경)
@@ -762,6 +846,10 @@
       editor.addEventListener('keydown', (e) => {
         if (e.ctrlKey || e.metaKey) {
           switch (e.key.toLowerCase()) {
+            case 'a':
+              // Ctrl+A는 기본 동작 허용 (전체 선택)
+              console.log('Ctrl+A detected - selecting all content');
+              break;
             case 'b':
               e.preventDefault();
               doCmd('bold');
