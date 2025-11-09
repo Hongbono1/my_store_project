@@ -162,60 +162,99 @@
                 geocoder = new kakao.maps.services.Geocoder();
             }
             
+            // 주소 정규화 및 여러 형태 준비
+            const normalizedAddress = address.trim()
+                .replace(/경기\s+의정부시/, '의정부시')
+                .replace(/\s+/g, ' ');
+            
+            const addressVariations = [
+                normalizedAddress,
+                normalizedAddress.replace(/\s+\d+\s*$/, ''), // 끝의 숫자 제거
+                normalizedAddress.split(' ').slice(0, 3).join(' '), // 앞 3단어만
+                '의정부시 부용로213번길', // 기본 도로명
+                '의정부시 부용로213번길 16'  // 건물번호까지
+            ];
+            
             console.log("🔍 주소 검색 시작:", {
-                address,
-                addressType: typeof address,
-                addressLength: address?.length,
+                originalAddress: address,
+                normalizedAddress,
+                addressVariations,
                 storeName
             });
             
-            geocoder.addressSearch(address, function (result, status) {
-                console.log("📍 지오코딩 결과:", { 
-                    status, 
-                    statusText: status === kakao.maps.services.Status.OK ? 'OK' : 'FAILED',
-                    result, 
-                    resultCount: result?.length 
-                });
-                
-                if (status === kakao.maps.services.Status.OK && result.length > 0) {
-                    const lat = parseFloat(result[0].y);
-                    const lng = parseFloat(result[0].x);
-                    const loc = new kakao.maps.LatLng(lat, lng);
-                    
-                    console.log("✅ 좌표 설정:", { lat, lng });
-                    map.setCenter(loc);
-                    marker.setPosition(loc);
-
-                    // 길찾기 버튼 링크 설정
-                    const dir = document.getElementById('kakaoDirBtn');
-                    const label = encodeURIComponent(storeName || '목적지');
-                    const dirUrl = `https://map.kakao.com/link/to/${label},${lat},${lng}`;
-                    dir.href = dirUrl;
-                    console.log("🔗 길찾기 링크:", dirUrl);
-                } else {
-                    console.error("❌ 주소 검색 실패:", { address, status });
-                    
-                    // 주소에 따른 기본 위치 설정
-                    let fallbackLat, fallbackLng;
-                    if (address.includes('의정부')) {
-                        fallbackLat = 37.7381; fallbackLng = 127.0342; // 의정부시청
-                    } else if (address.includes('서울')) {
-                        fallbackLat = 37.5665; fallbackLng = 126.9780; // 서울시청
-                    } else {
-                        fallbackLat = 37.5665; fallbackLng = 126.9780; // 기본: 서울
-                    }
-                    
-                    const fallbackLoc = new kakao.maps.LatLng(fallbackLat, fallbackLng);
-                    map.setCenter(fallbackLoc);
-                    marker.setPosition(fallbackLoc);
-                    console.log("📍 기본 위치로 설정:", { lat: fallbackLat, lng: fallbackLng });
-                    
-                    // 기본 길찾기 링크 (주소로 검색)
-                    const dir = document.getElementById('kakaoDirBtn');
-                    const encodedAddr = encodeURIComponent(address);
-                    dir.href = `https://map.kakao.com/link/search/${encodedAddr}`;
+            // 첫 번째 주소로 시도
+            tryGeocoding(0);
+            
+            function tryGeocoding(index) {
+                if (index >= addressVariations.length) {
+                    console.error("❌ 모든 주소 형태 검색 실패");
+                    handleGeocodingFailure(address, storeName);
+                    return;
                 }
-            });
+                
+                const currentAddress = addressVariations[index];
+                console.log(`📍 주소 검색 시도 ${index + 1}/${addressVariations.length}:`, currentAddress);
+                
+                geocoder.addressSearch(currentAddress, function (result, status) {
+                    console.log(`📍 지오코딩 결과 ${index + 1}:`, { 
+                        address: currentAddress,
+                        status, 
+                        statusText: status === kakao.maps.services.Status.OK ? 'OK' : 'FAILED',
+                        result, 
+                        resultCount: result?.length 
+                    });
+                    
+                    if (status === kakao.maps.services.Status.OK && result.length > 0) {
+                        const lat = parseFloat(result[0].y);
+                        const lng = parseFloat(result[0].x);
+                        const loc = new kakao.maps.LatLng(lat, lng);
+                        
+                        console.log("✅ 좌표 설정 성공:", { address: currentAddress, lat, lng });
+                        map.setCenter(loc);
+                        marker.setPosition(loc);
+
+                        // 길찾기 버튼 링크 설정
+                        const dir = document.getElementById('kakaoDirBtn');
+                        const label = encodeURIComponent(storeName || '목적지');
+                        const dirUrl = `https://map.kakao.com/link/to/${label},${lat},${lng}`;
+                        dir.href = dirUrl;
+                        console.log("🔗 길찾기 링크:", dirUrl);
+                        return; // 성공하면 종료
+                    } else {
+                        // 다음 주소 형태로 시도
+                        console.log(`❌ 주소 ${index + 1} 검색 실패, 다음 시도...`);
+                        tryGeocoding(index + 1);
+                    }
+                });
+            }
+            
+            function handleGeocodingFailure(originalAddress, storeName) {
+                console.error("❌ 모든 주소 형태 검색 실패:", originalAddress);
+                
+                // 주소에 따른 기본 위치 설정
+                let fallbackLat, fallbackLng;
+                if (originalAddress.includes('의정부')) {
+                    fallbackLat = 37.7381; fallbackLng = 127.0342; // 의정부시청
+                    console.log("📍 의정부 기본 위치로 설정");
+                } else if (originalAddress.includes('서울')) {
+                    fallbackLat = 37.5665; fallbackLng = 126.9780; // 서울시청
+                    console.log("📍 서울 기본 위치로 설정");
+                } else {
+                    fallbackLat = 37.5665; fallbackLng = 126.9780; // 기본: 서울
+                    console.log("📍 기본(서울) 위치로 설정");
+                }
+                
+                const fallbackLoc = new kakao.maps.LatLng(fallbackLat, fallbackLng);
+                map.setCenter(fallbackLoc);
+                marker.setPosition(fallbackLoc);
+                console.log("📍 기본 위치 좌표:", { lat: fallbackLat, lng: fallbackLng });
+                
+                // 기본 길찾기 링크 (주소로 검색)
+                const dir = document.getElementById('kakaoDirBtn');
+                const encodedAddr = encodeURIComponent(originalAddress);
+                dir.href = `https://map.kakao.com/link/search/${encodedAddr}`;
+                console.log("🔗 검색용 길찾기 링크:", dir.href);
+            }
         }
 
         async function main() {
