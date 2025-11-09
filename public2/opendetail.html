@@ -162,9 +162,20 @@
                 geocoder = new kakao.maps.services.Geocoder();
             }
             
-            console.log("🔍 주소 검색 시작:", address);
+            console.log("🔍 주소 검색 시작:", {
+                address,
+                addressType: typeof address,
+                addressLength: address?.length,
+                storeName
+            });
+            
             geocoder.addressSearch(address, function (result, status) {
-                console.log("📍 지오코딩 결과:", { status, result });
+                console.log("📍 지오코딩 결과:", { 
+                    status, 
+                    statusText: status === kakao.maps.services.Status.OK ? 'OK' : 'FAILED',
+                    result, 
+                    resultCount: result?.length 
+                });
                 
                 if (status === kakao.maps.services.Status.OK && result.length > 0) {
                     const lat = parseFloat(result[0].y);
@@ -258,6 +269,13 @@
 
             const fullAddr = [row.address, row.detail_address].filter(Boolean).join(' ');
             addrEl.textContent = fullAddr || '-';
+            
+            console.log("🏠 주소 데이터 확인:", {
+                address: row.address,
+                detail_address: row.detail_address,
+                fullAddr: fullAddr,
+                addrLength: fullAddr?.length
+            });
 
             const imgSrc = row.image_path || '/uploads/no-thumb.png';
             imgEl.src = imgSrc;
@@ -273,18 +291,38 @@
             // Kakao 지도 로딩 → 주소 반영
             kakao.maps.load(function () {
                 console.log("🗺️ 카카오맵 로드 완료");
+                console.log("🏠 지도 초기화용 주소 데이터:", {
+                    fullAddr,
+                    length: fullAddr?.length,
+                    trimmed: fullAddr?.trim(),
+                    storeName
+                });
                 
-                if (fullAddr && fullAddr.trim()) {
-                    console.log("📍 주소 검색:", fullAddr);
-                    // 주소가 있으면 주소 기준으로 지도 초기화
-                    const defaultCenter = fullAddr.includes('의정부') ? 
-                        new kakao.maps.LatLng(37.7381, 127.0342) : // 의정부 중심좌표
-                        new kakao.maps.LatLng(37.5665, 126.9780);   // 서울 중심좌표
+                if (fullAddr && fullAddr.trim() && fullAddr.trim() !== '-') {
+                    console.log("📍 유효한 주소로 지도 검색 시작:", fullAddr.trim());
+                    
+                    // 지역별 초기 중심점 설정 (더 많은 지역 추가)
+                    let defaultCenter;
+                    const addr = fullAddr.toLowerCase();
+                    if (addr.includes('의정부')) {
+                        defaultCenter = new kakao.maps.LatLng(37.7381, 127.0342);
+                        console.log("📍 의정부 중심으로 초기화");
+                    } else if (addr.includes('서울')) {
+                        defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
+                        console.log("📍 서울 중심으로 초기화");
+                    } else if (addr.includes('경기')) {
+                        defaultCenter = new kakao.maps.LatLng(37.4138, 127.5183);
+                        console.log("📍 경기도 중심으로 초기화");
+                    } else {
+                        defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
+                        console.log("📍 기본(서울) 중심으로 초기화");
+                    }
                     
                     initMap(defaultCenter);
-                    updateMapByAddress(fullAddr, storeName);
+                    updateMapByAddress(fullAddr.trim(), storeName);
                 } else {
-                    console.log("⚠️ 주소 정보 없음 - 서울 중심으로 초기화");
+                    console.log("⚠️ 주소 정보 없음 또는 유효하지 않음 - 서울 중심으로 초기화");
+                    console.log("⚠️ 주소 상태:", { fullAddr, type: typeof fullAddr });
                     const seoul = new kakao.maps.LatLng(37.5665, 126.9780);
                     initMap(seoul);
                 }
