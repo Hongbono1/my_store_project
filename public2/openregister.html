@@ -607,50 +607,36 @@
 
       try {
         console.log("🚀 서버로 전송 중...");
-        const result = await safeFetch('/open/register', {
-          method: 'POST',
-          body: formData, // ✅ Content-Type 직접 설정하지 않음 (브라우저가 자동 설정)
-        });
+        const fd = new FormData(e.target);
+        const data = await safeFetch('/open/register', { method: 'POST', body: fd });
         
-        console.log("📥 서버 응답:", result);
-
-        if (result.success || result.ok) {
-          alert("등록이 완료되었습니다!");
-          console.log("✅ 등록 성공 - ID:", result.id);
-          window.location.href = "/open.html";
-        } else {
-          alert("등록 실패: " + (result.error || result.message || "알 수 없는 오류"));
-          console.error("❌ 등록 실패:", result);
-        }
+        console.log("📥 서버 응답:", data);
+        alert('등록 완료! id=' + (data.id ?? 'ok'));
+        window.location.href = "/open.html";
       } catch (err) {
-        console.error("❌ 서버 통신 오류:", err);
-        alert("등록 실패: " + err.message);
+        console.error('❌ HTTP 오류:', err);
+        alert('등록 실패: ' + err.message);
       }
     });
 
   </script>
 
-  <!-- 공용 안전 fetch 함수 -->
+  <!-- 안전한 fetch 래퍼 -->
   <script>
-    // 공용 안전 fetch (HTML 에러 본문도 보여줌)
     async function safeFetch(url, options = {}) {
       const res = await fetch(url, options);
-      const ct = res.headers.get('content-type') || '';
       const text = await res.text();
       
       if (!res.ok) {
-        // 405 오류 특별 처리
-        if (res.status === 405) {
-          throw new Error(`서버 설정 오류: ${url} 엔드포인트가 ${options.method || 'GET'} 메서드를 지원하지 않습니다.\n관리자에게 문의하세요.`);
-        }
-        throw new Error(`HTTP ${res.status} ${res.statusText}\n${text.slice(0, 300)}`);
+        throw new Error(`HTTP ${res.status} ${res.statusText}\n${text.slice(0, 200)}`);
       }
       
+      const ct = res.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         return JSON.parse(text);
       }
       
-      throw new Error(`예상 외 content-type: ${ct}\n미리보기: ${text.slice(0, 120)}`);
+      throw new Error(`예상 외 Content-Type: ${ct}\n${text.slice(0, 120)}`);
     }
   </script>
 
