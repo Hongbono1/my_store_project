@@ -571,6 +571,10 @@
       e.preventDefault();
 
       console.log("📝 폼 제출 시작");
+      
+      // 개발 환경 감지
+      const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      console.log("🌍 환경:", isDev ? "개발(localhost)" : "배포(" + location.hostname + ")");
 
       // ✅ 제출 직전 에디터 내용 재동기화 (이중 안전장치)
       const customEditor = document.getElementById("customEditor");
@@ -604,7 +608,32 @@
       try {
         console.log("🚀 서버로 전송 중...");
         const response = await fetch("/openregister", { method: "POST", body: formData });
-        const result = await response.json();
+        
+        // 응답 상태 확인
+        if (!response.ok) {
+          console.error("❌ HTTP 오류:", response.status, response.statusText);
+          
+          // 405 오류 특별 처리
+          if (response.status === 405) {
+            alert("서버 설정 오류: 등록 기능이 현재 사용할 수 없습니다. 관리자에게 문의하세요.");
+            return;
+          }
+          
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // JSON 응답 파싱 시도
+        const contentType = response.headers.get("content-type");
+        let result;
+        
+        if (contentType && contentType.includes("application/json")) {
+          result = await response.json();
+        } else {
+          const text = await response.text();
+          console.error("❌ JSON이 아닌 응답:", text.substring(0, 200));
+          throw new Error("서버가 올바르지 않은 응답을 반환했습니다.");
+        }
+        
         console.log("📥 서버 응답:", result);
 
         if (result.success) {
