@@ -1,8 +1,12 @@
-import express from "express";
-import { getOpenDetail } from "../controllers/opendetailController.js";
-const router = express.Router();
+// routes/opendetailRouter.js
+import { Router } from "express";
+import { getOpenRegisterById } from "../controllers/openregisterController.js";
 
-router.get("/:id", getOpenDetail);
+const router = Router();
+
+// 숫자만 허용
+router.get("/:id(\\d+)", getOpenRegisterById);
 
 export default router;
+
 
