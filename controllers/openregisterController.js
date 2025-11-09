@@ -2,6 +2,16 @@
 import pool from "../db.js";
 import path from "path";
 
+// 🔎 간단 쿼리 래퍼(이 파일 전용)
+async function q(sql, params = []) {
+    try {
+        return await pool.query(sql, params);
+    } catch (e) {
+        console.error("SQL ERROR:", { sql, params, message: e.message });
+        throw e;
+    }
+}
+
 /* =========================================================
    1️⃣ 오픈예정 등록 (POST /openregister)
 ========================================================= */
@@ -33,7 +43,7 @@ export async function createOpenRegister(req, res) {
         }
 
         // DB 저장 (detail_address 포함)
-        const result = await pool.query(
+        const result = await q(
             `INSERT INTO open_stores
   (store_name, open_date, category, phone, description, address, detail_address, image_path, created_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
@@ -55,8 +65,7 @@ export async function createOpenRegister(req, res) {
 ========================================================= */
 export async function getOpenRegisters(req, res) {
     try {
-        const result = await pool.query(
-            `
+        const result = await q(`
       SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path
       FROM open_stores
       ORDER BY id DESC;
@@ -74,21 +83,22 @@ export async function getOpenRegisters(req, res) {
 ========================================================= */
 export async function getOpenRegisterById(req, res) {
     try {
-        const { id } = req.params;
-        const result = await pool.query(
-            `
-      SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path
-      FROM open_stores
-      WHERE id=$1;
-      `,
-            [id]
-        );
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ success: false, error: "데이터 없음" });
+        const idNum = Number(req.params.id);
+        if (!Number.isInteger(idNum) || idNum <= 0) {
+            return res.status(400).json({ success: false, error: "invalid_id" });
         }
 
-        res.json({ success: true, data: result.rows[0] });
+        const { rows, rowCount } = await pool.query(
+            `SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path
+       FROM open_stores
+       WHERE id = $1;`,
+            [idNum]
+        );
+
+        if (rowCount === 0) {
+            return res.status(404).json({ success: false, error: "데이터 없음" });
+        }
+        res.json({ success: true, data: rows[0] });
     } catch (err) {
         console.error("❌ [getOpenRegisterById] Error:", err);
         res.status(500).json({ success: false, error: err.message });
