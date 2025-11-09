@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>오픈 예정 상세 | MALL HANKOOK</title>
+    <meta name="color-scheme" content="light" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Kakao 지도 -->
+    <script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services">
+        </script>
+
+    <style>
+        body {
+            font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #f8fafc, #eef2ff);
+            color: #0f172a
+        }
+
+        .neo-card {
+            background: rgba(255, 255, 255, .72);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, .5);
+            border-radius: 1rem;
+            box-shadow: 8px 12px 28px rgba(2, 6, 23, .06)
+        }
+
+        .title-grad {
+            background: linear-gradient(90deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent
+        }
+
+        .k-label {
+            width: 92px;
+            color: #64748b
+        }
+
+        .content a {
+            color: #2563eb;
+            text-decoration: underline
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+
+    <header class="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-slate-200">
+        <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+            <a href="/open.html" class="text-sm text-slate-600 hover:text-slate-900">← 목록으로</a>
+            <h1 class="text-xl md:text-2xl font-extrabold title-grad">오픈 예정 상세</h1>
+            <span></span>
+        </div>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-4 py-8">
+        <!-- 상단: 사진 + 정보 -->
+        <section id="hero" class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <!-- 대표 이미지 -->
+                <div class="w-full">
+                    <img id="storeImage" src="/uploads/no-thumb.png" alt="대표 이미지"
+                        class="w-full h-auto max-h-96 md:max-h-[28rem] rounded-xl object-cover aspect-[4/3] border border-slate-200 shadow-sm" />
+                </div>
+
+                <!-- 정보 카드 -->
+                <div class="neo-card p-5 min-w-0 break-words">
+                    <h2 id="storeName" class="text-2xl font-bold mb-3">상호명</h2>
+
+                    <dl class="space-y-2 text-[15px] leading-6">
+                        <div class="grid grid-cols-[92px_1fr] gap-2">
+                            <dt class="k-label">오픈일</dt>
+                            <dd id="openDate">-</dd>
+                        </div>
+                        <div class="grid grid-cols-[92px_1fr] gap-2">
+                            <dt class="k-label">카테고리</dt>
+                            <dd id="category">-</dd>
+                        </div>
+                        <div class="grid grid-cols-[92px_1fr] gap-2">
+                            <dt class="k-label">전화</dt>
+                            <dd>
+                                <a id="phoneLink" href="#" class="underline underline-offset-2 hover:text-blue-600">
+                                    <span id="phone">-</span>
+                                </a>
+                            </dd>
+                        </div>
+                        <div class="grid grid-cols-[92px_1fr] gap-2">
+                            <dt class="k-label">주소</dt>
+                            <dd>
+                                <div id="addressText" class="whitespace-pre-wrap"></div>
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button id="copyLinkBtn" class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-sm">
+                            링크 복사
+                        </button>
+                        <a id="callBtn" href="#" class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-sm">
+                            전화하기
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 지도 (좌우 20% 축소 → 80% 너비) -->
+        <section id="mapSection" class="mb-10">
+            <div class="w-full md:w-4/5 mx-auto">
+                <div id="map" class="h-72 md:h-80 rounded-xl border border-slate-200 shadow-sm"></div>
+                <div class="mt-3 flex justify-end">
+                    <a id="kakaoDirBtn" href="#" target="_blank" rel="noopener"
+                        class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-sm">
+                        카카오맵에서 길찾기
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 설명 -->
+        <section class="mb-16">
+            <div class="neo-card p-5">
+                <h3 class="text-lg font-semibold mb-3">설명</h3>
+                <div id="desc" class="content text-[15px] leading-7 text-slate-800">
+                    등록된 설명이 없습니다.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // 안전 fetch
+        async function safeFetch(url, options = {}) {
+            const res = await fetch(url, options);
+            const txt = await res.text();
+            const ct = res.headers.get('content-type') || '';
+            if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt.slice(0, 150)}`);
+            if (ct.includes('application/json')) return JSON.parse(txt);
+            throw new Error(`예상 외 Content-Type: ${ct}\n${txt.slice(0, 150)}`);
+        }
+
+        function qs(name) {
+            const m = new URLSearchParams(location.search);
+            return m.get(name);
+        }
+
+        // Kakao 지도 준비
+        let map, marker, geocoder;
+        function initMap(centerLatLng) {
+            const container = document.getElementById('map');
+            map = new kakao.maps.Map(container, { center: centerLatLng, level: 3 });
+            marker = new kakao.maps.Marker({ map, position: centerLatLng });
+            geocoder = new kakao.maps.services.Geocoder();
+        }
+
+        function updateMapByAddress(address, storeName) {
+            if (!geocoder) geocoder = new kakao.maps.services.Geocoder();
+            geocoder.addressSearch(address, function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
+                    const loc = new kakao.maps.LatLng(lat, lng);
+                    map.setCenter(loc);
+                    marker.setPosition(loc);
+
+                    // 길찾기 버튼 링크
+                    const dir = document.getElementById('kakaoDirBtn');
+                    const label = encodeURIComponent(storeName || '목적지');
+                    dir.href = `https://map.kakao.com/link/to/${label},${lat},${lng}`;
+                }
+            });
+        }
+
+        async function main() {
+            const id = qs('id');
+            const idFromPath = (location.pathname.match(/\/open\/(\d+)/) || [])[1];
+            const finalId = id || idFromPath;
+
+            const detailApi = finalId ? `/open/${finalId}` : null;
+            if (!detailApi) {
+                alert('잘못된 접근입니다. id가 없습니다.');
+                location.href = '/open.html';
+                return;
+            }
+
+            const data = await safeFetch(detailApi); // { success:true, data:{...} } 라고 가정
+            const row = data.data || data;          // 혹은 바로 객체 반환일 수도 있으므로 대비
+
+            // DOM 반영
+            const nameEl = document.getElementById('storeName');
+            const openEl = document.getElementById('openDate');
+            const catEl = document.getElementById('category');
+            const phone = document.getElementById('phone');
+            const phoneLink = document.getElementById('phoneLink');
+            const addrEl = document.getElementById('addressText');
+            const imgEl = document.getElementById('storeImage');
+            const descEl = document.getElementById('desc');
+
+            const storeName = row.store_name || '상호명 미정';
+            nameEl.textContent = storeName;
+
+            // 날짜 예쁘게
+            try {
+                const d = row.open_date ? new Date(row.open_date) : null;
+                openEl.textContent = d ? d.toLocaleDateString('ko-KR') : '-';
+            } catch { openEl.textContent = row.open_date || '-'; }
+
+            catEl.textContent = row.category || '-';
+
+            const phoneStr = row.phone || '';
+            phone.textContent = phoneStr || '-';
+            if (phoneStr) phoneLink.href = `tel:${phoneStr.replace(/[^\d+]/g, '')}`;
+
+            const fullAddr = [row.address, row.detail_address].filter(Boolean).join(' ');
+            addrEl.textContent = fullAddr || '-';
+
+            const imgSrc = row.image_path || '/uploads/no-thumb.png';
+            imgEl.src = imgSrc;
+
+            // 설명(HTML 우선)
+            const html = row.description || '';
+            if (/<[a-z][\s\S]*>/i.test(html)) {
+                descEl.innerHTML = html;
+            } else {
+                descEl.textContent = html || '등록된 설명이 없습니다.';
+            }
+
+            // Kakao 지도 로딩 → 주소 반영
+            kakao.maps.load(function () {
+                const seoul = new kakao.maps.LatLng(37.5665, 126.9780);
+                initMap(seoul);
+                if (fullAddr) updateMapByAddress(fullAddr, storeName);
+            });
+
+            // 링크 복사
+            document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
+                const url = location.href.includes('?id=') ? location.href : `${location.origin}/opendetail.html?id=${finalId}`;
+                await navigator.clipboard.writeText(url);
+                alert('링크가 복사되었습니다.');
+            });
+
+            // 전화 버튼
+            document.getElementById('callBtn')?.setAttribute('href', phoneStr ? `tel:${phoneStr.replace(/[^\d+]/g, '')}` : '#');
+        }
+
+        // 실행
+        (async () => {
+            try { await main(); }
+            catch (e) {
+                console.error(e);
+                alert('상세 정보를 불러오지 못했습니다.');
+                location.href = '/open.html';
+            }
+        })();
+    </script>
+</body>
+
+</html>
