@@ -15,6 +15,7 @@ export async function createOpenRegister(req, res) {
             description,
             descHtml,
             address,
+            detail_address,
         } = req.body;
 
         // 리치 텍스트 HTML 우선 사용, 없으면 일반 텍스트
@@ -31,13 +32,13 @@ export async function createOpenRegister(req, res) {
             image_path = `/uploads/${path.basename(req.file.path)}`;
         }
 
-        // DB 저장 (위도/경도 제외)
+        // DB 저장 (detail_address 포함)
         const result = await pool.query(
             `INSERT INTO open_stores
-  (store_name, open_date, category, phone, description, address, image_path, created_at)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+  (store_name, open_date, category, phone, description, address, detail_address, image_path, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
   RETURNING id;`,
-            [store_name, open_date, category, phone, finalDescription, address, image_path]
+            [store_name, open_date, category, phone, finalDescription, address, detail_address || null, image_path]
         );
 
         console.log("🧾 INSERT DEBUG:", { store_name, open_date, category, phone, address });
@@ -56,7 +57,7 @@ export async function getOpenRegisters(req, res) {
     try {
         const result = await pool.query(
             `
-      SELECT id, store_name, open_date, category, phone, description, address, image_path
+      SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path
       FROM open_stores
       ORDER BY id DESC;
       `
@@ -76,7 +77,7 @@ export async function getOpenRegisterById(req, res) {
         const { id } = req.params;
         const result = await pool.query(
             `
-      SELECT id, store_name, open_date, category, phone, description, address, image_path
+      SELECT id, store_name, open_date, category, phone, description, address, detail_address, image_path
       FROM open_stores
       WHERE id=$1;
       `,

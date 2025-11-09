@@ -608,7 +608,7 @@
       try {
         console.log("🚀 서버로 전송 중...");
         const fd = new FormData(e.target);
-        const data = await safeFetch('/open/register', { method: 'POST', body: fd });
+        const data = await safeFetch('/api/open/register', { method: 'POST', body: fd });
         
         console.log("📥 서버 응답:", data);
         alert('등록 완료! id=' + (data.id ?? 'ok'));
@@ -672,6 +672,42 @@
         }
       }
 
+      // ✅ 인라인 스타일 적용 (브라우저 호환성 향상)
+      function applyInlineStyle(styleObj = {}) {
+        editor.focus();
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        Object.assign(span.style, styleObj);
+
+        if (!sel.isCollapsed) {
+          try { 
+            range.surroundContents(span); 
+          } catch {
+            const frag = range.extractContents();
+            span.appendChild(frag);
+            range.insertNode(span);
+          }
+        } else {
+          // 커서만 있을 때: 타이핑용 스팬 만들어두기
+          span.appendChild(document.createTextNode('\u200B')); // ZWSP
+          range.insertNode(span);
+          const r2 = document.createRange();
+          r2.setStart(span.firstChild, 1);
+          r2.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(r2);
+        }
+        editor.focus();
+      }
+
+      function removeInlineColors() {
+        // 글자색/배경색 제거만 안전하게
+        document.execCommand('removeFormat');
+      }
+
       function doCmd(cmd, value = null) {
         restoreSelection();
         document.execCommand(cmd, false, value);
@@ -724,9 +760,9 @@
         
         const color = swatch.getAttribute('data-fore');
         if (color === 'remove') {
-          doCmd('removeFormat');
+          removeInlineColors();
         } else {
-          doCmd('foreColor', color);
+          applyInlineStyle({ color });
         }
       });
 
@@ -736,9 +772,9 @@
         
         const color = swatch.getAttribute('data-back');
         if (color === 'remove') {
-          doCmd('hiliteColor', 'transparent');
+          applyInlineStyle({ backgroundColor: 'transparent' });
         } else {
-          doCmd('hiliteColor', color);
+          applyInlineStyle({ backgroundColor: color });
         }
       });
 
@@ -763,7 +799,7 @@
           if (fontNameLabel) fontNameLabel.textContent = fontDisplay;
           
           if (fontValue) {
-            doCmd('fontName', fontValue);
+            applyInlineStyle({ fontFamily: fontValue });
           }
           
           fontNameMenu.classList.add('hidden');
