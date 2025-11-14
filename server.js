@@ -20,6 +20,7 @@ import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.
 import pool from "./db.js"; //
 
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -53,6 +54,7 @@ app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
+
 
 // ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
 app.get("/admin/check-table", async (req, res) => {

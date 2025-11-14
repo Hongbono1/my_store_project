@@ -191,8 +191,8 @@
         statusEl.classList.remove("text-red-500");
         statusEl.classList.add("text-slate-500");
 
-        // 🔹 여기서 API 주소는 프로젝트에 맞게 수정 가능
-        const res = await fetch(`/storepride/${id}`);
+        // Store Pride Register API 호출
+        const res = await fetch(`/api/storeprideregister/${id}`);
         if (!res.ok) {
           throw new Error(`서버 응답 오류: ${res.status}`);
         }
@@ -204,23 +204,21 @@
 
         const data = json.data;
 
-        // 기대하는 데이터 구조 예시:
+        // Store Pride Register 데이터 구조:
         // data = {
-        //   id, store_id, title, event_date, category,
-        //   phone, address, content, image_path,
-        //   store: { business_name, business_type, business_category }
+        //   id, store_name, category, phone, address, main_img, free_pr, qa_mode, created_at,
+        //   qas: [{ qa_type, seq, question, answer, image_path }, ...]
         // }
 
-        // 가게/프라이드 기본 정보 채우기
-        document.getElementById("store-name").textContent =
-          (data.store && data.store.business_name) || "(가게 이름 없음)";
+        // 가게 기본 정보 채우기
+        document.getElementById("store-name").textContent = data.store_name || "(가게 이름 없음)";
 
+        // 업종 정보는 Store Pride에서는 category 필드 사용
         const bizTagsEl = document.getElementById("business-tags");
-        const bizType = data.store?.business_type || "";
-        const bizCategory = data.store?.business_category || "";
-        bizTagsEl.textContent = [bizType, bizCategory].filter(Boolean).join(" · ");
+        bizTagsEl.textContent = data.category || "";
 
-        document.getElementById("pride-title").textContent = data.title || "(제목 없음)";
+        // Store Pride에서는 제목이 store_name이므로 동일하게 설정
+        document.getElementById("pride-title").textContent = data.store_name || "(제목 없음)";
         document.getElementById("address").textContent = data.address || "-";
         document.getElementById("phone").textContent = data.phone || "-";
 
@@ -229,8 +227,8 @@
           data.category ? `분류: ${data.category}` : "분류 정보 없음";
 
         // 날짜 Pill
-        if (data.event_date) {
-          const d = new Date(data.event_date);
+        if (data.created_at) {
+          const d = new Date(data.created_at);
           const y = d.getFullYear();
           const m = String(d.getMonth() + 1).padStart(2, "0");
           const day = String(d.getDate()).padStart(2, "0");
@@ -239,13 +237,17 @@
           document.getElementById("date-pill").textContent = "날짜 정보 없음";
         }
 
-        // 대표 이미지 처리
+        // 대표 이미지 처리 (main_img)
         const thumbEl = document.getElementById("thumbnail");
         const thumbPlaceholder = document.getElementById("thumbnail-placeholder");
 
-        if (data.image_path) {
-          // 절대 경로/상대 경로 모두 대응
-          thumbEl.src = data.image_path;
+        if (data.main_img) {
+          // 이미지 경로 처리: /uploads/ 접두사 확인
+          let imgPath = data.main_img;
+          if (!imgPath.startsWith('/uploads/') && !imgPath.startsWith('http')) {
+            imgPath = `/uploads/${imgPath}`;
+          }
+          thumbEl.src = imgPath;
           thumbEl.classList.remove("hidden");
           thumbPlaceholder.classList.add("hidden");
         } else {
@@ -253,13 +255,62 @@
           thumbPlaceholder.classList.remove("hidden");
         }
 
-        // 내용(content) HTML 삽입
+        // Store Pride 내용 렌더링 (free_pr + Q&A)
         const contentEl = document.getElementById("pride-content");
-        if (data.content) {
-          // ⚠️ content는 우리가 직접 만든 에디터/관리자가 입력한 HTML이라고 가정
-          contentEl.innerHTML = data.content;
+        let contentHtml = "";
+
+        // 자유 홍보글
+        if (data.free_pr && data.free_pr.trim()) {
+          contentHtml += `<div class="mb-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-3">🎯 가게 홍보</h3>
+            <div class="bg-white rounded-xl p-4 border border-slate-200">
+              ${data.free_pr.replace(/\n/g, '<br>')}
+            </div>
+          </div>`;
+        }
+
+        // Q&A 섹션
+        if (data.qas && data.qas.length > 0) {
+          contentHtml += `<div class="mb-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-3">💬 질문과 답변 (${data.qa_mode === 'fixed' ? '고정 질문' : '자유 질문'})</h3>
+            <div class="space-y-4">`;
+
+          data.qas.forEach((qa, index) => {
+            contentHtml += `
+              <div class="bg-white rounded-xl p-4 border border-slate-200">
+                <div class="mb-3">
+                  <span class="inline-block bg-sky-100 text-sky-700 text-sm font-medium px-2 py-1 rounded-lg">
+                    Q${qa.seq || index + 1}
+                  </span>
+                </div>
+                <div class="mb-3">
+                  <p class="font-semibold text-slate-800">${qa.question || '질문이 없습니다'}</p>
+                </div>
+                <div class="mb-3">
+                  <p class="text-slate-700">${qa.answer ? qa.answer.replace(/\n/g, '<br>') : '답변이 없습니다'}</p>
+                </div>`;
+            
+            if (qa.image_path) {
+              let qaImgPath = qa.image_path;
+              if (!qaImgPath.startsWith('/uploads/') && !qaImgPath.startsWith('http')) {
+                qaImgPath = `/uploads/${qaImgPath}`;
+              }
+              contentHtml += `
+                <div class="mt-3">
+                  <img src="${qaImgPath}" alt="Q&A 이미지" class="max-w-full h-auto rounded-lg border border-slate-200" />
+                </div>`;
+            }
+            
+            contentHtml += `</div>`;
+          });
+
+          contentHtml += `</div></div>`;
+        }
+
+        if (contentHtml) {
+          contentEl.innerHTML = contentHtml;
         } else {
-          contentEl.textContent = "등록된 자랑글 내용이 없습니다.";
+          contentEl.innerHTML = '<p class="text-slate-500">등록된 내용이 없습니다.</p>';
         }
 
         statusEl.classList.add("hidden");
