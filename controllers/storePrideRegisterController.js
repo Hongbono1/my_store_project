@@ -123,7 +123,7 @@ export function createStorePrideRegisterController(pool) {
 
     /**
      * 상세: GET /api/storeprideregister/:id
-     *  - substorepride.html 에서 상세 조회용
+     *  - storepridedetail.html 에서 상세 조회용
      */
     async function getStorePrideRegisterDetail(req, res) {
         const id = Number(req.params.id);
