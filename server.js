@@ -102,6 +102,108 @@ app.get("/admin/check-table", async (req, res) => {
   }
 });
 
+// ✅ Store Pride 테이블 체크 엔드포인트 추가
+app.get("/admin/check-storepride-table", async (req, res) => {
+  try {
+    const { default: pool } = await import("./db.js");
+    const results = [];
+    
+    // 1. store_pride 테이블 확인 및 생성
+    const mainTableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'store_pride'
+      );
+    `);
+
+    if (!mainTableExists.rows[0].exists) {
+      results.push("📝 store_pride 테이블 생성 중...");
+      await pool.query(`
+        CREATE TABLE store_pride (
+          id SERIAL PRIMARY KEY,
+          store_name VARCHAR(255) NOT NULL,
+          category VARCHAR(100) NOT NULL,
+          phone VARCHAR(50),
+          address TEXT NOT NULL,
+          main_img TEXT,
+          free_pr TEXT,
+          qa_mode VARCHAR(20) NOT NULL CHECK (qa_mode IN ('fixed', 'custom')),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+      results.push("✅ store_pride 테이블이 생성되었습니다!");
+    } else {
+      results.push("✅ store_pride 테이블이 이미 존재합니다.");
+    }
+
+    // 2. store_pride_qas 테이블 확인 및 생성
+    const qasTableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'store_pride_qas'
+      );
+    `);
+
+    if (!qasTableExists.rows[0].exists) {
+      results.push("📝 store_pride_qas 테이블 생성 중...");
+      await pool.query(`
+        CREATE TABLE store_pride_qas (
+          id SERIAL PRIMARY KEY,
+          pride_id INTEGER REFERENCES store_pride(id) ON DELETE CASCADE,
+          qa_type VARCHAR(20) NOT NULL CHECK (qa_type IN ('fixed', 'custom')),
+          seq INTEGER NOT NULL,
+          question TEXT NOT NULL,
+          answer TEXT NOT NULL,
+          image_path TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+      results.push("✅ store_pride_qas 테이블이 생성되었습니다!");
+    } else {
+      results.push("✅ store_pride_qas 테이블이 이미 존재합니다.");
+    }
+
+    // 3. 테이블 구조 확인
+    const prideColumns = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'store_pride' 
+      ORDER BY ordinal_position;
+    `);
+    
+    const qasColumns = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'store_pride_qas' 
+      ORDER BY ordinal_position;
+    `);
+
+    // 4. 데이터 개수 확인
+    const prideCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
+    const qasCount = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
+    
+    res.json({
+      success: true,
+      results,
+      tables: {
+        store_pride: {
+          columns: prideColumns.rows,
+          count: prideCount.rows[0].count
+        },
+        store_pride_qas: {
+          columns: qasColumns.rows,
+          count: qasCount.rows[0].count
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Store Pride 테이블 체크 중 오류:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ✅ 새로운 명확한 API 엔드포인트
 app.use("/api/open/register", openregisterRouter); // POST /api/open/register (API)
 app.use("/api/open", openRouter);               // GET /api/open (목록 API)
@@ -113,6 +215,55 @@ app.use("/open", opendetailRouter);             // GET /open/:id (상세)
 // ✅ 기존 호환성 유지 (단계적 마이그레이션)
 app.use("/openregister", openregisterRouter);  // 구버전 지원
 app.use("/upload", uploadRouter);
+
+// ✅ Store Pride 데이터 확인 엔드포인트 추가
+app.get("/admin/check-storepride-data", async (req, res) => {
+  try {
+    const { default: pool } = await import("./db.js");
+    
+    // 1. 메인 테이블 데이터 조회
+    const prideData = await pool.query(`
+      SELECT id, store_name, category, phone, address, main_img, free_pr, qa_mode, created_at
+      FROM store_pride 
+      ORDER BY created_at DESC 
+      LIMIT 5;
+    `);
+    
+    const results = [];
+    
+    // 2. 각 데이터의 Q&A 조회
+    for (const row of prideData.rows) {
+      const qasData = await pool.query(`
+        SELECT qa_type, seq, question, answer, image_path
+        FROM store_pride_qas 
+        WHERE pride_id = $1
+        ORDER BY qa_type, seq;
+      `, [row.id]);
+      
+      results.push({
+        ...row,
+        qas: qasData.rows
+      });
+    }
+
+    // 3. 전체 통계
+    const totalCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
+    const totalQAs = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
+    
+    res.json({
+      success: true,
+      data: results,
+      stats: {
+        totalStores: totalCount.rows[0].count,
+        totalQAs: totalQAs.rows[0].count
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Store Pride 데이터 확인 중 오류:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 /* 정적 파일 */
 // ✅ HTML 파일은 캐시 방지 (항상 최신 버전 로드)
