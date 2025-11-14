@@ -16,7 +16,7 @@ import openregisterRouter from "./routes/openregisterRouter.js";
 import openRouter from "./routes/openRouter.js";
 import opendetailRouter from "./routes/opendetailRouter.js";
 import uploadRouter from "./routes/upload.js";
-import { makeStorePrideRouter } from "./routes/storeprideRouter.js";
+import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
 import pool from "./db.js"; //
 
 
@@ -52,7 +52,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
-app.use("/api/storepride", makeStorePrideRouter(pool));
+app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 
 // ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
 app.get("/admin/check-table", async (req, res) => {

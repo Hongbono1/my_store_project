@@ -1,11 +1,11 @@
-// controllers/storeprideController.js
+// controllers/storePrideRegisterController.js
 import path from "path";
 
 /**
- * Store Pride(우리 가게 자랑) 컨트롤러 팩토리
+ * Store Pride Register(우리 가게 자랑 등록) 컨트롤러 팩토리
  * @param {import('pg').Pool} pool
  */
-export function createStorePrideController(pool) {
+export function createStorePrideRegisterController(pool) {
     /**
      * 파일 맵 쉽게 얻기 (multer.any() 사용 가정)
      */
@@ -30,10 +30,10 @@ export function createStorePrideController(pool) {
     }
 
     /**
-     * 등록: POST /api/storepride/register
+     * 등록: POST /api/storeprideregister/register
      * multipart/form-data (main_img, q1_image..q8_image, customq*_image)
      */
-    async function registerStorePride(req, res) {
+    async function registerStorePrideRegister(req, res) {
         const client = await pool.connect();
         try {
             const files = buildFileMap(req.files);
@@ -114,7 +114,7 @@ export function createStorePrideController(pool) {
             return res.json({ success: true, pride_id: prideId });
         } catch (e) {
             await client.query("ROLLBACK");
-            console.error("[storepride register] ", e);
+            console.error("[storePrideRegister] ", e);
             return res.status(500).json({ success: false, error: e.message });
         } finally {
             client.release();
@@ -122,10 +122,10 @@ export function createStorePrideController(pool) {
     }
 
     /**
-     * 상세: GET /api/storepride/:id
+     * 상세: GET /api/storeprideregister/:id
      *  - substorepride.html 에서 상세 조회용
      */
-    async function getStorePrideDetail(req, res) {
+    async function getStorePrideRegisterDetail(req, res) {
         const id = Number(req.params.id);
         if (!id) return res.status(400).json({ ok: false, error: "invalid_id" });
 
@@ -147,10 +147,10 @@ export function createStorePrideController(pool) {
             );
             return res.json({ ok: true, data: { ...main.rows[0], qas: qas.rows } });
         } catch (e) {
-            console.error("[storepride detail] ", e);
+            console.error("[storePrideRegister detail] ", e);
             return res.status(500).json({ ok: false, error: e.message });
         }
     }
 
-    return { registerStorePride, getStorePrideDetail };
+    return { registerStorePrideRegister, getStorePrideRegisterDetail };
 }
