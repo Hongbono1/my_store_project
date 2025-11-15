@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>스토어 프라이드 상세 | MALL HANKOOK</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=112dd89a2dbd8030b97ա6b1a76420251&libraries=services"></script>
   <style>
     body {
       font-family: Pretendard, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -264,6 +265,11 @@
         document.getElementById("address").textContent = data.address || "-";
         document.getElementById("phone").textContent = data.phone || "-";
 
+        // 카카오 지도 초기화
+        if (data.address && typeof kakao !== 'undefined') {
+          initKakaoMap(data.address, data.store_name);
+        }
+
         // 카테고리 Pill
         document.getElementById("category-pill").textContent =
           data.category ? `분류: ${data.category}` : "분류 정보 없음";
@@ -363,6 +369,47 @@
         statusEl.classList.remove("text-slate-500");
         statusEl.classList.add("text-red-500");
       }
+    }
+
+    // 카카오 지도 초기화 함수
+    function initKakaoMap(address, storeName) {
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) return;
+
+      // 지도 기본 옵션 (서울시청 좌표로 임시 설정)
+      const mapOption = {
+        center: new kakao.maps.LatLng(37.5665, 126.9780),
+        level: 3
+      };
+
+      const map = new kakao.maps.Map(mapContainer, mapOption);
+
+      // 주소-좌표 변환 객체 생성
+      const geocoder = new kakao.maps.services.Geocoder();
+
+      // 주소로 좌표 검색
+      geocoder.addressSearch(address, function(result, status) {
+        if (status === kakao.maps.services.Status.OK) {
+          const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+
+          // 마커 생성
+          const marker = new kakao.maps.Marker({
+            map: map,
+            position: coords
+          });
+
+          // 인포윈도우 생성
+          const infowindow = new kakao.maps.InfoWindow({
+            content: `<div style="width:150px;text-align:center;padding:6px 0;font-size:12px;">${storeName || '가게 위치'}</div>`
+          });
+          infowindow.open(map, marker);
+
+          // 지도 중심을 마커 위치로 이동
+          map.setCenter(coords);
+        } else {
+          console.warn('주소 변환 실패:', address, status);
+        }
+      });
     }
 
     document.addEventListener("DOMContentLoaded", loadStorePrideDetail);
