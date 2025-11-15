@@ -18,6 +18,8 @@ import opendetailRouter from "./routes/opendetailRouter.js";
 import uploadRouter from "./routes/upload.js";
 import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
 import pool from "./db.js"; //
+import storeprideRouter from "./routes/storeprideRouter.js";
+
 
 
 
@@ -54,6 +56,8 @@ app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
+app.use("/storepride", storeprideRouter);
+
 
 
 // ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
