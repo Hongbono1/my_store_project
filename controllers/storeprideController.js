@@ -1,13 +1,13 @@
 // controllers/storeprideController.js
-import pool from "../db/pool.js";
+import pool from "../db.js";
 
 // ✔ 리스트 가져오기
 export async function getStorePrideList(req, res) {
     try {
         const sql = `
-      SELECT pride_id, store_name, category, main_image, created_at
+      SELECT id as pride_id, store_name, category, main_img as main_image, created_at
       FROM store_pride
-      ORDER BY pride_id DESC
+      ORDER BY id DESC
     `;
         const result = await pool.query(sql);
         return res.json(result.rows);
@@ -23,9 +23,9 @@ export async function getStorePrideDetail(req, res) {
     const { id } = req.params;
     try {
         const sql = `
-      SELECT pride_id, store_name, category, main_image, created_at
+      SELECT id as pride_id, store_name, category, main_img as main_image, created_at
       FROM store_pride
-      WHERE pride_id = $1
+      WHERE id = $1
     `;
         const result = await pool.query(sql, [id]);
 
