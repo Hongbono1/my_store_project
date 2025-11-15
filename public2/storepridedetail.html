@@ -120,6 +120,12 @@
               <div class="w-full md:w-1/2">
                 <div class="relative rounded-2xl overflow-hidden bg-gray-100 aspect-[4/3] shadow-lg" style="min-height: 300px;">
                   <div id="map" class="w-full h-full"></div>
+                  <!-- 길찾기 버튼 -->
+                  <button id="directions-btn" onclick="openDirections()" 
+                    class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg font-medium transition-all flex items-center gap-2 hidden">
+                    <span>🗺️</span>
+                    <span>길찾기</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -193,6 +199,30 @@
         } catch (error) {
             console.warn('헤더/푸터 로드 중 오류:', error);
         }
+    }
+
+    // 길찾기를 위한 전역 변수
+    let storeCoords = null;
+    let storeAddress = null;
+    let storeNameGlobal = null;
+
+    // 길찾기 버튼 클릭 핸들러
+    function openDirections() {
+      if (!storeCoords) {
+        alert('위치 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      // 카카오맵 앱으로 길찾기 열기
+      const lat = storeCoords.getLat();
+      const lng = storeCoords.getLng();
+      const name = encodeURIComponent(storeNameGlobal || '목적지');
+      
+      // 카카오맵 길찾기 URL
+      const kakaoMapUrl = `https://map.kakao.com/link/to/${name},${lat},${lng}`;
+      
+      // 새 창으로 열기
+      window.open(kakaoMapUrl, '_blank');
     }
 
     // 페이지 로드 시 컴포넌트 로드
@@ -407,6 +437,11 @@
             console.log('주소 변환 성공:', result[0]);
             const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
 
+            // 전역 변수에 저장 (길찾기용)
+            storeCoords = coords;
+            storeAddress = address;
+            storeNameGlobal = storeName;
+
             // 마커 생성
             const marker = new kakao.maps.Marker({
               map: map,
@@ -421,6 +456,12 @@
 
             // 지도 중심을 마커 위치로 이동
             map.setCenter(coords);
+
+            // 길찾기 버튼 표시
+            const directionsBtn = document.getElementById('directions-btn');
+            if (directionsBtn) {
+              directionsBtn.classList.remove('hidden');
+            }
           } else {
             console.error('주소 변환 실패:', address, status);
             // 주소 변환 실패시에도 기본 지도는 표시
