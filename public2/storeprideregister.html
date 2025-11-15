@@ -487,16 +487,21 @@
             }
 
             try {
-                const res = await                 fetch('/api/storeprideregister/register', {
+                const res = await fetch('/api/storeprideregister/register', {
                     method: 'POST',
                     body: formData
                 });
+                if (!res.ok) {
+                    const text = await res.text().catch(() => '');
+                    alert(`❌ 등록 요청 실패 (HTTP ${res.status})\n${text || ''}`);
+                    return;
+                }
                 const data = await res.json();
-                if (data.success) {
-                    alert('🎉 등록이 완료되었습니다!\n우리 가게 자랑 페이지로 이동합니다.');
+                if (data && data.success && data.pride_id) {
+                    // 성공: 상세 페이지로 이동
                     location.href = `/storepridedetail.html?id=${data.pride_id}`;
                 } else {
-                    alert('❌ 등록에 실패했습니다.\n' + (data.error || '잠시 후 다시 시도해주세요.'));
+                    alert('❌ 등록에 실패했습니다.\n' + (data?.error || '잠시 후 다시 시도해주세요.'));
                 }
             } catch (err) {
                 alert('🔌 네트워크 연결에 문제가 발생했습니다.\n인터넷 연결을 확인 후 다시 시도해주세요.');
