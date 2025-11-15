@@ -265,11 +265,20 @@
         document.getElementById("address").textContent = data.address || "-";
         document.getElementById("phone").textContent = data.phone || "-";
 
-        // 카카오 지도 초기화 - 약간의 지연을 두고 실행
+        // 카카오 지도 초기화 - window.kakao 전역 객체 확인
         if (data.address) {
-          setTimeout(() => {
-            initKakaoMap(data.address, data.store_name);
+          // 스크립트 로드 대기
+          const waitForKakao = setInterval(() => {
+            if (window.kakao && window.kakao.maps) {
+              clearInterval(waitForKakao);
+              initKakaoMap(data.address, data.store_name);
+            }
           }, 100);
+          
+          // 5초 후 타임아웃
+          setTimeout(() => {
+            clearInterval(waitForKakao);
+          }, 5000);
         }
 
         // 카테고리 Pill
@@ -429,6 +438,14 @@
     }
 
     document.addEventListener("DOMContentLoaded", loadStorePrideDetail);
+    
+    // 카카오맵 스크립트 로드 확인
+    window.addEventListener('load', function() {
+      console.log('페이지 로드 완료, kakao 객체:', typeof kakao);
+      if (typeof kakao === 'undefined') {
+        console.error('카카오맵 스크립트가 로드되지 않았습니다. 스크립트 태그를 확인하세요.');
+      }
+    });
   </script>
 </body>
 
