@@ -41,7 +41,7 @@
     <div id="header"></div>
 
     <!-- 메인 콘텐츠 -->
-    <div class="max-w-6xl mx-auto px-5 py-10">
+    <div class="max-w-7xl mx-auto px-5 py-10">
 
         <!-- 페이지 제목 -->
         <div class="glass-box p-8 mb-10 text-center">
@@ -49,14 +49,22 @@
             <p class="text-lg text-gray-600 mt-2">다양한 공연과 예술 행사를 만나보세요</p>
         </div>
 
-        <!-- 카드 목록 -->
-        <div id="art-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"></div>
+        <!-- 공연 섹션 -->
+        <div class="mb-16">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">🎭 공연</h2>
+            <div id="performance-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+        </div>
 
-        <!-- 더보기 버튼 -->
-        <div class="text-center">
-            <button id="loadMoreBtn" class="px-8 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition shadow-lg">
-                더보기
-            </button>
+        <!-- 예술/축제 섹션 -->
+        <div class="mb-16">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">🎨 예술/축제</h2>
+            <div id="art-festival-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+        </div>
+
+        <!-- 버스커 섹션 -->
+        <div class="mb-16">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">🎸 버스커</h2>
+            <div id="busker-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
         </div>
 
     </div>
@@ -69,7 +77,6 @@
         fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
 
         let allData = [];
-        let displayCount = 4; // 초기 4개 표시
 
         async function loadArts() {
             try {
@@ -82,18 +89,15 @@
                 }
 
                 allData = json.data || [];
-                renderArts();
+                renderAllSections();
             } catch (err) {
                 console.error('데이터 로드 오류:', err);
                 alert('데이터를 불러오는 중 오류가 발생했습니다.');
             }
         }
 
-        function renderArts() {
-            const container = document.getElementById('art-list');
-            const itemsToShow = allData.slice(0, displayCount);
-
-            container.innerHTML = itemsToShow.map(item => `
+        function createCard(item) {
+            return `
                 <div class="glass-box p-5 hover:shadow-2xl transition cursor-pointer" onclick="location.href='performingartdetail.html?id=${item.id}'">
                     <div class="w-full h-48 bg-gray-200 rounded-xl mb-4 overflow-hidden">
                         ${item.main_img 
@@ -101,29 +105,64 @@
                             : `<div class="w-full h-full flex items-center justify-center text-gray-400">이미지 없음</div>`
                         }
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">${item.title}</h3>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2 line-clamp-2">${item.title}</h3>
                     <p class="text-sm text-indigo-600 font-semibold mb-2">${item.type || '공연'}</p>
-                    <p class="text-sm text-gray-600 mb-1">📅 ${item.start_date ? item.start_date.split('T')[0] : '-'}</p>
-                    <p class="text-sm text-gray-600 mb-1">📍 ${item.venue || '-'}</p>
-                    <p class="text-sm text-gray-600 mb-1">🏠 ${item.address || '-'}</p>
-                    <p class="text-sm text-gray-600">💰 ${item.price || '-'}</p>
+                    <p class="text-xs text-gray-600 mb-1">📅 ${item.start_date ? item.start_date.split('T')[0] : '-'}</p>
+                    <p class="text-xs text-gray-600 mb-1">📍 ${item.venue || '-'}</p>
+                    <p class="text-xs text-gray-600">💰 ${item.price || '-'}</p>
                 </div>
-            `).join('');
-
-            // 더보기 버튼 표시/숨김
-            const loadMoreBtn = document.getElementById('loadMoreBtn');
-            if (displayCount >= allData.length) {
-                loadMoreBtn.style.display = 'none';
-            } else {
-                loadMoreBtn.style.display = 'block';
-            }
+            `;
         }
 
-        // 더보기 버튼 클릭
-        document.getElementById('loadMoreBtn').addEventListener('click', function() {
-            displayCount += 2; // 2개씩 추가
-            renderArts();
-        });
+        function createAdCard() {
+            return `
+                <div class="glass-box p-5 hover:shadow-2xl transition cursor-pointer bg-gradient-to-br from-yellow-100 to-orange-100">
+                    <div class="w-full h-48 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-xl mb-4 flex items-center justify-center">
+                        <div class="text-center">
+                            <p class="text-4xl mb-2">📢</p>
+                            <p class="text-lg font-bold text-gray-700">광고 문의</p>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2 text-center">이 자리에 광고하세요</h3>
+                    <p class="text-sm text-gray-600 text-center mb-2">귀하의 공연/행사를 홍보할 수 있습니다</p>
+                    <p class="text-xs text-gray-500 text-center">📞 문의: 02-1234-5678</p>
+                </div>
+            `;
+        }
+
+        function renderSection(containerId, items, maxCount = 8) {
+            const container = document.getElementById(containerId);
+            const cards = [];
+            
+            // 실제 데이터 카드
+            items.slice(0, maxCount).forEach(item => {
+                cards.push(createCard(item));
+            });
+            
+            // 8개 미만이면 광고 카드로 채우기
+            const adCount = maxCount - items.length;
+            if (adCount > 0) {
+                for (let i = 0; i < adCount; i++) {
+                    cards.push(createAdCard());
+                }
+            }
+            
+            container.innerHTML = cards.join('');
+        }
+
+        function renderAllSections() {
+            // 공연
+            const performances = allData.filter(item => item.type === '공연');
+            renderSection('performance-list', performances, 8);
+            
+            // 예술/축제 (예술/문화 + 축제 합치기)
+            const artFestival = allData.filter(item => item.type === '예술/문화' || item.type === '축제');
+            renderSection('art-festival-list', artFestival, 8);
+            
+            // 버스커
+            const buskers = allData.filter(item => item.type === '버스커');
+            renderSection('busker-list', buskers, 8);
+        }
 
         loadArts();
     </script>
