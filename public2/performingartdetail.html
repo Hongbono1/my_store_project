@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공연 · 예술 · 버스커 상세보기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
+
+    <style>
+        /* glass */
+        .glass-box {
+            backdrop-filter: blur(14px);
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 22px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow:
+                8px 8px 18px rgba(0, 0, 0, 0.12),
+                -5px -5px 16px rgba(255, 255, 255, 0.8),
+                inset 0 0 4px rgba(255, 255, 255, 0.3);
+        }
+
+        /* card shadow */
+        .neo-card {
+            border-radius: 18px;
+            background: linear-gradient(135deg, #ffffff, #f1f5ff);
+            box-shadow:
+                8px 8px 20px rgba(0, 0, 0, 0.12),
+                -6px -6px 18px rgba(255, 255, 255, 0.85);
+        }
+
+        .section-title {
+            @apply text-2xl font-bold mb-3 text-gray-800 drop-shadow;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 min-h-screen">
+
+    <div id="header"></div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="max-w-5xl mx-auto px-5 py-10">
+
+        <!-- 제목 + 카테고리 -->
+        <div class="glass-box p-8 mb-10 text-center">
+            <h1 id="title" class="text-4xl font-extrabold text-gray-900"></h1>
+            <p id="category" class="text-xl font-semibold text-indigo-600 mt-2 drop-shadow"></p>
+        </div>
+
+        <!-- 이미지 슬라이더 (최대 3장) -->
+        <div class="glass-box p-6 mb-10">
+            <div class="flex gap-4 justify-center flex-wrap" id="image-area"></div>
+        </div>
+
+        <!-- 기본 정보 -->
+        <div class="glass-box p-8 mb-10">
+            <h2 class="section-title">기본 정보</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+                <p><strong>📅 시작일 :</strong> <span id="start_date"></span></p>
+                <p><strong>📅 종료일 :</strong> <span id="end_date"></span></p>
+                <p><strong>🕐 시간 :</strong> <span id="time"></span></p>
+                <p><strong>📍 장소 :</strong> <span id="venue"></span></p>
+                <p><strong>💰 참가비 :</strong> <span id="price"></span></p>
+                <p><strong>👥 정원 :</strong> <span id="capacity"></span></p>
+                <p><strong>🎭 주최/주관 :</strong> <span id="host"></span></p>
+                <p><strong>🔞 관람등급 :</strong> <span id="age_limit"></span></p>
+                <p class="md:col-span-2"><strong>📞 연락처 :</strong> <span id="phone"></span></p>
+                <p class="md:col-span-2"><strong>🏠 주소 :</strong> <span id="address"></span></p>
+            </div>
+
+            <!-- 태그 -->
+            <div id="tags-area" class="mt-4 flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- 지도 -->
+        <div class="glass-box p-8 mb-10" id="map-section">
+            <h2 class="section-title">위치 안내</h2>
+            <div id="map" class="w-full h-64 rounded-xl border"></div>
+        </div>
+
+        <!-- 상세 소개 -->
+        <div class="glass-box p-8 mb-10">
+            <h2 class="section-title">상세 소개</h2>
+            <p id="description" class="whitespace-pre-line leading-relaxed text-gray-700"></p>
+        </div>
+
+        <!-- 팜플렛 -->
+        <div class="glass-box p-8 mb-10" id="pamphlet-section" style="display:none;">
+            <h2 class="section-title">팜플렛 / 포스터</h2>
+            <div id="pamphlet-area" class="flex flex-wrap gap-4"></div>
+        </div>
+
+        <!-- 소셜/예매 링크 -->
+        <div class="glass-box p-8 mb-10" id="links-section" style="display:none;">
+            <h2 class="section-title">링크</h2>
+            <div id="links-area" class="space-y-2"></div>
+        </div>
+
+    </div>
+
+    <div id="footer"></div>
+
+    <script>
+        /* 헤더/푸터 */
+        fetch('components/header.html').then(r => r.text()).then(h => header.innerHTML = h);
+        fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
+
+        const id = new URLSearchParams(location.search).get("id");
+
+        async function loadDetail() {
+            try {
+                const res = await fetch(`/api/performingart/${id}`);
+                const json = await res.json();
+                
+                if (!json.success) {
+                    alert('데이터를 불러올 수 없습니다.');
+                    return;
+                }
+
+                const data = json.data;
+
+                /* 텍스트 정보 출력 */
+                title.textContent = data.title;
+                category.textContent = `${data.type || '공연'}`;
+                phone.textContent = data.phone || '-';
+                address.textContent = data.address || '-';
+                start_date.textContent = data.start_date || '-';
+                end_date.textContent = data.end_date || '-';
+                time.textContent = data.time || '-';
+                venue.textContent = data.venue || '-';
+                price.textContent = data.price || '-';
+                capacity.textContent = data.capacity ? `${data.capacity}명` : '-';
+                host.textContent = data.host || '-';
+                age_limit.textContent = data.age_limit || '제한없음';
+                description.textContent = data.description || '';
+
+                /* 태그 */
+                if (data.tags) {
+                    const tagsArray = data.tags.split(/[,#]/).map(t => t.trim()).filter(Boolean);
+                    document.getElementById('tags-area').innerHTML = tagsArray.map(tag => 
+                        `<span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">#${tag}</span>`
+                    ).join('');
+                }
+
+                /* 이미지 로드 (main_img + files의 image 타입) */
+                const images = [data.main_img, ...(data.files || []).filter(f => f.file_type === 'image').map(f => f.file_path)].filter(Boolean);
+                const imgBox = document.getElementById("image-area");
+
+                if (images.length === 0) {
+                    imgBox.innerHTML = `<div class="text-gray-400 text-center py-10">이미지가 없습니다.</div>`;
+                } else {
+                    imgBox.innerHTML = images.map(src => `
+                        <img src="${src}"
+                             class="w-72 h-64 object-cover rounded-xl shadow-lg hover:scale-105 transition"/>
+                    `).join('');
+                }
+
+                /* 팜플렛 */
+                const pamphlets = (data.files || []).filter(f => f.file_type === 'pamphlet');
+                if (pamphlets.length > 0) {
+                    document.getElementById('pamphlet-section').style.display = 'block';
+                    document.getElementById('pamphlet-area').innerHTML = pamphlets.map(p => {
+                        const isPdf = p.file_path.toLowerCase().endsWith('.pdf');
+                        if (isPdf) {
+                            return `<a href="${p.file_path}" target="_blank" class="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg">📄 PDF 보기</a>`;
+                        } else {
+                            return `<img src="${p.file_path}" class="w-40 h-52 object-cover rounded-lg shadow"/>`;
+                        }
+                    }).join('');
+                }
+
+                /* 소셜/예매 링크 */
+                const links = [];
+                if (data.social1) links.push({ url: data.social1, label: '홈페이지/소셜1' });
+                if (data.social2) links.push({ url: data.social2, label: '소셜2' });
+                if (data.social3) links.push({ url: data.social3, label: '소셜3' });
+                if (data.booking_url) links.push({ url: data.booking_url, label: '🎫 예매하기' });
+
+                if (links.length > 0) {
+                    document.getElementById('links-section').style.display = 'block';
+                    document.getElementById('links-area').innerHTML = links.map(link => 
+                        `<a href="${link.url}" target="_blank" class="inline-block px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">${link.label}</a>`
+                    ).join('');
+                }
+
+                /* 지도 */
+                if (data.address) {
+                    drawMap(data.address);
+                } else {
+                    document.getElementById('map-section').style.display = 'none';
+                }
+
+            } catch (err) {
+                console.error('데이터 로드 오류:', err);
+                alert('데이터를 불러오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        function drawMap(address) {
+            if (!address) return;
+
+            kakao.maps.load(() => {
+                const geocoder = new kakao.maps.services.Geocoder();
+
+                geocoder.addressSearch(address, function (result, status) {
+                    if (status !== kakao.maps.services.Status.OK) {
+                        document.getElementById('map').innerHTML = '<p class="text-gray-500 text-center py-10">지도를 표시할 수 없습니다.</p>';
+                        return;
+                    }
+
+                    const lat = result[0].y;
+                    const lng = result[0].x;
+
+                    const map = new kakao.maps.Map(document.getElementById('map'), {
+                        center: new kakao.maps.LatLng(lat, lng),
+                        level: 3
+                    });
+
+                    new kakao.maps.Marker({
+                        map,
+                        position: new kakao.maps.LatLng(lat, lng)
+                    });
+                });
+            });
+        }
+
+        loadDetail();
+    </script>
+
+</body>
+</html>
