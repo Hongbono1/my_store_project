@@ -15,6 +15,8 @@ COPY . .
 
 # uploads 폴더가 없으면 생성
 RUN mkdir -p uploads
+RUN mkdir -p public/uploads
+RUN mkdir -p public2/uploads/traditionalmarket
 
 # .env 파일은 로컬에서는 사용하지만, Cloudtype에서는 환경변수로 관리됨
 
