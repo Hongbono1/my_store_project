@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공연 · 예술 · 버스커 목록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
+
+    <style>
+        /* glass */
+        .glass-box {
+            backdrop-filter: blur(14px);
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 22px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow:
+                8px 8px 18px rgba(0, 0, 0, 0.12),
+                -5px -5px 16px rgba(255, 255, 255, 0.8),
+                inset 0 0 4px rgba(255, 255, 255, 0.3);
+        }
+
+        /* card shadow */
+        .neo-card {
+            border-radius: 18px;
+            background: linear-gradient(135deg, #ffffff, #f1f5ff);
+            box-shadow:
+                8px 8px 20px rgba(0, 0, 0, 0.12),
+                -6px -6px 18px rgba(255, 255, 255, 0.85);
+        }
+
+        .section-title {
+            @apply text-2xl font-bold mb-3 text-gray-800 drop-shadow;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 min-h-screen">
+
+    <div id="header"></div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="max-w-6xl mx-auto px-5 py-10">
+
+        <!-- 페이지 제목 -->
+        <div class="glass-box p-8 mb-10 text-center">
+            <h1 class="text-4xl font-extrabold text-gray-900">공연 · 예술 · 버스커</h1>
+            <p class="text-lg text-gray-600 mt-2">다양한 공연과 예술 행사를 만나보세요</p>
+        </div>
+
+        <!-- 카드 목록 -->
+        <div id="art-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"></div>
+
+        <!-- 더보기 버튼 -->
+        <div class="text-center">
+            <button id="loadMoreBtn" class="px-8 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition shadow-lg">
+                더보기
+            </button>
+        </div>
+
+    </div>
+
+    <div id="footer"></div>
+
+    <script>
+        /* 헤더/푸터 */
+        fetch('components/header.html').then(r => r.text()).then(h => header.innerHTML = h);
+        fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
+
+        let allData = [];
+        let displayCount = 4; // 초기 4개 표시
+
+        async function loadArts() {
+            try {
+                const res = await fetch('/api/performingart');
+                const json = await res.json();
+                
+                if (!json.success) {
+                    alert('데이터를 불러올 수 없습니다.');
+                    return;
+                }
+
+                allData = json.data || [];
+                renderArts();
+            } catch (err) {
+                console.error('데이터 로드 오류:', err);
+                alert('데이터를 불러오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        function renderArts() {
+            const container = document.getElementById('art-list');
+            const itemsToShow = allData.slice(0, displayCount);
+
+            container.innerHTML = itemsToShow.map(item => `
+                <div class="glass-box p-5 hover:shadow-2xl transition cursor-pointer" onclick="location.href='performingartdetail.html?id=${item.id}'">
+                    <div class="w-full h-48 bg-gray-200 rounded-xl mb-4 overflow-hidden">
+                        ${item.main_img 
+                            ? `<img src="${item.main_img}" class="w-full h-full object-cover" alt="${item.title}"/>` 
+                            : `<div class="w-full h-full flex items-center justify-center text-gray-400">이미지 없음</div>`
+                        }
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">${item.title}</h3>
+                    <p class="text-sm text-indigo-600 font-semibold mb-2">${item.type || '공연'}</p>
+                    <p class="text-sm text-gray-600 mb-1">📅 ${item.start_date ? item.start_date.split('T')[0] : '-'}</p>
+                    <p class="text-sm text-gray-600 mb-1">📍 ${item.venue || '-'}</p>
+                    <p class="text-sm text-gray-600">💰 ${item.price || '-'}</p>
+                </div>
+            `).join('');
+
+            // 더보기 버튼 표시/숨김
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            if (displayCount >= allData.length) {
+                loadMoreBtn.style.display = 'none';
+            } else {
+                loadMoreBtn.style.display = 'block';
+            }
+        }
+
+        // 더보기 버튼 클릭
+        document.getElementById('loadMoreBtn').addEventListener('click', function() {
+            displayCount += 2; // 2개씩 추가
+            renderArts();
+        });
+
+        loadArts();
+    </script>
+
+</body>
+</html>
