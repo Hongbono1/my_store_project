@@ -1,5 +1,21 @@
 import pool from "../db.js";
 
+// 목록 조회
+export async function getMarketList(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, market_name, address, phone, main_img, event_info, facilities, parking_available, created_at 
+       FROM traditional_market 
+       ORDER BY created_at DESC`
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("MARKET LIST ERROR:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 // 상세 조회
 export async function getTraditionalMarketById(req, res) {
   try {
