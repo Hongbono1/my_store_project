@@ -4,6 +4,7 @@ import { createTraditionalMarket } from "../controllers/traditionalmarketregiste
 
 const router = express.Router();
 
+// 등록
 router.post(
   "/",
   marketUpload.fields([
