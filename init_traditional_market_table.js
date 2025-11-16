@@ -11,6 +11,8 @@ async function initTraditionalMarketTables() {
         id SERIAL PRIMARY KEY,
         market_name TEXT NOT NULL,
         address TEXT NOT NULL,
+        lat DECIMAL(10, 7),             -- 위도
+        lng DECIMAL(10, 7),             -- 경도
         main_img TEXT NOT NULL,         -- 대표 이미지
         phone TEXT,
         opening_hours TEXT NOT NULL,    -- 운영 시간

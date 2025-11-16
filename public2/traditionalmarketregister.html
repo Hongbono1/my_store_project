@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>전통시장 등록</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 </head>
 
 <body class="bg-gray-50">
@@ -20,9 +22,16 @@
                     <label class="font-bold">시장명 <span class="text-red-500">*</span></label>
                     <input name="market_name" required class="border rounded px-3 py-2 w-full mt-1" placeholder="시장명">
                 </div>
-                <div>
+                <div class="sm:col-span-2">
                     <label class="font-bold">주소 <span class="text-red-500">*</span></label>
-                    <input name="address" required class="border rounded px-3 py-2 w-full mt-1" placeholder="도로명 또는 지번">
+                    <div class="flex gap-2 mt-1">
+                        <input id="addressInput" name="address" required readonly class="border rounded px-3 py-2 w-full bg-gray-50" placeholder="주소 검색 버튼을 눌러주세요">
+                        <button type="button" id="addressSearchBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 whitespace-nowrap">주소 검색</button>
+                    </div>
+                    <input type="hidden" id="latInput" name="lat">
+                    <input type="hidden" id="lngInput" name="lng">
+                    <!-- 카카오맵 미리보기 -->
+                    <div id="mapPreview" class="hidden mt-3 border rounded-lg overflow-hidden" style="height: 300px;"></div>
                 </div>
                 <div>
                     <label class="font-bold">대표 이미지 <span class="text-red-500">*</span></label>
@@ -319,6 +328,62 @@
                         alert('저장 실패: ' + (data.error || '서버 오류'));
                     }
                 } catch (err) {
+                    alert('등록 실패: ' + err.message);
+                }
+            });
+
+            /* ---------- 주소 검색 및 지도 표시 ---------- */
+            let map, marker;
+
+            document.getElementById('addressSearchBtn').addEventListener('click', () => {
+                new daum.Postcode({
+                    oncomplete: function(data) {
+                        const fullAddr = data.roadAddress || data.jibunAddress;
+                        document.getElementById('addressInput').value = fullAddr;
+
+                        // 카카오맵 초기화 및 좌표 변환
+                        kakao.maps.load(() => {
+                            const geocoder = new kakao.maps.services.Geocoder();
+                            
+                            geocoder.addressSearch(fullAddr, (result, status) => {
+                                if (status === kakao.maps.services.Status.OK) {
+                                    const lat = parseFloat(result[0].y);
+                                    const lng = parseFloat(result[0].x);
+
+                                    document.getElementById('latInput').value = lat;
+                                    document.getElementById('lngInput').value = lng;
+
+                                    // 지도 표시
+                                    const mapContainer = document.getElementById('mapPreview');
+                                    mapContainer.classList.remove('hidden');
+
+                                    if (!map) {
+                                        map = new kakao.maps.Map(mapContainer, {
+                                            center: new kakao.maps.LatLng(lat, lng),
+                                            level: 3
+                                        });
+                                        marker = new kakao.maps.Marker({
+                                            position: new kakao.maps.LatLng(lat, lng),
+                                            map: map
+                                        });
+                                    } else {
+                                        const newPos = new kakao.maps.LatLng(lat, lng);
+                                        map.setCenter(newPos);
+                                        marker.setPosition(newPos);
+                                    }
+                                } else {
+                                    alert('좌표 변환 실패. 주소를 다시 확인해주세요.');
+                                }
+                            });
+                        });
+                    }
+                }).open();
+            });
+        });
+    </script>
+</body>
+
+</html>
                     alert('서버 연결 오류: ' + err.message);
                 }
             });

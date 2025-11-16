@@ -5,6 +5,8 @@ export async function createTraditionalMarket(req, res) {
     const {
       market_name,
       address,
+      lat,
+      lng,
       phone,
       opening_hours,
       main_products,
@@ -27,15 +29,17 @@ export async function createTraditionalMarket(req, res) {
     const result = await pool.query(
       `
       INSERT INTO traditional_market
-      (market_name, address, main_img, phone, opening_hours, main_products, 
+      (market_name, address, lat, lng, main_img, phone, opening_hours, main_products, 
        event_info, facilities, parking_available, parking_img, transport_info,
        transport_img, free_pr, qa_mode, qa_list)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       RETURNING id
       `,
       [
         market_name,
         address,
+        lat ? parseFloat(lat) : null,
+        lng ? parseFloat(lng) : null,
         main_img ? `/uploads/traditionalmarket/${main_img}` : null,
         phone,
         opening_hours,
