@@ -22,13 +22,31 @@ export async function createTraditionalMarket(req, res) {
     } = req.body;
 
     // JSON 파싱
-    const qa_list = req.body.qa_list ? JSON.parse(req.body.qa_list) : [];
+    let qa_list = req.body.qa_list ? JSON.parse(req.body.qa_list) : [];
 
     const main_img = req.files["main_img"]?.[0]?.filename || null;
     const parking_img = req.files["parking_img"]?.[0]?.filename || null;
     const transport_img = req.files["transport_img"]?.[0]?.filename || null;
 
+    // Q&A 이미지 경로 추가
+    if (qa_mode === 'fixed') {
+      qa_list = qa_list.map((item, idx) => ({
+        ...item,
+        img: req.files[`q${idx + 1}_image`]?.[0]?.filename 
+          ? `/uploads/traditionalmarket/${req.files[`q${idx + 1}_image`][0].filename}`
+          : null
+      }));
+    } else if (qa_mode === 'custom') {
+      qa_list = qa_list.map((item, idx) => ({
+        ...item,
+        img: req.files[`customq${idx + 1}_image`]?.[0]?.filename
+          ? `/uploads/traditionalmarket/${req.files[`customq${idx + 1}_image`][0].filename}`
+          : null
+      }));
+    }
+
     console.log("🖼️ 이미지 파일명:", { main_img, parking_img, transport_img });
+    console.log("📋 Q&A 리스트 (이미지 포함):", qa_list);
 
     // 1) 기본 정보 INSERT
     const result = await pool.query(
