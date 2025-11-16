@@ -33,8 +33,8 @@ const __dirname = path.dirname(__filename);
 // 📁 업로드 폴더 자동 생성
 const uploadDirs = [
   path.join(__dirname, "public/uploads"),
-  path.join(__dirname, "public2/uploads"),
-  path.join(__dirname, "public2/uploads/traditionalmarket")
+  path.join(__dirname, "public/uploads/traditionalmarket"),
+  path.join(__dirname, "public2/uploads")
 ];
 
 uploadDirs.forEach(dir => {

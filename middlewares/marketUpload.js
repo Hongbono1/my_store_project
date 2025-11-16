@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 절대 경로로 설정 (프로젝트 루트 기준)
-const marketDir = path.join(__dirname, "../public2/uploads/traditionalmarket");
+// public/uploads/traditionalmarket 으로 변경 (기존 볼륨 활용)
+const marketDir = path.join(__dirname, "../public/uploads/traditionalmarket");
 
 // 폴더가 없으면 자동 생성
 if (!fs.existsSync(marketDir)) {
@@ -37,4 +37,5 @@ export const marketUpload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB 제한
 });
+
 
