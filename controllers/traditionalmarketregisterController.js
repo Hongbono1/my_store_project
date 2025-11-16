@@ -2,6 +2,9 @@ import pool from "../db.js";
 
 export async function createTraditionalMarket(req, res) {
   try {
+    console.log("📦 받은 파일들:", req.files);
+    console.log("📝 받은 데이터:", req.body);
+    
     const {
       market_name,
       address,
@@ -24,6 +27,8 @@ export async function createTraditionalMarket(req, res) {
     const main_img = req.files["main_img"]?.[0]?.filename || null;
     const parking_img = req.files["parking_img"]?.[0]?.filename || null;
     const transport_img = req.files["transport_img"]?.[0]?.filename || null;
+
+    console.log("🖼️ 이미지 파일명:", { main_img, parking_img, transport_img });
 
     // 1) 기본 정보 INSERT
     const result = await pool.query(
