@@ -88,46 +88,63 @@
         const params = new URLSearchParams(location.search);
         const id = params.get("id");
 
+        if (!id) {
+            alert("잘못된 접근입니다.");
+            location.href = "/";
+        }
+
         async function loadDetail() {
-            const res = await fetch(`/api/market/${id}`);
-            const { data } = await res.json();
+            try {
+                const res = await fetch(`/api/market/${id}`);
+                const json = await res.json();
+                
+                if (!json.success || !json.data) {
+                    alert("데이터를 불러올 수 없습니다.");
+                    return;
+                }
 
-            // 기본 정보
-            market_name.textContent = data.market_name;
-            market_name_2.textContent = data.market_name;
-            address.textContent = data.address;
-            phone.textContent = data.phone || "-";
-            opening_hours.textContent = data.opening_hours || "";
-            main_products.textContent = data.main_products || "";
+                const data = json.data;
 
-            // 대표 이미지
-            if (data.main_img) main_img.src = data.main_img;
+                // 기본 정보
+                market_name.textContent = data.market_name;
+                market_name_2.textContent = data.market_name;
+                address.textContent = data.address;
+                phone.textContent = data.phone || "-";
+                opening_hours.textContent = data.opening_hours || "";
+                main_products.textContent = data.main_products || "";
 
-            // 텍스트 정보
-            event_info.textContent = data.event_info || "";
-            facilities.textContent = data.facilities || "";
-            parking_available.textContent = data.parking_available || "";
-            transport_info.textContent = data.transport_info || "";
+                // 대표 이미지
+                if (data.main_img) main_img.src = data.main_img;
 
-            // 주차 이미지
-            if (data.parking_img) {
-                parking_img_wrap.classList.remove("hidden");
-                parking_img.src = data.parking_img;
+                // 텍스트 정보
+                event_info.textContent = data.event_info || "";
+                facilities.textContent = data.facilities || "";
+                parking_available.textContent = data.parking_available || "";
+                transport_info.textContent = data.transport_info || "";
+
+                // 주차 이미지
+                if (data.parking_img) {
+                    parking_img_wrap.classList.remove("hidden");
+                    parking_img.src = data.parking_img;
+                }
+
+                // 교통 이미지
+                if (data.transport_img) {
+                    transport_img_wrap.classList.remove("hidden");
+                    transport_img.src = data.transport_img;
+                }
+
+                // 운영자 한마디
+                free_pr.textContent = data.free_pr || "";
+
+                // Q&A
+                renderQA(JSON.parse(data.qa_list || "[]"));
+
+                drawMap(data.lat, data.lng);
+            } catch (err) {
+                console.error("데이터 로드 오류:", err);
+                alert("데이터를 불러오는 중 오류가 발생했습니다.");
             }
-
-            // 교통 이미지
-            if (data.transport_img) {
-                transport_img_wrap.classList.remove("hidden");
-                transport_img.src = data.transport_img;
-            }
-
-            // 운영자 한마디
-            free_pr.textContent = data.free_pr || "";
-
-            // Q&A
-            renderQA(JSON.parse(data.qa_list || "[]"));
-
-            drawMap(data.lat, data.lng);
         }
 
         function renderQA(list) {
