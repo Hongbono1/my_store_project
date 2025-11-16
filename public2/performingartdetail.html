@@ -33,6 +33,47 @@
         .section-title {
             @apply text-2xl font-bold mb-3 text-gray-800 drop-shadow;
         }
+
+        /* 이미지 모달 */
+        #imageModal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        #imageModal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #modalImage {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 30px;
+            right: 50px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10000;
+        }
+
+        .close-modal:hover {
+            color: #ccc;
+        }
     </style>
 </head>
 
@@ -56,7 +97,7 @@
 
         <!-- 기본 정보 -->
         <div class="glass-box p-8 mb-10">
-            <h2 class="section-title">기본 정보</h2>
+            <h2 class="section-title text-center mb-6">기본 정보</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
                 <p><strong>📅 시작일 :</strong> <span id="start_date"></span></p>
@@ -67,41 +108,47 @@
                 <p><strong>👥 정원 :</strong> <span id="capacity"></span></p>
                 <p><strong>🎭 주최/주관 :</strong> <span id="host"></span></p>
                 <p><strong>🔞 관람등급 :</strong> <span id="age_limit"></span></p>
-                <p class="md:col-span-2"><strong>📞 연락처 :</strong> <span id="phone"></span></p>
-                <p class="md:col-span-2"><strong>🏠 주소 :</strong> <span id="address"></span></p>
+                <p><strong>📞 연락처 :</strong> <span id="phone"></span></p>
+                <p><strong>🏠 주소 :</strong> <span id="address"></span></p>
             </div>
 
             <!-- 태그 -->
-            <div id="tags-area" class="mt-4 flex flex-wrap gap-2"></div>
+            <div id="tags-area" class="mt-6 flex flex-wrap gap-2"></div>
         </div>
 
         <!-- 지도 -->
         <div class="glass-box p-8 mb-10" id="map-section">
-            <h2 class="section-title">위치 안내</h2>
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 text-center">위치 안내</h2>
             <div id="map" class="w-full h-64 rounded-xl border"></div>
         </div>
 
         <!-- 상세 소개 -->
         <div class="glass-box p-8 mb-10">
-            <h2 class="section-title">상세 소개</h2>
-            <p id="description" class="whitespace-pre-line leading-relaxed text-gray-700"></p>
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 text-center">상세 소개</h2>
+            <p id="description" class="whitespace-pre-line leading-relaxed text-gray-700 text-lg"></p>
         </div>
 
-        <!-- 팜플렛 -->
+        <!-- 팔플렛 -->
         <div class="glass-box p-8 mb-10" id="pamphlet-section" style="display:none;">
-            <h2 class="section-title">팜플렛 / 포스터</h2>
-            <div id="pamphlet-area" class="flex flex-wrap gap-4"></div>
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 text-center">팔플렛 / 포스터</h2>
+            <div id="pamphlet-area" class="flex flex-wrap gap-4 justify-center"></div>
         </div>
 
         <!-- 소셜/예매 링크 -->
         <div class="glass-box p-8 mb-10" id="links-section" style="display:none;">
-            <h2 class="section-title">링크</h2>
-            <div id="links-area" class="space-y-2"></div>
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 text-center">링크</h2>
+            <div id="links-area" class="flex flex-wrap gap-3 justify-center"></div>
         </div>
 
     </div>
 
     <div id="footer"></div>
+
+    <!-- 이미지 모달 -->
+    <div id="imageModal" onclick="closeModal()">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <img id="modalImage" src="" alt="큰 이미지" onclick="event.stopPropagation()">
+    </div>
 
     <script>
         /* 헤더/푸터 */
@@ -154,17 +201,17 @@
                 } else if (images.length === 1) {
                     // 1장: 가운데 배치, 큰 크기
                     imgBox.innerHTML = `
-                        <img src="${images[0]}" class="w-96 h-80 object-cover rounded-xl shadow-lg"/>
+                        <img src="${images[0]}" class="w-96 h-80 object-cover rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition" onclick="openModal('${images[0]}')"/>
                     `;
                 } else if (images.length === 2) {
                     // 2장: 균형있게 가운데 배치
                     imgBox.innerHTML = images.map(src => `
-                        <img src="${src}" class="w-80 h-72 object-cover rounded-xl shadow-lg hover:scale-105 transition"/>
+                        <img src="${src}" class="w-80 h-72 object-cover rounded-xl shadow-lg hover:scale-105 transition cursor-pointer" onclick="openModal('${src}')"/>
                     `).join('');
                 } else {
                     // 3장: 가득 채움
                     imgBox.innerHTML = images.slice(0, 3).map(src => `
-                        <img src="${src}" class="w-72 h-64 object-cover rounded-xl shadow-lg hover:scale-105 transition"/>
+                        <img src="${src}" class="w-72 h-64 object-cover rounded-xl shadow-lg hover:scale-105 transition cursor-pointer" onclick="openModal('${src}')"/>
                     `).join('');
                 }
 
@@ -177,7 +224,7 @@
                         if (isPdf) {
                             return `<a href="${p.file_path}" target="_blank" class="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg">📄 PDF 보기</a>`;
                         } else {
-                            return `<img src="${p.file_path}" class="w-40 h-52 object-cover rounded-lg shadow"/>`;
+                            return `<img src="${p.file_path}" class="w-40 h-52 object-cover rounded-lg shadow cursor-pointer hover:opacity-90 transition" onclick="openModal('${p.file_path}')"/>`;
                         }
                     }).join('');
                 }
@@ -236,6 +283,25 @@
                 });
             });
         }
+
+        // 이미지 모달 열기/닫기
+        function openModal(imageSrc) {
+            document.getElementById('modalImage').src = imageSrc;
+            document.getElementById('imageModal').classList.add('show');
+            document.body.style.overflow = 'hidden'; // 스크롤 방지
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').classList.remove('show');
+            document.body.style.overflow = 'auto'; // 스크롤 복원
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
 
         loadDetail();
     </script>
