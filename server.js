@@ -20,6 +20,7 @@ import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.
 import storeprideRouter from "./routes/storeprideRouter.js";
 import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterRouter.js";
 import traditionalmarketdetailRouter from "./routes/traditionalmarketdetailRouter.js";
+import bestpickRouter from "./routes/bestpickRouter.js";
 import pool from "./db.js"; //
 
 
@@ -61,6 +62,7 @@ app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
 app.use("/api/market", traditionalmarketregisterRouter);
 app.use("/api/market", traditionalmarketdetailRouter);
+app.use("/api/best-pick", bestpickRouter);
 
 
 // ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
