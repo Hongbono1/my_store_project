@@ -3,7 +3,7 @@ import pool from "../db.js";
 export async function getAllPerformingArts(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, type, title, start_date, end_date, venue, price, main_img, created_at 
+      `SELECT id, type, title, start_date, end_date, venue, address, price, main_img, created_at 
        FROM performing_arts 
        ORDER BY created_at DESC`
     );
