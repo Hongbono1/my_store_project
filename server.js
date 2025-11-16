@@ -22,6 +22,7 @@ import storeprideRouter from "./routes/storeprideRouter.js";
 import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterRouter.js";
 import traditionalmarketdetailRouter from "./routes/traditionalmarketdetailRouter.js";
 import bestpickRouter from "./routes/bestpickRouter.js";
+import performingartregisterRouter from "./routes/performingartregisterRouter.js";
 import pool from "./db.js"; //
 
 
@@ -34,6 +35,7 @@ const __dirname = path.dirname(__filename);
 const uploadDirs = [
   path.join(__dirname, "public/uploads"),
   path.join(__dirname, "public/uploads/traditionalmarket"),
+  path.join(__dirname, "public/uploads/performingart"),
   path.join(__dirname, "public2/uploads")
 ];
 
@@ -79,6 +81,7 @@ app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
 app.use("/api/market", traditionalmarketregisterRouter);
 app.use("/api/market", traditionalmarketdetailRouter);
+app.use("/api/performingart", performingartregisterRouter);
 app.use("/api/best-pick", bestpickRouter);
 
 
