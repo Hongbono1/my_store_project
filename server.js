@@ -4,6 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+import fs from "fs";
 
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
@@ -28,6 +29,22 @@ import pool from "./db.js"; //
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 📁 업로드 폴더 자동 생성
+const uploadDirs = [
+  path.join(__dirname, "public/uploads"),
+  path.join(__dirname, "public2/uploads"),
+  path.join(__dirname, "public2/uploads/traditionalmarket")
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    console.log("📁 폴더 생성:", dir);
+    fs.mkdirSync(dir, { recursive: true });
+  } else {
+    console.log("✅ 폴더 존재:", dir);
+  }
+});
 
 const app = express();
 
