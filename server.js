@@ -23,6 +23,7 @@ import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterR
 import traditionalmarketdetailRouter from "./routes/traditionalmarketdetailRouter.js";
 import bestpickRouter from "./routes/bestpickRouter.js";
 import performingartregisterRouter from "./routes/performingartregisterRouter.js";
+import performingartdetailRouter from "./routes/performingartdetailRouter.js";
 import pool from "./db.js";
 
 // 공연/예술 테이블 자동 생성
@@ -128,6 +129,7 @@ app.use("/storepride", storeprideRouter);
 app.use("/api/market", traditionalmarketregisterRouter);
 app.use("/api/market", traditionalmarketdetailRouter);
 app.use("/api/performingart", performingartregisterRouter);
+app.use("/api/performingart", performingartdetailRouter);
 app.use("/api/best-pick", bestpickRouter);
 
 
