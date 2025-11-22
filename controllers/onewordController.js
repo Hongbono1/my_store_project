@@ -18,7 +18,8 @@ export async function getLocalOneword(req, res) {
     if (search.rows.length > 0) {
       return res.json({
         success: true,
-        message: `지금 이 시간엔 '${search.rows[0].keyword}' 검색이 가장 많아요 🔥`
+        message: `지금 이 시간엔 '${search.rows[0].keyword}' 검색이 가장 많아요 🔥`,
+        keyword: search.rows[0].keyword
       });
     }
 
@@ -35,7 +36,8 @@ export async function getLocalOneword(req, res) {
     if (menu.rows.length > 0) {
       return res.json({
         success: true,
-        message: `지금 '${menu.rows[0].menu_name}' 메뉴를 찾는 분들이 많아요 😋`
+        message: `지금 '${menu.rows[0].menu_name}' 메뉴를 찾는 분들이 많아요 😋`,
+        keyword: menu.rows[0].menu_name
       });
     }
 
