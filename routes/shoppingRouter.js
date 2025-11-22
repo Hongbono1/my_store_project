@@ -22,13 +22,13 @@ router.post("/register", upload.fields([
         const inserted = await pool.query(`
             INSERT INTO shopping_info
             (shop_name, short_desc, full_desc, category, website,
-             sns_instagram, sns_youtube, sns_blog,
+             sns_instagram, sns_youtube, sns_blog, sns_other,
              image_main, image_banner1, image_banner2, image_banner3,
              image_best1, image_best2, image_best3, image_best4)
             VALUES ($1,$2,$3,$4,$5,
-                    $6,$7,$8,
-                    $9,$10,$11,$12,
-                    $13,$14,$15,$16)
+                    $6,$7,$8,$9,
+                    $10,$11,$12,$13,
+                    $14,$15,$16,$17)
             RETURNING id;
         `, [
             body.shop_name,
@@ -39,6 +39,7 @@ router.post("/register", upload.fields([
             body.sns_instagram || null,
             body.sns_youtube || null,
             body.sns_blog || null,
+            body.sns_other || null,
             main ? `/uploads/${main}` : null,
             banners[0] ? `/uploads/${banners[0]}` : null,
             banners[1] ? `/uploads/${banners[1]}` : null,
