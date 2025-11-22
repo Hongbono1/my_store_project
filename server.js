@@ -141,7 +141,7 @@ app.use("/api/events", eventregisterRouter);
 app.use("/api/localboard", localboardRouter);
 app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
-app.use("/shopping", shoppingDetailRouter);
+app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
 
 
