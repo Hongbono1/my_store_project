@@ -42,6 +42,14 @@
         </div>
     </div>
 
+    <!-- 우리동네 한마디 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+        <div id="localOnewordBox" class="neo-card p-6 text-center">
+            <div class="text-2xl font-bold mb-2">📍 우리동네 한마디</div>
+            <p class="text-lg text-gray-700">정보를 불러오는 중...</p>
+        </div>
+    </div>
+
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 md:grid-cols-3 gap-6 h-[500px] mt-10">
         <!-- 좌측 메인 배너 -->
         <div class="md:col-span-2 h-full">
@@ -308,6 +316,27 @@
             fetch("/components/footer.html")
                 .then(res => res.text())
                 .then(data => document.getElementById("footer-placeholder").innerHTML = data);
+
+            /* ───────── 우리동네 한마디 불러오기 ───────── */
+            try {
+                // localStorage에서 지역 정보 가져오기 (없으면 기본값)
+                const userRegion = localStorage.getItem("userRegion") || "의정부";
+                
+                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
+                if (onewordRes.ok) {
+                    const onewordData = await onewordRes.json();
+                    document.getElementById("localOnewordBox").innerHTML = `
+                        <div class="text-2xl font-bold mb-2">📍 우리동네 한마디</div>
+                        <p class="text-lg text-gray-700">${onewordData.message}</p>
+                    `;
+                }
+            } catch (error) {
+                console.error("우리동네 한마디 조회 실패:", error);
+                document.getElementById("localOnewordBox").innerHTML = `
+                    <div class="text-2xl font-bold mb-2">📍 우리동네 한마디</div>
+                    <p class="text-lg text-gray-700">우리동네가 오늘은 차분한 하루네요 🙂</p>
+                `;
+            }
 
             /* ───────── Best Pick 슬라이더 ───────── */
             let allStores = [];

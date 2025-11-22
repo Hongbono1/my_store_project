@@ -27,6 +27,7 @@ import performingartregisterRouter from "./routes/performingartregisterRouter.js
 import performingartdetailRouter from "./routes/performingartdetailRouter.js";
 import eventregisterRouter from "./routes/eventregisterRouter.js";
 import localboardRouter from "./routes/localboardRouter.js";
+import onewordRouter from "./routes/onewordRouter.js";
 import pool from "./db.js";
 
 // 공연/예술 테이블 자동 생성
@@ -136,6 +137,7 @@ app.use("/api/performingart", performingartregisterRouter);
 app.use("/api/performingart", performingartdetailRouter);
 app.use("/api/events", eventregisterRouter);
 app.use("/api/localboard", localboardRouter);
+app.use("/api/oneword", onewordRouter);
 app.use("/api/best-pick", bestpickRouter);
 
 
