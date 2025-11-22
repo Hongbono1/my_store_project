@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>쇼핑몰 상세 | MALL HANKOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .neo-card {
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 1rem;
+            backdrop-filter: blur(14px);
+            box-shadow:
+                8px 8px 20px rgba(0, 0, 0, 0.12),
+                -8px -8px 20px rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+
+    <div id="header"></div>
+
+    <div class="max-w-4xl mx-auto mt-20 mb-20 px-4">
+
+        <!-- 대표 이미지 -->
+        <div id="mainImageBox" class="w-full h-64 rounded-xl overflow-hidden shadow-lg">
+            <img id="mainImage" src="" class="w-full h-full object-cover" />
+        </div>
+
+        <!-- 쇼핑몰 정보 -->
+        <div class="neo-card p-6 mt-6">
+            <h1 id="shopName" class="text-3xl font-bold"></h1>
+            <p id="shortDesc" class="text-lg text-gray-700 mt-2"></p>
+
+            <!-- 카테고리 -->
+            <span id="categoryTag"
+                class="inline-block mt-4 px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-sm"></span>
+
+            <!-- 쇼핑몰 링크 -->
+            <div class="mt-4">
+                <p class="font-semibold text-gray-700">쇼핑몰 바로가기</p>
+                <a id="website" href="#" target="_blank"
+                    class="text-blue-600 underline break-all"></a>
+            </div>
+
+            <!-- SNS -->
+            <div class="mt-6">
+                <p class="font-semibold text-gray-700 mb-2">SNS 링크</p>
+                <ul class="space-y-1 text-blue-600">
+                    <li><a id="snsInstagram" target="_blank"></a></li>
+                    <li><a id="snsYoutube" target="_blank"></a></li>
+                    <li><a id="snsBlog" target="_blank"></a></li>
+                    <li><a id="snsOther" target="_blank"></a></li>
+                </ul>
+            </div>
+
+            <!-- 상세 설명 -->
+            <div class="mt-6">
+                <p class="font-semibold text-gray-700">상세 설명</p>
+                <p id="fullDesc" class="mt-2 leading-relaxed text-gray-800 whitespace-pre-line"></p>
+            </div>
+        </div>
+
+        <!-- 배너 이미지 -->
+        <div class="mt-10">
+            <h2 class="text-2xl font-bold mb-4">쇼핑몰 배너</h2>
+            <div id="bannerGallery" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- BEST 상품 -->
+        <div class="mt-12">
+            <h2 class="text-2xl font-bold mb-4">BEST 상품</h2>
+            <div id="bestGallery" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+        </div>
+
+    </div>
+
+    <div id="footer"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+
+            // Header / Footer
+            fetch("/components/header.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("header").innerHTML = html);
+
+            fetch("/components/footer.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("footer").innerHTML = html);
+
+            // ID 가져오기
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get("id");
+
+            if (!id) {
+                alert("잘못된 접근입니다. id가 없습니다.");
+                return;
+            }
+
+            // 데이터 불러오기
+            const res = await fetch(`/shopping/${id}`);
+            const store = await res.json();
+
+            if (!store || !store.id) {
+                alert("데이터를 찾을 수 없습니다.");
+                return;
+            }
+
+            // 데이터 넣기
+            document.getElementById("shopName").textContent = store.shop_name;
+            document.getElementById("shortDesc").textContent = store.short_desc;
+            document.getElementById("website").textContent = store.website;
+            document.getElementById("website").href = store.website;
+            document.getElementById("categoryTag").textContent = store.category;
+
+            document.getElementById("snsInstagram").textContent = store.sns_instagram ? `Instagram: ${store.sns_instagram}` : "";
+            document.getElementById("snsInstagram").href = store.sns_instagram ?? "#";
+
+            document.getElementById("snsYoutube").textContent = store.sns_youtube ? `YouTube: ${store.sns_youtube}` : "";
+            document.getElementById("snsYoutube").href = store.sns_youtube ?? "#";
+
+            document.getElementById("snsBlog").textContent = store.sns_blog ? `Blog: ${store.sns_blog}` : "";
+            document.getElementById("snsBlog").href = store.sns_blog ?? "#";
+
+            document.getElementById("snsOther").textContent = store.sns_other ? `기타: ${store.sns_other}` : "";
+            document.getElementById("snsOther").href = store.sns_other ?? "#";
+
+            document.getElementById("fullDesc").textContent = store.full_desc || "";
+
+            // 대표 이미지
+            document.getElementById("mainImage").src = store.image_main;
+
+            // 배너 이미지 3장
+            const banners = [store.image_banner1, store.image_banner2, store.image_banner3];
+            const bannerBox = document.getElementById("bannerGallery");
+            banners.forEach(img => {
+                if (img) {
+                    const box = document.createElement("div");
+                    box.className = "rounded-xl overflow-hidden shadow-lg";
+                    box.innerHTML = `<img src="${img}" class="w-full h-40 object-cover"/>`;
+                    bannerBox.appendChild(box);
+                }
+            });
+
+            // BEST 이미지 4장
+            const bests = [store.image_best1, store.image_best2, store.image_best3, store.image_best4];
+            const bestBox = document.getElementById("bestGallery");
+            bests.forEach(img => {
+                if (img) {
+                    const box = document.createElement("div");
+                    box.className = "rounded-xl overflow-hidden shadow";
+                    box.innerHTML = `<img src="${img}" class="w-full h-32 object-cover"/>`;
+                    bestBox.appendChild(box);
+                }
+            });
+
+        });
+    </script>
+
+</body>
+
+</html>
