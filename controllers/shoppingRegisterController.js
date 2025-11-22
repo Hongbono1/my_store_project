@@ -15,20 +15,21 @@ export async function registerShopping(req, res) {
 
     const inserted = await pool.query(`
       INSERT INTO shopping_info
-      (shop_name, short_desc, full_desc, category, website,
+      (shop_name, short_desc, full_desc, category, custom_category, website,
        sns_instagram, sns_facebook, sns_tiktok, sns_other,
        image_main, image_banner1, image_banner2, image_banner3,
        image_best1, image_best2, image_best3, image_best4)
-      VALUES ($1,$2,$3,$4,$5,
-              $6,$7,$8,$9,
-              $10,$11,$12,$13,
-              $14,$15,$16,$17)
+      VALUES ($1,$2,$3,$4,$5,$6,
+              $7,$8,$9,$10,
+              $11,$12,$13,$14,
+              $15,$16,$17,$18)
       RETURNING id;
     `, [
       body.shop_name,
       body.short_desc,
       body.full_desc || null,
       body.category,
+      body.custom_category || null,
       body.website,
       body.sns_instagram || null,
       body.sns_facebook || null,
