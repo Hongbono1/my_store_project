@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fs from "fs";
+import { normalizeScores } from "./utils/townScore.js";
 
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
@@ -30,6 +31,7 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
+import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
 // 공연/예술 테이블 자동 생성
@@ -142,6 +144,7 @@ app.use("/api/localboard", localboardRouter);
 app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
+app.use("/api/local-rank", localRankRouter);
 app.use("/api/best-pick", bestpickRouter);
 
 
@@ -498,3 +501,11 @@ app.use((req, res) => {
 /* 서버 시작 */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ server on :${PORT}`));
+
+/* 20분마다 인구 보정 정규화 실행 */
+setInterval(async () => {
+  await normalizeScores();
+}, 20 * 60 * 1000); // 20분 = 1,200,000ms
+
+// 서버 시작 시 즉시 1회 실행
+normalizeScores();

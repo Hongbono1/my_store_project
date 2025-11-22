@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리동네 활동 랭킹 | MALL HANKOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .neo-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            box-shadow:
+                6px 6px 12px rgba(0, 0, 0, 0.15),
+                -6px -6px 12px rgba(255, 255, 255, 0.9);
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50">
+
+    <!-- Header -->
+    <div id="header"></div>
+
+    <main class="max-w-4xl mx-auto px-4 pt-24 pb-16">
+        <h1 class="text-4xl font-bold mb-8 text-center">우리동네 활동 랭킹</h1>
+
+        <!-- 내 동네 순위 -->
+        <div id="myTownBox" class="neo-card p-8 mb-12 text-center"></div>
+
+        <!-- 전국 Top 10 -->
+        <div class="neo-card p-8">
+            <h2 class="text-3xl font-bold mb-6 text-center">전국 Top 10 활동 지역</h2>
+            <ul id="top10List" class="space-y-3"></ul>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <div id="footer"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Header/Footer 로드
+            fetch("/components/header.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("header").innerHTML = html);
+
+            fetch("/components/footer.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("footer").innerHTML = html);
+
+            await loadRanking();
+        });
+
+        async function loadRanking() {
+            try {
+                // 내 동네 정보 가져오기 (localStorage 또는 기본값)
+                const myTown = localStorage.getItem("userRegion") || "경기 의정부시 가능동";
+
+                // API 호출
+                const [myData, top10Data] = await Promise.all([
+                    fetch(`/api/local-rank/mytown?town=${encodeURIComponent(myTown)}`).then(r => r.json()),
+                    fetch(`/api/local-rank/top10`).then(r => r.json())
+                ]);
+
+                // 내 동네 순위 표시
+                const myBox = document.getElementById("myTownBox");
+                if (myData.rank) {
+                    myBox.innerHTML = `
+                        <p class="text-2xl font-bold text-gray-800">${myData.town}</p>
+                        <p class="text-4xl font-extrabold text-indigo-600 mt-4">
+                            전국 ${myData.rank}위
+                        </p>
+                        <p class="text-sm text-gray-500 mt-2">전체 ${myData.total_town}개 지역 중</p>
+                    `;
+                } else {
+                    myBox.innerHTML = `
+                        <p class="text-2xl font-bold text-gray-800">${myData.town}</p>
+                        <p class="text-lg text-gray-500 mt-4">아직 활동 기록이 없습니다.</p>
+                    `;
+                }
+
+                // Top 10 리스트 표시
+                const list = document.getElementById("top10List");
+                list.innerHTML = "";
+
+                if (top10Data.length === 0) {
+                    list.innerHTML = '<li class="text-center text-gray-500">아직 등록된 지역이 없습니다.</li>';
+                } else {
+                    top10Data.forEach((item, i) => {
+                        const rank = i + 1;
+                        let medalEmoji = "";
+                        if (rank === 1) medalEmoji = "🥇";
+                        else if (rank === 2) medalEmoji = "🥈";
+                        else if (rank === 3) medalEmoji = "🥉";
+
+                        const li = document.createElement("li");
+                        li.className = "flex items-center justify-between p-4 bg-white rounded-lg shadow hover:shadow-md transition";
+                        li.innerHTML = `
+                            <span class="text-xl font-bold text-gray-700">${rank}위 ${medalEmoji}</span>
+                            <span class="text-lg text-gray-800">${item.town_name}</span>
+                        `;
+                        list.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error("랭킹 로드 오류:", error);
+                document.getElementById("myTownBox").innerHTML = '<p class="text-red-500">데이터를 불러올 수 없습니다.</p>';
+            }
+        }
+    </script>
+
+</body>
+
+</html>
