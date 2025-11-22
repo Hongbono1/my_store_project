@@ -35,6 +35,34 @@
     <main class="max-w-6xl mx-auto px-4 pt-24 pb-16">
         <h1 class="text-3xl font-bold mb-8 text-center">쇼핑몰 홍보 리스트</h1>
 
+        <!-- 카테고리 필터 -->
+        <div class="flex flex-wrap justify-center gap-3 mb-8">
+            <button class="category-btn px-6 py-2 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition" data-category="">
+                전체
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="의류">
+                의류
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="주방/생활">
+                주방/생활
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="디지털">
+                디지털
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="뷰티/미용">
+                뷰티/미용
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="식품">
+                식품
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="펫용품">
+                펫용품
+            </button>
+            <button class="category-btn px-6 py-2 rounded-full bg-white text-gray-700 font-semibold hover:bg-gray-100 transition border border-gray-300" data-category="기타">
+                기타
+            </button>
+        </div>
+
         <!-- 리스트 -->
         <div id="shopList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             <!-- JS로 렌더링 -->
@@ -58,53 +86,81 @@
 
 
             /* 쇼핑몰 리스트 불러오기 */
-            const container = document.getElementById("shopList");
-            let shops = [];
+            async function loadShops(category = "") {
+                const container = document.getElementById("shopList");
+                container.innerHTML = '<p class="col-span-full text-center text-gray-500 mt-20">로딩 중...</p>';
+                
+                let shops = [];
 
-            try {
-                const res = await fetch("/api/shopping");
-                if (res.ok) shops = await res.json();
-            } catch (e) {
-                console.error("쇼핑몰 리스트 가져오기 실패", e);
+                try {
+                    const url = category ? `/api/shopping?category=${encodeURIComponent(category)}` : "/api/shopping";
+                    const res = await fetch(url);
+                    if (res.ok) shops = await res.json();
+                } catch (e) {
+                    console.error("쇼핑몰 리스트 가져오기 실패", e);
+                }
+
+                if (!shops || shops.length === 0) {
+                    container.innerHTML = `
+                    <p class="col-span-full text-center text-gray-500 mt-20 text-xl">
+                        등록된 쇼핑몰이 없습니다.
+                    </p>`;
+                    return;
+                }
+
+                /* 리스트 렌더링 */
+                container.innerHTML = "";
+                shops.forEach(shop => {
+                    const card = document.createElement("div");
+                    card.className = "neo-card p-4 cursor-pointer";
+                    card.onclick = () => window.location.href = `/shoppingdetail.html?id=${shop.id}`;
+
+                    card.innerHTML = `
+                        <div class="w-full h-48 rounded-lg overflow-hidden bg-gray-100">
+                            <img src="${shop.image_main || '/uploads/no-image.png'}" 
+                                 class="w-full h-full object-cover">
+                        </div>
+
+                        <h2 class="text-xl font-bold mt-4">${shop.shop_name}</h2>
+                        <p class="text-gray-600 text-sm mt-2">${shop.short_desc}</p>
+                        <p class="text-gray-500 text-xs mt-1">카테고리: ${shop.category}</p>
+
+                        <div class="flex gap-3 mt-4 text-xl">
+                            ${shop.sns_instagram ? `<span>📷</span>` : ""}
+                            ${shop.sns_facebook ? `<span>📘</span>` : ""}
+                            ${shop.sns_tiktok ? `<span>🎵</span>` : ""}
+                        </div>
+
+                        <div class="block mt-4 text-center bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">
+                           상세보기
+                        </div>
+                    `;
+
+                    container.appendChild(card);
+                });
             }
 
-            if (!shops || shops.length === 0) {
-                container.innerHTML = `
-                <p class="col-span-full text-center text-gray-500 mt-20 text-xl">
-                    등록된 쇼핑몰이 없습니다.
-                </p>`;
-                return;
-            }
+            /* 카테고리 버튼 이벤트 */
+            document.querySelectorAll(".category-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    // 모든 버튼 스타일 초기화
+                    document.querySelectorAll(".category-btn").forEach(b => {
+                        b.classList.remove("bg-indigo-600", "text-white");
+                        b.classList.add("bg-white", "text-gray-700", "border", "border-gray-300");
+                    });
 
-            /* 리스트 렌더링 */
-            shops.forEach(shop => {
-                const card = document.createElement("div");
-                card.className = "neo-card p-4 cursor-pointer";
-                card.onclick = () => window.location.href = `/shoppingdetail.html?id=${shop.id}`;
+                    // 클릭된 버튼 활성화
+                    btn.classList.remove("bg-white", "text-gray-700", "border", "border-gray-300");
+                    btn.classList.add("bg-indigo-600", "text-white");
 
-                card.innerHTML = `
-                    <div class="w-full h-48 rounded-lg overflow-hidden bg-gray-100">
-                        <img src="${shop.image_main || '/uploads/no-image.png'}" 
-                             class="w-full h-full object-cover">
-                    </div>
-
-                    <h2 class="text-xl font-bold mt-4">${shop.shop_name}</h2>
-                    <p class="text-gray-600 text-sm mt-2">${shop.short_desc}</p>
-                    <p class="text-gray-500 text-xs mt-1">카테고리: ${shop.category}</p>
-
-                    <div class="flex gap-3 mt-4 text-xl">
-                        ${shop.sns_instagram ? `<span>📷</span>` : ""}
-                        ${shop.sns_facebook ? `<span>📘</span>` : ""}
-                        ${shop.sns_tiktok ? `<span>🎵</span>` : ""}
-                    </div>
-
-                    <div class="block mt-4 text-center bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">
-                       상세보기
-                    </div>
-                `;
-
-                container.appendChild(card);
+                    // 카테고리로 필터링
+                    const category = btn.dataset.category;
+                    loadShops(category);
+                });
             });
+
+            // 초기 로드
+            loadShops();
         });
     </script>
 
