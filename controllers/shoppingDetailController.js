@@ -29,20 +29,28 @@ export async function getShoppingDetail(req, res) {
 // 쇼핑몰 리스트 조회
 export async function getShoppingList(req, res) {
   try {
-    const { category, limit = 20, offset = 0 } = req.query;
+    const { category, keyword, limit = 20, offset = 0 } = req.query;
 
-    let query = "SELECT * FROM shopping_info";
+    let query = "SELECT * FROM shopping_info WHERE 1=1";
     let params = [];
+    let paramIndex = 1;
 
+    // 카테고리 필터 (기본 카테고리 또는 커스텀 카테고리)
     if (category) {
-      query += " WHERE category = $1";
+      query += ` AND (category = $${paramIndex} OR custom_category = $${paramIndex})`;
       params.push(category);
-      query += " ORDER BY created_at DESC LIMIT $2 OFFSET $3";
-      params.push(limit, offset);
-    } else {
-      query += " ORDER BY created_at DESC LIMIT $1 OFFSET $2";
-      params.push(limit, offset);
+      paramIndex++;
     }
+
+    // 검색어 필터 (쇼핑몰 이름, 짧은 설명, 전체 설명)
+    if (keyword) {
+      query += ` AND (shop_name ILIKE $${paramIndex} OR short_desc ILIKE $${paramIndex} OR full_desc ILIKE $${paramIndex})`;
+      params.push(`%${keyword}%`);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
 

@@ -35,6 +35,19 @@
     <main class="max-w-6xl mx-auto px-4 pt-24 pb-16">
         <h1 class="text-3xl font-bold mb-8 text-center">쇼핑몰 홍보 리스트</h1>
 
+        <!-- 검색바 -->
+        <div class="max-w-2xl mx-auto mb-6">
+            <div class="flex gap-2">
+                <input type="text" id="searchInput" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="쇼핑몰 이름, 설명으로 검색...">
+                <button id="searchBtn" 
+                    class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    🔍 검색
+                </button>
+            </div>
+        </div>
+
         <!-- 카테고리 필터 -->
         <div class="flex flex-wrap justify-center gap-3 mb-8">
             <button class="category-btn px-6 py-2 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition" data-category="">
@@ -84,16 +97,27 @@
                 .then(res => res.text())
                 .then(html => document.getElementById("footer").innerHTML = html);
 
+            let currentCategory = "";
+            let currentKeyword = "";
 
             /* 쇼핑몰 리스트 불러오기 */
-            async function loadShops(category = "") {
+            async function loadShops(category = "", keyword = "") {
+                currentCategory = category;
+                currentKeyword = keyword;
+
                 const container = document.getElementById("shopList");
                 container.innerHTML = '<p class="col-span-full text-center text-gray-500 mt-20">로딩 중...</p>';
                 
                 let shops = [];
 
                 try {
-                    const url = category ? `/api/shopping?category=${encodeURIComponent(category)}` : "/api/shopping";
+                    // URL 구성
+                    let url = "/api/shopping";
+                    const params = [];
+                    if (category) params.push(`category=${encodeURIComponent(category)}`);
+                    if (keyword) params.push(`keyword=${encodeURIComponent(keyword)}`);
+                    if (params.length > 0) url += "?" + params.join("&");
+
                     const res = await fetch(url);
                     if (res.ok) shops = await res.json();
                 } catch (e) {
@@ -103,7 +127,7 @@
                 if (!shops || shops.length === 0) {
                     container.innerHTML = `
                     <p class="col-span-full text-center text-gray-500 mt-20 text-xl">
-                        등록된 쇼핑몰이 없습니다.
+                        ${keyword ? `"${keyword}" 검색 결과가 없습니다.` : '등록된 쇼핑몰이 없습니다.'}
                     </p>`;
                     return;
                 }
@@ -140,6 +164,22 @@
                 });
             }
 
+            /* 검색 기능 */
+            const searchInput = document.getElementById("searchInput");
+            const searchBtn = document.getElementById("searchBtn");
+
+            searchBtn.addEventListener("click", () => {
+                const keyword = searchInput.value.trim();
+                loadShops(currentCategory, keyword);
+            });
+
+            searchInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    const keyword = searchInput.value.trim();
+                    loadShops(currentCategory, keyword);
+                }
+            });
+
             /* 카테고리 버튼 이벤트 */
             document.querySelectorAll(".category-btn").forEach(btn => {
                 btn.addEventListener("click", () => {
@@ -153,9 +193,9 @@
                     btn.classList.remove("bg-white", "text-gray-700", "border", "border-gray-300");
                     btn.classList.add("bg-indigo-600", "text-white");
 
-                    // 카테고리로 필터링
+                    // 카테고리로 필터링 (검색어 유지)
                     const category = btn.dataset.category;
-                    loadShops(category);
+                    loadShops(category, currentKeyword);
                 });
             });
 
