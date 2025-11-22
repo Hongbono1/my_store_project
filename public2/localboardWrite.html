@@ -47,6 +47,9 @@
 fetch('components/header.html').then(r => r.text()).then(h => header.innerHTML = h);
 fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
 
+// 개발용: 지역 인증 비활성화 플래그
+const REGION_CHECK_ENABLED = false;
+
 // 지역 좌표 데이터
 const regionCoords = {
   '의정부': { lat: 37.7381, lng: 127.0475 },
@@ -106,6 +109,15 @@ async function getCurrentLocation() {
 function loadAvailableRegions() {
   const regionSelect = document.getElementById('region');
   
+  // 개발용: 인증 OFF 모드 - 모든 지역 표시
+  if (!REGION_CHECK_ENABLED) {
+    regionSelect.innerHTML = '<option value="">지역을 선택하세요</option>' +
+      Object.keys(regionCoords).map(name => 
+        `<option value="${name}">${name}</option>`
+      ).join('');
+    return;
+  }
+  
   if (!currentLat || !currentLng) {
     regionSelect.innerHTML = '<option>위치 정보를 가져올 수 없습니다</option>';
     return;
@@ -137,6 +149,11 @@ async function canWritePost(selectedRegion) {
     return false;
   }
 
+  // 개발용: 인증 OFF 모드 - 모든 글쓰기 허용
+  if (!REGION_CHECK_ENABLED) {
+    return true;
+  }
+
   // 내 동네 인증 확인
   const myRegion = localStorage.getItem("myRegion");
   if (!myRegion) {
@@ -166,6 +183,13 @@ async function canWritePost(selectedRegion) {
 // 초기화
 async function init() {
   try {
+    // 개발용: 인증 OFF 모드
+    if (!REGION_CHECK_ENABLED) {
+      document.getElementById('myRegion').textContent = "(테스트 모드)";
+      loadAvailableRegions();
+      return;
+    }
+
     // 내 동네 정보 표시
     myRegionName = localStorage.getItem("myRegion") || "미인증";
     document.getElementById('myRegion').textContent = myRegionName;
@@ -178,6 +202,14 @@ async function init() {
 
   } catch (error) {
     console.error('위치 정보 오류:', error);
+    
+    // 개발용: 인증 OFF 모드에서는 에러 무시
+    if (!REGION_CHECK_ENABLED) {
+      document.getElementById('myRegion').textContent = "(테스트 모드)";
+      loadAvailableRegions();
+      return;
+    }
+    
     alert('위치 정보를 가져올 수 없습니다.\n브라우저 설정에서 위치 권한을 허용해주세요.');
   }
 }
