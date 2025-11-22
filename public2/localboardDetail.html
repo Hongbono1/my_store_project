@@ -48,6 +48,25 @@ fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML =
 
 const id = new URLSearchParams(location.search).get("id");
 
+// 추천/신고 여부 체크
+function hasLiked() {
+  const liked = localStorage.getItem(`post_${id}_liked`);
+  return liked === 'true';
+}
+
+function hasReported() {
+  const reported = localStorage.getItem(`post_${id}_reported`);
+  return reported === 'true';
+}
+
+function setLiked() {
+  localStorage.setItem(`post_${id}_liked`, 'true');
+}
+
+function setReported() {
+  localStorage.setItem(`post_${id}_reported`, 'true');
+}
+
 async function loadDetail() {
   const res = await fetch(`/api/localboard/${id}`);
   const post = await res.json();
@@ -57,6 +76,22 @@ async function loadDetail() {
 
   // 추천 수 표시
   document.getElementById('likeCount').textContent = post.likes || 0;
+
+  // 이미 추천했으면 버튼 비활성화
+  if (hasLiked()) {
+    const likeBtn = document.querySelector('button[onclick="likePost()"]');
+    likeBtn.disabled = true;
+    likeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    likeBtn.innerHTML = '👍 추천완료 <span id="likeCount" class="font-bold">' + (post.likes || 0) + '</span>';
+  }
+
+  // 이미 신고했으면 버튼 비활성화
+  if (hasReported()) {
+    const reportBtn = document.querySelector('button[onclick="report()"]');
+    reportBtn.disabled = true;
+    reportBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    reportBtn.textContent = '🚨 신고완료';
+  }
 
   images.innerHTML = post.images
     .map(img => `<img src="${img.image_url}" class="rounded-lg shadow">`)
@@ -92,20 +127,45 @@ async function submitComment() {
 }
 
 async function report() {
+  if (hasReported()) {
+    alert('이미 신고한 게시글입니다.');
+    return;
+  }
+
   if (!confirm('이 게시글을 신고하시겠습니까?')) {
     return;
   }
   
   await fetch(`/api/localboard/${id}/report`, { method: "POST" });
+  setReported();
+  
   alert("신고가 접수되었습니다. 관리자가 확인 후 조치하겠습니다.");
+  
+  // 버튼 비활성화
+  const reportBtn = document.querySelector('button[onclick="report()"]');
+  reportBtn.disabled = true;
+  reportBtn.classList.add('opacity-50', 'cursor-not-allowed');
+  reportBtn.textContent = '🚨 신고완료';
 }
 
 async function likePost() {
+  if (hasLiked()) {
+    alert('이미 추천한 게시글입니다.');
+    return;
+  }
+
   const res = await fetch(`/api/localboard/${id}/like`, { method: "POST" });
   const data = await res.json();
   
   if (data.success) {
+    setLiked();
     document.getElementById('likeCount').textContent = data.likes;
+    
+    // 버튼 비활성화
+    const likeBtn = document.querySelector('button[onclick="likePost()"]');
+    likeBtn.disabled = true;
+    likeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    likeBtn.innerHTML = '👍 추천완료 <span id="likeCount" class="font-bold">' + data.likes + '</span>';
   }
 }
 
