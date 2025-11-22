@@ -17,11 +17,31 @@
 
 <div id="locationInfo" class="mb-4 p-4 bg-blue-50 rounded-lg">
   <p class="text-sm text-gray-600">현재 인증된 지역: <span id="myRegion" class="font-bold text-blue-600">-</span></p>
-  <p class="text-sm text-gray-600 mt-2">닉네임: <span id="currentNickname" class="font-bold text-indigo-600">미설정</span></p>
-  <a href="/nicknameSettings.html" class="inline-block mt-2 text-xs px-3 py-1 bg-white border border-blue-300 rounded-lg hover:bg-blue-50">닉네임 설정</a>
 </div>
 
 <form id="writeForm" enctype="multipart/form-data" class="flex flex-col gap-4">
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-2">닉네임 <span class="text-red-500">*</span></label>
+    <div class="flex gap-2">
+      <input 
+        id="nickname" 
+        type="text" 
+        class="flex-1 border p-3 rounded-lg" 
+        placeholder="닉네임을 입력하세요 (2-20자)"
+        maxlength="20"
+        required
+      >
+      <button 
+        type="button"
+        onclick="checkNickname()" 
+        class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap"
+      >
+        중복확인
+      </button>
+    </div>
+    <p id="nicknameMessage" class="text-xs mt-1"></p>
+  </div>
 
   <input id="region" name="region" class="border p-3 rounded-lg" placeholder="지역을 입력하세요 (예: 의정부, 호원동)" required>
 
@@ -62,14 +82,64 @@ const regionCoords = {
 let currentLat = null;
 let currentLng = null;
 let myRegionName = null;
+let isNicknameChecked = false; // 중복 확인 여부
 
-// 닉네임 불러오기
-function loadNickname() {
-  const nickname = localStorage.getItem('userNickname');
-  if (nickname) {
-    document.getElementById('currentNickname').textContent = nickname;
+// 닉네임 중복 체크
+async function checkNickname() {
+  const nicknameInput = document.getElementById('nickname');
+  const nickname = nicknameInput.value.trim();
+  const messageEl = document.getElementById('nicknameMessage');
+
+  if (!nickname) {
+    messageEl.textContent = '닉네임을 입력해주세요.';
+    messageEl.className = 'text-xs mt-1 text-red-500';
+    return;
+  }
+
+  if (nickname.length < 2) {
+    messageEl.textContent = '닉네임은 최소 2자 이상이어야 합니다.';
+    messageEl.className = 'text-xs mt-1 text-red-500';
+    return;
+  }
+
+  try {
+    // 서버에 중복 체크 요청
+    const res = await fetch(`/api/localboard/check-nickname?nickname=${encodeURIComponent(nickname)}`);
+    const result = await res.json();
+
+    if (result.available) {
+      messageEl.textContent = '✓ 사용 가능한 닉네임입니다.';
+      messageEl.className = 'text-xs mt-1 text-green-600 font-medium';
+      isNicknameChecked = true;
+    } else {
+      messageEl.textContent = '✗ 이미 사용 중인 닉네임입니다.';
+      messageEl.className = 'text-xs mt-1 text-red-500';
+      isNicknameChecked = false;
+    }
+  } catch (error) {
+    console.error('중복 체크 오류:', error);
+    messageEl.textContent = '중복 확인 중 오류가 발생했습니다.';
+    messageEl.className = 'text-xs mt-1 text-orange-500';
+    isNicknameChecked = false;
   }
 }
+
+// 닉네임 입력 시 중복확인 초기화
+document.addEventListener('DOMContentLoaded', () => {
+  const nicknameInput = document.getElementById('nickname');
+  
+  // localStorage에서 마지막 사용 닉네임 불러오기
+  const lastNickname = localStorage.getItem('userNickname');
+  if (lastNickname) {
+    nicknameInput.value = lastNickname;
+  }
+
+  nicknameInput.addEventListener('input', () => {
+    isNicknameChecked = false;
+    const messageEl = document.getElementById('nicknameMessage');
+    messageEl.textContent = '';
+  });
+});
 
 // 거리 계산 함수 (미터 단위)
 function getDistance(lat1, lng1, lat2, lng2) {
@@ -157,14 +227,10 @@ async function canWritePost(selectedRegion) {
 
 // 초기화
 async function init() {
-  // 닉네임 불러오기
-  loadNickname();
-  
   try {
     // 개발용: 인증 OFF 모드
     if (!REGION_CHECK_ENABLED) {
       document.getElementById('myRegion').textContent = "(테스트 모드)";
-      // 직접 입력 방식으로 변경되어 loadAvailableRegions() 호출 불필요
       return;
     }
 
@@ -195,13 +261,11 @@ document.getElementById("writeForm").addEventListener("submit", async e => {
   e.preventDefault();
 
   const selectedRegion = document.getElementById('region').value;
-  const nickname = localStorage.getItem('userNickname');
+  const nickname = document.getElementById('nickname').value.trim();
 
-  // 닉네임 확인
-  if (!nickname || !nickname.trim()) {
-    if (confirm('닉네임을 먼저 설정해주세요.\n설정 페이지로 이동하시겠습니까?')) {
-      location.href = '/nicknameSettings.html';
-    }
+  // 닉네임 중복확인 체크
+  if (!isNicknameChecked) {
+    alert('닉네임 중복확인을 먼저 해주세요.');
     return;
   }
 
@@ -212,6 +276,9 @@ document.getElementById("writeForm").addEventListener("submit", async e => {
 
   const formData = new FormData(writeForm);
   formData.append('writer', nickname);
+  
+  // localStorage에 저장 (다음에 사용하기 편하게)
+  localStorage.setItem('userNickname', nickname);
 
   try {
     const res = await fetch("/api/localboard", {
