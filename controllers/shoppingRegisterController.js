@@ -5,9 +5,13 @@ export async function registerShopping(req, res) {
   try {
     const body = req.body;
 
+    console.log("📤 업로드된 파일 정보:", req.files);
+
     const main = req.files["image_main"]?.[0]?.filename || null;
     const banners = req.files["image_banner"]?.map(f => f.filename) || [];
     const bests = req.files["image_best"]?.map(f => f.filename) || [];
+
+    console.log("✅ 처리된 파일명:", { main, banners, bests });
 
     const inserted = await pool.query(`
       INSERT INTO shopping_info
