@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { pool } from "../db.js"; // 네온 PostgreSQL Pool
+import pool from "../db.js"; // 네온 PostgreSQL Pool
 
 const router = express.Router();
 
