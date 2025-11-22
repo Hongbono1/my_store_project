@@ -127,6 +127,13 @@ async function submitComment() {
 }
 
 async function report() {
+  const nickname = localStorage.getItem('userNickname');
+  
+  if (!nickname) {
+    alert('닉네임을 먼저 설정해주세요.');
+    return;
+  }
+
   if (hasReported()) {
     alert('이미 신고한 게시글입니다.');
     return;
@@ -136,26 +143,57 @@ async function report() {
     return;
   }
   
-  await fetch(`/api/localboard/${id}/report`, { method: "POST" });
-  setReported();
+  const res = await fetch(`/api/localboard/${id}/report`, { 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nickname })
+  });
   
-  alert("신고가 접수되었습니다. 관리자가 확인 후 조치하겠습니다.");
+  const data = await res.json();
   
-  // 버튼 비활성화
-  const reportBtn = document.querySelector('button[onclick="report()"]');
-  reportBtn.disabled = true;
-  reportBtn.classList.add('opacity-50', 'cursor-not-allowed');
-  reportBtn.textContent = '🚨 신고완료';
+  if (data.alreadyReported) {
+    alert('이미 신고한 게시글입니다.');
+    return;
+  }
+  
+  if (data.success) {
+    setReported();
+    alert("신고가 접수되었습니다. 관리자가 확인 후 조치하겠습니다.");
+    
+    // 버튼 비활성화
+    const reportBtn = document.querySelector('button[onclick="report()"]');
+    reportBtn.disabled = true;
+    reportBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    reportBtn.textContent = '🚨 신고완료';
+  } else {
+    alert(data.error || '신고 처리 중 오류가 발생했습니다.');
+  }
 }
 
 async function likePost() {
+  const nickname = localStorage.getItem('userNickname');
+  
+  if (!nickname) {
+    alert('닉네임을 먼저 설정해주세요.');
+    return;
+  }
+
   if (hasLiked()) {
     alert('이미 추천한 게시글입니다.');
     return;
   }
 
-  const res = await fetch(`/api/localboard/${id}/like`, { method: "POST" });
+  const res = await fetch(`/api/localboard/${id}/like`, { 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nickname })
+  });
   const data = await res.json();
+  
+  if (data.alreadyLiked) {
+    alert('이미 추천한 게시글입니다.');
+    return;
+  }
   
   if (data.success) {
     setLiked();
@@ -166,6 +204,8 @@ async function likePost() {
     likeBtn.disabled = true;
     likeBtn.classList.add('opacity-50', 'cursor-not-allowed');
     likeBtn.innerHTML = '👍 추천완료 <span id="likeCount" class="font-bold">' + data.likes + '</span>';
+  } else {
+    alert(data.error || '추천 처리 중 오류가 발생했습니다.');
   }
 }
 

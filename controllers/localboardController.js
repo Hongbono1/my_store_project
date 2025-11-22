@@ -140,28 +140,82 @@ export const getComments = async (req, res) => {
 };
 
 /* -----------------------------
-   6) 신고
+   6) 신고 (닉네임 기반 중복 방지)
 --------------------------------*/
 export const reportPost = async (req, res) => {
     const { id } = req.params;
+    const { nickname } = req.body;
 
-    await pool.query("UPDATE local_board_posts SET reports = reports + 1 WHERE id=$1", [
-        id,
-    ]);
+    if (!nickname) {
+        return res.json({ success: false, error: "닉네임이 필요합니다" });
+    }
 
-    res.json({ success: true });
+    try {
+        // 이미 신고했는지 확인
+        const checkResult = await pool.query(
+            "SELECT * FROM post_reports WHERE post_id = $1 AND nickname = $2",
+            [id, nickname]
+        );
+
+        if (checkResult.rows.length > 0) {
+            return res.json({ success: false, error: "이미 신고한 게시글입니다", alreadyReported: true });
+        }
+
+        // 신고 기록 저장
+        await pool.query(
+            "INSERT INTO post_reports (post_id, nickname) VALUES ($1, $2)",
+            [id, nickname]
+        );
+
+        // 신고 수 증가
+        await pool.query("UPDATE local_board_posts SET reports = reports + 1 WHERE id=$1", [
+            id,
+        ]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("신고 오류:", error);
+        res.status(500).json({ success: false, error: "신고 처리 중 오류 발생" });
+    }
 };
 
 /* -----------------------------
-   7) 추천
+   7) 추천 (닉네임 기반 중복 방지)
 --------------------------------*/
 export const likePost = async (req, res) => {
     const { id } = req.params;
+    const { nickname } = req.body;
 
-    const result = await pool.query(
-        "UPDATE local_board_posts SET likes = likes + 1 WHERE id=$1 RETURNING likes",
-        [id]
-    );
+    if (!nickname) {
+        return res.json({ success: false, error: "닉네임이 필요합니다" });
+    }
 
-    res.json({ success: true, likes: result.rows[0].likes });
+    try {
+        // 이미 추천했는지 확인
+        const checkResult = await pool.query(
+            "SELECT * FROM post_likes WHERE post_id = $1 AND nickname = $2",
+            [id, nickname]
+        );
+
+        if (checkResult.rows.length > 0) {
+            return res.json({ success: false, error: "이미 추천한 게시글입니다", alreadyLiked: true });
+        }
+
+        // 추천 기록 저장
+        await pool.query(
+            "INSERT INTO post_likes (post_id, nickname) VALUES ($1, $2)",
+            [id, nickname]
+        );
+
+        // 추천 수 증가
+        const result = await pool.query(
+            "UPDATE local_board_posts SET likes = likes + 1 WHERE id=$1 RETURNING likes",
+            [id]
+        );
+
+        res.json({ success: true, likes: result.rows[0].likes });
+    } catch (error) {
+        console.error("추천 오류:", error);
+        res.status(500).json({ success: false, error: "추천 처리 중 오류 발생" });
+    }
 };
