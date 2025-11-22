@@ -370,8 +370,8 @@ app.use(express.static(path.join(__dirname, "public2"), {
 }));
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
-app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 
 
