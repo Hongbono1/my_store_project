@@ -9,10 +9,14 @@ import {
     getComments,
     reportPost,
     toggleNotice,
-    blockPost
+    blockPost,
+    checkNickname
 } from "../controllers/localboardController.js";
 
 const router = express.Router();
+
+// 닉네임 중복 체크
+router.get("/check-nickname", checkNickname);
 
 router.get("/", getPosts);
 router.get("/popular", getPopularPosts);

@@ -1,6 +1,33 @@
 import pool from "../db.js";
 
 /* -----------------------------
+   0) 닉네임 중복 체크
+--------------------------------*/
+export const checkNickname = async (req, res) => {
+    try {
+        const { nickname } = req.query;
+
+        if (!nickname) {
+            return res.json({ available: false, error: "닉네임을 입력해주세요" });
+        }
+
+        // 해당 닉네임으로 작성된 글이 있는지 확인
+        const result = await pool.query(
+            "SELECT COUNT(*) as count FROM local_board_posts WHERE writer = $1",
+            [nickname]
+        );
+
+        const count = parseInt(result.rows[0].count);
+        const available = count === 0;
+
+        res.json({ available });
+    } catch (error) {
+        console.error("닉네임 중복 체크 오류:", error);
+        res.status(500).json({ available: false, error: "서버 오류" });
+    }
+};
+
+/* -----------------------------
    1) 글 생성 (+ 이미지 업로드)
 --------------------------------*/
 export const createPost = async (req, res) => {
