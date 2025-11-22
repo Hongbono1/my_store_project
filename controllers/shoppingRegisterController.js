@@ -16,7 +16,7 @@ export async function registerShopping(req, res) {
     const inserted = await pool.query(`
       INSERT INTO shopping_info
       (shop_name, short_desc, full_desc, category, website,
-       sns_instagram, sns_youtube, sns_blog, sns_other,
+       sns_instagram, sns_facebook, sns_tiktok, sns_other,
        image_main, image_banner1, image_banner2, image_banner3,
        image_best1, image_best2, image_best3, image_best4)
       VALUES ($1,$2,$3,$4,$5,
@@ -31,8 +31,8 @@ export async function registerShopping(req, res) {
       body.category,
       body.website,
       body.sns_instagram || null,
-      body.sns_youtube || null,
-      body.sns_blog || null,
+      body.sns_facebook || null,
+      body.sns_tiktok || null,
       body.sns_other || null,
       main ? `/uploads/${main}` : null,
       banners[0] ? `/uploads/${banners[0]}` : null,
