@@ -30,12 +30,25 @@
 
   <h2 class="text-xl font-bold mt-10 mb-3">💬 댓글</h2>
 
-  <div id="comments" class="mb-5"></div>
+  <div id="comments" class="mb-6 space-y-3"></div>
 
-  <div class="flex gap-2">
-    <input id="commentWriter" class="border p-2 flex-1" placeholder="작성자">
-    <input id="commentText" class="border p-2 flex-1" placeholder="댓글 내용">
-    <button onclick="submitComment()" class="px-4 bg-indigo-600 text-white rounded-lg">등록</button>
+  <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+    <div class="mb-2">
+      <span class="text-sm font-medium text-gray-700">작성자: </span>
+      <span id="commentNickname" class="text-sm font-bold text-indigo-600">-</span>
+      <button onclick="location.href='/nicknameSettings.html'" class="ml-2 text-xs text-blue-500 underline">변경</button>
+    </div>
+    <textarea 
+      id="commentText" 
+      class="w-full border border-gray-300 p-3 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+      placeholder="댓글을 입력하세요..."
+      rows="3"
+    ></textarea>
+    <div class="flex justify-end mt-2">
+      <button onclick="submitComment()" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+        댓글 등록
+      </button>
+    </div>
   </div>
 
 </div>
@@ -101,28 +114,60 @@ async function loadDetail() {
 }
 loadDetail();
 
+// 댓글 작성자 닉네임 표시
+function loadCommentNickname() {
+  const nickname = localStorage.getItem('userNickname');
+  if (nickname) {
+    document.getElementById('commentNickname').textContent = nickname;
+  } else {
+    document.getElementById('commentNickname').textContent = '미설정';
+  }
+}
+loadCommentNickname();
+
 async function loadComments() {
   const res = await fetch(`/api/localboard/${id}/comments`);
   const data = await res.json();
 
   comments.innerHTML = data
-    .map(c => `<div class="border-b py-2"><b>${c.writer}</b> ${c.comment}</div>`)
+    .map(c => `
+      <div class="bg-white p-3 rounded-lg border border-gray-200">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="font-bold text-sm text-gray-800">${c.writer}</span>
+          <span class="text-xs text-gray-400">${new Date(c.created_at).toLocaleString('ko-KR')}</span>
+        </div>
+        <p class="text-gray-700">${c.comment}</p>
+      </div>
+    `)
     .join("");
 }
 loadComments();
 
 async function submitComment() {
+  const nickname = localStorage.getItem('userNickname');
+  const commentText = document.getElementById('commentText').value.trim();
+
+  if (!nickname) {
+    alert('닉네임을 먼저 설정해주세요.');
+    location.href = '/nicknameSettings.html';
+    return;
+  }
+
+  if (!commentText) {
+    alert('댓글 내용을 입력해주세요.');
+    return;
+  }
+
   await fetch(`/api/localboard/${id}/comment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      writer: commentWriter.value,
-      comment: commentText.value
+      writer: nickname,
+      comment: commentText
     })
   });
 
-  commentWriter.value = "";
-  commentText.value = "";
+  document.getElementById('commentText').value = "";
   loadComments();
 }
 
