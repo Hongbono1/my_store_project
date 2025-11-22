@@ -35,7 +35,7 @@ export const createPost = async (req, res) => {
         const { region, category, title, content, writer } = req.body;
 
         const sql =
-            "INSERT INTO local_board_posts(region, category, title, content, writer) VALUES($1,$2,$3,$4,$5) RETURNING id";
+            "INSERT INTO local_board_posts(region, category, title, content, writer, is_notice, is_blocked) VALUES($1,$2,$3,$4,$5, false, false) RETURNING id";
 
         const result = await pool.query(sql, [
             region,
