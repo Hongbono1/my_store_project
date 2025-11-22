@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>지역 글쓰기</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
 </head>
 
 <body class="bg-gray-100">
@@ -14,25 +15,27 @@
 
 <h1 class="text-3xl font-bold mb-6">✏️ 지역 게시글 작성</h1>
 
+<div id="locationInfo" class="mb-4 p-4 bg-blue-50 rounded-lg">
+  <p class="text-sm text-gray-600">현재 인증된 지역: <span id="myRegion" class="font-bold text-blue-600">-</span></p>
+  <p class="text-xs text-gray-500 mt-1">※ 10km 이내 지역만 글쓰기 가능합니다</p>
+</div>
+
 <form id="writeForm" enctype="multipart/form-data" class="flex flex-col gap-4">
 
   <select id="region" name="region" class="border p-3 rounded-lg">
-    <option>의정부</option>
-    <option>호원동</option>
-    <option>민락동</option>
-    <option>가능동</option>
+    <option value="">지역을 선택하세요</option>
   </select>
 
-  <input id="title" name="title" class="border p-3 rounded-lg" placeholder="제목">
+  <input id="title" name="title" class="border p-3 rounded-lg" placeholder="제목" required>
 
   <textarea id="content" name="content" class="border p-3 h-48 rounded-lg"
-    placeholder="내용"></textarea>
+    placeholder="내용" required></textarea>
 
-  <input id="writer" name="writer" class="border p-3 rounded-lg" placeholder="작성자">
+  <input id="writer" name="writer" class="border p-3 rounded-lg" placeholder="작성자" required>
 
-  <input type="file" name="images" multiple class="border p-3 rounded-lg">
+  <input type="file" name="images" multiple accept="image/*" class="border p-3 rounded-lg">
 
-  <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg">등록</button>
+  <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">등록</button>
 
 </form>
 
@@ -44,22 +47,175 @@
 fetch('components/header.html').then(r => r.text()).then(h => header.innerHTML = h);
 fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
 
+// 지역 좌표 데이터
+const regionCoords = {
+  '의정부': { lat: 37.7381, lng: 127.0475 },
+  '호원동': { lat: 37.7578, lng: 127.0475 },
+  '민락동': { lat: 37.7443, lng: 127.0647 },
+  '가능동': { lat: 37.7373, lng: 127.0819 },
+  '의정부1동': { lat: 37.7398, lng: 127.0335 },
+  '의정부2동': { lat: 37.7387, lng: 127.0475 },
+  '녹양동': { lat: 37.7525, lng: 127.0595 },
+  '송산동': { lat: 37.7231, lng: 127.0335 },
+};
+
+let currentLat = null;
+let currentLng = null;
+let myRegionName = null;
+
+// 거리 계산 함수 (미터 단위)
+function getDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3; // 지구 반지름 (미터)
+    const toRad = deg => deg * Math.PI / 180;
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lng2 - lng1);
+
+    const a =
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// 현재 위치 가져오기
+async function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('브라우저가 위치 서비스를 지원하지 않습니다'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        currentLat = position.coords.latitude;
+        currentLng = position.coords.longitude;
+        resolve({ lat: currentLat, lng: currentLng });
+      },
+      error => {
+        reject(error);
+      }
+    );
+  });
+}
+
+// 10km 이내 지역 필터링
+function loadAvailableRegions() {
+  const regionSelect = document.getElementById('region');
+  
+  if (!currentLat || !currentLng) {
+    regionSelect.innerHTML = '<option>위치 정보를 가져올 수 없습니다</option>';
+    return;
+  }
+
+  const availableRegions = Object.entries(regionCoords).filter(([name, coords]) => {
+    const distance = getDistance(currentLat, currentLng, coords.lat, coords.lng);
+    return distance <= 10000; // 10km 이내
+  });
+
+  if (availableRegions.length === 0) {
+    regionSelect.innerHTML = '<option>10km 이내에 등록 가능한 지역이 없습니다</option>';
+    return;
+  }
+
+  regionSelect.innerHTML = '<option value="">지역을 선택하세요</option>' +
+    availableRegions.map(([name, coords]) => {
+      const distance = getDistance(currentLat, currentLng, coords.lat, coords.lng);
+      const distanceKm = (distance / 1000).toFixed(1);
+      return `<option value="${name}">${name} (${distanceKm}km)</option>`;
+    }).join('');
+}
+
+// 글쓰기 가능 여부 체크
+async function canWritePost(selectedRegion) {
+  // 지역 선택 확인
+  if (!selectedRegion) {
+    alert("지역을 선택해주세요.");
+    return false;
+  }
+
+  // 내 동네 인증 확인
+  const myRegion = localStorage.getItem("myRegion");
+  if (!myRegion) {
+    alert("동네 인증을 먼저 해주세요.\n설정에서 내 동네를 인증할 수 있습니다.");
+    return false;
+  }
+
+  // 선택한 지역 좌표
+  const regionCoord = regionCoords[selectedRegion];
+  if (!regionCoord) {
+    alert("유효하지 않은 지역입니다.");
+    return false;
+  }
+
+  // 현재 위치와 선택한 지역의 거리 확인
+  const distance = getDistance(currentLat, currentLng, regionCoord.lat, regionCoord.lng);
+  
+  if (distance > 10000) {  // 10km 초과
+    const distanceKm = (distance / 1000).toFixed(1);
+    alert(`현재 위치에서 너무 먼 지역입니다.\n10km 이내 지역만 글쓰기가 가능합니다.\n(현재 거리: ${distanceKm}km)`);
+    return false;
+  }
+
+  return true;
+}
+
+// 초기화
+async function init() {
+  try {
+    // 내 동네 정보 표시
+    myRegionName = localStorage.getItem("myRegion") || "미인증";
+    document.getElementById('myRegion').textContent = myRegionName;
+
+    // 현재 위치 가져오기
+    await getCurrentLocation();
+    
+    // 10km 이내 지역 로드
+    loadAvailableRegions();
+
+  } catch (error) {
+    console.error('위치 정보 오류:', error);
+    alert('위치 정보를 가져올 수 없습니다.\n브라우저 설정에서 위치 권한을 허용해주세요.');
+  }
+}
+
+// 폼 제출
 document.getElementById("writeForm").addEventListener("submit", async e => {
   e.preventDefault();
 
+  const selectedRegion = document.getElementById('region').value;
+
+  // 글쓰기 가능 여부 체크
+  if (!await canWritePost(selectedRegion)) {
+    return;
+  }
+
   const formData = new FormData(writeForm);
 
-  const res = await fetch("/api/localboard", {
-    method: "POST",
-    body: formData
-  });
+  try {
+    const res = await fetch("/api/localboard", {
+      method: "POST",
+      body: formData
+    });
 
-  const result = await res.json();
+    const result = await res.json();
 
-  if (result.success) {
-    location.href = "localboardDetail.html?id=" + result.id;
+    if (result.success) {
+      alert('글이 등록되었습니다!');
+      location.href = "localboardDetail.html?id=" + result.id;
+    } else {
+      alert('등록 실패: ' + (result.error || '알 수 없는 오류'));
+    }
+  } catch (error) {
+    console.error('등록 오류:', error);
+    alert('등록 중 오류가 발생했습니다.');
   }
 });
+
+init();
 </script>
 
 </body>

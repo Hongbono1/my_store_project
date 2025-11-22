@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>내 동네 설정</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&libraries=services"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div id="header"></div>
+
+<div class="max-w-2xl mx-auto bg-white mt-10 p-8 rounded-2xl shadow-lg">
+
+<h1 class="text-3xl font-bold mb-6">📍 내 동네 설정</h1>
+
+<div class="mb-6 p-4 bg-blue-50 rounded-lg">
+  <p class="font-bold text-blue-900 mb-2">현재 위치</p>
+  <p id="currentLocation" class="text-gray-700">위치 정보를 가져오는 중...</p>
+  <p class="text-xs text-gray-500 mt-2">※ 현재 위치에서 10km 이내 지역만 선택 가능합니다</p>
+</div>
+
+<div class="mb-6">
+  <label class="block font-bold mb-2">내 동네 선택</label>
+  <select id="regionSelect" class="w-full border p-3 rounded-lg">
+    <option value="">지역을 선택하세요</option>
+  </select>
+  <p id="distanceInfo" class="text-sm text-gray-500 mt-2"></p>
+</div>
+
+<button onclick="saveMyRegion()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold">
+  내 동네로 설정
+</button>
+
+<div class="mt-6 p-4 bg-gray-50 rounded-lg">
+  <p class="font-bold text-gray-800 mb-2">현재 설정된 내 동네</p>
+  <p id="savedRegion" class="text-2xl font-bold text-indigo-600">-</p>
+</div>
+
+</div>
+
+<div id="footer"></div>
+
+<script>
+fetch('components/header.html').then(r => r.text()).then(h => header.innerHTML = h);
+fetch('components/footer.html').then(r => r.text()).then(f => footer.innerHTML = f);
+
+// 지역 좌표 데이터
+const regionCoords = {
+  '의정부': { lat: 37.7381, lng: 127.0475 },
+  '호원동': { lat: 37.7578, lng: 127.0475 },
+  '민락동': { lat: 37.7443, lng: 127.0647 },
+  '가능동': { lat: 37.7373, lng: 127.0819 },
+  '의정부1동': { lat: 37.7398, lng: 127.0335 },
+  '의정부2동': { lat: 37.7387, lng: 127.0475 },
+  '녹양동': { lat: 37.7525, lng: 127.0595 },
+  '송산동': { lat: 37.7231, lng: 127.0335 },
+};
+
+let currentLat = null;
+let currentLng = null;
+
+// 거리 계산 함수
+function getDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3;
+    const toRad = deg => deg * Math.PI / 180;
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lng2 - lng1);
+
+    const a =
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// 현재 위치 가져오기
+async function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('브라우저가 위치 서비스를 지원하지 않습니다'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        currentLat = position.coords.latitude;
+        currentLng = position.coords.longitude;
+        resolve({ lat: currentLat, lng: currentLng });
+      },
+      error => {
+        reject(error);
+      }
+    );
+  });
+}
+
+// 10km 이내 지역만 표시
+function loadAvailableRegions() {
+  const regionSelect = document.getElementById('regionSelect');
+  
+  if (!currentLat || !currentLng) {
+    regionSelect.innerHTML = '<option>위치 정보를 가져올 수 없습니다</option>';
+    return;
+  }
+
+  const availableRegions = Object.entries(regionCoords)
+    .map(([name, coords]) => {
+      const distance = getDistance(currentLat, currentLng, coords.lat, coords.lng);
+      return { name, coords, distance };
+    })
+    .filter(region => region.distance <= 10000) // 10km 이내
+    .sort((a, b) => a.distance - b.distance); // 가까운 순 정렬
+
+  if (availableRegions.length === 0) {
+    regionSelect.innerHTML = '<option>10km 이내에 등록 가능한 지역이 없습니다</option>';
+    return;
+  }
+
+  regionSelect.innerHTML = '<option value="">지역을 선택하세요</option>' +
+    availableRegions.map(region => {
+      const distanceKm = (region.distance / 1000).toFixed(1);
+      return `<option value="${region.name}">${region.name} (${distanceKm}km)</option>`;
+    }).join('');
+}
+
+// 지역 선택 시 거리 표시
+document.getElementById('regionSelect').addEventListener('change', function() {
+  const selectedRegion = this.value;
+  const distanceInfo = document.getElementById('distanceInfo');
+  
+  if (!selectedRegion) {
+    distanceInfo.textContent = '';
+    return;
+  }
+
+  const coords = regionCoords[selectedRegion];
+  if (coords && currentLat && currentLng) {
+    const distance = getDistance(currentLat, currentLng, coords.lat, coords.lng);
+    const distanceKm = (distance / 1000).toFixed(1);
+    distanceInfo.textContent = `현재 위치에서 ${distanceKm}km 떨어져 있습니다`;
+  }
+});
+
+// 내 동네 저장
+function saveMyRegion() {
+  const selectedRegion = document.getElementById('regionSelect').value;
+  
+  if (!selectedRegion) {
+    alert('지역을 선택해주세요');
+    return;
+  }
+
+  localStorage.setItem('myRegion', selectedRegion);
+  document.getElementById('savedRegion').textContent = selectedRegion;
+  alert(`'${selectedRegion}'이(가) 내 동네로 설정되었습니다!`);
+}
+
+// 초기화
+async function init() {
+  try {
+    // 저장된 내 동네 표시
+    const savedRegion = localStorage.getItem('myRegion');
+    if (savedRegion) {
+      document.getElementById('savedRegion').textContent = savedRegion;
+    }
+
+    // 현재 위치 가져오기
+    const location = await getCurrentLocation();
+    document.getElementById('currentLocation').textContent = 
+      `위도: ${location.lat.toFixed(4)}, 경도: ${location.lng.toFixed(4)}`;
+    
+    // 10km 이내 지역 로드
+    loadAvailableRegions();
+
+  } catch (error) {
+    console.error('위치 정보 오류:', error);
+    document.getElementById('currentLocation').textContent = '위치 정보를 가져올 수 없습니다';
+    alert('위치 정보를 가져올 수 없습니다.\n브라우저 설정에서 위치 권한을 허용해주세요.');
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
