@@ -153,25 +153,15 @@ export const reportPost = async (req, res) => {
 };
 
 /* -----------------------------
-   7) 관리자 - 공지 토글
+   7) 추천
 --------------------------------*/
-export const toggleNotice = async (req, res) => {
+export const likePost = async (req, res) => {
     const { id } = req.params;
 
-    await pool.query("UPDATE local_board_posts SET is_notice = NOT is_notice WHERE id=$1", [
-        id,
-    ]);
+    const result = await pool.query(
+        "UPDATE local_board_posts SET likes = likes + 1 WHERE id=$1 RETURNING likes",
+        [id]
+    );
 
-    res.json({ success: true });
-};
-
-/* -----------------------------
-   8) 관리자 - 게시글 정지
---------------------------------*/
-export const blockPost = async (req, res) => {
-    const { id } = req.params;
-
-    await pool.query("UPDATE local_board_posts SET is_blocked = TRUE WHERE id=$1", [id]);
-
-    res.json({ success: true });
+    res.json({ success: true, likes: result.rows[0].likes });
 };

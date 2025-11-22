@@ -8,8 +8,7 @@ import {
     addComment,
     getComments,
     reportPost,
-    toggleNotice,
-    blockPost,
+    likePost,
     checkNickname
 } from "../controllers/localboardController.js";
 
@@ -29,8 +28,6 @@ router.post("/:id/comment", addComment);
 router.get("/:id/comments", getComments);
 
 router.post("/:id/report", reportPost);
-
-router.post("/:id/notice", toggleNotice);
-router.post("/:id/block", blockPost);
+router.post("/:id/like", likePost);
 
 export default router;
