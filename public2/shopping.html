@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쇼핑몰 홍보 리스트 | MALL HANKOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .neo-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            box-shadow:
+                6px 6px 12px rgba(0, 0, 0, 0.15),
+                -6px -6px 12px rgba(255, 255, 255, 0.9);
+            transition: 0.3s ease;
+        }
+
+        .neo-card:hover {
+            transform: translateY(-6px);
+            box-shadow:
+                12px 12px 24px rgba(0, 0, 0, 0.18),
+                -6px -6px 12px rgba(255, 255, 255, 1);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <div id="header"></div>
+
+    <main class="max-w-6xl mx-auto px-4 pt-24 pb-16">
+        <h1 class="text-3xl font-bold mb-8 text-center">쇼핑몰 홍보 리스트</h1>
+
+        <!-- 리스트 -->
+        <div id="shopList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- JS로 렌더링 -->
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <div id="footer"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+
+            /* Header/Footer 로드 */
+            fetch("/components/header.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("header").innerHTML = html);
+
+            fetch("/components/footer.html")
+                .then(res => res.text())
+                .then(html => document.getElementById("footer").innerHTML = html);
+
+
+            /* 쇼핑몰 리스트 불러오기 */
+            const container = document.getElementById("shopList");
+            let shops = [];
+
+            try {
+                const res = await fetch("/shopping");
+                if (res.ok) shops = await res.json();
+            } catch (e) {
+                console.error("쇼핑몰 리스트 가져오기 실패", e);
+            }
+
+            if (!shops || shops.length === 0) {
+                container.innerHTML = `
+                <p class="col-span-full text-center text-gray-500 mt-20 text-xl">
+                    등록된 쇼핑몰이 없습니다.
+                </p>`;
+                return;
+            }
+
+            /* 리스트 렌더링 */
+            shops.forEach(shop => {
+                const card = document.createElement("div");
+                card.className = "neo-card p-4 cursor-pointer";
+                card.onclick = () => window.location.href = `/shoppingdetail.html?id=${shop.id}`;
+
+                card.innerHTML = `
+                    <div class="w-full h-48 rounded-lg overflow-hidden bg-gray-100">
+                        <img src="${shop.image_main || '/uploads/no-image.png'}" 
+                             class="w-full h-full object-cover">
+                    </div>
+
+                    <h2 class="text-xl font-bold mt-4">${shop.shop_name}</h2>
+                    <p class="text-gray-600 text-sm mt-2">${shop.short_desc}</p>
+                    <p class="text-gray-500 text-xs mt-1">카테고리: ${shop.category}</p>
+
+                    <div class="flex gap-3 mt-4 text-xl">
+                        ${shop.sns_instagram ? `<span>📷</span>` : ""}
+                        ${shop.sns_facebook ? `<span>📘</span>` : ""}
+                        ${shop.sns_tiktok ? `<span>🎵</span>` : ""}
+                    </div>
+
+                    <div class="block mt-4 text-center bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">
+                       상세보기
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        });
+    </script>
+
+</body>
+</html>
