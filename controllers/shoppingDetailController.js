@@ -46,11 +46,7 @@ export async function getShoppingList(req, res) {
 
     const result = await pool.query(query, params);
 
-    res.json({
-      success: true,
-      data: result.rows,
-      total: result.rows.length
-    });
+    res.json(result.rows);
   } catch (error) {
     console.error("❌ 쇼핑몰 리스트 조회 실패:", error);
     res.status(500).json({
