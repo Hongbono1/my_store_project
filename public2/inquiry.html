@@ -3,23 +3,41 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>문의 목록 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        .neo-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            box-shadow:
+                8px 8px 16px rgba(0, 0, 0, 0.15),
+                -8px -8px 16px rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
 </head>
 
-<body class="bg-gray-50">
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
     <div id="header"></div>
 
     <main class="max-w-4xl mx-auto py-20 px-4">
-        <h1 class="text-3xl font-bold mb-8">문의 목록</h1>
+        <div class="neo-card p-8">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">문의게시판</h1>
+                <a href="/inquiryWrite.html"
+                   class="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 font-semibold">
+                    문의 등록
+                </a>
+            </div>
 
-        <div id="inquiryList" class="space-y-4"></div>
-
-        <div class="text-right mt-10">
-            <a href="/inquiryregister.html"
-                class="px-5 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">
-                문의 등록
-            </a>
+            <div id="inquiryList" class="space-y-4"></div>
+            
+            <div id="loading" class="text-center py-8 text-gray-500">
+                문의 목록을 불러오는 중...
+            </div>
         </div>
     </main>
 
@@ -29,37 +47,89 @@
         // Header/Footer 로드
         fetch("/components/header.html")
             .then(res => res.text())
-            .then(html => header.innerHTML = html);
+            .then(html => document.getElementById("header").innerHTML = html)
+            .catch(err => console.warn("Header 로드 실패:", err));
 
         fetch("/components/footer.html")
             .then(res => res.text())
-            .then(html => footer.innerHTML = html);
+            .then(html => document.getElementById("footer").innerHTML = html)
+            .catch(err => console.warn("Footer 로드 실패:", err));
 
-        // 리스트 불러오기
+        // 문의 목록 불러오기 (Mall Hankook API 패턴)
         async function loadList() {
-            const res = await fetch("/inquiry/list");
-            const data = await res.json();
+            try {
+                console.log("📋 문의 목록 API 호출: /api/inquiry");
+                
+                const response = await fetch("/api/inquiry");
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log("📋 받은 데이터:", data);
 
-            if (!data.success) return;
+                document.getElementById("loading").style.display = "none";
+                
+                const listBox = document.getElementById("inquiryList");
+                
+                if (!data || data.length === 0) {
+                    listBox.innerHTML = `
+                        <div class="text-center py-16 text-gray-500">
+                            <p class="text-xl mb-4">등록된 문의가 없습니다.</p>
+                            <a href="/inquiryWrite.html" 
+                               class="text-indigo-600 hover:text-indigo-800 font-semibold">
+                                첫 문의를 등록해보세요 →
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
 
-            const box = document.getElementById("inquiryList");
-            box.innerHTML = "";
+                // 문의 목록 렌더링
+                const html = data.map(item => {
+                    const date = new Date(item.created_at).toLocaleDateString('ko-KR');
+                    const hasAnswer = item.has_answer;
+                    const statusColor = hasAnswer ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700";
+                    const statusText = hasAnswer ? "답변완료" : "답변대기";
 
-            data.list.forEach(item => {
-                const el = document.createElement("div");
-                el.className = "p-5 bg-white shadow rounded-xl border hover:bg-gray-100 transition";
-                el.innerHTML = `
-                    <a href="/inquirydetail.html?id=${item.id}">
-                        <div class="text-lg font-semibold text-gray-800">${item.title}</div>
-                        <div class="text-gray-600 mt-1">${item.primary_category}</div>
-                        <div class="text-gray-400 text-sm mt-1">${item.created_at}</div>
-                    </a>
-                `;
-                box.appendChild(el);
-            });
+                    return `
+                        <div class="p-6 bg-white/60 rounded-xl shadow-lg hover:shadow-xl transition-all hover:transform hover:scale-[1.01] cursor-pointer border border-white/20"
+                             onclick="location.href='/inquiryDetail.html?id=${item.id}'">
+                            <div class="flex justify-between items-start mb-3">
+                                <h3 class="font-bold text-lg text-gray-800 flex-1 pr-4">
+                                    ${item.title}
+                                </h3>
+                                <span class="px-3 py-1 rounded-full text-sm font-semibold ${statusColor}">
+                                    ${statusText}
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm text-gray-600">
+                                <span class="font-medium">${item.user_name}</span>
+                                <span>${date}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+
+                listBox.innerHTML = html;
+
+            } catch (error) {
+                console.error("❌ 문의 목록 로드 오류:", error);
+                document.getElementById("loading").innerHTML = 
+                    `<div class="text-center py-8">
+                        <p class="text-red-500 mb-2">문의 목록을 불러올 수 없습니다.</p>
+                        <p class="text-gray-500 text-sm">${error.message}</p>
+                        <button onclick="loadList()" 
+                                class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            다시 시도
+                        </button>
+                    </div>`;
+            }
         }
 
-        loadList();
+        // 페이지 로드 시 실행
+        document.addEventListener("DOMContentLoaded", loadList);
     </script>
 </body>
 
