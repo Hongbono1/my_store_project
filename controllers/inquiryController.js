@@ -90,9 +90,36 @@ export const createInquiry = async (req, res) => {
     }
 };
 
-// 문의 목록 조회
+// 문의 목록 조회 + Health Check (Mall Hankook 패턴)
 export const getInquiryList = async (req, res) => {
     try {
+        // Mall Hankook 표준: Health Check 처리
+        if (req.query.health === 'check') {
+            console.log("🏥 Mall Hankook API Health Check 요청");
+            
+            // 데이터베이스 연결 테스트
+            const healthTest = await pool.query('SELECT NOW() as server_time, version() as pg_version');
+            
+            return res.json({
+                success: true,
+                service: "Mall Hankook Inquiry API",
+                status: "healthy",
+                timestamp: new Date().toISOString(),
+                database: {
+                    connected: true,
+                    server_time: healthTest.rows[0].server_time,
+                    version: healthTest.rows[0].pg_version.split(' ')[0] + ' ' + healthTest.rows[0].pg_version.split(' ')[1]
+                },
+                upload_dir: uploadDir,
+                endpoints: [
+                    "GET /api/inquiry - 문의 목록",
+                    "POST /api/inquiry - 문의 등록 (이미지 업로드 지원)",
+                    "GET /api/inquiry/:id - 문의 상세"
+                ]
+            });
+        }
+
+        // 일반 목록 조회 (기존 로직)
         const result = await pool.query(`
             SELECT 
                 id, 
@@ -100,16 +127,36 @@ export const getInquiryList = async (req, res) => {
                 user_name, 
                 created_at,
                 CASE WHEN answer IS NOT NULL THEN true ELSE false END as has_answer,
-                CASE WHEN file_paths IS NOT NULL THEN JSON_ARRAY_LENGTH(file_paths::json) ELSE 0 END as file_count
+                CASE WHEN file_paths IS NOT NULL AND file_paths::text != 'null' AND file_paths::text != '[]' 
+                     THEN JSON_ARRAY_LENGTH(file_paths::json) 
+                     ELSE 0 END as file_count
             FROM inquiry 
             ORDER BY id DESC
             LIMIT 50
         `);
         
+        console.log(`📋 문의 목록 조회: ${result.rows.length}건`);
         res.json(result.rows);
 
     } catch (err) {
-        console.error("❌ 문의 목록 조회 오류:", err);
+        console.error("❌ 문의 목록 조회/Health Check 오류:", err);
+        
+        // Health Check 실패 시 상세 정보 제공
+        if (req.query.health === 'check') {
+            return res.status(500).json({ 
+                success: false,
+                service: "Mall Hankook Inquiry API",
+                status: "unhealthy",
+                error: err.message,
+                timestamp: new Date().toISOString(),
+                database: {
+                    connected: false,
+                    error: err.code || "UNKNOWN_ERROR"
+                }
+            });
+        }
+        
+        // 일반 목록 조회 실패
         res.status(500).json({ 
             success: false, 
             error: "서버 오류가 발생했습니다." 
@@ -152,17 +199,20 @@ export const getInquiryDetail = async (req, res) => {
         }
 
         const inquiry = result.rows[0];
-        // JSON 파일 경로 파싱
+        
+        // JSON 파일 경로 파싱 (Mall Hankook 패턴)
         if (inquiry.file_paths) {
             try {
                 inquiry.file_paths = JSON.parse(inquiry.file_paths);
             } catch (parseError) {
+                console.warn("⚠️ file_paths JSON 파싱 오류:", parseError);
                 inquiry.file_paths = [];
             }
         } else {
             inquiry.file_paths = [];
         }
 
+        console.log(`📋 문의 상세 조회: ID ${id}, 첨부파일 ${inquiry.file_paths.length}개`);
         res.json(inquiry);
 
     } catch (err) {
@@ -173,3 +223,28 @@ export const getInquiryDetail = async (req, res) => {
         });
     }
 };
+
+// inquiryregister.html 스크립트 수정 부분
+// 6. 페이지 로드 시 초기화
+document.addEventListener("DOMContentLoaded", function() {
+    loadComponents();
+    
+    // Mall Hankook API 헬스체크 (에러 처리 강화)
+    fetch("/api/inquiry?health=check")
+        .then(async res => {
+            console.log("🏥 API Health Check Status:", res.status);
+            
+            if (res.ok) {
+                const healthData = await res.json();
+                console.log("✅ Mall Hankook API 정상 작동");
+                console.log("📊 Health Data:", healthData);
+            } else {
+                const errorData = await res.json();
+                console.warn("⚠️ API Health Check 실패:");
+                console.warn("📊 Error Data:", errorData);
+            }
+        })
+        .catch(err => {
+            console.error("❌ API Health Check 네트워크 오류:", err.message);
+        });
+});
