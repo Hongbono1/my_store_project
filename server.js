@@ -488,3 +488,10 @@ app.use((req, res) => {
   }
   res.status(404).send("<h1>Not Found</h1>");
 });
+
+// ✅ 서버 리슨 (맨 마지막에 위치)
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 MALL HANKOOK server listening on http://127.0.0.1:${PORT}`);
+});
