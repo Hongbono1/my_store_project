@@ -31,6 +31,7 @@ import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryRouter from "./routes/inquiryRouter.js";
+import inquiryDetailRouter from "./routes/inquiryDetailRouter.js";
 
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
@@ -127,6 +128,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /* ✅ 문의 API 라우트 */
 app.use("/api/inquiry", inquiryRouter);
+app.use("/api/inquiry", inquiryDetailRouter);
 
 
 /* API 라우트 설정 */
@@ -491,6 +493,7 @@ app.use((req, res) => {
 
 // ✅ 서버 리슨 (맨 마지막에 위치)
 const PORT = process.env.PORT || 3000;
+
 
 app.listen(PORT, () => {
   console.log(`🚀 MALL HANKOOK server listening on http://127.0.0.1:${PORT}`);
