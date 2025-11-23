@@ -30,6 +30,8 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
+import inquiryRouter from "./routes/inquiryRouter.js";
+import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
 // 공연/예술 테이블 자동 생성
@@ -77,9 +79,6 @@ async function initPerformingArtsTables() {
 }
 
 initPerformingArtsTables();
-
-
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -143,7 +142,8 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
-
+app.use("/api/inquiry", inquiryRouter);
+app.use("/api/local-rank", localRankRouter);
 
 // ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
 app.get("/admin/check-table", async (req, res) => {
@@ -372,9 +372,6 @@ app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
-
-
-
 /* ✅ HTML 직접 라우트 */
 app.get("/hotsubcategory", (req, res) => {
   res.sendFile(path.join(__dirname, "public2", "hotsubcategory.html"));
@@ -382,7 +379,6 @@ app.get("/hotsubcategory", (req, res) => {
 app.get("/hotblogdetail", (req, res) => {
   res.sendFile(path.join(__dirname, "public2", "hotblogdetail.html"));
 });
-
 
 /* 사업자 인증 프록시 */
 app.post("/verify-biz", async (req, res) => {

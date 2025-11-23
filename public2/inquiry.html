@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>문의 게시판 | MALL HANKOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .neo-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            box-shadow:
+                8px 8px 16px rgba(0, 0, 0, 0.15),
+                -8px -8px 16px rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .neo-item {
+            background: rgba(255, 255, 255, 0.6);
+            padding: 18px 22px;
+            border-radius: 1rem;
+            box-shadow:
+                inset 3px 3px 6px rgba(0, 0, 0, 0.1),
+                inset -3px -3px 8px rgba(255, 255, 255, 0.8);
+            transition: all 0.25s ease;
+        }
+
+        .neo-item:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                inset 1px 1px 4px rgba(0, 0, 0, 0.12),
+                inset -2px -2px 6px rgba(255, 255, 255, 0.9);
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
+
+    <!-- Header -->
+    <div id="header"></div>
+
+    <main class="max-w-4xl mx-auto px-6 pt-28 pb-20">
+
+        <!-- 제목 + 버튼 -->
+        <div class="flex justify-between items-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-800">
+                문의 게시판
+            </h1>
+
+            <a href="/inquiryWrite.html"
+                class="neo-card px-6 py-3 text-lg font-semibold text-indigo-700 hover:scale-105 transition">
+                문의하기
+            </a>
+        </div>
+
+        <!-- 리스트 -->
+        <div id="boardList" class="space-y-6"></div>
+
+    </main>
+
+    <!-- Footer -->
+    <div id="footer"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // Header/Footer 로드
+            fetch("/components/header.html")
+                .then(res => res.text())
+                .then(html => (document.getElementById("header").innerHTML = html));
+
+            fetch("/components/footer.html")
+                .then(res => res.text())
+                .then(html => (document.getElementById("footer").innerHTML = html));
+
+            loadBoardList();
+        });
+
+        async function loadBoardList() {
+            try {
+                const res = await fetch("/api/inquiry");
+                const list = await res.json();
+
+                const wrap = document.getElementById("boardList");
+
+                // 문의 없음
+                if (!Array.isArray(list) || list.length === 0) {
+                    wrap.innerHTML = `
+                        <div class="neo-card p-12 text-center text-gray-500 text-xl">
+                            등록된 문의가 없습니다.
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 목록 출력
+                wrap.innerHTML = list
+                    .map(
+                        (item) => `
+                    <a href="/inquiryDetail.html?id=${item.id}" class="block neo-item">
+                        <div class="font-semibold text-xl text-gray-800 mb-1">${item.title}</div>
+                        <div class="text-gray-600 text-sm">
+                            ${item.user_name} · ${new Date(item.created_at).toLocaleString()}
+                        </div>
+                    </a>
+                `
+                    )
+                    .join("");
+            } catch (error) {
+                console.error(error);
+                document.getElementById("boardList").innerHTML = `
+                    <div class="neo-card p-12 text-center text-gray-500 text-xl">
+                        데이터를 불러오는 중 오류가 발생했습니다.
+                    </div>
+                `;
+            }
+        }
+    </script>
+
+</body>
+
+</html>
