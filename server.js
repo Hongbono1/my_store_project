@@ -121,6 +121,7 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use("/api/inquiry", inquiryRouter);
 
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
@@ -143,7 +144,7 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
-app.use("/api/inquiry", inquiryRouter);
+
 
 // Open Store API 라우트
 app.use("/api/open/register", openregisterRouter);
