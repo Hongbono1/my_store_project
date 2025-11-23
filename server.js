@@ -349,15 +349,16 @@ app.get("/admin/check-storepride-data", async (req, res) => {
   }
 });
 
-/* 정적 파일 */
+/* 정적 파일 서빙 */
 // ✅ HTML 파일은 캐시 방지 (항상 최신 버전 로드)
 app.use(express.static(path.join(__dirname, "public2"), { 
   extensions: ["html"],
-  setHeaders: (res, path) => {
-    if (path.endsWith('.html')) {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('Last-Modified', new Date().toUTCString());
     }
   }
 }));
@@ -487,3 +488,17 @@ app.use((req, res) => {
 /* 서버 시작 */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ server on :${PORT}`));
+
+// 개발자 도구 콘솔에서 실행
+fetch('/api/inquiry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        title: '테스트',
+        content: '테스트 내용',
+        user_name: '테스터'
+    })
+})
+.then(res => res.json())
+.then(data => console.log('응답:', data))
+.catch(err => console.error('오류:', err));

@@ -7,6 +7,11 @@
     <title>문의 등록 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- 캐시 방지 메타 태그 추가 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <style>
         .neo-card {
             background: rgba(255, 255, 255, 0.8);
@@ -40,6 +45,12 @@
     <main class="max-w-2xl mx-auto py-20 px-4">
         <div class="neo-card p-8">
             <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">문의하기</h1>
+            
+            <!-- 디버깅 정보 표시 -->
+            <div class="mb-4 p-3 bg-blue-50 rounded-lg text-sm">
+                <p><strong>API 엔드포인트:</strong> POST /api/inquiry</p>
+                <p><strong>버전:</strong> 2024-11-23 v2.0</p>
+            </div>
             
             <form id="inquiryForm" class="space-y-6">
                 <div>
@@ -97,6 +108,8 @@
     <div id="footer"></div>
 
     <script>
+        console.log("🚀 inquiryregister.html 로드 완료 - v2024.11.23.2");
+        
         // Header/Footer 로드 (Mall Hankook 패턴)
         fetch("/components/header.html")
             .then(res => res.text())
@@ -124,9 +137,12 @@
             submitBtn.classList.add("opacity-50");
             
             try {
-                console.log("📤 Mall Hankook API 호출: /api/inquiry");
+                // API 엔드포인트 명시적 정의 (캐시 문제 방지)
+                const API_ENDPOINT = "/api/inquiry";
+                console.log(`📤 Mall Hankook API 호출: ${API_ENDPOINT}`);
+                console.log("🌍 현재 도메인:", window.location.origin);
                 
-                // FormData를 JSON으로 변환 (표준 패턴)
+                // FormData를 JSON으로 변환 (Mall Hankook 표준 패턴)
                 const requestData = {
                     title: formData.get('title')?.trim(),
                     content: formData.get('content')?.trim(),
@@ -141,18 +157,29 @@
                 
                 console.log("📤 전송 데이터:", requestData);
                 
-                // ✅ 올바른 Mall Hankook API 엔드포인트 사용
-                const response = await fetch("/api/inquiry", {
+                // 캐시 방지를 위한 timestamp 추가
+                const cacheBuster = `?t=${Date.now()}`;
+                const fullUrl = `${API_ENDPOINT}${cacheBuster}`;
+                console.log(`🔗 전체 요청 URL: ${fullUrl}`);
+                
+                // Mall Hankook API 호출 (캐시 방지 헤더 추가)
+                const response = await fetch(fullUrl, {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "Cache-Control": "no-cache",
+                        "Pragma": "no-cache"
                     },
                     body: JSON.stringify(requestData)
                 });
                 
                 console.log("🌐 HTTP 응답 상태:", response.status, response.statusText);
+                console.log("🌐 응답 헤더:", Object.fromEntries(response.headers.entries()));
                 
                 if (!response.ok) {
+                    // 상세한 에러 정보 수집
+                    const errorText = await response.text();
+                    console.error("❌ 서버 응답 내용:", errorText);
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
@@ -190,10 +217,16 @@
                     <div class="p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
                         <p class="font-semibold">❌ 문의 등록에 실패했습니다.</p>
                         <p class="text-sm mt-1">오류: ${error.message}</p>
-                        <button onclick="location.reload()" 
-                                class="mt-2 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
-                            다시 시도
-                        </button>
+                        <div class="mt-2 space-x-2">
+                            <button onclick="location.reload()" 
+                                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                                페이지 새로고침
+                            </button>
+                            <button onclick="document.getElementById('result').classList.add('hidden')" 
+                                    class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700">
+                                닫기
+                            </button>
+                        </div>
                     </div>
                 `;
                 resultDiv.classList.remove("hidden");
@@ -203,6 +236,16 @@
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
                 submitBtn.classList.remove("opacity-50");
+            }
+        });
+
+        // 페이지 로드 시 API 엔드포인트 확인
+        window.addEventListener('load', async () => {
+            try {
+                const pingResponse = await fetch('/api/inquiry?ping=true');
+                console.log("🏥 API 헬스체크:", pingResponse.status);
+            } catch (error) {
+                console.warn("⚠️ API 접근 불가:", error.message);
             }
         });
     </script>
