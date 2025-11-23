@@ -1,19 +1,22 @@
+// routes/inquiryRouter.js
+
 import express from "express";
 import {
-    createInquiry,
+    uploadInquiry,
+    registerInquiry,
     getInquiryList,
     getInquiryDetail
 } from "../controllers/inquiryController.js";
 
 const router = express.Router();
 
-// 문의 등록
-router.post("/", createInquiry);
+// 등록 (파일 포함)
+router.post("/register", uploadInquiry.single("file"), registerInquiry);
 
-// 문의 전체 목록
-router.get("/", getInquiryList);
+// 목록
+router.get("/list", getInquiryList);
 
-// 문의 상세
+// 상세
 router.get("/:id", getInquiryDetail);
 
 export default router;

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>문의 상세 | MALL HANKOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50">
+    <div id="header"></div>
+
+    <main class="max-w-3xl mx-auto py-20 px-4">
+        <div id="detailBox" class="bg-white p-8 shadow-xl rounded-2xl border"></div>
+
+        <div class="mt-10 text-right">
+            <a href="/inquiry.html" 
+               class="px-6 py-3 bg-gray-400 text-white rounded-xl hover:bg-gray-500">
+                목록으로
+            </a>
+        </div>
+    </main>
+
+    <div id="footer"></div>
+
+    <script>
+        fetch("/components/header.html")
+            .then(res => res.text())
+            .then(html => header.innerHTML = html);
+
+        fetch("/components/footer.html")
+            .then(res => res.text())
+            .then(html => footer.innerHTML = html);
+
+        async function loadDetail() {
+            const params = new URLSearchParams(location.search);
+            const id = params.get("id");
+
+            if (!id) return alert("잘못된 접근입니다.");
+
+            const res = await fetch(`/inquiry/${id}`);
+            const data = await res.json();
+
+            if (!data.success) {
+                alert("문의 정보를 불러올 수 없습니다.");
+                return;
+            }
+
+            const d = data.detail;
+
+            const box = document.getElementById("detailBox");
+            box.innerHTML = `
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">${d.title}</h2>
+
+                <div class="text-gray-600 mb-2">1차 유형: ${d.primary_category}</div>
+                <div class="text-gray-600 mb-6">2차 유형: ${d.secondary_category}</div>
+
+                <div class="whitespace-pre-wrap text-gray-800 mb-10">${d.content}</div>
+
+                ${d.file_path ? `
+                    <div class="mt-4">
+                        <a href="${d.file_path}" target="_blank"
+                           class="text-indigo-600 underline">
+                            첨부파일 다운로드
+                        </a>
+                    </div>
+                ` : "" }
+
+                <div class="mt-10 text-gray-500 text-sm">
+                    등록일: ${d.created_at}
+                </div>
+            `;
+        }
+
+        loadDetail();
+    </script>
+
+</body>
+</html>

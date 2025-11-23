@@ -1,62 +1,78 @@
+// controllers/inquiryController.js
 import pool from "../config/db.js";
+import multer from "multer";
+import path from "path";
+
+// 업로드 설정
+const storage = multer.diskStorage({
+    destination(req, file, cb) {
+        cb(null, "public/uploads/inquiry");
+    },
+    filename(req, file, cb) {
+        const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, unique + path.extname(file.originalname));
+    }
+});
+export const uploadInquiry = multer({ storage });
 
 // 문의 등록
-export const createInquiry = async (req, res) => {
+export const registerInquiry = async (req, res) => {
     try {
-        const { title, user_name, user_phone, content } = req.body;
-
-        const sql = `
-            INSERT INTO inquiry (title, user_name, user_phone, content)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id
-        `;
-
-        const result = await pool.query(sql, [
+        const {
+            primary_category,
+            secondary_category,
             title,
-            user_name,
-            user_phone || null,
-            content
-        ]);
+            content,
+            email,
+            phone
+        } = req.body;
 
-        res.json({ success: true, id: result.rows[0].id });
-    } catch (err) {
-        console.error("❌ createInquiry error:", err);
-        res.status(500).json({ success: false, error: "Server Error" });
+        const file_path = req.file ? `/uploads/inquiry/${req.file.filename}` : null;
+
+        await pool.query(
+            `INSERT INTO inquiry 
+            (primary_category, secondary_category, title, content, email, phone, file_path)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [primary_category, secondary_category, title, content, email, phone, file_path]
+        );
+
+        return res.json({ success: true });
+
+    } catch (error) {
+        console.error("문의 등록 오류:", error);
+        return res.status(500).json({ success: false, message: "서버 오류" });
     }
 };
 
-// 문의 목록
+// 전체 목록
 export const getInquiryList = async (req, res) => {
     try {
-        const sql = `
-            SELECT id, title, user_name, created_at
-            FROM inquiry
-            ORDER BY id DESC
-        `;
-
-        const result = await pool.query(sql);
-        res.json(result.rows);
-    } catch (err) {
-        console.error("❌ getInquiryList error:", err);
-        res.status(500).json({ error: "Server Error" });
+        const result = await pool.query(
+            `SELECT id, primary_category, title, created_at 
+             FROM inquiry ORDER BY id DESC`
+        );
+        res.json({ success: true, list: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false });
     }
 };
 
-// 문의 상세
+// 상세페이지
 export const getInquiryDetail = async (req, res) => {
-    const { id } = req.params;
-
     try {
-        const sql = `SELECT * FROM inquiry WHERE id = $1`;
-        const result = await pool.query(sql, [id]);
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT * FROM inquiry WHERE id=$1`,
+            [id]
+        );
 
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: "Not Found" });
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "문의 없음" });
         }
 
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error("❌ getInquiryDetail error:", err);
-        res.status(500).json({ error: "Server Error" });
+        res.json({ success: true, detail: result.rows[0] });
+
+    } catch (error) {
+        res.status(500).json({ success: false });
     }
 };
