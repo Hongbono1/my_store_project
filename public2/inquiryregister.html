@@ -7,11 +7,11 @@
     <title>문의 등록 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 강력한 캐시 방지 -->
+    <!-- Mall Hankook 표준: 강력한 캐시 방지 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="cache-version" content="20241123-v4">
+    <meta name="version" content="v5.0-final">
     
     <style>
         .neo-card {
@@ -47,11 +47,13 @@
         <div class="neo-card p-8">
             <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">문의하기</h1>
             
-            <!-- Mall Hankook 아키텍처 확인 -->
-            <div class="mb-4 p-3 bg-blue-50 rounded-lg text-sm">
-                <p><strong>🏗️ Mall Hankook API:</strong> POST /api/inquiry</p>
-                <p><strong>🔧 Controller-Router:</strong> inquiryController.js + inquiryRouter.js</p>
-                <p><strong>📅 버전:</strong> 2024-11-23 v4.0 (캐시무효화)</p>
+            <!-- Mall Hankook 아키텍처 정보 -->
+            <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <h3 class="font-bold text-blue-800 mb-2">🏗️ Mall Hankook API Architecture</h3>
+                <p class="text-sm text-blue-700">✅ Endpoint: <code class="bg-blue-100 px-2 py-1 rounded">POST /api/inquiry</code></p>
+                <p class="text-sm text-blue-700">📁 Controller: inquiryController.createInquiry</p>
+                <p class="text-sm text-blue-700">🛣️ Router: inquiryRouter mounted at /api/inquiry</p>
+                <p class="text-sm text-blue-700">📅 Version: v5.0-final</p>
             </div>
             
             <form id="inquiryForm" class="space-y-6">
@@ -97,6 +99,7 @@
                         취소
                     </button>
                     <button type="submit" 
+                            id="submitBtn"
                             class="flex-1 py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
                         문의 등록
                     </button>
@@ -110,119 +113,121 @@
     <div id="footer"></div>
 
     <script>
-        // Mall Hankook 프로젝트 ES6 modules 패턴
-        console.log("🚀 Mall Hankook inquiryregister.html v4.0 - 캐시 무효화 강화");
-        console.log("🏗️ 아키텍처: Controller-Router 분리 패턴");
+        // Mall Hankook 프로젝트 v5.0 - 최종 수정본
+        console.log("🚀 Mall Hankook inquiryregister.html v5.0-final");
+        console.log("🏗️ Architecture: Controller-Router separation pattern");
+        console.log("📡 API Endpoint: POST /api/inquiry");
         
-        // Header/Footer 로드 (정적 파일 서빙)
-        fetch("/components/header.html?v=" + Date.now())
-            .then(res => res.text())
-            .then(html => document.getElementById("header").innerHTML = html)
-            .catch(err => console.warn("Header 로드 실패:", err));
+        // 1. Header/Footer 컴포넌트 로드
+        async function loadComponents() {
+            try {
+                const headerRes = await fetch("/components/header.html");
+                if (headerRes.ok) {
+                    document.getElementById("header").innerHTML = await headerRes.text();
+                }
+            } catch (err) {
+                console.warn("Header 로드 실패:", err);
+            }
 
-        fetch("/components/footer.html?v=" + Date.now())
-            .then(res => res.text())
-            .then(html => document.getElementById("footer").innerHTML = html)
-            .catch(err => console.warn("Footer 로드 실패:", err));
+            try {
+                const footerRes = await fetch("/components/footer.html");
+                if (footerRes.ok) {
+                    document.getElementById("footer").innerHTML = await footerRes.text();
+                }
+            } catch (err) {
+                console.warn("Footer 로드 실패:", err);
+            }
+        }
 
-        // Mall Hankook 표준: 문의 등록 처리
-        document.getElementById("inquiryForm").addEventListener("submit", async function handleInquirySubmit(e) {
+        // 2. Mall Hankook 표준: 문의 등록 함수
+        async function submitInquiry(formData) {
+            // Mall Hankook API 엔드포인트 - 절대 변경하지 말 것!
+            const MALL_HANKOOK_INQUIRY_API = "/api/inquiry";
+            
+            console.log("📤 Mall Hankook API 호출:", MALL_HANKOOK_INQUIRY_API);
+            
+            // FormData → JSON 변환 (Mall Hankook 표준 패턴)
+            const payload = {
+                title: formData.get('title')?.trim(),
+                content: formData.get('content')?.trim(),
+                user_name: formData.get('user_name')?.trim(),
+                user_phone: formData.get('user_phone')?.trim() || null
+            };
+            
+            console.log("📤 Payload:", payload);
+            
+            // Mall Hankook 표준 API 호출
+            const response = await fetch(MALL_HANKOOK_INQUIRY_API, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Cache-Control": "no-cache"
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            console.log("📥 Response Status:", response.status, response.statusText);
+            console.log("📥 Response Headers:", Object.fromEntries(response.headers.entries()));
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("❌ Error Response:", errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Content-Type 검증 (JSON만 허용)
+            const contentType = response.headers.get("content-type");
+            if (!contentType?.includes("application/json")) {
+                const responseText = await response.text();
+                console.error("❌ Non-JSON Response:", responseText);
+                throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.");
+            }
+            
+            return await response.json();
+        }
+
+        // 3. 폼 제출 이벤트 핸들러
+        document.getElementById("inquiryForm").addEventListener("submit", async function(e) {
             e.preventDefault();
             
             const form = e.target;
             const formData = new FormData(form);
             const resultDiv = document.getElementById("result");
+            const submitBtn = document.getElementById("submitBtn");
             
-            // 버튼 상태 관리 (UX 개선)
-            const submitBtn = form.querySelector('button[type="submit"]');
+            // UI 상태 관리
             const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
             submitBtn.textContent = "등록 중...";
             submitBtn.classList.add("opacity-50");
             
             try {
-                // Mall Hankook 아키텍처: API 엔드포인트 명시적 정의
-                const MALL_HANKOOK_API = "/api/inquiry";
-                console.log(`📤 Mall Hankook API 호출: ${MALL_HANKOOK_API}`);
-                console.log("🌐 Base URL:", window.location.origin);
-                console.log("📋 Controller: inquiryController.createInquiry");
-                console.log("🛣️ Router: inquiryRouter POST /");
-                
-                // FormData → JSON 변환 (표준 패턴)
-                const requestPayload = {
-                    title: formData.get('title')?.trim(),
-                    content: formData.get('content')?.trim(),
-                    user_name: formData.get('user_name')?.trim(),
-                    user_phone: formData.get('user_phone')?.trim() || null
-                };
-                
                 // 클라이언트 측 유효성 검사
-                if (!requestPayload.title || !requestPayload.content || !requestPayload.user_name) {
+                const title = formData.get('title')?.trim();
+                const content = formData.get('content')?.trim();
+                const userName = formData.get('user_name')?.trim();
+                
+                if (!title || !content || !userName) {
                     throw new Error("제목, 이름, 문의 내용은 필수 입력사항입니다.");
                 }
                 
-                console.log("📤 Request Payload:", requestPayload);
+                // Mall Hankook API 호출
+                const result = await submitInquiry(formData);
+                console.log("✅ Success Response:", result);
                 
-                // 강력한 캐시 무효화 + 타임스탬프
-                const cacheBuster = `?cache_bust=${Date.now()}&v=4`;
-                const finalURL = `${MALL_HANKOOK_API}${cacheBuster}`;
-                console.log(`🔗 Final URL: ${finalURL}`);
-                
-                // Mall Hankook 표준 API 호출
-                const response = await fetch(finalURL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Pragma": "no-cache",
-                        "X-Requested-With": "XMLHttpRequest",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify(requestPayload)
-                });
-                
-                console.log("🌐 Response Status:", response.status, response.statusText);
-                console.log("🌐 Response Headers:", Object.fromEntries(response.headers.entries()));
-                console.log("🌐 Response URL:", response.url);
-                
-                // 응답 상태 검증 (Mall Hankook 패턴)
-                if (!response.ok) {
-                    console.error("❌ HTTP Error Response");
-                    
-                    let errorDetail;
-                    try {
-                        errorDetail = await response.text();
-                        console.error("❌ Error Response Body:", errorDetail);
-                    } catch (parseError) {
-                        console.error("❌ Failed to read error response:", parseError);
-                        errorDetail = `HTTP ${response.status}: ${response.statusText}`;
-                    }
-                    
-                    throw new Error(`서버 오류 (${response.status}): ${errorDetail}`);
-                }
-                
-                // JSON 파싱 전 Content-Type 검증
-                const contentType = response.headers.get("content-type");
-                console.log("📄 Content-Type:", contentType);
-                
-                if (!contentType || !contentType.includes("application/json")) {
-                    const textResponse = await response.text();
-                    console.error("❌ Non-JSON Response:", textResponse);
-                    throw new Error("서버가 JSON 형식이 아닌 응답을 반환했습니다.");
-                }
-                
-                const result = await response.json();
-                console.log("📥 Success Response:", result);
-                
-                // Mall Hankook 표준 응답 형식 처리
+                // Mall Hankook 표준 응답 처리
                 if (result.success === true) {
-                    // 성공 처리
+                    // 성공 UI 표시
                     resultDiv.innerHTML = `
                         <div class="p-4 bg-green-100 border border-green-300 text-green-700 rounded-lg">
-                            <p class="font-semibold">✅ 문의가 성공적으로 등록되었습니다!</p>
-                            <p class="text-sm mt-1">📋 문의 번호: ${result.data.id}</p>
+                            <div class="flex items-center mb-2">
+                                <span class="text-2xl mr-2">✅</span>
+                                <span class="font-bold">문의가 성공적으로 등록되었습니다!</span>
+                            </div>
+                            <p class="text-sm">📋 문의 번호: ${result.data.id}</p>
                             <p class="text-sm">⏰ 등록 시간: ${new Date(result.data.created_at).toLocaleString('ko-KR')}</p>
-                            <p class="text-sm text-green-600 mt-2">3초 후 문의 목록으로 이동합니다...</p>
+                            <p class="text-sm text-green-600 mt-2 font-medium">3초 후 문의 목록으로 자동 이동합니다...</p>
                         </div>
                     `;
                     resultDiv.classList.remove("hidden");
@@ -237,26 +242,28 @@
                     
                 } else {
                     // 비즈니스 로직 에러
-                    throw new Error(result.error || "서버에서 알 수 없는 오류가 발생했습니다.");
+                    throw new Error(result.error || "알 수 없는 서버 오류가 발생했습니다.");
                 }
                 
             } catch (error) {
                 console.error("❌ 문의 등록 실패:", error);
-                console.error("❌ Error Stack:", error.stack);
                 
-                // 사용자 친화적 에러 메시지
+                // 에러 UI 표시
                 resultDiv.innerHTML = `
                     <div class="p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
-                        <p class="font-semibold">❌ 문의 등록에 실패했습니다</p>
-                        <p class="text-sm mt-1">🔍 오류 내용: ${error.message}</p>
-                        <div class="mt-3 space-x-2">
+                        <div class="flex items-center mb-2">
+                            <span class="text-2xl mr-2">❌</span>
+                            <span class="font-bold">문의 등록에 실패했습니다</span>
+                        </div>
+                        <p class="text-sm mb-3">오류 내용: ${error.message}</p>
+                        <div class="space-x-2">
                             <button onclick="location.reload()" 
-                                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                                    class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition">
                                 🔄 페이지 새로고침
                             </button>
                             <button onclick="document.getElementById('result').classList.add('hidden')" 
-                                    class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition">
-                                ❌ 닫기
+                                    class="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition">
+                                ✕ 닫기
                             </button>
                         </div>
                     </div>
@@ -271,33 +278,29 @@
             }
         });
 
-        // Mall Hankook 패턴: API 헬스체크
-        window.addEventListener('load', async function checkAPIHealth() {
-            try {
-                console.log("🏥 Mall Hankook API 헬스체크 시작...");
-                
-                const healthResponse = await fetch('/api/inquiry?health=check&t=' + Date.now(), {
-                    method: 'GET',
-                    headers: { 'Cache-Control': 'no-cache' }
+        // 4. 페이지 로드 시 초기화
+        document.addEventListener("DOMContentLoaded", function() {
+            loadComponents();
+            
+            // Mall Hankook API 헬스체크
+            fetch("/api/inquiry?health=check")
+                .then(res => {
+                    console.log("🏥 API Health Check:", res.status);
+                    if (res.status === 200) {
+                        console.log("✅ Mall Hankook API 정상 작동");
+                    }
+                })
+                .catch(err => {
+                    console.warn("⚠️ API Health Check 실패:", err.message);
                 });
-                
-                console.log("🏥 API Health Status:", healthResponse.status);
-                
-                if (healthResponse.status === 200) {
-                    console.log("✅ Mall Hankook API 정상 작동");
-                } else {
-                    console.warn("⚠️ Mall Hankook API 응답 이상:", healthResponse.status);
-                }
-                
-            } catch (healthError) {
-                console.error("❌ Mall Hankook API 헬스체크 실패:", healthError.message);
-            }
         });
 
-        // 디버깅: 모든 fetch 요청 감시
+        // 5. 디버깅: fetch 요청 모니터링
         const originalFetch = window.fetch;
         window.fetch = function(...args) {
-            console.log("🔍 Fetch Intercept:", args[0], args[1]?.method || 'GET');
+            const url = args[0];
+            const options = args[1];
+            console.log(`🔍 Fetch Monitor: ${options?.method || 'GET'} ${url}`);
             return originalFetch.apply(this, args);
         };
     </script>

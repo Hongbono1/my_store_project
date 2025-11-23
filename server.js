@@ -143,7 +143,6 @@ app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
 app.use("/api/inquiry", inquiryRouter);
-app.use("/api/local-rank", localRankRouter);
 
 // Open Store API 라우트
 app.use("/api/open/register", openregisterRouter);
