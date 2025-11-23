@@ -5,7 +5,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fs from "fs";
-import { normalizeScores } from "./utils/townScore.js";
 
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
@@ -31,10 +30,7 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
-<<<<<<< HEAD
 import inquiryRouter from "./routes/inquiryRouter.js";
-=======
->>>>>>> ce90c4e25af1b6dfd662c2fa8f07abf04566bd75
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
@@ -129,7 +125,7 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* API 라우트 먼저 설정 */
+/* API 라우트 설정 */
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
@@ -145,17 +141,23 @@ app.use("/api/localboard", localboardRouter);
 app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
-app.use("/api/local-rank", localRankRouter);
 app.use("/api/best-pick", bestpickRouter);
 app.use("/api/inquiry", inquiryRouter);
 app.use("/api/local-rank", localRankRouter);
 
-// ✅ 임시: 테이블 구조 확인 및 컬럼 추가 엔드포인트
+// Open Store API 라우트
+app.use("/api/open/register", openregisterRouter);
+app.use("/api/open", openRouter);
+app.use("/api/open", opendetailRouter);
+app.use("/open/register", openregisterRouter);
+app.use("/open", openRouter);
+app.use("/open", opendetailRouter);
+app.use("/openregister", openregisterRouter);
+app.use("/upload", uploadRouter);
+
+// 관리자 엔드포인트들
 app.get("/admin/check-table", async (req, res) => {
   try {
-    const { default: pool } = await import("./db.js");
-    
-    // 현재 테이블 구조 확인
     const columns = await pool.query(`
       SELECT column_name, data_type, is_nullable 
       FROM information_schema.columns 
@@ -163,7 +165,6 @@ app.get("/admin/check-table", async (req, res) => {
       ORDER BY ordinal_position;
     `);
     
-    // detail_address 컬럼 존재 여부 확인
     const hasDetailAddress = columns.rows.some(col => col.column_name === 'detail_address');
     
     if (!hasDetailAddress) {
@@ -171,7 +172,6 @@ app.get("/admin/check-table", async (req, res) => {
       await pool.query(`ALTER TABLE open_stores ADD COLUMN detail_address TEXT`);
       console.log("✅ detail_address 컬럼이 추가되었습니다!");
       
-      // 업데이트된 구조 재조회
       const updatedColumns = await pool.query(`
         SELECT column_name, data_type, is_nullable 
         FROM information_schema.columns 
@@ -299,18 +299,6 @@ app.get("/admin/check-storepride-table", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// ✅ 새로운 명확한 API 엔드포인트
-app.use("/api/open/register", openregisterRouter); // POST /api/open/register (API)
-app.use("/api/open", openRouter);               // GET /api/open (목록 API)
-app.use("/api/open", opendetailRouter);         // GET /api/open/:id (상세 API)
-app.use("/open/register", openregisterRouter); // POST /open/register (호환성)
-app.use("/open", openRouter);                   // GET /open (목록)
-app.use("/open", opendetailRouter);             // GET /open/:id (상세)
-
-// ✅ 기존 호환성 유지 (단계적 마이그레이션)
-app.use("/openregister", openregisterRouter);  // 구버전 지원
-app.use("/upload", uploadRouter);
 
 // ✅ Store Pride 데이터 확인 엔드포인트 추가
 app.get("/admin/check-storepride-data", async (req, res) => {
@@ -499,11 +487,3 @@ app.use((req, res) => {
 /* 서버 시작 */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ server on :${PORT}`));
-
-/* 20분마다 인구 보정 정규화 실행 */
-setInterval(async () => {
-  await normalizeScores();
-}, 20 * 60 * 1000); // 20분 = 1,200,000ms
-
-// 서버 시작 시 즉시 1회 실행
-normalizeScores();
