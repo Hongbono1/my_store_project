@@ -114,18 +114,20 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const ms = Date.now() - started;
     console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
-    // ✅ POST 요청 특별 로깅
     if (req.method === 'POST') {
       console.log(`🔥 POST 요청 상세: ${req.originalUrl} | Content-Type: ${req.get('content-type') || 'none'}`);
     }
   });
   next();
 });
-app.use("/api/inquiry", inquiryRouter);
 
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+/* ✅ 문의 API 라우트 */
+app.use("/api/inquiry", inquiryRouter);
+
 
 /* API 라우트 설정 */
 app.use("/owner", ownerRouter);
@@ -165,21 +167,21 @@ app.get("/admin/check-table", async (req, res) => {
       WHERE table_name = 'open_stores' 
       ORDER BY ordinal_position;
     `);
-    
+
     const hasDetailAddress = columns.rows.some(col => col.column_name === 'detail_address');
-    
+
     if (!hasDetailAddress) {
       console.log("📝 detail_address 컬럼 추가 중...");
       await pool.query(`ALTER TABLE open_stores ADD COLUMN detail_address TEXT`);
       console.log("✅ detail_address 컬럼이 추가되었습니다!");
-      
+
       const updatedColumns = await pool.query(`
         SELECT column_name, data_type, is_nullable 
         FROM information_schema.columns 
         WHERE table_name = 'open_stores' 
         ORDER BY ordinal_position;
       `);
-      
+
       res.json({
         success: true,
         message: "detail_address 컬럼이 추가되었습니다",
@@ -192,7 +194,7 @@ app.get("/admin/check-table", async (req, res) => {
         columns: columns.rows
       });
     }
-    
+
   } catch (error) {
     console.error("❌ 테이블 구조 확인 오류:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -204,7 +206,7 @@ app.get("/admin/check-storepride-table", async (req, res) => {
   try {
     const { default: pool } = await import("./db.js");
     const results = [];
-    
+
     // 1. store_pride 테이블 확인 및 생성
     const mainTableExists = await pool.query(`
       SELECT EXISTS (
@@ -268,7 +270,7 @@ app.get("/admin/check-storepride-table", async (req, res) => {
       WHERE table_name = 'store_pride' 
       ORDER BY ordinal_position;
     `);
-    
+
     const qasColumns = await pool.query(`
       SELECT column_name, data_type, is_nullable, column_default
       FROM information_schema.columns 
@@ -279,7 +281,7 @@ app.get("/admin/check-storepride-table", async (req, res) => {
     // 4. 데이터 개수 확인
     const prideCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
     const qasCount = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
-    
+
     res.json({
       success: true,
       results,
@@ -294,7 +296,7 @@ app.get("/admin/check-storepride-table", async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error("❌ Store Pride 테이블 체크 중 오류:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -305,7 +307,7 @@ app.get("/admin/check-storepride-table", async (req, res) => {
 app.get("/admin/check-storepride-data", async (req, res) => {
   try {
     const { default: pool } = await import("./db.js");
-    
+
     // 1. 메인 테이블 데이터 조회
     const prideData = await pool.query(`
       SELECT id, store_name, category, phone, address, main_img, free_pr, qa_mode, created_at
@@ -313,9 +315,9 @@ app.get("/admin/check-storepride-data", async (req, res) => {
       ORDER BY created_at DESC 
       LIMIT 5;
     `);
-    
+
     const results = [];
-    
+
     // 2. 각 데이터의 Q&A 조회
     for (const row of prideData.rows) {
       const qasData = await pool.query(`
@@ -324,7 +326,7 @@ app.get("/admin/check-storepride-data", async (req, res) => {
         WHERE pride_id = $1
         ORDER BY qa_type, seq;
       `, [row.id]);
-      
+
       results.push({
         ...row,
         qas: qasData.rows
@@ -334,7 +336,7 @@ app.get("/admin/check-storepride-data", async (req, res) => {
     // 3. 전체 통계
     const totalCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
     const totalQAs = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
-    
+
     res.json({
       success: true,
       data: results,
@@ -343,7 +345,7 @@ app.get("/admin/check-storepride-data", async (req, res) => {
         totalQAs: totalQAs.rows[0].count
       }
     });
-    
+
   } catch (error) {
     console.error("❌ Store Pride 데이터 확인 중 오류:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -351,7 +353,7 @@ app.get("/admin/check-storepride-data", async (req, res) => {
 });
 
 /* 정적 파일 서빙 - 강력한 캐시 방지 */
-app.use(express.static(path.join(__dirname, "public2"), { 
+app.use(express.static(path.join(__dirname, "public2"), {
   extensions: ["html"],
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
@@ -486,21 +488,3 @@ app.use((req, res) => {
   }
   res.status(404).send("<h1>Not Found</h1>");
 });
-
-/* 서버 시작 */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ server on :${PORT}`));
-
-// 개발자 도구 콘솔에서 실행
-fetch('/api/inquiry', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        title: '테스트',
-        content: '테스트 내용',
-        user_name: '테스터'
-    })
-})
-.then(res => res.json())
-.then(data => console.log('응답:', data))
-.catch(err => console.error('오류:', err));

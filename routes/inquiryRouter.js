@@ -1,20 +1,29 @@
+// routes/inquiryRouter.js
 import express from "express";
-import { 
-    createInquiry,
-    getInquiryList,
-    getInquiryDetail,
-    uploadInquiry      // ✅ Multer 미들웨어 import
-} from "../controllers/inquiryController.js";
+import { uploadInquiry, createInquiry } from "../controllers/inquiryController.js";
 
 const router = express.Router();
 
-// POST /api/inquiry - 문의 등록 (이미지 업로드 포함)
-router.post("/", uploadInquiry, createInquiry);  // ✅ uploadInquiry 미들웨어 추가
-
-// GET /api/inquiry - 문의 목록 조회
-router.get("/", getInquiryList);
-
-// GET /api/inquiry/:id - 문의 상세 조회
-router.get("/:id", getInquiryDetail);
+/**
+ * POST /api/inquiry
+ * - server.js 에서 app.use("/api/inquiry", inquiryRouter); 로 마운트하므로
+ *   여기서는 "/" 만 쓰면 최종 경로가 "/api/inquiry"가 됨
+ */
+router.post(
+    "/",
+    (req, res, next) => {
+        uploadInquiry(req, res, function (err) {
+            if (err) {
+                console.error("❌ 문의 이미지 업로드 오류:", err);
+                return res.status(400).json({
+                    ok: false,
+                    message: "이미지 업로드 중 오류가 발생했습니다.",
+                });
+            }
+            next();
+        });
+    },
+    createInquiry
+);
 
 export default router;
