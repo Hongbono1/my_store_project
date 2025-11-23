@@ -4,12 +4,14 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-// ✅ 업로드 디렉토리: public/uploads/inquiry
+// ✅ 문의 업로드 디렉토리 (실제 경로: 프로젝트루트/public/uploads/inquiry)
 const uploadDir = "public/uploads/inquiry";
 
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
     console.log("📁 문의 업로드 폴더 생성:", uploadDir);
+} else {
+    console.log("✅ 문의 업로드 폴더 존재:", uploadDir);
 }
 
 // ✅ Multer 스토리지 설정
@@ -26,13 +28,13 @@ const storage = multer.diskStorage({
     }
 });
 
-// ✅ 최대 3개 이미지 업로드 미들웨어 (필드명: images)
+// ✅ 최대 3개 이미지 업로드 (필드명: images)
 export const uploadInquiry = multer({
     storage,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
+        fileSize: 5 * 1024 * 1024,  // 5MB
         files: 3
-    },
+    }
 }).array("images", 3);
 
 // ✅ 문의 등록 컨트롤러
@@ -47,6 +49,7 @@ export async function createInquiry(req, res) {
             content
         } = req.body;
 
+        // 필수 값 체크
         if (!writer_name || !inquiry_type || !title || !content) {
             return res.status(400).json({
                 ok: false,
