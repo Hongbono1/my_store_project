@@ -1,21 +1,21 @@
 // routes/inquiryRouter.js
 import express from "express";
 import { 
-    registerInquiry,
+    uploadInquiry,
+    createInquiry,
     getInquiryList,
-    getInquiryDetail,
-    uploadInquiry
+    getInquiryDetail 
 } from "../controllers/inquiryController.js";
 
 const router = express.Router();
 
-// POST /api/inquiry/register
-router.post("/register", uploadInquiry.single("file"), registerInquiry);
+// POST /api/inquiry - 문의 등록 (이미지 업로드 포함)
+router.post("/", uploadInquiry, createInquiry);
 
-// GET /api/inquiry
+// GET /api/inquiry - 문의 목록 조회
 router.get("/", getInquiryList);
 
-// GET /api/inquiry/:id
+// GET /api/inquiry/:id - 문의 상세 조회
 router.get("/:id", getInquiryDetail);
 
 export default router;
