@@ -7,10 +7,11 @@
     <title>문의 등록 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 캐시 방지 메타 태그 추가 -->
+    <!-- 강력한 캐시 방지 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="cache-version" content="20241123-v4">
     
     <style>
         .neo-card {
@@ -46,10 +47,11 @@
         <div class="neo-card p-8">
             <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">문의하기</h1>
             
-            <!-- 디버깅 정보 표시 -->
+            <!-- Mall Hankook 아키텍처 확인 -->
             <div class="mb-4 p-3 bg-blue-50 rounded-lg text-sm">
-                <p><strong>✅ 올바른 API 엔드포인트:</strong> POST /api/inquiry</p>
-                <p><strong>버전:</strong> 2024-11-23 v3.0 (수정완료)</p>
+                <p><strong>🏗️ Mall Hankook API:</strong> POST /api/inquiry</p>
+                <p><strong>🔧 Controller-Router:</strong> inquiryController.js + inquiryRouter.js</p>
+                <p><strong>📅 버전:</strong> 2024-11-23 v4.0 (캐시무효화)</p>
             </div>
             
             <form id="inquiryForm" class="space-y-6">
@@ -108,28 +110,30 @@
     <div id="footer"></div>
 
     <script>
-        console.log("🚀 inquiryregister.html v3.0 - API 엔드포인트 수정 완료");
+        // Mall Hankook 프로젝트 ES6 modules 패턴
+        console.log("🚀 Mall Hankook inquiryregister.html v4.0 - 캐시 무효화 강화");
+        console.log("🏗️ 아키텍처: Controller-Router 분리 패턴");
         
-        // Header/Footer 로드
-        fetch("/components/header.html")
+        // Header/Footer 로드 (정적 파일 서빙)
+        fetch("/components/header.html?v=" + Date.now())
             .then(res => res.text())
             .then(html => document.getElementById("header").innerHTML = html)
             .catch(err => console.warn("Header 로드 실패:", err));
 
-        fetch("/components/footer.html")
+        fetch("/components/footer.html?v=" + Date.now())
             .then(res => res.text())
             .then(html => document.getElementById("footer").innerHTML = html)
             .catch(err => console.warn("Footer 로드 실패:", err));
 
-        // 문의 등록 처리 (Mall Hankook API 아키텍처 준수)
-        document.getElementById("inquiryForm").addEventListener("submit", async (e) => {
+        // Mall Hankook 표준: 문의 등록 처리
+        document.getElementById("inquiryForm").addEventListener("submit", async function handleInquirySubmit(e) {
             e.preventDefault();
             
             const form = e.target;
             const formData = new FormData(form);
             const resultDiv = document.getElementById("result");
             
-            // 버튼 상태 관리
+            // 버튼 상태 관리 (UX 개선)
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
@@ -137,13 +141,15 @@
             submitBtn.classList.add("opacity-50");
             
             try {
-                // ✅ 올바른 Mall Hankook API 엔드포인트 (수정 완료)
-                const API_ENDPOINT = "/api/inquiry";
-                console.log(`📤 Mall Hankook API 호출: ${API_ENDPOINT}`);
-                console.log("🌍 현재 도메인:", window.location.origin);
+                // Mall Hankook 아키텍처: API 엔드포인트 명시적 정의
+                const MALL_HANKOOK_API = "/api/inquiry";
+                console.log(`📤 Mall Hankook API 호출: ${MALL_HANKOOK_API}`);
+                console.log("🌐 Base URL:", window.location.origin);
+                console.log("📋 Controller: inquiryController.createInquiry");
+                console.log("🛣️ Router: inquiryRouter POST /");
                 
-                // FormData를 JSON으로 변환 (Mall Hankook 표준 패턴)
-                const requestData = {
+                // FormData → JSON 변환 (표준 패턴)
+                const requestPayload = {
                     title: formData.get('title')?.trim(),
                     content: formData.get('content')?.trim(),
                     user_name: formData.get('user_name')?.trim(),
@@ -151,43 +157,72 @@
                 };
                 
                 // 클라이언트 측 유효성 검사
-                if (!requestData.title || !requestData.content || !requestData.user_name) {
+                if (!requestPayload.title || !requestPayload.content || !requestPayload.user_name) {
                     throw new Error("제목, 이름, 문의 내용은 필수 입력사항입니다.");
                 }
                 
-                console.log("📤 전송 데이터:", requestData);
+                console.log("📤 Request Payload:", requestPayload);
                 
-                // Mall Hankook API 호출 (올바른 엔드포인트)
-                const response = await fetch(API_ENDPOINT, {
+                // 강력한 캐시 무효화 + 타임스탬프
+                const cacheBuster = `?cache_bust=${Date.now()}&v=4`;
+                const finalURL = `${MALL_HANKOOK_API}${cacheBuster}`;
+                console.log(`🔗 Final URL: ${finalURL}`);
+                
+                // Mall Hankook 표준 API 호출
+                const response = await fetch(finalURL, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Cache-Control": "no-cache"
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Accept": "application/json"
                     },
-                    body: JSON.stringify(requestData)
+                    body: JSON.stringify(requestPayload)
                 });
                 
-                console.log("🌐 HTTP 응답 상태:", response.status, response.statusText);
-                console.log("🌐 응답 헤더:", Object.fromEntries(response.headers.entries()));
+                console.log("🌐 Response Status:", response.status, response.statusText);
+                console.log("🌐 Response Headers:", Object.fromEntries(response.headers.entries()));
+                console.log("🌐 Response URL:", response.url);
                 
+                // 응답 상태 검증 (Mall Hankook 패턴)
                 if (!response.ok) {
-                    // 상세한 에러 정보 수집
-                    const errorText = await response.text();
-                    console.error("❌ 서버 응답 내용:", errorText);
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    console.error("❌ HTTP Error Response");
+                    
+                    let errorDetail;
+                    try {
+                        errorDetail = await response.text();
+                        console.error("❌ Error Response Body:", errorDetail);
+                    } catch (parseError) {
+                        console.error("❌ Failed to read error response:", parseError);
+                        errorDetail = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    
+                    throw new Error(`서버 오류 (${response.status}): ${errorDetail}`);
+                }
+                
+                // JSON 파싱 전 Content-Type 검증
+                const contentType = response.headers.get("content-type");
+                console.log("📄 Content-Type:", contentType);
+                
+                if (!contentType || !contentType.includes("application/json")) {
+                    const textResponse = await response.text();
+                    console.error("❌ Non-JSON Response:", textResponse);
+                    throw new Error("서버가 JSON 형식이 아닌 응답을 반환했습니다.");
                 }
                 
                 const result = await response.json();
-                console.log("📥 서버 응답:", result);
+                console.log("📥 Success Response:", result);
                 
                 // Mall Hankook 표준 응답 형식 처리
-                if (result.success) {
-                    // 성공 메시지 표시
+                if (result.success === true) {
+                    // 성공 처리
                     resultDiv.innerHTML = `
                         <div class="p-4 bg-green-100 border border-green-300 text-green-700 rounded-lg">
                             <p class="font-semibold">✅ 문의가 성공적으로 등록되었습니다!</p>
-                            <p class="text-sm mt-1">문의 번호: ${result.data.id}</p>
-                            <p class="text-sm">등록 시간: ${new Date(result.data.created_at).toLocaleString('ko-KR')}</p>
+                            <p class="text-sm mt-1">📋 문의 번호: ${result.data.id}</p>
+                            <p class="text-sm">⏰ 등록 시간: ${new Date(result.data.created_at).toLocaleString('ko-KR')}</p>
+                            <p class="text-sm text-green-600 mt-2">3초 후 문의 목록으로 이동합니다...</p>
                         </div>
                     `;
                     resultDiv.classList.remove("hidden");
@@ -195,30 +230,33 @@
                     // 폼 초기화
                     form.reset();
                     
-                    // 3초 후 목록으로 이동
+                    // 자동 리다이렉션 (Mall Hankook UX 패턴)
                     setTimeout(() => {
                         window.location.href = "/inquiry.html";
                     }, 3000);
                     
                 } else {
+                    // 비즈니스 로직 에러
                     throw new Error(result.error || "서버에서 알 수 없는 오류가 발생했습니다.");
                 }
                 
             } catch (error) {
-                console.error("❌ 문의 등록 오류:", error);
+                console.error("❌ 문의 등록 실패:", error);
+                console.error("❌ Error Stack:", error.stack);
                 
+                // 사용자 친화적 에러 메시지
                 resultDiv.innerHTML = `
                     <div class="p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
-                        <p class="font-semibold">❌ 문의 등록에 실패했습니다.</p>
-                        <p class="text-sm mt-1">오류: ${error.message}</p>
-                        <div class="mt-2 space-x-2">
+                        <p class="font-semibold">❌ 문의 등록에 실패했습니다</p>
+                        <p class="text-sm mt-1">🔍 오류 내용: ${error.message}</p>
+                        <div class="mt-3 space-x-2">
                             <button onclick="location.reload()" 
-                                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
-                                페이지 새로고침
+                                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                                🔄 페이지 새로고침
                             </button>
                             <button onclick="document.getElementById('result').classList.add('hidden')" 
-                                    class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700">
-                                닫기
+                                    class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition">
+                                ❌ 닫기
                             </button>
                         </div>
                     </div>
@@ -233,15 +271,35 @@
             }
         });
 
-        // 페이지 로드 시 API 엔드포인트 확인
-        window.addEventListener('load', async () => {
+        // Mall Hankook 패턴: API 헬스체크
+        window.addEventListener('load', async function checkAPIHealth() {
             try {
-                const pingResponse = await fetch('/api/inquiry?ping=true');
-                console.log("🏥 API 헬스체크:", pingResponse.status);
-            } catch (error) {
-                console.warn("⚠️ API 접근 불가:", error.message);
+                console.log("🏥 Mall Hankook API 헬스체크 시작...");
+                
+                const healthResponse = await fetch('/api/inquiry?health=check&t=' + Date.now(), {
+                    method: 'GET',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                
+                console.log("🏥 API Health Status:", healthResponse.status);
+                
+                if (healthResponse.status === 200) {
+                    console.log("✅ Mall Hankook API 정상 작동");
+                } else {
+                    console.warn("⚠️ Mall Hankook API 응답 이상:", healthResponse.status);
+                }
+                
+            } catch (healthError) {
+                console.error("❌ Mall Hankook API 헬스체크 실패:", healthError.message);
             }
         });
+
+        // 디버깅: 모든 fetch 요청 감시
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            console.log("🔍 Fetch Intercept:", args[0], args[1]?.method || 'GET');
+            return originalFetch.apply(this, args);
+        };
     </script>
 </body>
 
