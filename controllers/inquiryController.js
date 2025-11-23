@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-// ✅ 업로드 디렉토리: /public/uploads/inquiry (브라우저에서 /uploads/… 로 접근)
+// ✅ 업로드 디렉토리: /public/uploads/inquiry
 const uploadDir = path.join(process.cwd(), "public", "uploads", "inquiry");
 
 if (!fs.existsSync(uploadDir)) {
@@ -14,7 +14,7 @@ if (!fs.existsSync(uploadDir)) {
     console.log("✅ 문의 업로드 폴더 존재:", uploadDir);
 }
 
-// ✅ Multer 설정
+// ✅ Multer 설정 (이미지 최대 3장, 5MB)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir);
@@ -30,16 +30,15 @@ const storage = multer.diskStorage({
     },
 });
 
-// ✅ 이미지 최대 3장, 5MB 제한
 const upload = multer({
     storage,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
+        fileSize: 5 * 1024 * 1024,
         files: 3,
     },
 });
 
-// ✅ 라우터에서 쓸 미들웨어
+// 라우터에서 사용할 업로드 미들웨어
 export const uploadInquiry = upload.array("images", 3);
 
 // --------------------------------------------------------
@@ -47,7 +46,6 @@ export const uploadInquiry = upload.array("images", 3);
 // --------------------------------------------------------
 export async function createInquiry(req, res, next) {
     try {
-        // 1) 기본 필드 읽기
         const {
             inquiry_type,
             title,
@@ -57,66 +55,73 @@ export async function createInquiry(req, res, next) {
             writer_email,
         } = req.body || {};
 
-        // 2) 서버 측에서도 필수값 한 번 더 체크
-        if (!inquiry_type || !title || !content) {
+        // 서버에서도 필수값 체크
+        if (!title || !content) {
             return res.status(400).json({
                 ok: false,
-                message: "문의 유형, 제목, 내용은 필수입니다.",
+                message: "제목과 내용은 필수입니다.",
             });
         }
 
+        // 연락처 하나도 없으면 막기 (선택)
         if (!writer_name && !writer_phone && !writer_email) {
             return res.status(400).json({
                 ok: false,
-                message: "연락 가능한 정보(이름/전화/이메일) 중 최소 1개는 입력해 주세요.",
+                message: "이름/전화/이메일 중 최소 1개는 입력해 주세요.",
             });
         }
 
-        // 3) 파일 경로 정리 (최대 3장)
+        // 파일 경로 정리 (최대 3장)
         const files = Array.isArray(req.files) ? req.files.slice(0, 3) : [];
-        const imagePaths = files.map((f) => {
-            // 브라우저에서 접근할 경로: /uploads/inquiry/파일명
-            return `/uploads/inquiry/${f.filename}`;
-        });
+        const imagePaths = files.map((f) => `/uploads/inquiry/${f.filename}`);
 
-        // image1~3 채우기
-        const image1 = imagePaths[0] || null;
-        const image2 = imagePaths[1] || null;
-        const image3 = imagePaths[2] || null;
+        const image1_path = imagePaths[0] || null;
+        const image2_path = imagePaths[1] || null;
+        const image3_path = imagePaths[2] || null;
 
-        // 4) DB INSERT
+        // 🔥 핵심: inquiry.user_name 이 NOT NULL 이라서
+        // writer_name 값을 그대로 user_name, user_phone 에도 같이 넣어준다.
+        const user_name = writer_name || null;
+        const user_phone = writer_phone || null;
+
         const sql = `
       INSERT INTO inquiry (
-        inquiry_type,
         title,
         content,
+        user_name,
+        user_phone,
+        inquiry_type,
         writer_name,
         writer_phone,
         writer_email,
-        image1,
-        image2,
-        image3,
+        image1_path,
+        image2_path,
+        image3_path,
         created_at,
         updated_at
       ) VALUES (
-        $1, $2, $3,
-        $4, $5, $6,
-        $7, $8, $9,
+        $1, $2,
+        $3, $4,
+        $5,
+        $6, $7, $8,
+        $9, $10, $11,
         NOW(), NOW()
       )
       RETURNING id
     `;
 
         const params = [
-            inquiry_type,
             title,
             content,
+            user_name,
+            user_phone,
+            inquiry_type || null,
             writer_name || null,
             writer_phone || null,
             writer_email || null,
-            image1,
-            image2,
-            image3,
+            image1_path,
+            image2_path,
+            image3_path,
         ];
 
         const result = await pool.query(sql, params);
@@ -126,6 +131,7 @@ export async function createInquiry(req, res, next) {
             id: newId,
             inquiry_type,
             title,
+            user_name,
             writer_name,
         });
 
@@ -136,7 +142,6 @@ export async function createInquiry(req, res, next) {
         });
     } catch (err) {
         console.error("❌ createInquiry ERROR:", err);
-        // 전역 에러 핸들러로도 넘기고, 응답도 한 번 보냄
         if (!res.headersSent) {
             return res.status(500).json({
                 ok: false,
@@ -148,7 +153,7 @@ export async function createInquiry(req, res, next) {
     }
 }
 
-// (선택) 나중에 관리자용 목록 조회도 쓸 수 있게 기본 골격만 만들어 둠
+// (옵션) 관리자용 목록 조회
 export async function listInquiry(req, res, next) {
     try {
         const result = await pool.query(
@@ -157,6 +162,7 @@ export async function listInquiry(req, res, next) {
         id,
         inquiry_type,
         title,
+        user_name,
         writer_name,
         writer_phone,
         writer_email,
