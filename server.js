@@ -31,6 +31,7 @@ import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryRouter from "./routes/inquiryRouter.js";
+
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
