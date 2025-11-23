@@ -1,25 +1,20 @@
 import express from "express";
-import {
-    uploadInquiry,
+import { 
     createInquiry,
     getInquiryList,
-    getInquiryDetail
+    getInquiryDetail,
+    uploadInquiry      // ✅ Multer 미들웨어 import
 } from "../controllers/inquiryController.js";
 
 const router = express.Router();
 
-// health check
-router.get("/", (req, res, next) => {
-    if (req.query.health === "check") {
-        return res.status(200).json({ ok: true, message: "inquiry API alive" });
-    }
-    next();
-});
+// POST /api/inquiry - 문의 등록 (이미지 업로드 포함)
+router.post("/", uploadInquiry, createInquiry);  // ✅ uploadInquiry 미들웨어 추가
 
-// multipart + controller 연결
-router.post("/", uploadInquiry, createInquiry);
-
+// GET /api/inquiry - 문의 목록 조회
 router.get("/", getInquiryList);
+
+// GET /api/inquiry/:id - 문의 상세 조회
 router.get("/:id", getInquiryDetail);
 
 export default router;
