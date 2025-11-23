@@ -1,7 +1,5 @@
-// routes/inquiryRouter.js
 import express from "express";
 import { 
-    uploadInquiry,
     createInquiry,
     getInquiryList,
     getInquiryDetail 
@@ -9,13 +7,17 @@ import {
 
 const router = express.Router();
 
-// POST /api/inquiry - 문의 등록 (이미지 업로드 포함)
-router.post("/", uploadInquiry, createInquiry);
+// 🔥 1) Health check 라우트 추가
+router.get("/", (req, res, next) => {
+    if (req.query.health === "check") {
+        return res.status(200).json({ ok: true, message: "inquiry API alive" });
+    }
+    next();
+});
 
-// GET /api/inquiry - 문의 목록 조회
+// 🔥 2) 실제 API
+router.post("/", createInquiry);
 router.get("/", getInquiryList);
-
-// GET /api/inquiry/:id - 문의 상세 조회
 router.get("/:id", getInquiryDetail);
 
 export default router;
