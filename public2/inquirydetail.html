@@ -92,36 +92,32 @@
 
             <hr class="border-slate-200/70" />
 
-            <!-- 본문 & 이미지 -->
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                <!-- 문의 내용 -->
-                <div class="lg:col-span-2 flex flex-col gap-4">
-                    <h3 class="text-sm font-semibold text-slate-500 tracking-wide">
-                        문의 내용
-                    </h3>
-                    <div id="contentBox"
-                        class="rounded-2xl bg-white/80 border border-slate-100 px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base text-slate-800 leading-relaxed whitespace-pre-line">
-                    </div>
+            <!-- ✅ 문의 내용 (전체 폭) -->
+            <section class="flex flex-col gap-4">
+                <h3 class="text-sm font-semibold text-slate-500 tracking-wide">
+                    문의 내용
+                </h3>
+                <div id="contentBox"
+                    class="rounded-2xl bg-white/80 border border-slate-100 px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base text-slate-800 leading-relaxed whitespace-pre-line min-h-[120px]">
                 </div>
+            </section>
 
-                <!-- 첨부 이미지 -->
-                <div class="flex flex-col gap-3">
-                    <h3 class="text-sm font-semibold text-slate-500 tracking-wide">
-                        첨부 이미지
-                    </h3>
-                    <div id="imageBox"
-                        class="rounded-2xl bg-white/80 border border-slate-100 px-3 py-3 sm:px-4 sm:py-4 flex flex-col gap-2">
-                        <p id="noImageText" class="text-xs text-slate-400">
-                            등록된 이미지가 없습니다.
-                        </p>
-                        <div id="imageGrid" class="grid grid-cols-2 gap-2"></div>
+            <!-- ✅ 첨부 이미지 (문의 내용 바로 아래) -->
+            <section id="imageSection" class="flex flex-col gap-4 hidden">
+                <h3 class="text-sm font-semibold text-slate-500 tracking-wide">
+                    첨부 이미지
+                </h3>
+                <div id="imageBox"
+                    class="rounded-2xl bg-white/80 border border-slate-100 px-3 py-3 sm:px-4 sm:py-4">
+                    <div id="imageGrid" class="flex flex-wrap gap-3">
+                        <!-- 이미지들이 가로로 배치됨 -->
                     </div>
                 </div>
             </section>
 
             <hr class="border-slate-200/70" />
 
-            <!-- 답변 영역 -->
+            <!-- ✅ 답변 영역 (최하단) -->
             <section class="flex flex-col gap-3">
                 <h3 class="text-sm font-semibold text-slate-500 tracking-wide">
                     답변
@@ -230,7 +226,7 @@
                 document.getElementById("contentBox").textContent =
                     item.content || "(내용 없음)";
 
-                // 이미지들
+                // ✅ 첨부 이미지: 세로 배치 + 가로 그리드
                 const paths = [
                     item.image1_path,
                     item.image2_path,
@@ -240,25 +236,34 @@
                     item.image3,
                 ].filter((p) => typeof p === "string" && p.trim() !== "");
 
-                const noImageText = document.getElementById("noImageText");
+                const imageSection = document.getElementById("imageSection");
                 const imageGrid = document.getElementById("imageGrid");
                 imageGrid.innerHTML = "";
 
-                if (paths.length === 0) {
-                    noImageText.classList.remove("hidden");
-                } else {
-                    noImageText.classList.add("hidden");
-                    paths.forEach((src) => {
+                if (paths.length > 0) {
+                    imageSection.classList.remove("hidden");
+                    paths.forEach((src, index) => {
                         const img = document.createElement("img");
                         img.src = src;
-                        img.alt = "문의 첨부 이미지";
+                        img.alt = `첨부 이미지 ${index + 1}`;
                         img.className =
-                            "w-full aspect-video object-cover rounded-2xl border border-slate-100 shadow-sm cursor-pointer";
+                            "w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform";
+
+                        // 이미지 클릭 시 새 탭에서 원본 열기
                         img.addEventListener("click", () => {
                             window.open(src, "_blank");
                         });
+
+                        // 이미지 로드 오류 처리
+                        img.onerror = function () {
+                            this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTZMOCAxMUwxMyAxNkwxNiAxM0wyMSAxOFY2QzIxIDQuOSAyMC4xIDQgMTkgNEg1QzMuOSA0IDMgNC45IDMgNlYxNloiIGZpbGw9IiNDREQ1REYiLz4KPHN2Zz4K';
+                            this.className += ' opacity-50';
+                        };
+
                         imageGrid.appendChild(img);
                     });
+                } else {
+                    imageSection.classList.add("hidden");
                 }
 
                 // 답변
