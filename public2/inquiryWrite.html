@@ -75,7 +75,8 @@
 
         <!-- 메인 카드 -->
         <section class="neo-card p-6 sm:p-8">
-            <form id="inquiryForm" class="space-y-6">
+            <!-- 🔹 파일 업로드를 위해 enctype 추가 -->
+            <form id="inquiryForm" class="space-y-6" enctype="multipart/form-data">
                 <!-- 기본 정보 -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <!-- 제목 -->
@@ -88,7 +89,7 @@
                             placeholder="문의 제목을 입력하세요" />
                     </div>
 
-                    <!-- 🔹 문의 유형 -->
+                    <!-- 문의 유형 -->
                     <div class="sm:col-span-2">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">
                             문의 유형
@@ -139,6 +140,45 @@
                         placeholder="문의하실 내용을 자세히 작성해주세요. (서비스 관련, 가게 등록, 제휴/광고 문의 등)"></textarea>
                 </div>
 
+                <!-- 🔹 첨부 이미지 (최대 3장) -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-semibold text-slate-700">
+                            첨부 이미지
+                        </label>
+                        <span class="text-[11px] sm:text-xs text-slate-400">
+                            선택 사항 · 최대 3장 (jpg, png 등)
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <!-- 이미지 1 -->
+                        <label class="neo-input flex flex-col items-center justify-center px-3 py-4 cursor-pointer">
+                            <span class="text-xs font-semibold text-slate-600 mb-1">이미지 1</span>
+                            <span class="text-[11px] text-slate-400" id="fileLabel1">선택된 파일 없음</span>
+                            <input type="file" name="image1" accept="image/*" class="hidden" id="image1">
+                        </label>
+
+                        <!-- 이미지 2 -->
+                        <label class="neo-input flex flex-col items-center justify-center px-3 py-4 cursor-pointer">
+                            <span class="text-xs font-semibold text-slate-600 mb-1">이미지 2</span>
+                            <span class="text-[11px] text-slate-400" id="fileLabel2">선택된 파일 없음</span>
+                            <input type="file" name="image2" accept="image/*" class="hidden" id="image2">
+                        </label>
+
+                        <!-- 이미지 3 -->
+                        <label class="neo-input flex flex-col items-center justify-center px-3 py-4 cursor-pointer">
+                            <span class="text-xs font-semibold text-slate-600 mb-1">이미지 3</span>
+                            <span class="text-[11px] text-slate-400" id="fileLabel3">선택된 파일 없음</span>
+                            <input type="file" name="image3" accept="image/*" class="hidden" id="image3">
+                        </label>
+                    </div>
+
+                    <p class="mt-2 text-[11px] text-slate-400">
+                        가게 사진, 캡처 화면 등 설명에 도움이 되는 이미지를 올려주세요. (한 장당 용량 제한은 서버 설정 기준)
+                    </p>
+                </div>
+
                 <!-- 버튼 영역 -->
                 <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
                     <button type="button" onclick="history.back()"
@@ -171,12 +211,36 @@
             .then(html => document.getElementById("footer").innerHTML = html)
             .catch(err => console.warn("Footer 로드 실패:", err));
 
-        // 문의 등록 처리
+        // 🔹 파일 이름 표시
+        function bindFileLabel(inputId, labelId) {
+            const input = document.getElementById(inputId);
+            const label = document.getElementById(labelId);
+            if (!input || !label) return;
+
+            input.addEventListener("change", () => {
+                if (input.files && input.files[0]) {
+                    label.textContent = input.files[0].name;
+                    label.classList.remove("text-slate-400");
+                    label.classList.add("text-slate-600");
+                } else {
+                    label.textContent = "선택된 파일 없음";
+                    label.classList.remove("text-slate-600");
+                    label.classList.add("text-slate-400");
+                }
+            });
+        }
+
+        bindFileLabel("image1", "fileLabel1");
+        bindFileLabel("image2", "fileLabel2");
+        bindFileLabel("image3", "fileLabel3");
+
+        // 문의 등록 처리 (multipart/form-data 전송)
         document.getElementById("inquiryForm").addEventListener("submit", async (e) => {
             e.preventDefault();
 
             const form = e.target;
-            const formData = new FormData(form);
+            const formData = new FormData(form); // 🔹 파일 포함
+
             const resultDiv = document.getElementById("result");
 
             // 버튼 비활성화
@@ -188,22 +252,14 @@
             try {
                 console.log("📤 문의 등록 API 호출: /api/inquiry");
 
-                const data = {
-                    title: formData.get('title').trim(),
-                    content: formData.get('content').trim(),
-                    user_name: formData.get('user_name').trim(),
-                    user_phone: formData.get('user_phone')?.trim() || null,
-                    inquiry_type: (formData.get('inquiry_type') || '일반 문의').trim()
-                };
-
-                console.log("📤 전송 데이터:", data);
+                // inquiry_type 기본값 처리 (선택 안 하면 '일반 문의')
+                if (!formData.get("inquiry_type")) {
+                    formData.set("inquiry_type", "일반 문의");
+                }
 
                 const response = await fetch("/api/inquiry", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(data)
+                    body: formData // 🔹 Content-Type 직접 지정하지 않음 (브라우저가 boundary 포함해서 설정)
                 });
 
                 const result = await response.json();
@@ -222,6 +278,15 @@
                     resultDiv.classList.remove("hidden");
 
                     form.reset();
+                    // 파일 레이블도 초기화
+                    ["fileLabel1", "fileLabel2", "fileLabel3"].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.textContent = "선택된 파일 없음";
+                            el.classList.remove("text-slate-600");
+                            el.classList.add("text-slate-400");
+                        }
+                    });
 
                     setTimeout(() => {
                         location.href = "/inquiry.html";
