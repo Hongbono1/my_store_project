@@ -33,18 +33,18 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 5 * 1024 * 1024, // 5MB
         files: 3,
     },
 });
 
-// 라우터에서 사용할 업로드 미들웨어
-// image1 / image2 / image3 각 1장씩 허용
+// ✅ 라우터에서 사용할 업로드 미들웨어 (image1, image2, image3)
 export const uploadInquiry = upload.fields([
     { name: "image1", maxCount: 1 },
     { name: "image2", maxCount: 1 },
     { name: "image3", maxCount: 1 },
 ]);
+
 // --------------------------------------------------------
 // 문의 생성
 // --------------------------------------------------------
@@ -57,7 +57,7 @@ export async function createInquiry(req, res, next) {
             writer_name,
             writer_phone,
             writer_email,
-            is_secret, // 🔹 비밀글 플래그 (체크박스 name="is_secret")
+            is_secret, // 나중에 DB 컬럼 만들면 활용 가능
         } = req.body || {};
 
         // 서버에서도 필수값 체크
@@ -76,28 +76,24 @@ export async function createInquiry(req, res, next) {
             });
         }
 
-        // 파일 경로 정리 (최대 3장) - image1 / image2 / image3
-        const image1File = req.files?.image1?.[0];
-        const image2File = req.files?.image2?.[0];
-        const image3File = req.files?.image3?.[0];
+        // ✅ 파일 경로 정리 (image1, image2, image3 각각 1개씩)
+        const fileNames = [];
 
-        const image1_path = image1File ? `/uploads/inquiry/${image1File.filename}` : null;
-        const image2_path = image2File ? `/uploads/inquiry/${image2File.filename}` : null;
-        const image3_path = image3File ? `/uploads/inquiry/${image3File.filename}` : null;
+        ["image1", "image2", "image3"].forEach((field) => {
+            const arr = req.files && req.files[field];
+            if (Array.isArray(arr) && arr[0]) {
+                fileNames.push(`/uploads/inquiry/${arr[0].filename}`);
+            } else {
+                fileNames.push(null);
+            }
+        });
 
+        const [image1_path, image2_path, image3_path] = fileNames;
 
-        // 🔥 핵심: inquiry.user_name 이 NOT NULL 이라서
-        // writer_name 값을 그대로 user_name, user_phone 에도 같이 넣어준다.
+        // 🔥 inquiry.user_name 이 NOT NULL 이라서
+        // writer_name 값을 그대로 user_name, writer_phone 를 user_phone 으로 복사
         const user_name = writer_name || null;
         const user_phone = writer_phone || null;
-
-        // 🔹 비밀글 플래그 정규화 (true/false)
-        const isSecret =
-            is_secret === "on" ||
-            is_secret === "true" ||
-            is_secret === "1" ||
-            is_secret === true ||
-            is_secret === 1;
 
         const sql = `
       INSERT INTO inquiry (
@@ -112,7 +108,6 @@ export async function createInquiry(req, res, next) {
         image1_path,
         image2_path,
         image3_path,
-        is_secret,
         created_at,
         updated_at
       ) VALUES (
@@ -121,7 +116,6 @@ export async function createInquiry(req, res, next) {
         $5,
         $6, $7, $8,
         $9, $10, $11,
-        $12,
         NOW(), NOW()
       )
       RETURNING id
@@ -139,7 +133,6 @@ export async function createInquiry(req, res, next) {
             image1_path,
             image2_path,
             image3_path,
-            isSecret, // 🔹 is_secret 컬럼으로 저장
         ];
 
         const result = await pool.query(sql, params);
@@ -151,7 +144,6 @@ export async function createInquiry(req, res, next) {
             title,
             user_name,
             writer_name,
-            is_secret: isSecret,
         });
 
         return res.status(201).json({
@@ -185,7 +177,6 @@ export async function listInquiry(req, res, next) {
         writer_name,
         writer_phone,
         writer_email,
-        is_secret,
         created_at
       FROM inquiry
       ORDER BY created_at DESC
