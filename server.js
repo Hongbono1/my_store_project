@@ -344,7 +344,7 @@ app.get("/admin/check-storepride-data", async (req, res) => {
 
 /* 정적 파일 서빙 - 강력한 캐시 방지 */
 app.use(express.static(path.join(__dirname, "public2"), {
-  extensions: ["html"],
+  extensions: ["html"],  // ✅ .html 확장자 자동 처리
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
@@ -355,6 +355,15 @@ app.use(express.static(path.join(__dirname, "public2"), {
     }
   }
 }));
+
+// ✅ HTML 직접 라우트 추가 (명시적 처리)
+app.get("/inquirydetail", (req, res) => {
+  res.sendFile(path.join(__dirname, "public2", "inquirydetail.html"));
+});
+
+app.get("/inquiryDetail", (req, res) => {
+  res.sendFile(path.join(__dirname, "public2", "inquirydetail.html"));
+});
 
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
