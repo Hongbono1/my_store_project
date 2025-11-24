@@ -31,9 +31,10 @@ import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryRouter from "./routes/inquiryRouter.js";
-import inquiryDetailRouter from "./routes/inquiryDetailRouter.js";
-import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 
+// ✅ 두 가지 경로 모두 지원 (하위 호환성)
+app.use("/api/inquiry", inquiryRouter);
+app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 호환용
 
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
@@ -130,10 +131,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /* ✅ 문의 API 라우트 */
 app.use("/api/inquiry", inquiryRouter);
-app.use("/api/inquiry", inquiryDetailRouter);
-app.use("/api/inquiry-board", inquiryBoardRouter);
-
-
+app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 호환용
 
 /* API 라우트 설정 */
 app.use("/owner", ownerRouter);
@@ -501,4 +499,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`🚀 MALL HANKOOK server listening on http://127.0.0.1:${PORT}`);
+  console.log("✅ Router mounted: /api/inquiry");
+  console.log(`📁 Serving static files from public2/`);
+  console.log(`📡 API mounted at /api/inquiry`);
 });
