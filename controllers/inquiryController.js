@@ -39,8 +39,12 @@ const upload = multer({
 });
 
 // 라우터에서 사용할 업로드 미들웨어
-export const uploadInquiry = upload.array("images", 3);
-
+// image1 / image2 / image3 각 1장씩 허용
+export const uploadInquiry = upload.fields([
+    { name: "image1", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+    { name: "image3", maxCount: 1 },
+]);
 // --------------------------------------------------------
 // 문의 생성
 // --------------------------------------------------------
@@ -72,13 +76,15 @@ export async function createInquiry(req, res, next) {
             });
         }
 
-        // 파일 경로 정리 (최대 3장)
-        const files = Array.isArray(req.files) ? req.files.slice(0, 3) : [];
-        const imagePaths = files.map((f) => `/uploads/inquiry/${f.filename}`);
+        // 파일 경로 정리 (최대 3장) - image1 / image2 / image3
+        const image1File = req.files?.image1?.[0];
+        const image2File = req.files?.image2?.[0];
+        const image3File = req.files?.image3?.[0];
 
-        const image1_path = imagePaths[0] || null;
-        const image2_path = imagePaths[1] || null;
-        const image3_path = imagePaths[2] || null;
+        const image1_path = image1File ? `/uploads/inquiry/${image1File.filename}` : null;
+        const image2_path = image2File ? `/uploads/inquiry/${image2File.filename}` : null;
+        const image3_path = image3File ? `/uploads/inquiry/${image3File.filename}` : null;
+
 
         // 🔥 핵심: inquiry.user_name 이 NOT NULL 이라서
         // writer_name 값을 그대로 user_name, user_phone 에도 같이 넣어준다.
