@@ -166,42 +166,76 @@
 
         // 첨부 이미지 렌더링
         function renderAttachmentImages(item) {
+            console.log("📁 이미지 렌더링 시작:", {
+                image1: item.image1,
+                image2: item.image2,
+                image3: item.image3
+            });
+
+            // ✅ 모든 가능한 필드명 확인
             const paths = [
-                item.image1_path,
-                item.image2_path,
-                item.image3_path,
                 item.image1,
                 item.image2,
                 item.image3,
-            ].filter((p) => typeof p === "string" && p.trim() !== "");
+                item.image1_path,  // 혹시 모를 다른 필드명
+                item.image2_path,
+                item.image3_path,
+            ].filter((p) => p && typeof p === "string" && p.trim() !== "");
+
+            console.log("📊 유효한 이미지 경로:", paths);
 
             const imageSection = document.getElementById("imageSection");
             const imageGrid = document.getElementById("imageGrid");
+            
+            if (!imageSection || !imageGrid) {
+                console.error("❌ 이미지 섹션 요소를 찾을 수 없습니다.");
+                return;
+            }
+
             imageGrid.innerHTML = "";
 
             if (paths.length === 0) {
                 imageSection.classList.add("hidden");
+                console.log("ℹ️ 첨부 이미지 없음 - 섹션 숨김");
                 return;
             }
 
-            // 첨부 파일이 있으면 섹션 표시
+            // ✅ 첨부 파일이 있으면 섹션 표시
             imageSection.classList.remove("hidden");
+            console.log(`✅ ${paths.length}개의 이미지 렌더링 시작`);
             
             paths.forEach((src, index) => {
+                // ✅ 경로 정규화 (중복 슬래시 제거)
+                let normalizedSrc = src;
+                if (!src.startsWith('http')) {
+                    // 상대 경로인 경우 정규화
+                    normalizedSrc = src.replace(/^\/+/, '/');
+                }
+
+                console.log(`🖼️ 이미지 ${index + 1}: ${normalizedSrc}`);
+
                 const img = document.createElement("img");
-                img.src = src;
+                img.src = normalizedSrc;
                 img.alt = `첨부 이미지 ${index + 1}`;
                 img.className = "w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform";
 
                 // 새 탭에서 원본 이미지 열기
                 img.addEventListener("click", () => {
-                    window.open(src, "_blank", "noopener,noreferrer");
+                    console.log("🔍 이미지 클릭:", normalizedSrc);
+                    window.open(normalizedSrc, "_blank", "noopener,noreferrer");
                 });
+
+                // 이미지 로드 성공
+                img.onload = function () {
+                    console.log(`✅ 이미지 로드 성공: ${normalizedSrc}`);
+                };
 
                 // 이미지 로드 실패 처리
                 img.onerror = function () {
-                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1zbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTZMOCAxMUwxMyAxNkwxNiAxM0wyMSAxOFY2QzIxIDQuOSAyMC4xIDQgMTkgNEg1QzMuOSA0IDMgNC45IDMgNlYxNloiIGZpbGw9IiNDREQ1REYiLz4KPHN2Zz4K';
+                    console.error(`❌ 이미지 로드 실패: ${normalizedSrc}`);
+                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTZMOCAxMUwxMyAxNkwxNiAxM0wyMSAxOFY2QzIxIDQuOSAyMC4xIDQgMTkgNEg1QzMuOSA0IDMgNC45IDMgNlYxNloiIGZpbGw9IiNDREQ1REYiLz4KPHN2Zz4K';
                     this.className += ' opacity-50';
+                    this.title = `이미지를 불러올 수 없습니다: ${normalizedSrc}`;
                 };
 
                 imageGrid.appendChild(img);
@@ -237,11 +271,13 @@
                 console.log("📊 응답 데이터:", data);
                 
                 // Mall Hankook 표준 응답 구조 확인
-                const item = data.success ? data.data : data.item || data;
+                const item = data.item || data;
                 
                 if (!item) {
                     throw new Error("응답 데이터가 올바르지 않습니다.");
                 }
+
+                console.log("📦 문의 아이템:", item);
 
                 // 기본 정보 렌더링
                 document.getElementById("badgeId").textContent = `#${item.id}`;
@@ -253,7 +289,7 @@
                     document.getElementById("metaLine").textContent = `작성일: ${formatDateTime(item.created_at)}`;
                 }
 
-                // 작성자 정보 (하단) - 빈 값 제외하고 동적 생성
+                // 작성자 정보 (하단)
                 const subMetaData = [];
                 
                 const writerName = item.writer_name || item.user_name;
@@ -282,7 +318,7 @@
                 // 문의 내용
                 document.getElementById("contentBox").textContent = item.content || "(내용 없음)";
 
-                // 첨부 이미지 렌더링
+                // ✅ 첨부 이미지 렌더링
                 renderAttachmentImages(item);
 
                 // 답변 처리

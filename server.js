@@ -342,19 +342,25 @@ app.get("/admin/check-storepride-data", async (req, res) => {
   }
 });
 
-/* 정적 파일 서빙 - 강력한 캐시 방지 */
+/* 정적 파일 서빙 */
 app.use(express.static(path.join(__dirname, "public2"), {
-  extensions: ["html"],  // ✅ .html 확장자 자동 처리
+  extensions: ["html"],
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.setHeader('Last-Modified', new Date().toUTCString());
-      res.setHeader('ETag', Date.now().toString());
     }
   }
 }));
+
+// ✅ 업로드 파일 서빙 (중요!)
+app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
+
+console.log("✅ Static files:", {
+  html: path.join(__dirname, "public2"),
+  uploads: path.join(__dirname, "public2", "uploads")
+});
 
 // ✅ HTML 직접 라우트 추가 (명시적 처리)
 app.get("/inquirydetail", (req, res) => {

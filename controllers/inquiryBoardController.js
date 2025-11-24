@@ -191,7 +191,7 @@ export const getInquiryDetail = async (req, res) => {
         const id = parseInt(req.params.id, 10);
         if (Number.isNaN(id)) {
             return res.status(400).json({
-                ok: false,  // ✅ Frontend 호환성을 위해 ok 사용
+                ok: false,
                 error: "유효하지 않은 문의 ID입니다.",
             });
         }
@@ -205,9 +205,9 @@ export const getInquiryDetail = async (req, res) => {
                 writer_name,
                 writer_phone, 
                 writer_email,
-                image1,
-                image2,
-                image3,
+                image1,      -- ✅ DB 컬럼명과 일치
+                image2,      -- ✅ DB 컬럼명과 일치
+                image3,      -- ✅ DB 컬럼명과 일치
                 is_secret,
                 answer,
                 created_at,
@@ -218,7 +218,7 @@ export const getInquiryDetail = async (req, res) => {
 
         if (result.rowCount === 0) {
             return res.status(404).json({
-                ok: false,  // ✅ Frontend 호환성을 위해 ok 사용
+                ok: false,
                 error: "문의를 찾을 수 없습니다.",
             });
         }
@@ -226,8 +226,13 @@ export const getInquiryDetail = async (req, res) => {
         const inquiry = result.rows[0];
 
         console.log(`📋 문의 상세 조회: ID ${id}`);
+        console.log(`📁 첨부 이미지:`, {
+            image1: inquiry.image1,
+            image2: inquiry.image2,
+            image3: inquiry.image3
+        });
         
-        // Mall Hankook 표준 응답 구조 (Frontend 호환)
+        // ✅ Frontend 호환 응답 구조
         return res.json({
             ok: true,
             item: inquiry
@@ -236,7 +241,7 @@ export const getInquiryDetail = async (req, res) => {
     } catch (err) {
         console.error("❌ 문의 상세 조회 오류:", err);
         return res.status(500).json({
-            ok: false,  // ✅ Frontend 호환성을 위해 ok 사용
+            ok: false,
             error: "서버 오류가 발생했습니다.",
         });
     }
