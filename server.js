@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fs from "fs";
 
+// Router imports
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
@@ -30,12 +31,7 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
-import inquiryRouter from "./routes/inquiryRouter.js";
-
-// ✅ 두 가지 경로 모두 지원 (하위 호환성)
-app.use("/api/inquiry", inquiryRouter);
-app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 호환용
-
+import inquiryRouter from "./routes/inquiryRouter.js";  // ✅ Inquiry Router import
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
@@ -93,7 +89,8 @@ const uploadDirs = [
   path.join(__dirname, "public/uploads"),
   path.join(__dirname, "public/uploads/traditionalmarket"),
   path.join(__dirname, "public/uploads/performingart"),
-  path.join(__dirname, "public2/uploads")
+  path.join(__dirname, "public2/uploads"),
+  path.join(__dirname, "public2/uploads/inquiry")  // ✅ Inquiry 업로드 폴더 추가
 ];
 
 uploadDirs.forEach(dir => {
@@ -105,6 +102,7 @@ uploadDirs.forEach(dir => {
   }
 });
 
+// ✅ Express app 인스턴스 생성 (가장 먼저)
 const app = express();
 
 /* 공통 미들웨어 */
@@ -113,6 +111,7 @@ app.use((req, res, next) => {
   res.setHeader("X-Request-Id", req.id);
   next();
 });
+
 app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
@@ -129,9 +128,9 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ✅ 문의 API 라우트 */
+/* ✅ 문의 API 라우트 (Mall Hankook 표준) */
 app.use("/api/inquiry", inquiryRouter);
-app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 호환용
+app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 하위 호환성
 
 /* API 라우트 설정 */
 app.use("/owner", ownerRouter);
@@ -150,7 +149,6 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
-
 
 // Open Store API 라우트
 app.use("/api/open/register", openregisterRouter);
@@ -205,13 +203,10 @@ app.get("/admin/check-table", async (req, res) => {
   }
 });
 
-// ✅ Store Pride 테이블 체크 엔드포인트 추가
 app.get("/admin/check-storepride-table", async (req, res) => {
   try {
-    const { default: pool } = await import("./db.js");
     const results = [];
 
-    // 1. store_pride 테이블 확인 및 생성
     const mainTableExists = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -240,7 +235,6 @@ app.get("/admin/check-storepride-table", async (req, res) => {
       results.push("✅ store_pride 테이블이 이미 존재합니다.");
     }
 
-    // 2. store_pride_qas 테이블 확인 및 생성
     const qasTableExists = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -267,7 +261,6 @@ app.get("/admin/check-storepride-table", async (req, res) => {
       results.push("✅ store_pride_qas 테이블이 이미 존재합니다.");
     }
 
-    // 3. 테이블 구조 확인
     const prideColumns = await pool.query(`
       SELECT column_name, data_type, is_nullable, column_default
       FROM information_schema.columns 
@@ -282,7 +275,6 @@ app.get("/admin/check-storepride-table", async (req, res) => {
       ORDER BY ordinal_position;
     `);
 
-    // 4. 데이터 개수 확인
     const prideCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
     const qasCount = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
 
@@ -307,12 +299,8 @@ app.get("/admin/check-storepride-table", async (req, res) => {
   }
 });
 
-// ✅ Store Pride 데이터 확인 엔드포인트 추가
 app.get("/admin/check-storepride-data", async (req, res) => {
   try {
-    const { default: pool } = await import("./db.js");
-
-    // 1. 메인 테이블 데이터 조회
     const prideData = await pool.query(`
       SELECT id, store_name, category, phone, address, main_img, free_pr, qa_mode, created_at
       FROM store_pride 
@@ -322,7 +310,6 @@ app.get("/admin/check-storepride-data", async (req, res) => {
 
     const results = [];
 
-    // 2. 각 데이터의 Q&A 조회
     for (const row of prideData.rows) {
       const qasData = await pool.query(`
         SELECT qa_type, seq, question, answer, image_path
@@ -337,7 +324,6 @@ app.get("/admin/check-storepride-data", async (req, res) => {
       });
     }
 
-    // 3. 전체 통계
     const totalCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
     const totalQAs = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
 
@@ -361,7 +347,6 @@ app.use(express.static(path.join(__dirname, "public2"), {
   extensions: ["html"],
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
-      // Mall Hankook 표준: HTML 캐시 완전 방지
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
@@ -370,14 +355,16 @@ app.use(express.static(path.join(__dirname, "public2"), {
     }
   }
 }));
+
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
-/* ✅ HTML 직접 라우트 */
+/* HTML 직접 라우트 */
 app.get("/hotsubcategory", (req, res) => {
   res.sendFile(path.join(__dirname, "public2", "hotsubcategory.html"));
 });
+
 app.get("/hotblogdetail", (req, res) => {
   res.sendFile(path.join(__dirname, "public2", "hotblogdetail.html"));
 });
@@ -471,18 +458,36 @@ function collectRoutes(app) {
   });
   return out.sort();
 }
+
 app.get("/__routes", (_req, res) => res.json({ ok: true, routes: collectRoutes(app) }));
 
 /* 전역 에러 핸들러 */
 app.use((err, req, res, next) => {
   console.error("[error]", req?.id, err);
   if (err?.code === "LIMIT_FILE_SIZE") {
-    return res.status(413).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
+    return res.status(413).json({ 
+      ok: false, 
+      error: "upload_error", 
+      code: err.code, 
+      message: err.message, 
+      reqId: req?.id 
+    });
   }
   if (err?.code?.startsWith?.("LIMIT_") || /Unexpected field/.test(err?.message || "")) {
-    return res.status(400).json({ ok: false, error: "upload_error", code: err.code, message: err.message, reqId: req?.id });
+    return res.status(400).json({ 
+      ok: false, 
+      error: "upload_error", 
+      code: err.code, 
+      message: err.message, 
+      reqId: req?.id 
+    });
   }
-  res.status(500).json({ ok: false, error: "internal", message: err.message, reqId: req?.id });
+  res.status(500).json({ 
+    ok: false, 
+    error: "internal", 
+    message: err.message, 
+    reqId: req?.id 
+  });
 });
 
 /* 404 핸들러 */
@@ -496,10 +501,9 @@ app.use((req, res) => {
 // ✅ 서버 리슨 (맨 마지막에 위치)
 const PORT = process.env.PORT || 3000;
 
-
 app.listen(PORT, () => {
   console.log(`🚀 MALL HANKOOK server listening on http://127.0.0.1:${PORT}`);
-  console.log("✅ Router mounted: /api/inquiry");
+  console.log("✅ Router mounted: /api/inquiry, /api/inquiryBoard");
   console.log(`📁 Serving static files from public2/`);
-  console.log(`📡 API mounted at /api/inquiry`);
+  console.log(`📡 Inquiry API available at both endpoints`);
 });
