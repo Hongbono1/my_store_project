@@ -32,6 +32,8 @@ import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryRouter from "./routes/inquiryRouter.js";
 import inquiryDetailRouter from "./routes/inquiryDetailRouter.js";
+import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
+
 
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
@@ -129,6 +131,8 @@ app.use(express.urlencoded({ extended: true }));
 /* ✅ 문의 API 라우트 */
 app.use("/api/inquiry", inquiryRouter);
 app.use("/api/inquiry", inquiryDetailRouter);
+app.use("/api/inquiry-board", inquiryBoardRouter);
+
 
 
 /* API 라우트 설정 */

@@ -2,134 +2,349 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>문의 목록 | MALL HANKOOK</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>문의 게시판 | MALL HANKOOK</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <style>
+        body {
+            font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+            background: radial-gradient(circle at 0 0, #eef2ff, #f9fafb);
+            min-height: 100vh;
+        }
+
         .neo-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            border-radius: 1.5rem;
+            background: radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.95));
             box-shadow:
-                8px 8px 16px rgba(0, 0, 0, 0.15),
-                -8px -8px 16px rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+                18px 18px 40px rgba(15, 23, 42, 0.15),
+                -10px -10px 30px rgba(255, 255, 255, 0.95);
+        }
+
+        .glass-toolbar {
+            backdrop-filter: blur(18px);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(219, 234, 254, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .badge-wait {
+            background: rgba(250, 250, 250, 0.95);
+            color: #f97316;
+            border-color: rgba(251, 146, 60, 0.25);
+        }
+
+        .badge-done {
+            background: rgba(240, 253, 250, 0.95);
+            color: #059669;
+            border-color: rgba(45, 212, 191, 0.3);
+        }
+
+        .row-hover {
+            transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.12s ease;
+        }
+
+        .row-hover:hover {
+            background: rgba(239, 246, 255, 0.85);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
-    <div id="header"></div>
-
-    <main class="max-w-4xl mx-auto py-20 px-4">
-        <div class="neo-card p-8">
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-800">문의게시판</h1>
-                <a href="/inquiryWrite.html"
-                   class="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 font-semibold">
-                    문의 등록
-                </a>
+<body>
+    <div class="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+        <!-- 상단 헤더 -->
+        <header class="mb-6 sm:mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                        문의 게시판
+                    </h1>
+                    <p class="mt-1 text-sm sm:text-base text-slate-500">
+                        남기신 문의 내역을 한눈에 확인할 수 있습니다. 제목을 클릭하면 상세 내용을 볼 수 있어요.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <button type="button"
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-2xl text-xs sm:text-sm font-medium text-slate-500 bg-white/80 border border-slate-200 hover:bg-slate-50"
+                        onclick="window.location.reload()">
+                        <span>새로고침</span>
+                    </button>
+                    <button type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-sky-500 shadow-md shadow-indigo-200 hover:from-indigo-600 hover:to-sky-600"
+                        onclick="window.location.href='/inquiryregister.html'">
+                        + 새 문의 작성
+                    </button>
+                </div>
             </div>
+        </header>
 
-            <div id="inquiryList" class="space-y-4"></div>
-            
-            <div id="loading" class="text-center py-8 text-gray-500">
-                문의 목록을 불러오는 중...
+        <!-- 메시지 영역 -->
+        <div id="messageBox" class="mb-4 hidden">
+            <div id="messageInner"
+                class="glass-toolbar rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 flex items-center justify-between gap-3">
+                <span id="messageText"></span>
+                <button type="button" class="text-xs text-slate-400 hover:text-slate-600"
+                    onclick="document.getElementById('messageBox').classList.add('hidden')">
+                    닫기
+                </button>
             </div>
         </div>
-    </main>
 
-    <div id="footer"></div>
+        <!-- 네오 카드 안에 게시판 -->
+        <section class="neo-card rounded-3xl border border-white/80 p-4 sm:p-6 lg:p-7">
+            <!-- 검색/필터 툴바 (간단 버전) -->
+            <div
+                class="glass-toolbar rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-500">
+                    <span
+                        class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-500 text-xs font-semibold">Q</span>
+                    <span id="summaryText">문의 데이터를 불러오는 중입니다…</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs sm:text-sm">
+                    <select id="filterType"
+                        class="border border-slate-200 bg-white/90 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">전체 유형</option>
+                        <option value="가게등록">가게등록</option>
+                        <option value="광고문의">광고문의</option>
+                        <option value="일반문의">일반문의</option>
+                        <option value="제휴문의">제휴문의</option>
+                    </select>
+                    <select id="filterStatus"
+                        class="border border-slate-200 bg-white/90 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">전체 상태</option>
+                        <option value="wait">답변대기</option>
+                        <option value="done">답변완료</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 리스트 (테이블 형태) -->
+            <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white/80">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs sm:text-sm">
+                        <thead class="bg-slate-50">
+                            <tr class="text-slate-500">
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs font-semibold border-b border-slate-100 w-14">
+                                    번호
+                                </th>
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-left text-[11px] sm:text-xs font-semibold border-b border-slate-100 w-28">
+                                    문의유형
+                                </th>
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-left text-[11px] sm:text-xs font-semibold border-b border-slate-100">
+                                    제목
+                                </th>
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-left text-[11px] sm:text-xs font-semibold border-b border-slate-100 w-32">
+                                    작성자
+                                </th>
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs font-semibold border-b border-slate-100 w-32">
+                                    작성일
+                                </th>
+                                <th
+                                    class="px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs font-semibold border-b border-slate-100 w-28">
+                                    상태
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="inquiryTableBody" class="divide-y divide-slate-100">
+                            <!-- 로딩 중 -->
+                            <tr id="loadingRow">
+                                <td colspan="6" class="px-4 py-6 text-center text-slate-400 text-xs sm:text-sm">
+                                    문의 목록을 불러오는 중입니다…
+                                </td>
+                            </tr>
+                            <!-- 데이터 없을 때 -->
+                            <tr id="emptyRow" class="hidden">
+                                <td colspan="6" class="px-4 py-6 text-center text-slate-400 text-xs sm:text-sm">
+                                    등록된 문의가 없습니다. 상단의 <span class="font-semibold text-slate-600">[새 문의 작성]</span> 버튼을 눌러
+                                    첫 문의를 남겨보세요.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
 
     <script>
-        // Header/Footer 로드
-        fetch("/components/header.html")
-            .then(res => res.text())
-            .then(html => document.getElementById("header").innerHTML = html)
-            .catch(err => console.warn("Header 로드 실패:", err));
+        let inquiryData = [];
 
-        fetch("/components/footer.html")
-            .then(res => res.text())
-            .then(html => document.getElementById("footer").innerHTML = html)
-            .catch(err => console.warn("Footer 로드 실패:", err));
+        function showMessage(message, type = "info") {
+            const box = document.getElementById("messageBox");
+            const inner = document.getElementById("messageInner");
+            const text = document.getElementById("messageText");
 
-        // 문의 목록 불러오기 (Mall Hankook API 패턴)
-        async function loadList() {
-            try {
-                console.log("📋 문의 목록 API 호출: /api/inquiry");
-                
-                const response = await fetch("/api/inquiry");
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                console.log("📋 받은 데이터:", data);
+            text.textContent = message;
+            box.classList.remove("hidden");
 
-                document.getElementById("loading").style.display = "none";
-                
-                const listBox = document.getElementById("inquiryList");
-                
-                if (!data || data.length === 0) {
-                    listBox.innerHTML = `
-                        <div class="text-center py-16 text-gray-500">
-                            <p class="text-xl mb-4">등록된 문의가 없습니다.</p>
-                            <a href="/inquiryWrite.html" 
-                               class="text-indigo-600 hover:text-indigo-800 font-semibold">
-                                첫 문의를 등록해보세요 →
-                            </a>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // 문의 목록 렌더링
-                const html = data.map(item => {
-                    const date = new Date(item.created_at).toLocaleDateString('ko-KR');
-                    const hasAnswer = item.has_answer;
-                    const statusColor = hasAnswer ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700";
-                    const statusText = hasAnswer ? "답변완료" : "답변대기";
-
-                    return `
-                        <div class="p-6 bg-white/60 rounded-xl shadow-lg hover:shadow-xl transition-all hover:transform hover:scale-[1.01] cursor-pointer border border-white/20"
-                             onclick="location.href='/inquiryDetail.html?id=${item.id}'">
-                            <div class="flex justify-between items-start mb-3">
-                                <h3 class="font-bold text-lg text-gray-800 flex-1 pr-4">
-                                    ${item.title}
-                                </h3>
-                                <span class="px-3 py-1 rounded-full text-sm font-semibold ${statusColor}">
-                                    ${statusText}
-                                </span>
-                            </div>
-                            <div class="flex justify-between items-center text-sm text-gray-600">
-                                <span class="font-medium">${item.user_name}</span>
-                                <span>${date}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join("");
-
-                listBox.innerHTML = html;
-
-            } catch (error) {
-                console.error("❌ 문의 목록 로드 오류:", error);
-                document.getElementById("loading").innerHTML = 
-                    `<div class="text-center py-8">
-                        <p class="text-red-500 mb-2">문의 목록을 불러올 수 없습니다.</p>
-                        <p class="text-gray-500 text-sm">${error.message}</p>
-                        <button onclick="loadList()" 
-                                class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                            다시 시도
-                        </button>
-                    </div>`;
+            inner.classList.remove("border-red-200", "text-red-800");
+            if (type === "error") {
+                inner.classList.add("border-red-200", "text-red-800");
             }
         }
 
-        // 페이지 로드 시 실행
-        document.addEventListener("DOMContentLoaded", loadList);
+        function formatDate(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return iso;
+            return d.toLocaleString("ko-KR", {
+                year: "2-digit",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+
+        function applyFiltersAndRender() {
+            const tbody = document.getElementById("inquiryTableBody");
+            const loadingRow = document.getElementById("loadingRow");
+            const emptyRow = document.getElementById("emptyRow");
+            const filterType = document.getElementById("filterType").value;
+            const filterStatus = document.getElementById("filterStatus").value;
+
+            loadingRow.classList.add("hidden");
+            tbody.querySelectorAll("tr.data-row").forEach((tr) => tr.remove());
+
+            let filtered = inquiryData.slice();
+
+            // 유형 필터
+            if (filterType) {
+                filtered = filtered.filter((item) => (item.inquiry_type || "") === filterType);
+            }
+
+            // 상태 필터 (답변여부)
+            if (filterStatus === "wait") {
+                filtered = filtered.filter((item) => !item.answer || !item.answer.trim());
+            } else if (filterStatus === "done") {
+                filtered = filtered.filter((item) => item.answer && item.answer.trim());
+            }
+
+            if (filtered.length === 0) {
+                emptyRow.classList.remove("hidden");
+                return;
+            } else {
+                emptyRow.classList.add("hidden");
+            }
+
+            filtered.forEach((item, idx) => {
+                const tr = document.createElement("tr");
+                tr.className = "data-row cursor-pointer row-hover";
+
+                const idCell = document.createElement("td");
+                idCell.className = "px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs text-slate-500";
+                idCell.textContent = item.id;
+
+                const typeCell = document.createElement("td");
+                typeCell.className =
+                    "px-3 sm:px-4 py-2.5 text-left text-[11px] sm:text-xs text-slate-600 whitespace-nowrap";
+                typeCell.textContent = item.inquiry_type || "기타";
+
+                const titleCell = document.createElement("td");
+                titleCell.className =
+                    "px-3 sm:px-4 py-2.5 text-left text-xs sm:text-sm text-slate-800";
+                const titleText = item.title || "(제목 없음)";
+                titleCell.innerHTML =
+                    '<span class="line-clamp-1 hover:underline">' +
+                    titleText.replace(/</g, "&lt;").replace(/>/g, "&gt;") +
+                    "</span>";
+
+                const nameCell = document.createElement("td");
+                nameCell.className =
+                    "px-3 sm:px-4 py-2.5 text-left text-xs text-slate-600 whitespace-nowrap";
+                nameCell.textContent = item.writer_name || item.user_name || "익명";
+
+                const dateCell = document.createElement("td");
+                dateCell.className =
+                    "px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs text-slate-500 whitespace-nowrap";
+                dateCell.textContent = formatDate(item.created_at);
+
+                const statusCell = document.createElement("td");
+                statusCell.className =
+                    "px-3 sm:px-4 py-2.5 text-center text-[11px] sm:text-xs whitespace-nowrap";
+
+                const answered = item.answer && item.answer.trim();
+                const badge = document.createElement("span");
+                badge.className =
+                    "inline-flex items-center justify-center px-2.5 py-1 rounded-full border text-[11px] sm:text-xs font-medium";
+                if (answered) {
+                    badge.classList.add("badge-done");
+                    badge.textContent = "답변완료";
+                } else {
+                    badge.classList.add("badge-wait");
+                    badge.textContent = "답변대기";
+                }
+                statusCell.appendChild(badge);
+
+                tr.appendChild(idCell);
+                tr.appendChild(typeCell);
+                tr.appendChild(titleCell);
+                tr.appendChild(nameCell);
+                tr.appendChild(dateCell);
+                tr.appendChild(statusCell);
+
+                tr.addEventListener("click", () => {
+                    window.location.href = `/inquirydetail.html?id=${item.id}`;
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            // 상단 요약 텍스트 갱신
+            const summary = document.getElementById("summaryText");
+            summary.textContent = `전체 ${inquiryData.length}건 중 ${filtered.length}건이 표시됩니다.`;
+        }
+
+        async function loadInquiries() {
+            const tbody = document.getElementById("inquiryTableBody");
+            const loadingRow = document.getElementById("loadingRow");
+            const emptyRow = document.getElementById("emptyRow");
+            const summary = document.getElementById("summaryText");
+
+            loadingRow.classList.remove("hidden");
+            emptyRow.classList.add("hidden");
+
+            try {
+                const res = await fetch("/api/inquiry");
+                if (!res.ok) {
+                    throw new Error("서버 응답이 올바르지 않습니다.");
+                }
+                const data = await res.json();
+                if (!data.ok || !Array.isArray(data.items)) {
+                    throw new Error("문의 데이터를 가져오지 못했습니다.");
+                }
+
+                inquiryData = data.items;
+                if (inquiryData.length === 0) {
+                    loadingRow.classList.add("hidden");
+                    emptyRow.classList.remove("hidden");
+                    summary.textContent = "등록된 문의가 아직 없습니다.";
+                    return;
+                }
+
+                loadingRow.classList.add("hidden");
+                summary.textContent = `전체 ${inquiryData.length}건의 문의가 있습니다.`;
+                applyFiltersAndRender();
+            } catch (err) {
+                console.error("❌ loadInquiries ERROR:", err);
+                loadingRow.classList.add("hidden");
+                emptyRow.classList.remove("hidden");
+                emptyRow.querySelector("td").textContent =
+                    "문의 목록을 불러오는 중 오류가 발생했습니다.";
+                showMessage("문의 목록을 불러오는 중 오류가 발생했습니다.", "error");
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("filterType").addEventListener("change", applyFiltersAndRender);
+            document.getElementById("filterStatus").addEventListener("change", applyFiltersAndRender);
+            loadInquiries();
+        });
     </script>
 </body>
 
