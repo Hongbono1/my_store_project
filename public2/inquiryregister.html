@@ -207,7 +207,7 @@
                         class="w-full sm:flex-1 py-3 px-6 border border-slate-200 text-sm sm:text-base text-slate-600 rounded-xl font-semibold bg-white/80 hover:bg-slate-50 hover:border-slate-300 transition">
                         취소
                     </button>
-                    <button type="submit"
+                    <button type="submit" id="submitBtn"
                         class="w-full sm:flex-1 py-3 px-6 rounded-xl font-semibold text-sm sm:text-base text-white bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 shadow-md shadow-indigo-500/30 hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500 transition">
                         문의 등록
                     </button>
@@ -261,54 +261,109 @@
             e.preventDefault();
 
             const form = e.target;
-            const formData = new FormData(form); // 🔹 파일 포함
-
+            const formData = new FormData(form);
             const resultDiv = document.getElementById("result");
+            const submitBtn = document.getElementById("submitBtn");
 
-            // 버튼 비활성화
-            const submitBtn = form.querySelector('button[type="submit"]');
+            // ✅ 디버깅: FormData 내용 출력
+            console.log("\n🚀 === 폼 전송 시작 ===");
+            console.log("📝 FormData 내용:");
+            for (let [key, value] of formData.entries()) {
+                if (value instanceof File) {
+                    console.log(`  ${key}: [File] ${value.name} (${value.size} bytes, ${value.type})`);
+                } else {
+                    console.log(`  ${key}: ${value}`);
+                }
+            }
+
+            // UI 상태 관리
             const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
             submitBtn.textContent = "등록 중...";
+            submitBtn.classList.add("opacity-50");
 
             try {
-                console.log("📤 문의 등록 API 호출: /api/inquiry");
+                // 클라이언트 유효성 검사
+                const title = formData.get('title')?.trim();
+                const content = formData.get('content')?.trim();
+                const writerName = formData.get('writer_name')?.trim();
 
-                // inquiry_type 기본값 처리 (선택 안 하면 '일반 문의')
+                if (!title || !content || !writerName) {
+                    throw new Error("제목, 문의 내용, 이름은 필수 입력사항입니다.");
+                }
+
+                // inquiry_type 기본값 설정
                 if (!formData.get("inquiry_type")) {
                     formData.set("inquiry_type", "일반 문의");
                 }
 
+                console.log("📤 API 호출: POST /api/inquiry");
+
                 const response = await fetch("/api/inquiry", {
                     method: "POST",
-                    body: formData // 🔹 Content-Type 직접 지정하지 않음 (브라우저가 boundary 포함해서 설정)
+                    body: formData
                 });
 
-                const result = await response.json();
-                console.log("📥 응답 데이터:", result);
+                console.log(`📥 응답 상태: ${response.status} ${response.statusText}`);
+                
+                const responseText = await response.text();
+                console.log("📄 응답 본문 (raw):", responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                    console.log("📊 응답 JSON:", result);
+                } catch (parseErr) {
+                    console.error("❌ JSON 파싱 실패:", parseErr);
+                    throw new Error(`서버 응답 파싱 오류: ${responseText.substring(0, 100)}`);
+                }
+                
+                if (!response.ok) {
+                    throw new Error(result.error || result.message || `HTTP ${response.status}`);
+                }
 
-                // ✅ 서버 응답 형식: { ok: true, id: NEW_ID, message: "..." }
-                if (response.ok && result.ok) {
-                    const newId = result.id;
-
+                if (result.ok) {
                     resultDiv.innerHTML = `
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-sm">
-          <p class="font-semibold text-sm sm:text-base">✅ 문의가 성공적으로 등록되었습니다.</p>
-          <p class="text-xs sm:text-sm mt-1">
-            문의 번호: <span class="font-mono">${newId}</span>
-          </p>
-          <p class="text-xs sm:text-[13px] mt-2 text-emerald-600">
-            방금 작성하신 내용을 상세 페이지에서 확인하실 수 있습니다.
-          </p>
-        </div>
-    `;
+                        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-sm">
+                            <div class="flex items-center mb-2">
+                                <span class="text-2xl mr-2">✅</span>
+                                <p class="font-semibold text-sm sm:text-base">문의가 성공적으로 등록되었습니다!</p>
+                            </div>
+                            <p class="text-xs sm:text-sm mt-1">
+                                📋 문의 번호: <span class="font-mono bg-emerald-100 px-2 py-0.5 rounded">#${result.id}</span>
+                            </p>
+                            ${result.uploaded_files > 0 ? `
+                                <p class="text-xs sm:text-sm mt-1">
+                                    📁 첨부 파일: ${result.uploaded_files}개 업로드됨
+                                </p>
+                            ` : ''}
+                            <p class="text-xs sm:text-[13px] mt-2 text-emerald-600">
+                                담당자가 내용을 확인한 후 순차적으로 답변드릴 예정입니다.
+                            </p>
+                            <p class="text-[11px] mt-2 text-emerald-500">
+                                3초 후 문의 목록으로 이동합니다...
+                            </p>
+                        </div>
+                    `;
                     resultDiv.classList.remove("hidden");
 
-                    // ✅ 바로 상세 페이지로 이동
-                    location.href = `/inquirydetail.html?id=${newId}`;
+                    form.reset();
+                    ["fileLabel1", "fileLabel2", "fileLabel3"].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.textContent = "선택된 파일 없음";
+                            el.classList.remove("text-slate-600");
+                            el.classList.add("text-slate-400");
+                        }
+                    });
+
+                    console.log("✅ === 폼 전송 완료 ===\n");
+
+                    setTimeout(() => {
+                        window.location.href = "/inquiryboard.html";
+                    }, 3000);
 
                 } else {
-                    // 서버에서 보낸 에러 메시지 우선 사용
                     throw new Error(result.message || result.error || "등록에 실패했습니다.");
                 }
 
@@ -316,19 +371,24 @@
                 console.error("❌ 문의 등록 오류:", error);
 
                 resultDiv.innerHTML = `
-          <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 shadow-sm">
-            <p class="font-semibold text-sm sm:text-base">❌ 문의 등록에 실패했습니다.</p>
-            <p class="text-xs sm:text-[13px] mt-1">${error.message}</p>
-            <p class="text-[11px] mt-2 text-rose-500">
-              잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요.
-            </p>
-          </div>
-        `;
+                    <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 shadow-sm">
+                        <div class="flex items-center mb-2">
+                            <span class="text-2xl mr-2">❌</span>
+                            <p class="font-semibold text-sm sm:text-base">문의 등록에 실패했습니다</p>
+                        </div>
+                        <p class="text-xs sm:text-[13px] mt-1 mb-3">오류: ${error.message}</p>
+                        <button onclick="location.reload()" 
+                                class="px-4 py-2 bg-rose-600 text-white text-sm rounded-lg hover:bg-rose-700 transition">
+                            🔄 페이지 새로고침
+                        </button>
+                    </div>
+                `;
                 resultDiv.classList.remove("hidden");
 
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
+                submitBtn.classList.remove("opacity-50");
             }
         });
     </script>

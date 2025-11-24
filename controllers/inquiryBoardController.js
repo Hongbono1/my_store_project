@@ -10,18 +10,23 @@ const uploadDir = path.join(process.cwd(), "public2", "uploads", "inquiry");
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
     console.log("📁 문의 업로드 폴더 생성:", uploadDir);
+} else {
+    console.log("✅ 문의 업로드 폴더 존재:", uploadDir);
 }
 
 // Multer 설정 (Mall Hankook 표준)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        console.log("📁 Multer destination:", uploadDir);
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const timestamp = Date.now();
         const random = Math.round(Math.random() * 1e9);
         const ext = path.extname(file.originalname);
-        cb(null, `${timestamp}-${random}${ext}`);
+        const filename = `${timestamp}-${random}${ext}`;
+        console.log("📝 Multer 파일명 생성:", filename, "원본:", file.originalname);
+        cb(null, filename);
     },
 });
 
@@ -29,13 +34,21 @@ export const uploadInquiry = multer({
     storage,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
     fileFilter: (req, file, cb) => {
+        console.log("🔍 Multer fileFilter:", {
+            fieldname: file.fieldname,
+            originalname: file.originalname,
+            mimetype: file.mimetype
+        });
+        
         const allowed = /jpeg|jpg|png|gif|webp/;
         const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
         const mimeOk = allowed.test(file.mimetype);
 
         if (extOk && mimeOk) {
+            console.log("✅ 파일 허용:", file.originalname);
             cb(null, true);
         } else {
+            console.log("❌ 파일 거부:", file.originalname);
             cb(new Error("이미지 파일(jpg, png, gif, webp)만 업로드 가능합니다."));
         }
     },
@@ -43,6 +56,10 @@ export const uploadInquiry = multer({
 
 export const createInquiry = async (req, res) => {
     try {
+        console.log("\n🚀 === 문의 등록 시작 ===");
+        console.log("📦 req.body:", req.body);
+        console.log("📁 req.files:", req.files);
+        
         const { 
             inquiry_type,
             title, 
@@ -55,21 +72,31 @@ export const createInquiry = async (req, res) => {
         // 필수값 체크
         if (!title || !content || !writer_name) {
             return res.status(400).json({
-                ok: false,  // ✅ Frontend 호환성을 위해 ok 사용
+                ok: false,
                 error: "제목, 내용, 이름은 필수 입력사항입니다.",
             });
         }
 
-        // 비밀글 처리 (Mall Hankook 표준)
+        // 비밀글 처리
         const is_secret = req.body?.is_secret === "on" || req.body?.is_secret === "true";
 
-        // 업로드된 파일 경로 처리
+        // ✅ 업로드된 파일 경로 처리 (디버깅 강화)
         const files = Array.isArray(req.files) ? req.files.slice(0, 3) : [];
-        const filePaths = files.map(file => `/uploads/inquiry/${file.filename}`);
+        console.log(`📊 업로드된 파일 수: ${files.length}`);
         
-        console.log("📁 업로드된 문의 이미지:", filePaths);
+        const filePaths = files.map((file, index) => {
+            const relativePath = `/uploads/inquiry/${file.filename}`;
+            console.log(`  [${index + 1}] ${file.originalname} → ${relativePath}`);
+            return relativePath;
+        });
 
-        // Mall Hankook 표준 DB 삽입
+        console.log("📁 최종 저장 경로:", {
+            image1: filePaths[0] || null,
+            image2: filePaths[1] || null,
+            image3: filePaths[2] || null
+        });
+
+        // DB 삽입
         const result = await pool.query(`
             INSERT INTO inquiry (
                 inquiry_type, 
@@ -100,35 +127,35 @@ export const createInquiry = async (req, res) => {
         ]);
 
         const row = result.rows[0];
+        console.log(`✅ DB 저장 완료: ID=${row.id}`);
+        console.log("🚀 === 문의 등록 완료 ===\n");
 
-        // ✅ Frontend 호환성을 위해 ok: true 사용
         return res.status(201).json({
             ok: true,
             id: row.id,
             message: "문의가 성공적으로 등록되었습니다.",
             created_at: row.created_at,
-            uploaded_files: filePaths.length
+            uploaded_files: filePaths.length,
+            files: filePaths // ✅ 디버깅용 응답 추가
         });
 
     } catch (err) {
         console.error("❌ 문의 등록 오류:", err);
         return res.status(500).json({
-            ok: false,  // ✅ Frontend 호환성을 위해 ok 사용
+            ok: false,
             error: "서버 오류가 발생했습니다.",
+            details: err.message
         });
     }
 };
 
 export const getInquiryList = async (req, res) => {
     try {
-        // Health Check 처리
         if (req.query.health === 'check') {
             console.log("🏥 Mall Hankook API Health Check");
-            
             const healthTest = await pool.query('SELECT NOW() as server_time');
-            
             return res.json({
-                ok: true,  // ✅ 일관성을 위해 ok 사용
+                ok: true,
                 service: "Mall Hankook Inquiry API",
                 status: "healthy",
                 timestamp: new Date().toISOString(),
@@ -139,7 +166,6 @@ export const getInquiryList = async (req, res) => {
             });
         }
 
-        // 일반 목록 조회
         const result = await pool.query(`
             SELECT 
                 id,
@@ -163,8 +189,6 @@ export const getInquiryList = async (req, res) => {
         `);
 
         console.log(`📋 문의 목록 조회: ${result.rows.length}건`);
-        
-        // Mall Hankook 표준: 목록 조회는 직접 배열 응답
         return res.json(result.rows);
 
     } catch (err) {
@@ -205,9 +229,9 @@ export const getInquiryDetail = async (req, res) => {
                 writer_name,
                 writer_phone, 
                 writer_email,
-                image1,      -- ✅ DB 컬럼명과 일치
-                image2,      -- ✅ DB 컬럼명과 일치
-                image3,      -- ✅ DB 컬럼명과 일치
+                image1,
+                image2,
+                image3,
                 is_secret,
                 answer,
                 created_at,
@@ -232,7 +256,6 @@ export const getInquiryDetail = async (req, res) => {
             image3: inquiry.image3
         });
         
-        // ✅ Frontend 호환 응답 구조
         return res.json({
             ok: true,
             item: inquiry
