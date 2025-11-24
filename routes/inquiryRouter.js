@@ -2,13 +2,12 @@
 import express from "express";
 
 // 📌 문의 등록(레지스터) 전용 컨트롤러
-import { uploadInquiry, createInquiry } from "../controllers/inquiryController.js";
-
-// 📌 문의 상세 보기 전용 컨트롤러
-import { getInquiryDetail } from "../controllers/inquiryDetailController.js";
-
-// 📌 문의 게시판(목록) 전용 컨트롤러
-import { listInquiryBoard } from "../controllers/inquiryBoardController.js";
+import { 
+    createInquiry,      // ✅ Controller에서 실제 export하는 함수명
+    getInquiryList,     // ✅ Controller에서 실제 export하는 함수명
+    getInquiryDetail,   // ✅ Controller에서 실제 export하는 함수명
+    uploadInquiry       // ✅ Controller에서 실제 export하는 함수명
+} from "../controllers/inquiryBoardController.js";
 
 const router = express.Router();
 
@@ -22,7 +21,7 @@ router.post("/", uploadInquiry, createInquiry);
  * GET /api/inquiry
  * - 문의 목록 (게시판)
  */
-router.get("/", listInquiryBoard);
+router.get("/", getInquiryList);
 
 /**
  * GET /api/inquiry/:id
