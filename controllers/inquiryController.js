@@ -53,6 +53,7 @@ export async function createInquiry(req, res, next) {
             writer_name,
             writer_phone,
             writer_email,
+            is_secret, // 🔹 비밀글 플래그 (체크박스 name="is_secret")
         } = req.body || {};
 
         // 서버에서도 필수값 체크
@@ -84,6 +85,14 @@ export async function createInquiry(req, res, next) {
         const user_name = writer_name || null;
         const user_phone = writer_phone || null;
 
+        // 🔹 비밀글 플래그 정규화 (true/false)
+        const isSecret =
+            is_secret === "on" ||
+            is_secret === "true" ||
+            is_secret === "1" ||
+            is_secret === true ||
+            is_secret === 1;
+
         const sql = `
       INSERT INTO inquiry (
         title,
@@ -97,6 +106,7 @@ export async function createInquiry(req, res, next) {
         image1_path,
         image2_path,
         image3_path,
+        is_secret,
         created_at,
         updated_at
       ) VALUES (
@@ -105,6 +115,7 @@ export async function createInquiry(req, res, next) {
         $5,
         $6, $7, $8,
         $9, $10, $11,
+        $12,
         NOW(), NOW()
       )
       RETURNING id
@@ -122,6 +133,7 @@ export async function createInquiry(req, res, next) {
             image1_path,
             image2_path,
             image3_path,
+            isSecret, // 🔹 is_secret 컬럼으로 저장
         ];
 
         const result = await pool.query(sql, params);
@@ -133,6 +145,7 @@ export async function createInquiry(req, res, next) {
             title,
             user_name,
             writer_name,
+            is_secret: isSecret,
         });
 
         return res.status(201).json({
@@ -166,6 +179,7 @@ export async function listInquiry(req, res, next) {
         writer_name,
         writer_phone,
         writer_email,
+        is_secret,
         created_at
       FROM inquiry
       ORDER BY created_at DESC
