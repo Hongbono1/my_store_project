@@ -171,18 +171,7 @@
                 image2: item.image2,
                 image3: item.image3
             });
-
-            // ✅ 모든 가능한 필드명 확인
-            const paths = [
-                item.image1,
-                item.image2,
-                item.image3,
-                item.image1_path,  // 혹시 모를 다른 필드명
-                item.image2_path,
-                item.image3_path,
-            ].filter((p) => p && typeof p === "string" && p.trim() !== "");
-
-            console.log("📊 유효한 이미지 경로:", paths);
+            console.log("📂 file_paths 원본:", item.file_paths);
 
             const imageSection = document.getElementById("imageSection");
             const imageGrid = document.getElementById("imageGrid");
@@ -193,6 +182,52 @@
             }
 
             imageGrid.innerHTML = "";
+
+            // 1️⃣ 기본 필드(image1, image2, image3, image*_path) 먼저 모으기
+            let paths = [];
+
+            const directCandidates = [
+                item.image1,
+                item.image2,
+                item.image3,
+                item.image1_path,
+                item.image2_path,
+                item.image3_path,
+            ];
+
+            directCandidates.forEach((p) => {
+                if (p && typeof p === "string" && p.trim() !== "") {
+                    paths.push(p);
+                }
+            });
+
+            // 2️⃣ file_paths(JSON)에 있는 이미지도 추가
+            if (item.file_paths) {
+                let fileArray = [];
+
+                // PostgreSQL json 타입이면 이미 JS 배열/객체일 가능성 큼
+                if (Array.isArray(item.file_paths)) {
+                    fileArray = item.file_paths;
+                } else if (typeof item.file_paths === "string") {
+                    // 혹시 문자열(JSON 문자열)로 들어온 경우
+                    try {
+                        const parsed = JSON.parse(item.file_paths);
+                        if (Array.isArray(parsed)) {
+                            fileArray = parsed;
+                        }
+                    } catch (e) {
+                        console.error("❌ file_paths JSON 파싱 실패:", e);
+                    }
+                }
+
+                fileArray.forEach((p) => {
+                    if (p && typeof p === "string" && p.trim() !== "") {
+                        paths.push(p);
+                    }
+                });
+            }
+
+            console.log("📊 유효한 이미지 경로 (file_paths 포함):", paths);
 
             if (paths.length === 0) {
                 imageSection.classList.add("hidden");
@@ -207,9 +242,8 @@
             paths.forEach((src, index) => {
                 // ✅ 경로 정규화 (중복 슬래시 제거)
                 let normalizedSrc = src;
-                if (!src.startsWith('http')) {
-                    // 상대 경로인 경우 정규화
-                    normalizedSrc = src.replace(/^\/+/, '/');
+                if (!src.startsWith("http")) {
+                    normalizedSrc = src.replace(/^\/+/, "/");
                 }
 
                 console.log(`🖼️ 이미지 ${index + 1}: ${normalizedSrc}`);
@@ -217,7 +251,8 @@
                 const img = document.createElement("img");
                 img.src = normalizedSrc;
                 img.alt = `첨부 이미지 ${index + 1}`;
-                img.className = "w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform";
+                img.className =
+                    "w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform";
 
                 // 새 탭에서 원본 이미지 열기
                 img.addEventListener("click", () => {
@@ -233,8 +268,9 @@
                 // 이미지 로드 실패 처리
                 img.onerror = function () {
                     console.error(`❌ 이미지 로드 실패: ${normalizedSrc}`);
-                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTZMOCAxMUwxMyAxNkwxNiAxM0wyMSAxOFY2QzIxIDQuOSAyMC4xIDQgMTkgNEg1QzMuOSA0IDMgNC45IDMgNlYxNloiIGZpbGw9IiNDREQ1REYiLz4KPHN2Zz4K';
-                    this.className += ' opacity-50';
+                    this.src =
+                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTZMOCAxMUwxMyAxNkwxNiAxM0wyMSAxOFY2QzIxIDQuOSAyMC4xIDQgMTkgNEg1QzMuOSA0IDMgNC45IDMgNlYxNloiIGZpbGw9IiNDREQ1REYiLz4KPHN2Zz4K";
+                    this.className += " opacity-50";
                     this.title = `이미지를 불러올 수 없습니다: ${normalizedSrc}`;
                 };
 
