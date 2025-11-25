@@ -19,7 +19,7 @@ router.get("/:id", getInquiryBoardDetail);
 router.post("/", (req, res, next) => {
   uploadInquiryBoard(req, res, (err) => {
     if (err) {
-      return next(err); // LIMIT_UNEXPECTED_FILE 같은 에러 여기서 처리 → 전역 에러핸들러 감
+      return next(err); // Multer 에러 (LIMIT_UNEXPECTED_FILE 등) → 전역 에러핸들러에서 JSON으로 응답
     }
     createInquiryBoard(req, res, next);
   });
