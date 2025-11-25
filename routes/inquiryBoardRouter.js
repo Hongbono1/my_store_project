@@ -1,24 +1,28 @@
 // routes/inquiryBoardRouter.js
-import express from "express";
+import { Router } from "express";
 import {
-  uploadInquiry,
-  createInquiry,
-  listInquiry,
-} from "../controllers/inquiryController.js";
+  uploadInquiryBoard,
+  createInquiryBoard,
+  getInquiryBoardList,
+  getInquiryBoardDetail
+} from "../controllers/inquiryBoardController.js";
 
-const router = express.Router();
+const router = Router();
 
-console.log("✅ inquiryBoardRouter 초기화");
+// 목록
+router.get("/", getInquiryBoardList);
 
-// GET /api/inquiryBoard - 문의 목록
-router.get("/", listInquiry);
+// 상세
+router.get("/:id", getInquiryBoardDetail);
 
-// GET /api/inquiryBoard/:id - 문의 상세 (나중에 구현)
-// router.get("/:id", getInquiryDetail);
-
-// POST /api/inquiryBoard - 문의 등록 (이미지 업로드 + 저장)
-router.post("/", uploadInquiry, createInquiry);
-
-console.log("✅ inquiryBoardRouter 라우트 등록 완료");
+// 등록 (업로드 + DB 저장)
+router.post("/", (req, res, next) => {
+  uploadInquiryBoard(req, res, (err) => {
+    if (err) {
+      return next(err); // LIMIT_UNEXPECTED_FILE 같은 에러 여기서 처리 → 전역 에러핸들러 감
+    }
+    createInquiryBoard(req, res, next);
+  });
+});
 
 export default router;
