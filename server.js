@@ -31,7 +31,7 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
-import inquiryRouter from "./routes/inquiryRouter.js";  // ✅ Inquiry Router import
+import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";  // ✅ 새 문의 게시판
 import localRankRouter from "./routes/localRankRouter.js";
 import pool from "./db.js";
 
@@ -89,8 +89,9 @@ const uploadDirs = [
   path.join(__dirname, "public/uploads"),
   path.join(__dirname, "public/uploads/traditionalmarket"),
   path.join(__dirname, "public/uploads/performingart"),
+  path.join(__dirname, "public/uploads/inquiry"),  // ✅ 문의 업로드 폴더
   path.join(__dirname, "public2/uploads"),
-  path.join(__dirname, "public2/uploads/inquiry")  // ✅ Inquiry 업로드 폴더 추가
+  path.join(__dirname, "public2/uploads/inquiry")
 ];
 
 uploadDirs.forEach(dir => {
@@ -102,7 +103,7 @@ uploadDirs.forEach(dir => {
   }
 });
 
-// ✅ Express app 인스턴스 생성 (가장 먼저)
+// ✅ Express app 인스턴스 생성
 const app = express();
 
 /* 공통 미들웨어 */
@@ -118,7 +119,7 @@ app.use((req, res, next) => {
     const ms = Date.now() - started;
     console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
     if (req.method === 'POST') {
-      console.log(`🔥 POST 요청 상세: ${req.originalUrl} | Content-Type: ${req.get('content-type') || 'none'}`);
+      console.log(`🔥 POST 요청: ${req.originalUrl} | Content-Type: ${req.get('content-type') || 'none'}`);
     }
   });
   next();
@@ -128,11 +129,15 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ✅ 문의 API 라우트 (Mall Hankook 표준) */
-app.use("/api/inquiry", inquiryRouter);
-app.use("/api/inquiryBoard", inquiryRouter); // 기존 Frontend 하위 호환성
+/* ✅ 문의 게시판 API 라우트 */
+console.log("[boot] mounting /api/inquiryBoard -> inquiryBoardRouter");
+app.use("/api/inquiryBoard", inquiryBoardRouter);
 
-/* API 라우트 설정 */
+// 🔁 기존 /api/inquiry도 같은 라우터로 연결 (하위 호환성)
+console.log("[boot] mounting /api/inquiry -> inquiryBoardRouter (legacy)");
+app.use("/api/inquiry", inquiryBoardRouter);
+
+/* 기타 API 라우트 설정 */
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
@@ -150,7 +155,6 @@ app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
 
-// Open Store API 라우트
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
 app.use("/api/open", opendetailRouter);
@@ -160,189 +164,7 @@ app.use("/open", opendetailRouter);
 app.use("/openregister", openregisterRouter);
 app.use("/upload", uploadRouter);
 
-// 관리자 엔드포인트들
-app.get("/admin/check-table", async (req, res) => {
-  try {
-    const columns = await pool.query(`
-      SELECT column_name, data_type, is_nullable 
-      FROM information_schema.columns 
-      WHERE table_name = 'open_stores' 
-      ORDER BY ordinal_position;
-    `);
-
-    const hasDetailAddress = columns.rows.some(col => col.column_name === 'detail_address');
-
-    if (!hasDetailAddress) {
-      console.log("📝 detail_address 컬럼 추가 중...");
-      await pool.query(`ALTER TABLE open_stores ADD COLUMN detail_address TEXT`);
-      console.log("✅ detail_address 컬럼이 추가되었습니다!");
-
-      const updatedColumns = await pool.query(`
-        SELECT column_name, data_type, is_nullable 
-        FROM information_schema.columns 
-        WHERE table_name = 'open_stores' 
-        ORDER BY ordinal_position;
-      `);
-
-      res.json({
-        success: true,
-        message: "detail_address 컬럼이 추가되었습니다",
-        columns: updatedColumns.rows
-      });
-    } else {
-      res.json({
-        success: true,
-        message: "detail_address 컬럼이 이미 존재합니다",
-        columns: columns.rows
-      });
-    }
-
-  } catch (error) {
-    console.error("❌ 테이블 구조 확인 오류:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get("/admin/check-storepride-table", async (req, res) => {
-  try {
-    const results = [];
-
-    const mainTableExists = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'store_pride'
-      );
-    `);
-
-    if (!mainTableExists.rows[0].exists) {
-      results.push("📝 store_pride 테이블 생성 중...");
-      await pool.query(`
-        CREATE TABLE store_pride (
-          id SERIAL PRIMARY KEY,
-          store_name VARCHAR(255) NOT NULL,
-          category VARCHAR(100) NOT NULL,
-          phone VARCHAR(50),
-          address TEXT NOT NULL,
-          main_img TEXT,
-          free_pr TEXT,
-          qa_mode VARCHAR(20) NOT NULL CHECK (qa_mode IN ('fixed', 'custom')),
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-      `);
-      results.push("✅ store_pride 테이블이 생성되었습니다!");
-    } else {
-      results.push("✅ store_pride 테이블이 이미 존재합니다.");
-    }
-
-    const qasTableExists = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'store_pride_qas'
-      );
-    `);
-
-    if (!qasTableExists.rows[0].exists) {
-      results.push("📝 store_pride_qas 테이블 생성 중...");
-      await pool.query(`
-        CREATE TABLE store_pride_qas (
-          id SERIAL PRIMARY KEY,
-          pride_id INTEGER REFERENCES store_pride(id) ON DELETE CASCADE,
-          qa_type VARCHAR(20) NOT NULL CHECK (qa_type IN ('fixed', 'custom')),
-          seq INTEGER NOT NULL,
-          question TEXT NOT NULL,
-          answer TEXT NOT NULL,
-          image_path TEXT,
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-      `);
-      results.push("✅ store_pride_qas 테이블이 생성되었습니다!");
-    } else {
-      results.push("✅ store_pride_qas 테이블이 이미 존재합니다.");
-    }
-
-    const prideColumns = await pool.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'store_pride' 
-      ORDER BY ordinal_position;
-    `);
-
-    const qasColumns = await pool.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'store_pride_qas' 
-      ORDER BY ordinal_position;
-    `);
-
-    const prideCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
-    const qasCount = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
-
-    res.json({
-      success: true,
-      results,
-      tables: {
-        store_pride: {
-          columns: prideColumns.rows,
-          count: prideCount.rows[0].count
-        },
-        store_pride_qas: {
-          columns: qasColumns.rows,
-          count: qasCount.rows[0].count
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error("❌ Store Pride 테이블 체크 중 오류:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get("/admin/check-storepride-data", async (req, res) => {
-  try {
-    const prideData = await pool.query(`
-      SELECT id, store_name, category, phone, address, main_img, free_pr, qa_mode, created_at
-      FROM store_pride 
-      ORDER BY created_at DESC 
-      LIMIT 5;
-    `);
-
-    const results = [];
-
-    for (const row of prideData.rows) {
-      const qasData = await pool.query(`
-        SELECT qa_type, seq, question, answer, image_path
-        FROM store_pride_qas 
-        WHERE pride_id = $1
-        ORDER BY qa_type, seq;
-      `, [row.id]);
-
-      results.push({
-        ...row,
-        qas: qasData.rows
-      });
-    }
-
-    const totalCount = await pool.query("SELECT COUNT(*) as count FROM store_pride");
-    const totalQAs = await pool.query("SELECT COUNT(*) as count FROM store_pride_qas");
-
-    res.json({
-      success: true,
-      data: results,
-      stats: {
-        totalStores: totalCount.rows[0].count,
-        totalQAs: totalQAs.rows[0].count
-      }
-    });
-
-  } catch (error) {
-    console.error("❌ Store Pride 데이터 확인 중 오류:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/* 정적 파일 서빙 */
+/* 정적 파일 서빙 - 강력한 캐시 방지 */
 app.use(express.static(path.join(__dirname, "public2"), {
   extensions: ["html"],
   setHeaders: (res, filePath) => {
@@ -350,89 +172,20 @@ app.use(express.static(path.join(__dirname, "public2"), {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('Last-Modified', new Date().toUTCString());
+      res.setHeader('ETag', Date.now().toString());
     }
   }
 }));
 
-// ✅ 업로드 파일 서빙 (중요!)
-app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
-
-console.log("✅ Static files:", {
-  html: path.join(__dirname, "public2"),
-  uploads: path.join(__dirname, "public2", "uploads")
-});
-
-// ✅ HTML 직접 라우트 추가 (명시적 처리)
-app.get("/inquirydetail", (req, res) => {
-  res.sendFile(path.join(__dirname, "public2", "inquirydetail.html"));
-});
-
-app.get("/inquiryDetail", (req, res) => {
-  res.sendFile(path.join(__dirname, "public2", "inquirydetail.html"));
-});
-
 app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
+
+// ✅ 업로드 파일 서빙
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
 
-/* HTML 직접 라우트 */
-app.get("/hotsubcategory", (req, res) => {
-  res.sendFile(path.join(__dirname, "public2", "hotsubcategory.html"));
-});
-
-app.get("/hotblogdetail", (req, res) => {
-  res.sendFile(path.join(__dirname, "public2", "hotblogdetail.html"));
-});
-
-/* 사업자 인증 프록시 */
-app.post("/verify-biz", async (req, res) => {
-  try {
-    const body = req.body || {};
-    let raw = "";
-    if (Array.isArray(body.b_no)) raw = body.b_no[0];
-    else if (typeof body.b_no === "string") raw = body.b_no;
-    else if (body.bNo) raw = body.bNo;
-    else if (body.bizNumber) raw = body.bizNumber;
-    else if (body.biz1 && body.biz2 && body.biz3) raw = `${body.biz1}${body.biz2}${body.biz3}`;
-
-    const digits = String(raw || "").replace(/[^\d]/g, "");
-    const b_no = digits.slice(0, 10);
-
-    if (b_no.length !== 10) {
-      return res.status(200).json({ status_code: "ERROR", ok: false, message: "invalid b_no", data: [] });
-    }
-
-    if (!process.env.BIZ_API_KEY) {
-      return res.status(200).json({
-        status_code: "OK",
-        data: [{ b_no, b_stt_cd: "01", b_stt: "계속사업자", b_nm: "" }],
-      });
-    }
-
-    const url =
-      "https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=" +
-      encodeURIComponent(process.env.BIZ_API_KEY);
-
-    const upstream = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ b_no: [b_no] }),
-    });
-
-    if (!upstream.ok) {
-      console.error("[verify-biz] upstream HTTP", upstream.status);
-      return res.status(200).json({ status_code: "ERROR", ok: false, data: [] });
-    }
-
-    const payload = await upstream.json();
-    return res.status(200).json(payload);
-  } catch (e) {
-    console.error("[verify-biz] error:", e);
-    return res.status(200).json({ status_code: "ERROR", ok: false, data: [] });
-  }
-});
-
-/* API 라우터 */
+/* 나머지 라우터들 */
 console.log("[boot] mounting /store -> foodregisterRouter");
 app.use("/store", foodregisterRouter);
 
@@ -447,34 +200,6 @@ app.use("/api/hotblog", hotblogRouter);
 
 /* 헬스체크 */
 app.get("/__ping", (_req, res) => res.json({ ok: true }));
-
-/* 라우트 목록 */
-function collectRoutes(app) {
-  const out = [];
-  app._router?.stack?.forEach(layer => {
-    if (layer.route) {
-      const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase()).join(", ");
-      out.push(`${methods} ${layer.route.path}`);
-      return;
-    }
-    if (layer.name === "router" && layer.handle?.stack) {
-      let mount = "";
-      if (layer.regexp && layer.regexp.fast_star !== true) {
-        const m = layer.regexp.toString().match(/\\\/([^\\^?]+)\\\//);
-        if (m && m[1]) mount = `/${m[1]}`;
-      }
-      layer.handle.stack.forEach(r => {
-        if (r.route) {
-          const methods = Object.keys(r.route.methods).map(m => m.toUpperCase()).join(", ");
-          out.push(`${methods} ${mount}${r.route.path}`);
-        }
-      });
-    }
-  });
-  return out.sort();
-}
-
-app.get("/__routes", (_req, res) => res.json({ ok: true, routes: collectRoutes(app) }));
 
 /* 전역 에러 핸들러 */
 app.use((err, req, res, next) => {
@@ -513,12 +238,12 @@ app.use((req, res) => {
   res.status(404).send("<h1>Not Found</h1>");
 });
 
-// ✅ 서버 리슨 (맨 마지막에 위치)
+// ✅ 서버 리슨
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 MALL HANKOOK server listening on http://127.0.0.1:${PORT}`);
-  console.log("✅ Router mounted: /api/inquiry, /api/inquiryBoard");
-  console.log(`📁 Serving static files from public2/`);
-  console.log(`📡 Inquiry API available at both endpoints`);
+  console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
+  console.log(`📡 Inquiry API: /api/inquiryBoard (new) & /api/inquiry (legacy)`);
+  console.log(`📁 Static files: public2/`);
+  console.log(`📤 Upload directory: public/uploads/inquiry/\n`);
 });

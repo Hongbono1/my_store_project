@@ -1,32 +1,24 @@
 // routes/inquiryBoardRouter.js
 import express from "express";
 import {
-  uploadInquiryBoard,
-  createInquiryBoard,
-  getInquiryBoardList,
-  getInquiryBoardDetail,
-} from "../controllers/inquiryBoardController.js";
+  uploadInquiry,
+  createInquiry,
+  listInquiry,
+} from "../controllers/inquiryController.js";
 
 const router = express.Router();
 
-// 🏥 Health Check: GET /api/inquiryBoard?health=check
-router.get("/", (req, res, next) => {
-  if (req.query.health === "check") {
-    return res.status(200).json({
-      ok: true,
-      message: "inquiryBoard API alive",
-    });
-  }
-  return next();
-});
+console.log("✅ inquiryBoardRouter 초기화");
 
-// 📨 문의 등록 (이미지 업로드 포함)
-router.post("/", uploadInquiryBoard, createInquiryBoard);
+// GET /api/inquiryBoard - 문의 목록
+router.get("/", listInquiry);
 
-// 📋 문의 목록
-router.get("/", getInquiryBoardList);
+// GET /api/inquiryBoard/:id - 문의 상세 (나중에 구현)
+// router.get("/:id", getInquiryDetail);
 
-// 📄 문의 상세
-router.get("/:id", getInquiryBoardDetail);
+// POST /api/inquiryBoard - 문의 등록 (이미지 업로드 + 저장)
+router.post("/", uploadInquiry, createInquiry);
+
+console.log("✅ inquiryBoardRouter 라우트 등록 완료");
 
 export default router;

@@ -38,12 +38,25 @@ const upload = multer({
     },
 });
 
-// ✅ 라우터에서 사용할 업로드 미들웨어 (image1, image2, image3)
-export const uploadInquiry = upload.fields([
-    { name: "image1", maxCount: 1 },
-    { name: "image2", maxCount: 1 },
-    { name: "image3", maxCount: 1 },
-]);
+// ✅ Multer 설정 변경: array() 사용
+export const uploadInquiry = multer({
+    storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+        files: 3,
+    },
+    fileFilter: (req, file, cb) => {
+        const allowed = /jpeg|jpg|png|gif|webp/;
+        const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
+        const mimeOk = allowed.test(file.mimetype);
+        
+        if (extOk && mimeOk) {
+            cb(null, true);
+        } else {
+            cb(new Error("이미지 파일만 업로드 가능합니다."));
+        }
+    }
+}).array("images", 3);  // ✅ name="images"로 통일
 
 // --------------------------------------------------------
 // 문의 생성
@@ -57,7 +70,7 @@ export async function createInquiry(req, res, next) {
             writer_name,
             writer_phone,
             writer_email,
-            is_secret, // 나중에 DB 컬럼 만들면 활용 가능
+            is_secret,
         } = req.body || {};
 
         // 서버에서도 필수값 체크
@@ -76,19 +89,18 @@ export async function createInquiry(req, res, next) {
             });
         }
 
-        // ✅ 파일 경로 정리 (image1, image2, image3 각각 1개씩)
-        const fileNames = [];
-
-        ["image1", "image2", "image3"].forEach((field) => {
-            const arr = req.files && req.files[field];
-            if (Array.isArray(arr) && arr[0]) {
-                fileNames.push(`/uploads/inquiry/${arr[0].filename}`);
-            } else {
-                fileNames.push(null);
-            }
-        });
+        // ✅ array()로 받은 파일들 처리
+        const files = Array.isArray(req.files) ? req.files.slice(0, 3) : [];
+        const fileNames = files.map(f => `/uploads/inquiry/${f.filename}`);
+        
+        // 3개 맞추기 (부족하면 null 채움)
+        while (fileNames.length < 3) {
+            fileNames.push(null);
+        }
 
         const [image1_path, image2_path, image3_path] = fileNames;
+
+        console.log("📁 업로드된 파일:", { image1_path, image2_path, image3_path });
 
         // 🔥 inquiry.user_name 이 NOT NULL 이라서
         // writer_name 값을 그대로 user_name, writer_phone 를 user_phone 으로 복사
@@ -143,13 +155,14 @@ export async function createInquiry(req, res, next) {
             inquiry_type,
             title,
             user_name,
-            writer_name,
+            uploaded_files: files.length
         });
 
         return res.status(201).json({
             ok: true,
             id: newId,
             message: "문의가 정상적으로 등록되었습니다.",
+            uploaded_files: files.length
         });
     } catch (err) {
         console.error("❌ createInquiry ERROR:", err);
