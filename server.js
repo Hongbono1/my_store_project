@@ -34,6 +34,7 @@ import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";  // ✅ 새 문의 게시판
 import localRankRouter from "./routes/localRankRouter.js";
+import storeRouter from "./routes/storeRouter.js";
 
 // 공연/예술 테이블 자동 생성
 async function initPerformingArtsTables() {
@@ -141,6 +142,11 @@ app.use("/api/inquiry", inquiryBoardRouter);
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
+
+// ✅ 홍보의 신문 API (store.html 연동)
+console.log("[boot] mounting /api -> storeRouter");
+app.use("/api", storeRouter);
+
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
 app.use("/api/market", traditionalmarketregisterRouter);

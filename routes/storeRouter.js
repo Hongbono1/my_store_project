@@ -15,17 +15,17 @@ import {
 
 const router = express.Router();
 
-// 🔽 각 섹션별 최신 데이터 API
-router.get("/food/latest", getFoodLatest);
-router.get("/hot/latest", getHotLatest);
-router.get("/traditional/latest", getTraditionalLatest);
-router.get("/festival/latest", getFestivalLatest);
-router.get("/event/latest", getEventLatest);
-router.get("/open/latest", getOpenLatest);
-router.get("/storepride/latest", getPrideLatest);
-router.get("/stores/latest", getAllStoresLatest);
-router.get("/suggest/latest", getSuggestLatest);
-router.get("/season/latest", getSeasonLatest);
-router.get("/localboard/latest", getLocalBoardLatest);
+// 🔽 홍보의 신문 - 각 섹션별 최신 데이터 API
+router.get("/food/latest", getFoodLatest);           // 홍보의 배달
+router.get("/hot/latest", getHotLatest);             // HOT 랭킹
+router.get("/traditional/latest", getTraditionalLatest); // 전통시장
+router.get("/festival/latest", getFestivalLatest);   // 공연/축제
+router.get("/event/latest", getEventLatest);         // 이벤트
+router.get("/open/latest", getOpenLatest);           // 오픈 예정
+router.get("/storepride/latest", getPrideLatest);    // 가게 자랑
+router.get("/stores/latest", getAllStoresLatest);    // 모든 가게
+router.get("/suggest/latest", getSuggestLatest);     // 홍보의 추천
+router.get("/season/latest", getSeasonLatest);       // 계절 테마
+router.get("/localboard/latest", getLocalBoardLatest); // 지역 게시판
 
 export default router;
