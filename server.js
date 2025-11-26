@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fs from "fs";
+import pool from "./db.js";
 
 // Router imports
 import foodregisterRouter from "./routes/foodregister.js";
@@ -33,7 +34,6 @@ import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";  // ✅ 새 문의 게시판
 import localRankRouter from "./routes/localRankRouter.js";
-import pool from "./db.js";
 
 // 공연/예술 테이블 자동 생성
 async function initPerformingArtsTables() {
