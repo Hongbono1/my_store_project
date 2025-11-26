@@ -77,7 +77,6 @@ export async function getOpenLatest(req, res) {
     if (!tableCheck.rows[0].exists) {
       console.log("⚠️ open_stores 테이블이 존재하지 않음 - 테이블 생성");
       
-      // 테이블 자동 생성
       await pool.query(`
         CREATE TABLE IF NOT EXISTS open_stores (
           id SERIAL PRIMARY KEY,
@@ -95,7 +94,7 @@ export async function getOpenLatest(req, res) {
       `);
       
       console.log("✅ open_stores 테이블 생성 완료");
-      return res.json([]); // 새로 생성된 테이블은 비어있음
+      return res.json([]);
     }
     
     // 실제 컬럼 구조 확인
