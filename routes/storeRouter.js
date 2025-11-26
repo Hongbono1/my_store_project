@@ -11,7 +11,7 @@ import {
     getSuggestLatest,
     getSeasonLatest,
     getLocalBoardLatest,
-} from "../controllers/newspaperController.js";
+} from "../controllers/storeController.js";
 
 const router = express.Router();
 

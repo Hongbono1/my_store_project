@@ -143,8 +143,7 @@ app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 
-// ✅ 홍보의 신문 API (store.html 연동)
-console.log("[boot] mounting /api -> storeRouter");
+// ✅ 홍보의 신문 API 추가
 app.use("/api", storeRouter);
 
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));

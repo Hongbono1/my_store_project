@@ -385,15 +385,28 @@
             const cardsEl = document.getElementById("promoDeliveryCards");
 
             try {
+                console.log("📱 홍보의 배달 API 호출 시작");
                 const res = await fetch("/api/food/latest?limit=6");
-
+                console.log("📱 응답 상태:", res.status);
+                
                 if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error("📱 API 오류 응답:", errorText);
                     throw new Error(`API 호출 실패: ${res.status}`);
                 }
-
+                
                 const data = await res.json();
+                console.log("📱 받은 데이터:", data);
 
-                if (!data || data.length === 0) {
+                // 🚨 배열 체크 강화
+                if (!Array.isArray(data)) {
+                    console.warn("📱 데이터가 배열이 아님:", typeof data, data);
+                    summaryEl.textContent = "데이터 형식 오류가 발생했습니다.";
+                    cardsEl.innerHTML = "<p class='text-sm text-amber-600 p-4'>서버에서 잘못된 형식의 데이터를 받았습니다</p>";
+                    return;
+                }
+
+                if (data.length === 0) {
                     summaryEl.textContent = "아직 등록된 배달 가게가 없습니다.";
                     cardsEl.innerHTML = "<p class='text-sm text-slate-500 p-4 text-center'>등록된 가게가 없습니다</p>";
                     return;
@@ -401,11 +414,11 @@
 
                 summaryEl.textContent = `최근 등록된 배달 가게 ${data.length}곳을 소개합니다.`;
                 cardsEl.innerHTML = data.map(store => createStoreCard(store)).join("");
-
+                
             } catch (err) {
                 console.error("❌ 홍보의 배달 로딩 실패:", err);
                 summaryEl.textContent = "정보를 불러오지 못했습니다.";
-                cardsEl.innerHTML = "<p class='text-sm text-red-500 p-4'>데이터 로딩 실패</p>";
+                cardsEl.innerHTML = `<p class='text-sm text-red-500 p-4'>오류: ${err.message}</p>`;
             }
         }
 
@@ -415,10 +428,24 @@
             const cardsEl = document.getElementById("hotCards");
 
             try {
+                console.log("🔥 HOT 랭킹 API 호출 시작");
                 const res = await fetch("/api/hot/latest?limit=4");
+                
+                if (!res.ok) {
+                    throw new Error(`API 호출 실패: ${res.status}`);
+                }
+                
                 const data = await res.json();
+                console.log("🔥 받은 데이터:", data);
 
-                if (!data || data.length === 0) {
+                if (!Array.isArray(data)) {
+                    console.warn("🔥 데이터가 배열이 아님:", typeof data, data);
+                    summaryEl.textContent = "데이터 형식 오류가 발생했습니다.";
+                    cardsEl.innerHTML = "<p class='text-sm text-amber-600 p-4'>서버 오류</p>";
+                    return;
+                }
+
+                if (data.length === 0) {
                     summaryEl.textContent = "아직 HOT 랭킹 데이터가 없습니다.";
                     cardsEl.innerHTML = "<p class='text-sm text-slate-500 p-4 text-center'>데이터가 없습니다</p>";
                     return;
@@ -426,11 +453,11 @@
 
                 summaryEl.textContent = `지금 가장 인기 있는 가게 ${data.length}곳입니다.`;
                 cardsEl.innerHTML = data.map(store => createStoreCard(store)).join("");
-
+                
             } catch (err) {
                 console.error("❌ HOT 랭킹 로딩 실패:", err);
                 summaryEl.textContent = "HOT 랭킹을 불러오지 못했습니다.";
-                cardsEl.innerHTML = "<p class='text-sm text-red-500 p-4'>데이터 로딩 실패</p>";
+                cardsEl.innerHTML = `<p class='text-sm text-red-500 p-4'>오류: ${err.message}</p>`;
             }
         }
 
