@@ -1,6 +1,6 @@
 import pool from "../db.js";
 
-// 🔽 이벤트 최신 데이터
+// 🔽 이벤트 최신 데이터 - 실제 테이블 스키마 확인 후 쿼리
 export async function getEventLatest(req, res) {
   try {
     console.log("🎉 getEventLatest 호출됨");
@@ -16,47 +16,51 @@ export async function getEventLatest(req, res) {
     
     if (!tableCheck.rows[0].exists) {
       console.log("⚠️ events 테이블이 존재하지 않음");
-      return res.json([]); // 빈 배열 반환
+      return res.json([]);
     }
     
-    // 컬럼 구조 확인
+    // 실제 컬럼 구조 확인
     const columnCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'events'
+      ORDER BY ordinal_position
     `);
     
-    console.log("📋 events 테이블 컬럼:", columnCheck.rows.map(row => row.column_name));
+    const columns = columnCheck.rows.map(row => row.column_name);
+    console.log("📋 events 테이블 실제 컬럼:", columns);
     
-    const result = await pool.query(`
+    // 안전한 컬럼명으로 쿼리 구성
+    const hasStoreName = columns.includes('store_name');
+    const hasEventType = columns.includes('event_type');
+    const hasImageUrl = columns.includes('image_url');
+    
+    let query = `
       SELECT 
         id, 
-        title, 
-        COALESCE(store_name, '') as store_name,
-        COALESCE(event_type, '') as event_type,
-        COALESCE(image_url, '') as image,
-        start_date, 
-        end_date,
+        title,
+        ${hasStoreName ? 'store_name' : "'' as store_name"},
+        ${hasEventType ? 'event_type' : "'' as event_type"},
+        ${hasImageUrl ? 'image_url' : "'' as image"},
         created_at
       FROM events
       WHERE title IS NOT NULL AND title != ''
       ORDER BY created_at DESC
       LIMIT $1
-    `, [limit]);
+    `;
+    
+    const result = await pool.query(query, [limit]);
     
     console.log(`✅ events 조회 결과: ${result.rows.length}개`);
-    res.json(result.rows); // 항상 배열 반환
+    res.json(result.rows);
     
   } catch (err) {
     console.error("❌ getEventLatest 오류:", err.message);
-    console.error("❌ 스택:", err.stack);
-    
-    // 에러 발생 시에도 빈 배열 반환 (500 에러 방지)
     res.json([]);
   }
 }
 
-// 🔽 오픈 예정 최신 데이터
+// 🔽 오픈 예정 최신 데이터 - 실제 테이블 스키마 확인 후 쿼리
 export async function getOpenLatest(req, res) {
   try {
     console.log("🎊 getOpenLatest 호출됨");
@@ -71,14 +75,14 @@ export async function getOpenLatest(req, res) {
     `);
     
     if (!tableCheck.rows[0].exists) {
-      console.log("⚠️ open_stores 테이블이 존재하지 않음 - 테이블 생성 시도");
+      console.log("⚠️ open_stores 테이블이 존재하지 않음 - 테이블 생성");
       
       // 테이블 자동 생성
       await pool.query(`
         CREATE TABLE IF NOT EXISTS open_stores (
           id SERIAL PRIMARY KEY,
           store_name VARCHAR(255) NOT NULL,
-          store_category VARCHAR(100),
+          category VARCHAR(100),
           address TEXT,
           open_date DATE,
           description TEXT,
@@ -94,39 +98,60 @@ export async function getOpenLatest(req, res) {
       return res.json([]); // 새로 생성된 테이블은 비어있음
     }
     
-    const result = await pool.query(`
+    // 실제 컬럼 구조 확인
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'open_stores'
+      ORDER BY ordinal_position
+    `);
+    
+    const columns = columnCheck.rows.map(row => row.column_name);
+    console.log("📋 open_stores 테이블 실제 컬럼:", columns);
+    
+    // 안전한 컬럼명으로 쿼리 구성
+    const hasStoreCategory = columns.includes('store_category');
+    const hasCategory = columns.includes('category');
+    const hasImageUrl = columns.includes('image_url');
+    const hasOpenDate = columns.includes('open_date');
+    
+    // category vs store_category 처리
+    let categoryColumn = '';
+    if (hasStoreCategory) {
+      categoryColumn = 'store_category as category';
+    } else if (hasCategory) {
+      categoryColumn = 'category';
+    } else {
+      categoryColumn = "'' as category";
+    }
+    
+    let query = `
       SELECT 
         id, 
         store_name, 
-        COALESCE(store_category, '') as category,
+        ${categoryColumn},
         COALESCE(address, '') as address,
-        open_date, 
-        COALESCE(image_url, '') as image,
+        ${hasOpenDate ? 'open_date' : 'NULL as open_date'}, 
+        ${hasImageUrl ? 'image_url' : "'' as image_url"} as image,
         created_at
       FROM open_stores
       WHERE store_name IS NOT NULL AND store_name != ''
-      ORDER BY 
-        CASE 
-          WHEN open_date >= CURRENT_DATE THEN open_date 
-          ELSE '9999-12-31'::date 
-        END ASC,
-        created_at DESC
+      ORDER BY created_at DESC
       LIMIT $1
-    `, [limit]);
+    `;
+    
+    const result = await pool.query(query, [limit]);
     
     console.log(`✅ open_stores 조회 결과: ${result.rows.length}개`);
     res.json(result.rows);
     
   } catch (err) {
     console.error("❌ getOpenLatest 오류:", err.message);
-    console.error("❌ 스택:", err.stack);
-    
-    // 에러 발생 시에도 빈 배열 반환
     res.json([]);
   }
 }
 
-// 🔽 홍보의 배달 (기존 함수 개선)
+// 🔽 홍보의 배달 - foods 테이블 안전 쿼리
 export async function getFoodLatest(req, res) {
   try {
     console.log("📱 getFoodLatest 호출됨");
@@ -144,18 +169,41 @@ export async function getFoodLatest(req, res) {
       return res.json([]);
     }
     
-    const result = await pool.query(`
+    // foods 테이블 컬럼 확인
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'foods'
+    `);
+    
+    const columns = columnCheck.rows.map(row => row.column_name);
+    const hasStoreCategory = columns.includes('store_category');
+    const hasCategory = columns.includes('category');
+    const hasImageUrl = columns.includes('image_url');
+    
+    let categoryColumn = '';
+    if (hasStoreCategory) {
+      categoryColumn = 'store_category as category';
+    } else if (hasCategory) {
+      categoryColumn = 'category';
+    } else {
+      categoryColumn = "'일반' as category";
+    }
+    
+    const query = `
       SELECT 
         id, 
         store_name as name, 
-        COALESCE(store_category, '일반') as category, 
-        COALESCE(image_url, '') as image,
+        ${categoryColumn}, 
+        ${hasImageUrl ? 'image_url' : "'' as image_url"} as image,
         created_at
       FROM foods
       WHERE store_name IS NOT NULL AND store_name != ''
       ORDER BY created_at DESC
       LIMIT $1
-    `, [limit]);
+    `;
+    
+    const result = await pool.query(query, [limit]);
     
     console.log(`✅ foods 조회 결과: ${result.rows.length}개`);
     res.json(result.rows);
@@ -166,7 +214,7 @@ export async function getFoodLatest(req, res) {
   }
 }
 
-// 🔽 HOT 랭킹 (기존 함수 개선)
+// 🔽 HOT 랭킹 - 안전한 컬럼 참조
 export async function getHotLatest(req, res) {
   try {
     console.log("🔥 getHotLatest 호출됨");
@@ -183,23 +231,37 @@ export async function getHotLatest(req, res) {
       return res.json([]);
     }
     
-    // view_count 컬럼 존재 여부 확인
+    // 컬럼 존재 확인
     const columnCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.columns 
-        WHERE table_name = 'foods' AND column_name = 'view_count'
-      )
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'foods'
     `);
     
+    const columns = columnCheck.rows.map(row => row.column_name);
+    const hasViewCount = columns.includes('view_count');
+    const hasStoreCategory = columns.includes('store_category');
+    const hasCategory = columns.includes('category');
+    const hasImageUrl = columns.includes('image_url');
+    
+    let categoryColumn = '';
+    if (hasStoreCategory) {
+      categoryColumn = 'store_category as category';
+    } else if (hasCategory) {
+      categoryColumn = 'category';
+    } else {
+      categoryColumn = "'일반' as category";
+    }
+    
     let query;
-    if (columnCheck.rows[0].exists) {
+    if (hasViewCount) {
       query = `
         SELECT 
           id, 
           store_name as name, 
-          COALESCE(store_category, '일반') as category,
+          ${categoryColumn},
           COALESCE(view_count, 0) as view_count,
-          COALESCE(image_url, '') as image
+          ${hasImageUrl ? 'image_url' : "'' as image_url"} as image
         FROM foods
         WHERE store_name IS NOT NULL AND store_name != ''
         ORDER BY COALESCE(view_count, 0) DESC, created_at DESC
@@ -210,9 +272,9 @@ export async function getHotLatest(req, res) {
         SELECT 
           id, 
           store_name as name, 
-          COALESCE(store_category, '일반') as category,
+          ${categoryColumn},
           0 as view_count,
-          COALESCE(image_url, '') as image
+          ${hasImageUrl ? 'image_url' : "'' as image_url"} as image
         FROM foods
         WHERE store_name IS NOT NULL AND store_name != ''
         ORDER BY created_at DESC
@@ -230,7 +292,7 @@ export async function getHotLatest(req, res) {
   }
 }
 
-// 🔽 전통시장 (기존 함수 개선)
+// 🔽 전통시장 - 안전한 컬럼 참조
 export async function getTraditionalLatest(req, res) {
   try {
     console.log("🏪 getTraditionalLatest 호출됨");
@@ -248,19 +310,33 @@ export async function getTraditionalLatest(req, res) {
       return res.json([]);
     }
     
-    const result = await pool.query(`
+    // 컬럼 확인
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'traditional_markets'
+    `);
+    
+    const columns = columnCheck.rows.map(row => row.column_name);
+    const hasImageUrl = columns.includes('image_url');
+    const hasRegion = columns.includes('region');
+    const hasAddress = columns.includes('address');
+    
+    const query = `
       SELECT 
         id, 
         market_name as name, 
-        COALESCE(region, '') as region,
-        COALESCE(address, '') as address, 
-        COALESCE(image_url, '') as image,
+        ${hasRegion ? 'region' : "'' as region"},
+        ${hasAddress ? 'address' : "'' as address"}, 
+        ${hasImageUrl ? 'image_url' : "'' as image_url"} as image,
         created_at
       FROM traditional_markets
       WHERE market_name IS NOT NULL AND market_name != ''
       ORDER BY created_at DESC
       LIMIT $1
-    `, [limit]);
+    `;
+    
+    const result = await pool.query(query, [limit]);
     
     console.log(`✅ traditional_markets 조회 결과: ${result.rows.length}개`);
     res.json(result.rows);
@@ -271,46 +347,20 @@ export async function getTraditionalLatest(req, res) {
   }
 }
 
-// 🔽 모든 가게 (기존 함수 개선)
+// 🔽 모든 가게 - foods 테이블 안전 쿼리 재사용
 export async function getAllStoresLatest(req, res) {
   try {
     console.log("🗺️ getAllStoresLatest 호출됨");
-    const limit = parseInt(req.query.limit) || 4;
-    
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'foods'
-      )
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      return res.json([]);
-    }
-    
-    const result = await pool.query(`
-      SELECT 
-        id, 
-        store_name as name, 
-        COALESCE(store_category, '일반') as category,
-        COALESCE(image_url, '') as image,
-        created_at
-      FROM foods
-      WHERE store_name IS NOT NULL AND store_name != ''
-      ORDER BY created_at DESC
-      LIMIT $1
-    `, [limit]);
-    
-    console.log(`✅ 모든 가게 조회 결과: ${result.rows.length}개`);
-    res.json(result.rows);
-    
+    // getFoodLatest와 동일한 로직 사용
+    req.query.limit = req.query.limit || 4;
+    return await getFoodLatest(req, res);
   } catch (err) {
     console.error("❌ getAllStoresLatest 오류:", err.message);
     res.json([]);
   }
 }
 
-// 🔽 나머지 빈 함수들
+// 🔽 나머지 빈 함수들 (테이블 없음)
 export async function getFestivalLatest(req, res) {
   console.log("🎭 getFestivalLatest 호출됨 (빈 데이터 반환)");
   res.json([]);
