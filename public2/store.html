@@ -507,12 +507,31 @@
             const listEl = document.getElementById("eventList");
 
             try {
+                console.log("🎉 이벤트 API 호출 시작");
                 const res = await fetch("/api/event/latest?limit=4");
+                console.log("🎉 응답 상태:", res.status);
+                
+                if (!res.ok) {
+                    console.warn(`🎉 API 응답 오류: ${res.status}`);
+                    summaryEl.textContent = "이벤트 정보를 불러올 수 없습니다.";
+                    listEl.innerHTML = "<li class='text-sm text-slate-500 p-2'>서버 연결 오류</li>";
+                    return;
+                }
+                
                 const data = await res.json();
+                console.log("🎉 받은 데이터:", data, "타입:", typeof data, "배열여부:", Array.isArray(data));
 
-                if (!data || data.length === 0) {
+                // 🚨 배열 검증 강화
+                if (!Array.isArray(data)) {
+                    console.warn("🎉 응답이 배열이 아님:", data);
+                    summaryEl.textContent = "이벤트 데이터 형식 오류";
+                    listEl.innerHTML = "<li class='text-sm text-amber-600 p-2'>데이터 형식 오류</li>";
+                    return;
+                }
+
+                if (data.length === 0) {
                     summaryEl.textContent = "진행중인 이벤트가 없습니다.";
-                    listEl.innerHTML = "<li class='text-sm text-slate-500 p-2'>진행중인 이벤트가 없습니다</li>";
+                    listEl.innerHTML = "<li class='text-sm text-slate-500 p-2 text-center'>진행중인 이벤트가 없습니다</li>";
                     return;
                 }
 
@@ -528,11 +547,11 @@
                         <span class="text-xs text-slate-500 ml-2">${item.store_name || ""}</span>
                     </li>
                 `).join("");
-
+                
             } catch (err) {
                 console.error("❌ 이벤트 로딩 실패:", err);
                 summaryEl.textContent = "이벤트 정보를 불러오지 못했습니다.";
-                listEl.innerHTML = "<li class='text-sm text-red-500 p-2'>데이터 로딩 실패</li>";
+                listEl.innerHTML = `<li class='text-sm text-red-500 p-2'>네트워크 오류: ${err.message}</li>`;
             }
         }
 
@@ -542,10 +561,29 @@
             const cardsEl = document.getElementById("openCards");
 
             try {
+                console.log("🎊 오픈 예정 API 호출 시작");
                 const res = await fetch("/api/open/latest?limit=4");
+                console.log("🎊 응답 상태:", res.status);
+                
+                if (!res.ok) {
+                    console.warn(`🎊 API 응답 오류: ${res.status}`);
+                    summaryEl.textContent = "오픈 예정 정보를 불러올 수 없습니다.";
+                    cardsEl.innerHTML = "<p class='text-sm text-slate-500 p-4 text-center'>서버 연결 오류</p>";
+                    return;
+                }
+                
                 const data = await res.json();
+                console.log("🎊 받은 데이터:", data, "타입:", typeof data, "배열여부:", Array.isArray(data));
 
-                if (!data || data.length === 0) {
+                // 🚨 배열 검증
+                if (!Array.isArray(data)) {
+                    console.warn("🎊 응답이 배열이 아님:", data);
+                    summaryEl.textContent = "오픈 예정 데이터 형식 오류";
+                    cardsEl.innerHTML = "<p class='text-sm text-amber-600 p-4'>데이터 형식 오류</p>";
+                    return;
+                }
+
+                if (data.length === 0) {
                     summaryEl.textContent = "곧 오픈할 가게가 없습니다.";
                     cardsEl.innerHTML = "<p class='text-sm text-slate-500 p-4 text-center'>오픈 예정 가게가 없습니다</p>";
                     return;
@@ -553,11 +591,11 @@
 
                 summaryEl.textContent = `곧 문을 여는 새 가게 ${data.length}곳입니다.`;
                 cardsEl.innerHTML = data.map(store => createStoreCard(store, "/opendetail.html")).join("");
-
+                
             } catch (err) {
                 console.error("❌ 오픈 예정 로딩 실패:", err);
                 summaryEl.textContent = "오픈 예정 정보를 불러오지 못했습니다.";
-                cardsEl.innerHTML = "<p class='text-sm text-red-500 p-4'>데이터 로딩 실패</p>";
+                cardsEl.innerHTML = `<p class='text-sm text-red-500 p-4'>네트워크 오류: ${err.message}</p>`;
             }
         }
 
