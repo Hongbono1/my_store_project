@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import {
-  registerFood,      // 등록
+  createFoodStore,   // 등록
   getStoreFull       // 상세 조회
 } from "../controllers/foodregisterController.js";
 
@@ -61,10 +61,14 @@ const uploadWithCatch = (req, res, next) => {
   });
 };
 
-/* 💥 라우터 등록 (server.js에서 /store 프리픽스 붙음) */
-router.post("/", uploadWithCatch, registerFood);
+/* ============================
+   등록 (server.js에서 /store 프리픽스)
+=============================== */
+router.post("/", uploadWithCatch, createFoodStore);
 
-/* 🔥 ndetail.html 상세 조회 */
+/* ============================
+   ndetail.html 조회
+=============================== */
 router.get("/:id/full", getStoreFull);
 
 export default router;
