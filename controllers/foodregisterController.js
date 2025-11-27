@@ -1,4 +1,3 @@
-// controllers/foodregisterController.js
 import pool from "../db.js";
 import path from "path";
 
@@ -171,7 +170,7 @@ export async function createFoodStore(req, res) {
   }
 }
 
-/* ===================== 상세 조회 ====================== */
+/* ===================== 기본 상세 조회 ====================== */
 export async function getStoreFull(req, res) {
   try {
     const id = parseId(req.params.id);
@@ -220,7 +219,7 @@ export async function getStoreFull(req, res) {
   }
 }
 
-/* ===================== ndetail.html용 상세 조회 ====================== */
+/* ===================== ndetail.html용 Combined 조회 ====================== */
 export async function getCombinedFull(req, res) {
   try {
     const id = parseId(req.params.id);
