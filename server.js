@@ -239,6 +239,52 @@ app.use("/uploads", express.static(UPLOAD_ROOT));
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
 
+// -------------------------------
+// 국세청 사업자번호 인증 중계 API
+// -------------------------------
+import fetch from "node-fetch";
+
+app.post("/verify-biz", async (req, res) => {
+  try {
+    const { bizNo } = req.body;
+
+    if (!bizNo) {
+      return res.status(400).json({ ok: false, message: "사업자등록번호가 없습니다." });
+    }
+
+    const apiURL = "https://api.odcloud.kr/api/nts-businessman/v1/status";
+    const serviceKey = process.env.NTS_KEY; // 🔥 Cloudtype 환경변수
+
+    // 국세청 API 요청
+    const response = await fetch(`${apiURL}?serviceKey=${serviceKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        b_no: [bizNo] // 배열 형태 필수
+      })
+    });
+
+    const data = await response.json();
+
+    // 응답 형식 체크
+    if (!data || !data.data || data.data.length === 0) {
+      return res.status(500).json({ ok: false, message: "국세청 응답 없음" });
+    }
+
+    const result = data.data[0]; // 첫 번째 데이터
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+
+  } catch (err) {
+    console.error("NTS VERIFY ERROR:", err);
+    res.status(500).json({ ok: false, message: "서버 오류" });
+  }
+});
+
+
 // ------------------------------------------------------------
 // 9. 에러 핸들러
 // ------------------------------------------------------------
