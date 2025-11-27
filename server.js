@@ -9,7 +9,7 @@ import pool from "./db.js";
 
 // Router imports
 import foodregisterRouter from "./routes/foodregister.js";
-import ncombinedregister from "./routes/ncombinedregister.js";
+import ncombinedregisterRouter from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
 import hotblogRouter from "./routes/hotblogregister.js";
 import ownerRouter from "./routes/owner.js";
@@ -192,10 +192,10 @@ app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
 
 /* 나머지 라우터들 */
 console.log("[boot] mounting /store -> foodregisterRouter");
-app.use("/store", foodregisterRouter);
+app.use("/store", foodregisterRouter);      // /store/:id/full 처리
 
 console.log("[boot] mounting /combined -> ncombinedregister");
-app.use("/combined", ncombinedregister);
+app.use("/combined", ncombinedregisterRouter); // /combined/:id/full 처리
 
 console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);

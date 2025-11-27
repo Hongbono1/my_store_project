@@ -475,6 +475,117 @@ export async function updateFoodStore(req, res) {
   }
 }
 
+/* ===================== 상세 조회(GET /store/:id/full) ===================== */
+export async function getStoreFull(req, res) {
+  try {
+    const { id } = req.params;
+    console.log(`🏪 getStoreFull 호출됨 - ID: ${id}`);
+    
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ ok: false, error: "유효하지 않은 ID" });
+    }
+    
+    // 1. 가게 기본 정보 조회 (foods 테이블)
+    const storeResult = await pool.query(`
+      SELECT 
+        id,
+        store_name,
+        store_category as category,
+        business_hours,
+        phone,
+        road_address as address,
+        detail_address,
+        postal_code,
+        service_details as description,
+        image_url,
+        lat,
+        lng,
+        delivery_option,
+        parking,
+        facilities,
+        pets_allowed,
+        homepage,
+        instagram,
+        facebook,
+        event1,
+        event2,
+        additional_desc,
+        created_at
+      FROM foods 
+      WHERE id = $1
+    `, [id]);
+    
+    if (storeResult.rows.length === 0) {
+      console.log(`⚠️ 가게 ID ${id} 없음`);
+      return res.status(404).json({ ok: false, error: "가게를 찾을 수 없습니다." });
+    }
+    
+    const store = storeResult.rows[0];
+    
+    // 2. 메뉴 조회 (menus 테이블)
+    let menus = [];
+    try {
+      const menuResult = await pool.query(`
+        SELECT 
+          id,
+          name,
+          price,
+          category,
+          description,
+          image_url,
+          theme
+        FROM menus 
+        WHERE store_id = $1 
+        ORDER BY category, id
+      `, [id]);
+      menus = menuResult.rows;
+      console.log(`📋 메뉴 ${menus.length}개 조회됨`);
+    } catch (err) {
+      console.log("⚠️ menus 테이블 조회 실패:", err.message);
+    }
+    
+    // 3. 추가 이미지 조회 (store_images 테이블)
+    let images = [];
+    try {
+      const imageResult = await pool.query(`
+        SELECT image_url 
+        FROM store_images 
+        WHERE store_id = $1 
+        ORDER BY id
+      `, [id]);
+      images = imageResult.rows.map(row => row.image_url);
+      console.log(`🖼️ 이미지 ${images.length}개 조회됨`);
+    } catch (err) {
+      console.log("⚠️ store_images 테이블 조회 실패:", err.message);
+    }
+    
+    // 4. 응답 구성
+    const response = {
+      ok: true,
+      data: {
+        ...store,
+        menus,
+        images,
+        menu_count: menus.length,
+        image_count: images.length
+      }
+    };
+    
+    console.log(`✅ 가게 상세 조회 성공: ${store.store_name}`);
+    res.json(response);
+    
+  } catch (err) {
+    console.error("❌ getStoreFull 오류:", err);
+    res.status(500).json({ ok: false, error: "서버 오류" });
+  }
+}
+
+// GET /combined/:id/full - 통합 상세 정보 (getStoreFull과 동일)
+export async function getCombinedFull(req, res) {
+  console.log(`🔄 getCombinedFull 호출됨 - getStoreFull로 위임`);
+  return getStoreFull(req, res);
+}
+
 /* ── 호환용 export ───────────────────── */
 export const getFoodStoreFull = getFoodRegisterFull;
 export const createFoodRegister = createFoodStore;

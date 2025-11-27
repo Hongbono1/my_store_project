@@ -1,11 +1,13 @@
 // routes/foodregister.js
-import { Router } from "express";
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import * as ctrl from "../controllers/foodregisterController.js";
+import express from "express";
+import { upload } from "../middlewares/upload.js";
+import {
+  registerFood,
+  getStoreFull,      // 추가
+  getCombinedFull    // 추가
+} from "../controllers/foodregisterController.js";
 
-const router = Router();
+const router = express.Router();
 
 /* 업로드 받을 필드 정의 (호환 포함) */
 const fieldsDef = [
@@ -64,11 +66,7 @@ const uploadWithCatch = (req, res, next) => {
  */
 router.post("/", uploadWithCatch, ctrl.createFoodStore);
 
-// ✅ 상세 조회: 최종 경로는 /store/:id/full
-router.get("/:id/full", ctrl.getFoodStoreFull);
-
-// (선택) 단건 조회/수정이 컨트롤러에 없다면 제거하거나 안전 가드
-// router.get("/:id", ctrl.getFoodStoreById);
-// router.put("/:id", uploadWithCatch, ctrl.updateFoodStore);
+// 🔽 ndetail.html용 상세 조회 라우트 추가
+router.get("/:id/full", getStoreFull);
 
 export default router;

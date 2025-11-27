@@ -1,10 +1,9 @@
-import { Router } from "express";
-import multer from "multer";
-import path from "path";
-import { randomUUID } from "crypto";
-import * as ctrl from "../controllers/ncombinedregisterController.js";
+import express from "express";
+import {
+  getCombinedFull,
+} from "../controllers/foodregisterController.js";
 
-const router = Router();
+const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -31,6 +30,6 @@ router.post(
 );
 
 // [GET] /combined/:id/full
-router.get("/:id/full", ctrl.getCombinedStoreFull);
+router.get("/:id/full", getCombinedFull);
 
 export default router;
