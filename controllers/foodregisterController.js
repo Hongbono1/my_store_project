@@ -219,3 +219,47 @@ export async function getStoreFull(req, res) {
     return res.status(500).json({ ok: false });
   }
 }
+
+/* ===================== ndetail.html용 상세 조회 ====================== */
+export async function getCombinedFull(req, res) {
+  try {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ ok: false });
+
+    // 1) 기본정보
+    const { rows: infoRows } = await pool.query(
+      `SELECT * FROM store_info WHERE id=$1`,
+      [id]
+    );
+    if (!infoRows.length) return res.status(404).json({ ok: false });
+
+    // 2) 이미지
+    const { rows: imgRows } = await pool.query(
+      `SELECT url FROM store_images WHERE store_id=$1 ORDER BY sort_order`,
+      [id]
+    );
+
+    // 3) 메뉴
+    const { rows: menuRows } = await pool.query(
+      `SELECT * FROM store_menu WHERE store_id=$1 ORDER BY id`,
+      [id]
+    );
+
+    // 4) 이벤트
+    const { rows: eventRows } = await pool.query(
+      `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
+      [id]
+    );
+
+    return res.json({
+      ok: true,
+      storeInfo: infoRows[0],
+      images: imgRows.map(r => r.url),
+      menus: menuRows,
+      events: eventRows.map(r => r.content)
+    });
+  } catch (err) {
+    console.error("getCombinedFull ERROR:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  }
+}
