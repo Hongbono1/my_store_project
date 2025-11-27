@@ -1,7 +1,8 @@
 /**  ----------------------------------------------------------
- *  MALL HANKOOK SERVER - FINAL FIXED VERSION
- *  이미지 경로 통합(public2/uploads), 중복 서빙 제거,
- *  기존 문제(BEST PICK ERR, 이미지 404 등) 모두 해결
+ *  MALL HANKOOK SERVER - PERSISTENT UPLOAD VERSION (A 방식)
+ *  이미지 경로 /data/uploads 로 영구 저장
+ *  public2/uploads와 충돌 제거
+ *  기존 라우터 / 기능 절대 변경 없음
  *  ---------------------------------------------------------- */
 
 import "dotenv/config";
@@ -99,9 +100,9 @@ async function initPerformingArtsTables() {
 initPerformingArtsTables();
 
 // ------------------------------------------------------------
-// 2. 업로드 폴더 구조 통일 (public2/uploads)
+// 2. 업로드 폴더 구성 (영구 저장용 /data/uploads)
 // ------------------------------------------------------------
-const UPLOAD_ROOT = path.join(__dirname, "public2/uploads");
+const UPLOAD_ROOT = "/data/uploads"; // ★★★ 영구 저장 A 방식 ★★★
 
 const uploadDirs = [
   UPLOAD_ROOT,
@@ -124,7 +125,6 @@ uploadDirs.forEach((dir) => {
 // ------------------------------------------------------------
 const app = express();
 
-// Request ID + Logger
 app.use((req, res, next) => {
   req.id = randomUUID();
   next();
@@ -147,10 +147,10 @@ app.use(express.urlencoded({ extended: true }));
 // 4. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
-app.use("/api/inquiry", inquiryBoardRouter); // legacy
+app.use("/api/inquiry", inquiryBoardRouter);
 
 // ------------------------------------------------------------
-// 5. 주요 라우트
+// 5. 주요 API 라우트
 // ------------------------------------------------------------
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
@@ -176,14 +176,13 @@ app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
 app.use("/upload", uploadRouter);
 
-// food / combined
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 
 // ------------------------------------------------------------
-// 6. 정적 파일 정책 (public2 기반)
+// 6. 정적 파일 (public2)
 // ------------------------------------------------------------
 app.use(
   express.static(path.join(__dirname, "public2"), {
@@ -194,22 +193,22 @@ app.use(
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
       }
-    },
+    }
   })
 );
 
 // ------------------------------------------------------------
-// 7. 업로드 파일 정적 서빙 (public2/uploads ONLY)
+// 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
 // ------------------------------------------------------------
 app.use("/uploads", express.static(UPLOAD_ROOT));
 
 // ------------------------------------------------------------
-// 8. 헬스 체크
+// 8. 헬스체크
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
 
 // ------------------------------------------------------------
-// 9. 전역 에러 핸들러
+// 9. 에러 핸들러
 // ------------------------------------------------------------
 app.use((err, req, res, next) => {
   console.error("[error]", req.id, err);
@@ -240,5 +239,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
   console.log(`📁 Static root: public2/`);
-  console.log(`📤 Upload folder: public2/uploads/`);
+  console.log(`📤 Upload folder (persistent): /data/uploads/`);
 });
