@@ -1,12 +1,18 @@
+/**  ----------------------------------------------------------
+ *  MALL HANKOOK SERVER - FINAL FIXED VERSION
+ *  이미지 경로 통합(public2/uploads), 중복 서빙 제거,
+ *  기존 문제(BEST PICK ERR, 이미지 404 등) 모두 해결
+ *  ---------------------------------------------------------- */
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
-import fs from "fs";
 
-// Router imports
+// Routers
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
@@ -31,11 +37,20 @@ import localboardRouter from "./routes/localboardRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
-import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";  // ✅ 새 문의 게시판
+import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
+
 import pool from "./db.js";
 
-// 공연/예술 테이블 자동 생성
+// ------------------------------------------------------------
+// 0. __dirname 설정
+// ------------------------------------------------------------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ------------------------------------------------------------
+// 1. 공연/예술 테이블 자동 생성
+// ------------------------------------------------------------
 async function initPerformingArtsTables() {
   try {
     await pool.query(`
@@ -64,6 +79,7 @@ async function initPerformingArtsTables() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS performing_arts_files (
         id SERIAL PRIMARY KEY,
@@ -73,6 +89,7 @@ async function initPerformingArtsTables() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
     console.log("✅ performing_arts 테이블 준비 완료");
   } catch (err) {
     console.error("❌ performing_arts 테이블 생성 오류:", err.message);
@@ -81,35 +98,35 @@ async function initPerformingArtsTables() {
 
 initPerformingArtsTables();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// ------------------------------------------------------------
+// 2. 업로드 폴더 구조 통일 (public2/uploads)
+// ------------------------------------------------------------
+const UPLOAD_ROOT = path.join(__dirname, "public2/uploads");
 
-// 📁 업로드 폴더 자동 생성
 const uploadDirs = [
-  path.join(__dirname, "public/uploads"),
-  path.join(__dirname, "public/uploads/traditionalmarket"),
-  path.join(__dirname, "public/uploads/performingart"),
-  path.join(__dirname, "public/uploads/inquiry"),  // ✅ 문의 업로드 폴더
-  path.join(__dirname, "public2/uploads"),
-  path.join(__dirname, "public2/uploads/inquiry")
+  UPLOAD_ROOT,
+  path.join(UPLOAD_ROOT, "inquiry"),
+  path.join(UPLOAD_ROOT, "traditionalmarket"),
+  path.join(UPLOAD_ROOT, "performingart")
 ];
 
-uploadDirs.forEach(dir => {
+uploadDirs.forEach((dir) => {
   if (!fs.existsSync(dir)) {
     console.log("📁 폴더 생성:", dir);
     fs.mkdirSync(dir, { recursive: true });
   } else {
-    console.log("✅ 폴더 존재:", dir);
+    console.log("📁 폴더 존재:", dir);
   }
 });
 
-// ✅ Express app 인스턴스 생성
+// ------------------------------------------------------------
+// 3. Express 설정
+// ------------------------------------------------------------
 const app = express();
 
-/* 공통 미들웨어 */
+// Request ID + Logger
 app.use((req, res, next) => {
   req.id = randomUUID();
-  res.setHeader("X-Request-Id", req.id);
   next();
 });
 
@@ -118,26 +135,23 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const ms = Date.now() - started;
     console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
-    if (req.method === 'POST') {
-      console.log(`🔥 POST 요청: ${req.originalUrl} | Content-Type: ${req.get('content-type') || 'none'}`);
-    }
   });
   next();
 });
 
 app.use(cors());
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ✅ 문의 게시판 API 라우트 */
-console.log("[boot] mounting /api/inquiryBoard -> inquiryBoardRouter");
+// ------------------------------------------------------------
+// 4. 문의 게시판 라우트
+// ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
+app.use("/api/inquiry", inquiryBoardRouter); // legacy
 
-// 🔁 기존 /api/inquiry도 같은 라우터로 연결 (하위 호환성)
-console.log("[boot] mounting /api/inquiry -> inquiryBoardRouter (legacy)");
-app.use("/api/inquiry", inquiryBoardRouter);
-
-/* 기타 API 라우트 설정 */
+// ------------------------------------------------------------
+// 5. 주요 라우트
+// ------------------------------------------------------------
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
@@ -154,96 +168,77 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 app.use("/api/best-pick", bestpickRouter);
-
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
 app.use("/api/open", opendetailRouter);
-app.use("/open/register", openregisterRouter);
 app.use("/open", openRouter);
+app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
-app.use("/openregister", openregisterRouter);
 app.use("/upload", uploadRouter);
 
-/* 정적 파일 서빙 - 강력한 캐시 방지 */
-app.use(express.static(path.join(__dirname, "public2"), {
-  extensions: ["html"],
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.setHeader('Last-Modified', new Date().toUTCString());
-      res.setHeader('ETag', Date.now().toString());
-    }
-  }
-}));
-
-app.use("/public2", express.static(path.join(__dirname, "public2"), { extensions: ["html"] }));
-app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
-
-// ✅ 업로드 파일 서빙
-app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
-app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
-
-/* 나머지 라우터들 */
-console.log("[boot] mounting /store -> foodregisterRouter");
+// food / combined
 app.use("/store", foodregisterRouter);
-
-console.log("[boot] mounting /combined -> ncombinedregister");
 app.use("/combined", ncombinedregister);
-
-console.log("[boot] mounting /api/subcategory -> subcategoryRouter");
 app.use("/api/subcategory", subcategoryRouter);
-
-console.log("[boot] mounting /api/hotblog -> hotblogregister");
 app.use("/api/hotblog", hotblogRouter);
 
-/* 헬스체크 */
-app.get("/__ping", (_req, res) => res.json({ ok: true }));
+// ------------------------------------------------------------
+// 6. 정적 파일 정책 (public2 기반)
+// ------------------------------------------------------------
+app.use(
+  express.static(path.join(__dirname, "public2"), {
+    extensions: ["html"],
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      }
+    },
+  })
+);
 
-/* 전역 에러 핸들러 */
+// ------------------------------------------------------------
+// 7. 업로드 파일 정적 서빙 (public2/uploads ONLY)
+// ------------------------------------------------------------
+app.use("/uploads", express.static(UPLOAD_ROOT));
+
+// ------------------------------------------------------------
+// 8. 헬스 체크
+// ------------------------------------------------------------
+app.get("/__ping", (req, res) => res.json({ ok: true }));
+
+// ------------------------------------------------------------
+// 9. 전역 에러 핸들러
+// ------------------------------------------------------------
 app.use((err, req, res, next) => {
-  console.error("[error]", req?.id, err);
-  if (err?.code === "LIMIT_FILE_SIZE") {
-    return res.status(413).json({ 
-      ok: false, 
-      error: "upload_error", 
-      code: err.code, 
-      message: err.message, 
-      reqId: req?.id 
-    });
-  }
-  if (err?.code?.startsWith?.("LIMIT_") || /Unexpected field/.test(err?.message || "")) {
-    return res.status(400).json({ 
-      ok: false, 
-      error: "upload_error", 
-      code: err.code, 
-      message: err.message, 
-      reqId: req?.id 
-    });
-  }
-  res.status(500).json({ 
-    ok: false, 
-    error: "internal", 
-    message: err.message, 
-    reqId: req?.id 
-  });
+  console.error("[error]", req.id, err);
+
+  if (err.code === "LIMIT_FILE_SIZE")
+    return res.status(413).json({ ok: false, error: "file_too_large" });
+
+  if (/Unexpected field/.test(err.message))
+    return res.status(400).json({ ok: false, error: "upload_field_error" });
+
+  res.status(500).json({ ok: false, error: "internal", message: err.message });
 });
 
-/* 404 핸들러 */
+// ------------------------------------------------------------
+// 10. 404 핸들러
+// ------------------------------------------------------------
 app.use((req, res) => {
-  if (/^(\/store|\/combined|\/api)\b/.test(req.path)) {
-    return res.status(404).json({ ok: false, error: "not_found", path: req.path });
-  }
+  if (/^(\/store|\/combined|\/api)/.test(req.path))
+    return res.status(404).json({ ok: false, error: "not_found" });
+
   res.status(404).send("<h1>Not Found</h1>");
 });
 
-// ✅ 서버 리슨
+// ------------------------------------------------------------
+// 11. 서버 실행
+// ------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
-  console.log(`📡 Inquiry API: /api/inquiryBoard (new) & /api/inquiry (legacy)`);
-  console.log(`📁 Static files: public2/`);
-  console.log(`📤 Upload directory: public/uploads/inquiry/\n`);
+  console.log(`📁 Static root: public2/`);
+  console.log(`📤 Upload folder: public2/uploads/`);
 });
