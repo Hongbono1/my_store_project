@@ -68,8 +68,8 @@ export async function createFoodStore(req, res) {
 
     await client.query("BEGIN");
 
-    /* 1) store_info */
-    const insertInfo = `
+    /* 1) store_info — 컬럼/값 정확히 17개 */
+    const insertInfoSQL = `
       INSERT INTO store_info (
         business_name, owner_name, phone, email, address,
         business_type, business_category, business_hours, delivery_option,
@@ -85,7 +85,7 @@ export async function createFoodStore(req, res) {
       ) RETURNING id
     `;
 
-    const { rows } = await client.query(insertInfo, [
+    const paramsInfo = [
       businessName,
       data.ownerName || null,
       data.phone || null,
@@ -103,21 +103,22 @@ export async function createFoodStore(req, res) {
       data.facilities || null,
       data.petsAllowed === "true",
       data.parking || null
-    ]);
+    ];
 
+    const { rows } = await client.query(insertInfoSQL, paramsInfo);
     const storeId = rows[0].id;
 
-    /* 2) 이미지 */
+    /* 2) store_images */
     const allFiles = collectFiles(req);
     const storeImages = filesByField(allFiles, "storeImages", "storeImages[]");
 
     if (storeImages.length) {
-      const urls = storeImages.map(toWebPath).filter(Boolean);
-      const q = `
+      const urls = storeImages.map(toWebPath);
+      const sql = `
         INSERT INTO store_images (store_id, url, sort_order)
         VALUES ${urls.map((_, i) => `($1,$${i + 2},${i})`).join(",")}
       `;
-      await client.query(q, [storeId, ...urls]);
+      await client.query(sql, [storeId, ...urls]);
     }
 
     /* 3) 메뉴 */
@@ -125,7 +126,7 @@ export async function createFoodStore(req, res) {
     const menus = parseMenus(req.body, menuFiles);
 
     if (menus.length) {
-      const q = `
+      const sql = `
         INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme)
         VALUES ${menus
           .map(
@@ -134,7 +135,6 @@ export async function createFoodStore(req, res) {
           )
           .join(",")}
       `;
-
       const params = menus.flatMap(m => [
         m.name,
         m.price,
@@ -143,8 +143,7 @@ export async function createFoodStore(req, res) {
         m.description,
         m.theme
       ]);
-
-      await client.query(q, [storeId, ...params]);
+      await client.query(sql, [storeId, ...params]);
     }
 
     /* 4) 이벤트 */
@@ -154,19 +153,19 @@ export async function createFoodStore(req, res) {
       .filter(Boolean);
 
     if (events.length) {
-      const q = `
+      const sql = `
         INSERT INTO store_events (store_id, content, ord)
         VALUES ${events.map((_, i) => `($1,$${i + 2},${i})`).join(",")}
       `;
-      await client.query(q, [storeId, ...events]);
+      await client.query(sql, [storeId, ...events]);
     }
 
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    console.error("createFoodStore:", err);
+    console.error("createFoodStore ERROR:", err);
     await client.query("ROLLBACK");
-    return res.status(500).json({ ok: false });
+    return res.status(500).json({ ok: false, message: err.message });
   } finally {
     client.release();
   }
@@ -178,22 +177,20 @@ export async function getStoreFull(req, res) {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ ok: false });
 
-    /* 1) store_info */
+    /* 1) 기본 info */
     const { rows: infoRows } = await pool.query(
       `SELECT * FROM store_info WHERE id=$1`,
       [id]
     );
     if (!infoRows.length) return res.status(404).json({ ok: false });
 
-    const info = infoRows[0];
-
-    /* 2) store_images */
+    /* 2) 이미지 */
     const { rows: imgRows } = await pool.query(
       `SELECT url FROM store_images WHERE store_id=$1 ORDER BY sort_order`,
       [id]
     );
 
-    /* 3) store_menu */
+    /* 3) 메뉴 */
     const { rows: menuRows } = await pool.query(
       `SELECT name, price, category, image_url, description, theme
          FROM store_menu
@@ -202,7 +199,7 @@ export async function getStoreFull(req, res) {
       [id]
     );
 
-    /* 4) store_events */
+    /* 4) 이벤트 */
     const { rows: eventRows } = await pool.query(
       `SELECT content FROM store_events WHERE store_id=$1 ORDER BY ord`,
       [id]
@@ -211,127 +208,14 @@ export async function getStoreFull(req, res) {
     return res.json({
       ok: true,
       data: {
-        ...info,
+        ...infoRows[0],
         images: imgRows.map(r => r.url),
         menus: menuRows,
         events: eventRows.map(r => r.content)
       }
     });
   } catch (err) {
-    console.error("getStoreFull:", err);
+    console.error("getStoreFull ERROR:", err);
     return res.status(500).json({ ok: false });
-  }
-}
-
-/* ===================== 수정 ====================== */
-export async function updateFoodStore(req, res) {
-  const client = await pool.connect();
-  try {
-    const id = parseId(req.params.id);
-    if (!id) return res.json({ ok: false });
-
-    await client.query("BEGIN");
-
-    /* 1) store_info 업데이트 */
-    const fields = {
-      business_name: req.body.businessName,
-      owner_name: req.body.ownerName,
-      phone: req.body.phone,
-      email: req.body.email,
-      address: req.body.roadAddress,
-      business_type: req.body.businessType,
-      business_category: req.body.businessCategory,
-      business_hours: req.body.businessHours,
-      delivery_option: req.body.deliveryOption,
-      service_details: req.body.serviceDetails,
-      additional_desc: req.body.additionalDesc,
-      homepage: req.body.homepage,
-      instagram: req.body.instagram,
-      facebook: req.body.facebook,
-      facilities: req.body.facilities,
-      pets_allowed: req.body.petsAllowed === "true",
-      parking: req.body.parking
-    };
-
-    const set = [];
-    const params = [];
-    Object.entries(fields).forEach(([col, val]) => {
-      if (val !== undefined) {
-        set.push(`${col}=$${params.length + 1}`);
-        params.push(val === "" ? null : val);
-      }
-    });
-
-    if (set.length) {
-      await client.query(
-        `UPDATE store_info SET ${set.join(", ")} WHERE id=$${params.length + 1}`,
-        [...params, id]
-      );
-    }
-
-    /* 2) 이미지가 다시 들어왔으면 삭제 후 재삽입 */
-    const allFiles = collectFiles(req);
-    const newImages = filesByField(allFiles, "storeImages", "storeImages[]");
-
-    if (newImages.length) {
-      await client.query(`DELETE FROM store_images WHERE store_id=$1`, [id]);
-      const urls = newImages.map(toWebPath);
-
-      const q = `
-        INSERT INTO store_images (store_id, url, sort_order)
-        VALUES ${urls.map((_, i) => `($1,$${i + 2},${i})`).join(",")}
-      `;
-      await client.query(q, [id, ...urls]);
-    }
-
-    /* 3) 메뉴 재작성 */
-    await client.query(`DELETE FROM store_menu WHERE store_id=$1`, [id]);
-    const menuFiles = filesByField(allFiles, "menuImage", "menuImage[]");
-    const menus = parseMenus(req.body, menuFiles);
-
-    if (menus.length) {
-      const q = `
-        INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme)
-        VALUES ${menus
-          .map(
-            (_, i) =>
-              `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`
-          )
-          .join(",")}
-      `;
-      const params = menus.flatMap(m => [
-        m.name,
-        m.price,
-        m.category,
-        m.image_url,
-        m.description,
-        m.theme
-      ]);
-      await client.query(q, [id, ...params]);
-    }
-
-    /* 4) 이벤트 재작성 */
-    await client.query(`DELETE FROM store_events WHERE store_id=$1`, [id]);
-    const events = Object.entries(req.body)
-      .filter(([k]) => /^event\d+$/.test(k))
-      .map(([, v]) => v?.trim())
-      .filter(Boolean);
-
-    if (events.length) {
-      const q = `
-        INSERT INTO store_events (store_id, content, ord)
-        VALUES ${events.map((_, i) => `($1,$${i + 2},${i})`).join(",")}
-      `;
-      await client.query(q, [id, ...events]);
-    }
-
-    await client.query("COMMIT");
-    return res.json({ ok: true, id });
-  } catch (err) {
-    console.error("updateFoodStore:", err);
-    await client.query("ROLLBACK");
-    return res.json({ ok: false });
-  } finally {
-    client.release();
   }
 }
