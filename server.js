@@ -144,6 +144,38 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ------------------------------------------------------------
+// 사업자등록번호 검증 API (국세청 프록시)
+// ------------------------------------------------------------
+app.post("/verify-biz", async (req, res) => {
+  try {
+    const { b_no } = req.body; // 사업자등록번호
+    if (!b_no) {
+      return res.status(400).json({ ok: false, error: "사업자등록번호가 필요합니다." });
+    }
+
+    const serviceKey = process.env.BIZ_API_KEY;
+    if (!serviceKey) {
+      return res.status(500).json({ ok: false, error: "API 키가 설정되지 않았습니다." });
+    }
+
+    const response = await fetch(
+      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${serviceKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ b_no: [b_no.replace(/-/g, "")] })
+      }
+    );
+
+    const data = await response.json();
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error("[verify-biz error]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ------------------------------------------------------------
 // 4. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
