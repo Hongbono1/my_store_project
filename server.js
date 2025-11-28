@@ -42,6 +42,8 @@ import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
 
 import pool from "./db.js";
+console.log("### MALL HANKOOK SERVER START ###");
+console.log("BIZ_API_KEY exists? =>", !!process.env.BIZ_API_KEY);
 
 // ------------------------------------------------------------
 // 0. __dirname 설정
