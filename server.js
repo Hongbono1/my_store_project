@@ -144,7 +144,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // -------------------------------
-// 국세청 사업자번호 인증 API (최종 완성본)
+// 표준화된 국세청 사업자번호 인증 API
 // -------------------------------
 import fetch from "node-fetch";
 
@@ -159,54 +159,41 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    // 숫자만
-    const cleanBizNo = bizNo.replace(/-/g, "").trim();
-
-    // 서비스키
-    const serviceKey = process.env.BIZ_API_KEY;
-    if (!serviceKey) {
+    // 환경변수 확인
+    if (!process.env.BIZ_API_KEY) {
       console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
-      return res.status(500).json({
-        ok: false,
-        message: "환경변수 오류(BIZ_API_KEY)"
-      });
+      return res.status(500).json({ ok: false, message: "환경변수 없음" });
     }
 
-    // 국세청 API URL
-    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${serviceKey}`;
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
 
-    // 실제 요청
+    const cleanBizNo = bizNo.replace(/-/g, "");
+
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        b_no: [cleanBizNo]  // odcloud는 반드시 배열로 제출해야 함
+        b_no: [cleanBizNo]
       })
     });
 
     const data = await response.json();
 
-    // 응답 검증
-    if (!data || !Array.isArray(data.data) || data.data.length === 0) {
+    if (!data || !data.data || data.data.length === 0) {
       return res.status(500).json({
         ok: false,
         message: "국세청 응답 없음"
       });
     }
 
-    const result = data.data[0];
-
     return res.json({
       ok: true,
-      data: result
+      data: data.data[0]
     });
 
   } catch (err) {
-    console.error("verify-biz ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "서버 오류"
-    });
+    console.error("verify-biz ERROR:", err.message);
+    return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 });
 
