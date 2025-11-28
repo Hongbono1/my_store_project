@@ -285,10 +285,14 @@
                         <div class="flex items-center gap-2 relative flex-1">
                             <input name="businessType" placeholder="예: 음식점, 카페, 숙박 등"
                                 class="neo-input flex-1 px-3 py-2" />
-                            <button id="helpBtn" type="button" onclick="toggleTip(event)"
+
+                            <!-- 🔹 onclick에서 event 제거 -->
+                            <button id="helpBtn" type="button" onclick="toggleTip()"
                                 class="neo-btn shrink-0 px-3 py-2 rounded-full !font-bold">?</button>
-                            <div id="tipBox" class="fixed w-64 p-4 neo-section text-sm z-20 hidden"
-                                style="left:0; top:0;">
+
+                            <!-- 🔹 fixed → absolute, 버튼 아래에 나오도록 정렬 -->
+                            <div id="tipBox"
+                                class="absolute right-0 top-full mt-2 w-64 p-4 neo-section text-sm z-20 hidden">
                                 <strong class="block mb-2 text-blue-700">업종 예시</strong>
                                 식당, 병원, 약국, 어린이집, 학원, 마트<br>
                                 편의점, 운동, 미용, 이발, 세탁, 옷수선<br>
@@ -873,19 +877,30 @@
         }
 
         /* =========================================================
-           도움말 토글 (업종 예시)
-        ========================================================= */
-        function toggleTip(ev) {
+   도움말 토글 (업종 예시)
+========================================================= */
+        function toggleTip() {
             const tip = qs("#tipBox");
             if (!tip) return;
-            if (tip.classList.contains("hidden")) {
-                const rect = ev.currentTarget.getBoundingClientRect();
-                tip.style.left = `${rect.left}px`;
-                tip.style.top = `${rect.bottom + 6 + window.scrollY}px`;
-                tip.classList.remove("hidden");
-            } else tip.classList.add("hidden");
+            tip.classList.toggle("hidden");
         }
         window.toggleTip = toggleTip;
+
+        // 🔹 바깥 클릭하면 자동으로 닫히게 (선택사항이지만 추천)
+        document.addEventListener("click", (e) => {
+            const tip = qs("#tipBox");
+            const btn = qs("#helpBtn");
+            if (!tip || !btn) return;
+
+            // 이미 숨김이면 신경 X
+            if (tip.classList.contains("hidden")) return;
+
+            // 버튼이나 말풍선 내부를 클릭한 경우는 유지
+            if (btn.contains(e.target) || tip.contains(e.target)) return;
+
+            // 그 외 아무 곳이나 클릭 시 닫기
+            tip.classList.add("hidden");
+        });
 
         /* =========================================================
            임시 수정 버튼
