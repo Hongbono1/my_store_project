@@ -48,6 +48,7 @@ function extractMenusFromBody(body) {
       category: (m.category ?? "").trim() || null,
       description: (m.description ?? "").trim() || null,
       image_url: (m.image_url ?? "").trim() || null,
+      theme: (m.theme ?? "").trim() || null,
     });
   };
 
@@ -64,10 +65,10 @@ function extractMenusFromBody(body) {
   // (B) 브래킷 키: storeMenus[i][j][field]
   const buckets = {};
   for (const [k, v] of Object.entries(body || {})) {
-    const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/);
+    const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url|theme)\]$/);
     if (!m) continue;
     const idx = `${m[1]}:${m[2]}`;
-    (buckets[idx] ||= { category: null, name: "", price: 0, description: "", image_url: null });
+    (buckets[idx] ||= { category: null, name: "", price: 0, description: "", image_url: null, theme: null });
     const val = String(v ?? "").trim();
     if (m[3] === "price") buckets[idx].price = toInt(val);
     else if (m[3] === "category") buckets[idx].category = val || null;
@@ -88,7 +89,6 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
   const descs = toArr(body["menuDesc[]"] ?? body.menuDesc);
   const themes = toArr(body["menuTheme[]"] ?? body.menuTheme); // ✅ 추가됨
 
-
   const rows = [];
   for (let i = 0; i < names.length; i++) {
     const name = (names[i] || "").trim();
@@ -101,14 +101,13 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
 
     if (name && price > 0) {
       const theme = (themes[i] || "").trim() || null;
-      rows.push({ name, price, category, description, image_url: img, theme }); // ✅ theme 추가
+      rows.push({ name, price, category, description, image_url: img, theme }); // ✅ theme 포함
     }
   }
   return rows;
 }
 
 /* ===================== 등록(POST) ===================== */
-
 
 export async function createFoodStore(req, res) {
   console.log("BODY >>>", req.body);
@@ -152,23 +151,23 @@ export async function createFoodStore(req, res) {
 
     await client.query("BEGIN");
 
-    // 1) 가게
+    // 1) 가게 (store_info 사용)
     const insertStoreQ = `
-  INSERT INTO store_info (
-    business_name, owner_name, phone, email, address,
-    business_type, business_category, business_hours, delivery_option,
-    service_details, additional_desc,
-    homepage, instagram, facebook,
-    facilities, pets_allowed, parking
-  ) VALUES (
-    $1,$2,$3,$4,$5,
-    $6,$7,$8,$9,
-    $10,$11,
-    $12,$13,$14,
-    $15,$16,$17
-  )
-  RETURNING id
-`;
+      INSERT INTO store_info (
+        business_name, owner_name, phone, email, address,
+        business_type, business_category, business_hours, delivery_option,
+        service_details, additional_desc,
+        homepage, instagram, facebook,
+        facilities, pets_allowed, parking
+      ) VALUES (
+        $1,$2,$3,$4,$5,
+        $6,$7,$8,$9,
+        $10,$11,
+        $12,$13,$14,
+        $15,$16,$17
+      )
+      RETURNING id
+    `;
 
     const { rows } = await client.query(insertStoreQ, [
       businessName,
@@ -191,7 +190,6 @@ export async function createFoodStore(req, res) {
     ]);
 
     const storeId = rows[0].id;
-
 
     // 2) 파일 분류
     const allFiles = collectFiles(req);
@@ -220,7 +218,7 @@ export async function createFoodStore(req, res) {
 
     if (menus.length) {
       const values = menus
-        .map((_, i) => `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`)
+        .map((_, i) => `($1,$${i * 7 + 2},$${i * 7 + 3},$${i * 7 + 4},$${i * 7 + 5},$${i * 7 + 6},$${i * 7 + 7},$${i * 7 + 8})`)
         .join(",");
 
       const params = menus.flatMap(m => [
@@ -229,16 +227,17 @@ export async function createFoodStore(req, res) {
         (m.category || null),
         (m.image_url || null),
         (m.description || null),
-        (m.theme || null)
+        (m.theme || null),
+        null,        // reserved1
+        null         // reserved2
       ]);
 
       await client.query(
-        `INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme)
-     VALUES ${values}`,
+        `INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme, reserved1)
+         VALUES ${values}`,
         [storeId, ...params]
       );
     }
-
 
     // 4) 이벤트 저장 (inline 파싱)
     const events = Object.entries(req.body)
@@ -315,7 +314,7 @@ export async function getFoodRegisterFull(req, res) {
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지 → store_images 사용 (기존과 동일)
+    // 2) 이미지 → store_images 사용
     const { rows: images } = await pool.query(
       `SELECT url 
          FROM store_images
@@ -324,17 +323,17 @@ export async function getFoodRegisterFull(req, res) {
       [storeId]
     );
 
-    // 3) 메뉴 → store_menu 테이블로 변경
+    // 3) 메뉴 → store_menu 테이블 사용
     const { rows: menus } = await pool.query(
       `SELECT store_id, COALESCE(category,'기타') AS category,
-              name, price, image_url, description
+              name, price, image_url, description, theme
          FROM store_menu
         WHERE store_id = $1
         ORDER BY id ASC`,
       [storeId]
     );
 
-    // 4) 이벤트 (기존과 동일)
+    // 4) 이벤트
     const { rows: ev } = await pool.query(
       `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
       [storeId]
@@ -406,7 +405,6 @@ export async function updateFoodStore(req, res) {
     }
 
     // 3) 메뉴 저장
-    // 3) 메뉴 저장  (이 블록으로 교체)
     const allFiles = collectFiles(req);
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
 
@@ -431,14 +429,14 @@ export async function updateFoodStore(req, res) {
       return base;
     });
 
-    // 구형 폼(백워드 컴패티빌리티): menuName[]/menuPrice[]/menuDesc[] + menuImage[]
+    // 구형 폼(백워드 컴패티빌리티)
     const legacyMenus = extractLegacyMenusFromBody(req.body, menuImgFiles.slice(ptr));
 
     // 최종 합치기
     const menus = [...menusFromJsonWithFiles, ...legacyMenus]
       .filter(m => m.name && m.price > 0);
 
-    // 저장 전 기존 것 정리(신규 생성에도 안전)
+    // 저장 전 기존 것 정리
     await client.query(`DELETE FROM menu_items WHERE store_id=$1`, [storeId]);
 
     if (menus.length) {
@@ -446,7 +444,7 @@ export async function updateFoodStore(req, res) {
         .map((_, i) => `($1,$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5},$${i * 5 + 6})`)
         .join(",");
 
-      const params = menus.flatMap(m => [
+      const params2 = menus.flatMap(m => [
         m.name,
         m.price,
         m.category,
@@ -456,7 +454,7 @@ export async function updateFoodStore(req, res) {
 
       await client.query(
         `INSERT INTO menu_items (store_id, name, price, category, image_url, description) VALUES ${vals}`,
-        [storeId, ...params]
+        [storeId, ...params2]
       );
     }
 
@@ -472,6 +470,38 @@ export async function updateFoodStore(req, res) {
     try {
       client.release();
     } catch { }
+  }
+}
+
+/* ===================== 푸드 카테고리 목록(GET /api/food/categories) ===================== */
+/**
+ * 음식점(business_type='음식점') 기준으로
+ * 중복 없는 business_category 목록을 반환
+ */
+export async function getFoodCategories(req, res) {
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT DISTINCT business_category
+      FROM store_info
+      WHERE business_type = '음식점'
+        AND business_category IS NOT NULL
+        AND business_category <> ''
+      ORDER BY business_category
+      `
+    );
+
+    return res.json({
+      ok: true,
+      categories: rows, // [{ business_category: '한식' }, ...]
+    });
+  } catch (err) {
+    console.error("[getFoodCategories] error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "server_error",
+      message: "푸드 카테고리 조회 중 오류가 발생했습니다.",
+    });
   }
 }
 
