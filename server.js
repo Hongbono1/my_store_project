@@ -150,7 +150,7 @@ import fetch from "node-fetch";
 
 app.post("/verify-biz", async (req, res) => {
   try {
-    const { bizNo } = req.body; // 모든 register 페이지 공통 통일
+    const { bizNo } = req.body;
 
     if (!bizNo) {
       return res.status(400).json({
@@ -159,13 +159,20 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
-
-
     const cleanBizNo = bizNo.replace(/-/g, "");
+    const serviceKey = process.env.BIZ_API_KEY;
+
+    if (!serviceKey) {
+      return res.status(500).json({
+        ok: false,
+        message: "환경변수 BIZ_API_KEY가 설정되지 않았습니다."
+      });
+    }
+
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${serviceKey}`;
 
     // 국세청 API 요청
-    const response = await fetch(`${apiURL}?serviceKey=${serviceKey}`, {
+    const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -182,11 +189,9 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const result = data.data[0];
-
     return res.json({
       ok: true,
-      data: result
+      data: data.data[0]
     });
 
   } catch (err) {
@@ -194,7 +199,6 @@ app.post("/verify-biz", async (req, res) => {
     return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 });
-
 
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
