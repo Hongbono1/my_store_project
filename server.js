@@ -159,8 +159,8 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const apiURL = "https://api.odcloud.kr/api/nts-businessman/v1/status";
-    const serviceKey = process.env.NTS_KEY; // 🔥 환경변수 단일화
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
+
 
     const cleanBizNo = bizNo.replace(/-/g, "");
 
