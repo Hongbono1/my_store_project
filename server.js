@@ -147,7 +147,6 @@ app.use(express.urlencoded({ extended: true }));
 // 표준화된 국세청 사업자번호 인증 API
 // -------------------------------
 import fetch from "node-fetch";
-
 app.post("/verify-biz", async (req, res) => {
   try {
     const { bizNo } = req.body;
@@ -159,27 +158,22 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    // 환경변수 확인
-    if (!process.env.BIZ_API_KEY) {
-      console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
-      return res.status(500).json({ ok: false, message: "환경변수 없음" });
-    }
-
-    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
-
+    // 숫자만 사용
     const cleanBizNo = bizNo.replace(/-/g, "");
 
+    const API_URL =
+      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
+
+    // 국세청 API 요청
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        b_no: [cleanBizNo]
-      })
+      body: JSON.stringify({ b_no: [cleanBizNo] })
     });
 
     const data = await response.json();
 
-    if (!data || !data.data || data.data.length === 0) {
+    if (!data?.data || data.data.length === 0) {
       return res.status(500).json({
         ok: false,
         message: "국세청 응답 없음"
@@ -193,9 +187,14 @@ app.post("/verify-biz", async (req, res) => {
 
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
-    return res.status(500).json({ ok: false, message: "서버 오류" });
+    return res.status(500).json({
+      ok: false,
+      message: "서버 오류"
+    });
   }
 });
+
+
 
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
