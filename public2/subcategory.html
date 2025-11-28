@@ -99,6 +99,7 @@
         const params = new URLSearchParams(window.location.search);
         const TYPE = (params.get("type") || "food").toLowerCase();
         const CATEGORY = params.get("category");                // 카테고리명
+        const SUB = params.get("sub") || "";  // 한식 하위 카테고리 (밥/찌개탕/...)
 
         // =============================
         // 기본 데이터
@@ -119,9 +120,6 @@
         // =============================
         // 서버 데이터 불러오기
         // =============================
-        // =============================
-        // 서버 데이터 불러오기
-        // =============================
         async function loadData() {
             try {
                 if (TYPE === "food") {
@@ -138,12 +136,46 @@
                 else {
                     DATA = DEFAULT_DATA;
                 }
+
+                // ✅ 한식 하위 카테고리(밥/찌개/국밥 등)용 hero/필터 보정
+                if (TYPE === "food" && CATEGORY === "한식") {
+                    const titleBase = "한식";
+                    const subLabel = SUB ? ` · ${SUB}` : "";
+
+                    DATA.hero = {
+                        title: `${titleBase}${subLabel}`,
+                        subtitle:
+                            SUB === "밥"
+                                ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
+                                : SUB === "찌개탕"
+                                    ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
+                                    : SUB === "고기구이"
+                                        ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
+                                        : SUB === "생선"
+                                            ? "구이 · 조림 · 회 등 다양한 생선 요리"
+                                            : SUB === "족발보쌈"
+                                                ? "족발 · 보쌈 · 수육까지 푸짐하게"
+                                                : SUB === "국밥"
+                                                    ? "뜨끈한 국밥 한 그릇으로 든든하게"
+                                                    : SUB === "반찬"
+                                                        ? "집밥 느낌 나는 반찬/도시락 가게 모음"
+                                                        : SUB === "기타한식"
+                                                            ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
+                                                            : "우리동네 한식 맛집들을 모았습니다.",
+                        image: "/uploads/sample-banner-product.png"
+                    };
+
+                    // 필터 버튼도 하위 카테고리로 세팅 (없으면 '한식')
+                    DATA.filters = SUB ? [SUB] : ["한식"];
+                }
+
             } catch (e) {
                 console.error("데이터 불러오기 실패:", e);
                 DATA = DEFAULT_DATA;
             }
             init();
         }
+
 
         // =============================
         // 광고 카드 (12개 단위 페이징 + 드래그)
@@ -187,14 +219,14 @@
                     const card = document.createElement("div");
                     // 전체 카드 높이는 내용에 맞게 자동, 이미지 영역은 234px 고정
                     card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white";
-                     // 안전한 필드 매핑 (fallback)
-                     const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
-                     const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
-                     const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
- 
-                     // DEBUG: 값 확인 (콘솔에 출력)
-                     console.log("[renderPagedAdStores] id:", store.id, "name:", dispName, "category:", dispCategory);
- 
+                    // 안전한 필드 매핑 (fallback)
+                    const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
+                    const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
+                    const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
+
+                    // DEBUG: 값 확인 (콘솔에 출력)
+                    console.log("[renderPagedAdStores] id:", store.id, "name:", dispName, "category:", dispCategory);
+
                     const imgNorm = normalizeSrc(imgSrc);
                     card.innerHTML = `
           <div class="relative h-[260px]">
@@ -204,14 +236,14 @@
                <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
              </div>
            </div>`;
-                     // 상세로 이동 (type 결정도 안전하게)
-                     card.addEventListener("click", () => {
-                         const bt = store.business_type ?? store.businessType ?? store.business_category ?? "";
-                         const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
-                         window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
-                     });
-                     wrapper.appendChild(card);
-                 });
+                    // 상세로 이동 (type 결정도 안전하게)
+                    card.addEventListener("click", () => {
+                        const bt = store.business_type ?? store.businessType ?? store.business_category ?? "";
+                        const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
+                        window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
+                    });
+                    wrapper.appendChild(card);
+                });
 
                 grid.appendChild(wrapper);
 
@@ -290,15 +322,15 @@
                <p class="text-gray-600 text-xs md:text-sm mb-0">${escapeHtml(dispCategory)}</p>
              </div>
            </div>`;
- 
-                      // 상세로 이동 (type 결정도 안전하게)
-                      card.addEventListener("click", () => {
-                          const bt = p?.business_type ?? p?.businessType ?? p?.business_category ?? "";
-                          const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
-                          window.location.href = `/ndetail.html?id=${p.id}&type=${type}`;
-                      });
-                      wrapper.appendChild(card);
-                 });
+
+                    // 상세로 이동 (type 결정도 안전하게)
+                    card.addEventListener("click", () => {
+                        const bt = p?.business_type ?? p?.businessType ?? p?.business_category ?? "";
+                        const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
+                        window.location.href = `/ndetail.html?id=${p.id}&type=${type}`;
+                    });
+                    wrapper.appendChild(card);
+                });
 
                 grid.appendChild(wrapper);
 
@@ -354,7 +386,7 @@
             if (/^https?:\/\//i.test(src)) return src;
             return src.startsWith("/") ? src : "/" + src;
         }
-        
+
         function bindHero() {
             document.getElementById("heroTitle").innerHTML =
                 (DATA.hero?.title || "").replace(/\n/g, "<br>");
@@ -413,75 +445,76 @@
         }
     </script>
     <script>
-    (async function(){
-      // 1) API로 목록을 가져오는 경우
-      let list;
-      try {
-        const q = new URLSearchParams(location.search);
-        const category = q.get("category") || "";
-        const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(category)}`);
-        list = res.ok ? await res.json() : null;
-      } catch(e) {
-        console.warn("subcategory list fetch failed", e);
-        list = null;
-      }
-
-      // 2) 유틸: 다양한 키를 허용하는 안전한 매핑
-      function mapName(store){
-        return store?.business_name ?? store?.businessName ?? store?.name ?? store?.title ?? "";
-      }
-      function mapType(store){
-        return store?.business_type ?? store?.businessType ?? store?.type ?? store?.category ?? "";
-      }
-
-      // 3) 화면에 이미 렌더된 카드들 보정 (data-store-id 사용 시)
-      document.querySelectorAll("[data-store-id]").forEach(async (card) => {
-        const id = card.dataset.storeId;
-        if (!id) return;
-        const nameEl = card.querySelector(".store-name");
-        const typeEl = card.querySelector(".store-type");
-
-        let store = null;
-        if (list && list.ok && Array.isArray(list.stores)) {
-          store = list.stores.find(s => String(s.id) === String(id)) ?? null;
-        }
-
-        if (!store) {
-          try {
-            const typeParam = new URLSearchParams(location.search).get("type") || "combined";
-            const api = typeParam === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
-            const r = await fetch(api);
-            if (r.ok) {
-              const j = await r.json();
-              store = j.store ?? j;
+        (async function () {
+            // 1) API로 목록을 가져오는 경우
+            let list;
+            try {
+                const q = new URLSearchParams(location.search);
+                const category = q.get("category") || "";
+                const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(category)}`);
+                list = res.ok ? await res.json() : null;
+            } catch (e) {
+                console.warn("subcategory list fetch failed", e);
+                list = null;
             }
-          } catch (e) { /* ignore */ }
-        }
 
-        if (nameEl && store) nameEl.textContent = mapName(store) || nameEl.textContent || "-";
-        if (typeEl && store) typeEl.textContent = mapType(store) || typeEl.textContent || "-";
-      });
+            // 2) 유틸: 다양한 키를 허용하는 안전한 매핑
+            function mapName(store) {
+                return store?.business_name ?? store?.businessName ?? store?.name ?? store?.title ?? "";
+            }
+            function mapType(store) {
+                return store?.business_type ?? store?.businessType ?? store?.type ?? store?.category ?? "";
+            }
 
-      // 4) 만약 서브카테고리 목록을 JS로 렌더한다면 (간단한 예)
-      if (!document.querySelector("#subcategory-container") && list && list.ok && Array.isArray(list.stores)) {
-        const container = document.createElement("div");
-        container.id = "subcategory-container";
-        container.className = "grid grid-cols-3 gap-6";
-        list.stores.forEach(s => {
-          const name = mapName(s) || "-";
-          const type = mapType(s) || "-";
-          const img = s.image || "/uploads/no-image.png";
-          container.innerHTML += `
+            // 3) 화면에 이미 렌더된 카드들 보정 (data-store-id 사용 시)
+            document.querySelectorAll("[data-store-id]").forEach(async (card) => {
+                const id = card.dataset.storeId;
+                if (!id) return;
+                const nameEl = card.querySelector(".store-name");
+                const typeEl = card.querySelector(".store-type");
+
+                let store = null;
+                if (list && list.ok && Array.isArray(list.stores)) {
+                    store = list.stores.find(s => String(s.id) === String(id)) ?? null;
+                }
+
+                if (!store) {
+                    try {
+                        const typeParam = new URLSearchParams(location.search).get("type") || "combined";
+                        const api = typeParam === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+                        const r = await fetch(api);
+                        if (r.ok) {
+                            const j = await r.json();
+                            store = j.store ?? j;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                if (nameEl && store) nameEl.textContent = mapName(store) || nameEl.textContent || "-";
+                if (typeEl && store) typeEl.textContent = mapType(store) || typeEl.textContent || "-";
+            });
+
+            // 4) 만약 서브카테고리 목록을 JS로 렌더한다면 (간단한 예)
+            if (!document.querySelector("#subcategory-container") && list && list.ok && Array.isArray(list.stores)) {
+                const container = document.createElement("div");
+                container.id = "subcategory-container";
+                container.className = "grid grid-cols-3 gap-6";
+                list.stores.forEach(s => {
+                    const name = mapName(s) || "-";
+                    const type = mapType(s) || "-";
+                    const img = s.image || "/uploads/no-image.png";
+                    container.innerHTML += `
             <div class="card p-4 bg-white rounded" data-store-id="${s.id}">
               <img src="${img}" class="w-full h-40 object-cover rounded mb-3" />
               <div class="text-lg font-semibold store-name">${escapeHtml(name)}</div>
               <div class="text-sm text-gray-500 store-type">${escapeHtml(type)}</div>
             </div>
           `;
-        });
-        document.querySelector("main")?.appendChild(container);
-      }
-    })();
+                });
+                document.querySelector("main")?.appendChild(container);
+            }
+        })();
     </script>
-  </body>
+</body>
+
 </html>
