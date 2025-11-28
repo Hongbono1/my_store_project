@@ -666,8 +666,8 @@
         }
 
         /* =========================================================
-           사업자번호 인증
-        ========================================================= */
+   사업자번호 인증 (응답 포맷 모두 대응)
+========================================================= */
         async function verifyBiz() {
             const out = qs("#bizVerifyResult");
             const btn = qs("#btnVerifyBiz");
@@ -676,52 +676,113 @@
             const nameInput = qs("#businessName");
 
             const { b1, b2, b3, full } = getBizNumberParts();
-            if (out) { out.textContent = ""; out.className = "text-sm text-center"; }
+            if (out) {
+                out.textContent = "";
+                out.className = "text-sm text-center";
+            }
 
+            // 형식 체크
             if (b1.length !== 3 || b2.length !== 2 || b3.length !== 5) {
-                if (out) { out.textContent = "사업자번호 형식이 올바르지 않습니다."; out.classList.add("text-red-600"); }
+                if (out) {
+                    out.textContent = "사업자번호 형식이 올바르지 않습니다.";
+                    out.classList.add("text-red-600");
+                }
                 if (bizVerified) bizVerified.value = "N";
                 return;
             }
 
             btn && (btn.disabled = true);
-            if (out) { out.textContent = "인증 조회 중…"; out.className = "text-sm text-slate-600 text-center"; }
+            if (out) {
+                out.textContent = "인증 조회 중…";
+                out.className = "text-sm text-slate-600 text-center";
+            }
 
             try {
                 const res = await fetch(API.VERIFY_BIZ, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ bizNo: full })
+                    body: JSON.stringify({ bizNo: full })   // ★ 서버와 약속: bizNo
                 });
 
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
 
-                // 🔥 배열 아님, 바로 객체
-                const rec = data?.data || null;
+                const data = await res.json();
+                console.log("[verify-biz] raw response:", data);
+
+                // ✅ 응답 포맷 통합 처리
+                let rec = null;
+
+                if (data && typeof data === "object") {
+                    // 1) { ok:true, data:{...} }
+                    if (data.data && !Array.isArray(data.data) && typeof data.data === "object") {
+                        rec = data.data;
+                    }
+                    // 2) { data:[{...}] } (odcloud 원본)
+                    else if (Array.isArray(data.data) && data.data.length > 0) {
+                        rec = data.data[0];
+                    }
+                    // 3) 혹시 다른 키(b_no 등)를 쓸 수도 있어서 예비 처리
+                    else if (Array.isArray(data.b_no) && data.b_no.length > 0) {
+                        rec = data.b_no[0];
+                    }
+                }
+
+                if (!rec) {
+                    // 데이터 구조를 못 읽은 경우
+                    if (bizVerified) bizVerified.value = "N";
+                    if (out) {
+                        out.textContent = "인증 실패 또는 상태 확인 불가 (국세청 응답 구조 확인 필요)";
+                        out.className = "text-sm text-red-600 text-center";
+                    }
+                    return;
+                }
+
+                console.log("[verify-biz] parsed record:", rec);
+
+                // ✅ 계속사업자 여부 판정 (여러 경우 허용)
+                const sttCode = rec.b_stt_cd || rec.status_cd;
+                const sttText = (rec.b_stt || rec.status || "").trim();
 
                 const isActive =
-                    (rec?.b_stt_cd === "01") ||
-                    (typeof rec?.b_stt === "string" && rec.b_stt.trim() === "계속사업자") ||
-                    (data?.ok === true && (data?.valid === true || data?.status === "OK"));
+                    sttCode === "01" ||                      // 가장 확실한 코드
+                    sttText === "계속사업자" ||
+                    sttText.includes("계속") ||             // 혹시 공백 섞여 있을 때
+                    (data.ok === true && (data.valid === true || data.status === "OK"));
 
                 if (isActive) {
                     if (bizVerified) bizVerified.value = "Y";
                     if (bizNumber) bizNumber.value = full;
-                    const bizName = (rec?.b_nm || rec?.biz_name || "").trim();
-                    if (bizName && nameInput && !nameInput.value.trim()) nameInput.value = bizName;
-                    if (out) { out.textContent = "인증 완료: 계속사업자 상태입니다."; out.className = "text-sm text-green-700 text-center"; }
+
+                    // 상호명 자동 입력
+                    const bizName = (rec.b_nm || rec.biz_name || "").trim();
+                    if (bizName && nameInput && !nameInput.value.trim()) {
+                        nameInput.value = bizName;
+                    }
+
+                    if (out) {
+                        out.textContent = "인증 완료: 계속사업자 상태입니다.";
+                        out.className = "text-sm text-green-700 text-center";
+                    }
                 } else {
                     if (bizVerified) bizVerified.value = "N";
-                    if (out) { out.textContent = "인증 실패 또는 상태 확인 불가 (서버 응답 포맷 확인 필요)"; out.className = "text-sm text-red-600 text-center"; }
+                    const msg = sttText || "등록되지 않았거나 폐업/휴업 사업자일 수 있습니다.";
+                    if (out) {
+                        out.textContent = `인증 실패: ${msg}`;
+                        out.className = "text-sm text-red-600 text-center";
+                    }
                 }
             } catch (e) {
+                console.error("verifyBiz error:", e);
                 if (bizVerified) bizVerified.value = "N";
-                if (out) { out.textContent = "인증 API 미연동 또는 응답 실패 (나중에 연동)"; out.className = "text-sm text-orange-600 text-center"; }
+                if (out) {
+                    out.textContent = "인증 API 미연동 또는 응답 실패 (나중에 실제 연동 예정)";
+                    out.className = "text-sm text-orange-600 text-center";
+                }
             } finally {
                 btn && (btn.disabled = false);
             }
         }
+
 
         /* =========================================================
            이메일 도메인 처리
