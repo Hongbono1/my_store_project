@@ -16,13 +16,20 @@ const fieldsDef = [
   { name: "businessCertImage", maxCount: 1 },
 ];
 
-/* 업로드 저장소 보장 */
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+/* ✅ 업로드 저장소: 영구 폴더 (/data/uploads) */
+const UPLOAD_ROOT = "/data/uploads";
+
+// 폴더 보장
+if (!fs.existsSync(UPLOAD_ROOT)) {
+  fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+}
 
 /* multer 설정 */
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
+  // ✅ 실제 파일은 /data/uploads 에 저장
+  destination: (_req, _file, cb) => cb(null, UPLOAD_ROOT),
+
+  // 파일명: 타임스탬프 + 랜덤값 + 원본 확장자
   filename: (_req, file, cb) => {
     const ext = (path.extname(file?.originalname || "") || ".jpg").toLowerCase();
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -33,7 +40,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 20 * 1024 * 1024, // 20MB
     files: 200,
     fields: 2000,
     parts: 2300,
@@ -66,9 +73,5 @@ router.post("/", uploadWithCatch, ctrl.createFoodStore);
 
 // ✅ 상세 조회: 최종 경로는 /store/:id/full
 router.get("/:id/full", ctrl.getFoodStoreFull);
-
-// (선택) 단건 조회/수정이 컨트롤러에 없다면 제거하거나 안전 가드
-// router.get("/:id", ctrl.getFoodStoreById);
-// router.put("/:id", uploadWithCatch, ctrl.updateFoodStore);
 
 export default router;
