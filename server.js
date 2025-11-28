@@ -158,13 +158,11 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    // 숫자만 사용
     const cleanBizNo = bizNo.replace(/-/g, "");
 
     const API_URL =
       `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
 
-    // 국세청 API 요청
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -193,6 +191,7 @@ app.post("/verify-biz", async (req, res) => {
     });
   }
 });
+
 
 
 
