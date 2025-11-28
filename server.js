@@ -5,13 +5,17 @@
  *  기존 라우터 / 기능 절대 변경 없음
  *  ---------------------------------------------------------- */
 
-import dotenv from "dotenv";
+// .env 를 가장 먼저 로드 (cwd 기준)
+// pm2 start 시 cwd 를 /root/my_store_project_new 로 맞출 것!
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+import fetch from "node-fetch";
 
 // Routers
 import foodregisterRouter from "./routes/foodregister.js";
@@ -42,21 +46,26 @@ import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
 
 import pool from "./db.js";
-import fetch from "node-fetch";
 
 // ------------------------------------------------------------
-// 0. __dirname 설정 + .env 강제 로드
+// 0. __dirname 설정
 // ------------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 항상 server.js와 같은 폴더의 .env를 읽도록 강제
-dotenv.config({ path: path.join(__dirname, ".env") });
-
+// ------------------------------------------------------------
+// 0-1. ENV 로드 확인 로그
+// ------------------------------------------------------------
 if (!process.env.BIZ_API_KEY) {
-  console.error("❌ BIZ_API_KEY 환경변수를 로드하지 못했습니다. (.env 위치 또는 값 확인 필요)");
+  console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
 } else {
-  console.log("✅ BIZ_API_KEY 로드 완료");
+  console.log("✅ BIZ_API_KEY 환경변수 감지됨");
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error("❌ DATABASE_URL 환경변수가 없습니다.");
+} else {
+  console.log("✅ DATABASE_URL 환경변수 감지됨");
 }
 
 // ------------------------------------------------------------
@@ -153,12 +162,12 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// -------------------------------
-// 표준화된 국세청 사업자번호 인증 API
-// -------------------------------
+// ------------------------------------------------------------
+// 3-1. 표준화된 국세청 사업자번호 인증 API
+// ------------------------------------------------------------
 app.post("/verify-biz", async (req, res) => {
   try {
-    const { bizNo } = req.body; // foodregister.html 등에서 공통 사용
+    const { bizNo } = req.body;
 
     if (!bizNo) {
       return res.status(400).json({
@@ -167,31 +176,34 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const cleanBizNo = bizNo.replace(/-/g, "");
-
-    if (!process.env.BIZ_API_KEY) {
-      console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
+    const serviceKey = process.env.BIZ_API_KEY;
+    if (!serviceKey) {
+      console.error("❌ BIZ_API_KEY 환경변수가 없습니다. (.env 확인 필요)");
       return res.status(500).json({
         ok: false,
-        message: "서버 환경변수(BIZ_API_KEY) 미설정"
+        message: "서버 설정 오류(BIZ_API_KEY 미설정)"
       });
     }
 
-    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
+    const cleanBizNo = bizNo.replace(/-/g, "");
+
+    const API_URL =
+      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
 
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ b_no: [cleanBizNo] }) // 배열 필수
+      body: JSON.stringify({ b_no: [cleanBizNo] })
     });
 
     const data = await response.json();
 
     if (!data?.data || data.data.length === 0) {
-      console.error("❌ 국세청 응답 data 없음:", data);
+      console.error("verify-biz 응답 이상:", data);
       return res.status(500).json({
         ok: false,
-        message: "국세청 응답 없음"
+        message: "국세청 응답 없음",
+        raw: data
       });
     }
 
@@ -199,6 +211,7 @@ app.post("/verify-biz", async (req, res) => {
       ok: true,
       data: data.data[0]
     });
+
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
     return res.status(500).json({
@@ -240,8 +253,6 @@ app.use("/open", openRouter);
 app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
 app.use("/upload", uploadRouter);
-// (localRankRouter 실제 사용 경로가 있다면 아래처럼 추가 가능)
-// app.use("/api/localRank", localRankRouter);
 
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
@@ -273,6 +284,14 @@ app.use("/uploads", express.static(UPLOAD_ROOT));
 // 8. 헬스체크
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
+
+// (선택) ENV 체크 라우트 (필요하면 사용)
+// app.get("/__env-check", (req, res) => {
+//   res.json({
+//     BIZ_API_KEY: !!process.env.BIZ_API_KEY,
+//     DATABASE_URL: !!process.env.DATABASE_URL
+//   });
+// });
 
 // ------------------------------------------------------------
 // 9. 에러 핸들러
