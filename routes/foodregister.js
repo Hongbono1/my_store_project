@@ -83,13 +83,6 @@ const uploadWithCatch = (req, res, next) => {
  *    - server.js 에서 /store 로 마운트되므로 여기서는 "/" 부터만
  * ------------------------------------------------------------------ */
 
-/**
- * ✅ 푸드 카테고리 목록 API
- * 최종 경로: GET /store/api/food/categories
- * - 프론트에서: fetch("/store/api/food/categories")
- */
-router.get("/api/food/categories", ctrl.getFoodCategories);
-
 // 등록
 router.post("/", uploadWithCatch, ctrl.createFoodStore);
 
