@@ -5,13 +5,29 @@
  *  기존 라우터 / 기능 절대 변경 없음
  *  ---------------------------------------------------------- */
 
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+
+// ------------------------------------------------------------
+// 0. __dirname 설정 + .env 강제 로드
+// ------------------------------------------------------------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// server.js와 같은 폴더의 .env 로드
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+// 디버깅용: BIZ_API_KEY 길이만 확인 (값 자체는 로그에 안 남김)
+console.log("🔑 BIZ_API_KEY length =", (process.env.BIZ_API_KEY || "").length);
+
+// ------------------------------------------------------------
+// 1. Router & DB import
+// ------------------------------------------------------------
 
 // Routers
 import foodregisterRouter from "./routes/foodregister.js";
@@ -39,20 +55,12 @@ import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
-import localRankRouter from "./routes/localRankRouter.js";
+import localRankRouter from "./routes/localRankRouter.js"; // 아직 미사용이어도 import 유지
 
 import pool from "./db.js";
-console.log("### MALL HANKOOK SERVER START ###");
-console.log("BIZ_API_KEY exists? =>", !!process.env.BIZ_API_KEY);
 
 // ------------------------------------------------------------
-// 0. __dirname 설정
-// ------------------------------------------------------------
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ------------------------------------------------------------
-// 1. 공연/예술 테이블 자동 생성
+// 2. 공연/예술 테이블 자동 생성
 // ------------------------------------------------------------
 async function initPerformingArtsTables() {
   try {
@@ -102,7 +110,7 @@ async function initPerformingArtsTables() {
 initPerformingArtsTables();
 
 // ------------------------------------------------------------
-// 2. 업로드 폴더 구성 (영구 저장용 /data/uploads)
+// 3. 업로드 폴더 구성 (영구 저장용 /data/uploads)
 // ------------------------------------------------------------
 const UPLOAD_ROOT = "/data/uploads"; // ★★★ 영구 저장 A 방식 ★★★
 
@@ -123,7 +131,7 @@ uploadDirs.forEach((dir) => {
 });
 
 // ------------------------------------------------------------
-// 3. Express 설정
+// 4. Express 기본 설정
 // ------------------------------------------------------------
 const app = express();
 
@@ -136,7 +144,9 @@ app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - started;
-    console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
+    console.log(
+      `[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`
+    );
   });
   next();
 });
@@ -145,13 +155,14 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// -------------------------------
-// 표준화된 국세청 사업자번호 인증 API
-// -------------------------------
+// ------------------------------------------------------------
+// 5. 국세청 사업자번호 인증 API (/verify-biz)
+// ------------------------------------------------------------
 import fetch from "node-fetch";
+
 app.post("/verify-biz", async (req, res) => {
   try {
-    const { bizNo } = req.body;
+    const { bizNo } = req.body || {};
 
     if (!bizNo) {
       return res.status(400).json({
@@ -160,23 +171,49 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const cleanBizNo = bizNo.replace(/-/g, "");
-
-    const API_URL =
-      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${process.env.BIZ_API_KEY}`;
-
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ b_no: [cleanBizNo] })
-    });
-
-    const data = await response.json();
-
-    if (!data?.data || data.data.length === 0) {
+    if (!process.env.BIZ_API_KEY) {
+      console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
       return res.status(500).json({
         ok: false,
-        message: "국세청 응답 없음"
+        message: "서버 설정 오류(BIZ_API_KEY 미설정)"
+      });
+    }
+
+    const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
+
+    const apiUrl = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(
+      process.env.BIZ_API_KEY
+    )}`;
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ b_no: [cleanBizNo] }) // 배열 필수
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error(
+        "verify-biz HTTP ERROR:",
+        response.status,
+        text?.slice(0, 200)
+      );
+      return res.status(502).json({
+        ok: false,
+        message: "국세청 서버 응답 오류",
+        status: response.status
+      });
+    }
+
+    const data = await response.json().catch((err) => {
+      console.error("verify-biz JSON parse error:", err.message);
+      return null;
+    });
+
+    if (!data || !Array.isArray(data.data) || data.data.length === 0) {
+      return res.status(500).json({
+        ok: false,
+        message: "국세청 응답 데이터 없음"
       });
     }
 
@@ -184,7 +221,6 @@ app.post("/verify-biz", async (req, res) => {
       ok: true,
       data: data.data[0]
     });
-
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
     return res.status(500).json({
@@ -194,17 +230,14 @@ app.post("/verify-biz", async (req, res) => {
   }
 });
 
-
-
-
 // ------------------------------------------------------------
-// 4. 문의 게시판 라우트
+// 6. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
 app.use("/api/inquiry", inquiryBoardRouter);
 
 // ------------------------------------------------------------
-// 5. 주요 API 라우트
+// 7. 주요 API 라우트 (기존 경로 유지)
 // ------------------------------------------------------------
 app.use("/owner", ownerRouter);
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
@@ -230,13 +263,17 @@ app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
 app.use("/upload", uploadRouter);
 
+// (기존대로 유지)
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 
+// localRankRouter는 필요 시 추후 경로 확정 후 연결
+// app.use("/api/localrank", localRankRouter);
+
 // ------------------------------------------------------------
-// 6. 정적 파일 (public2)
+// 8. 정적 파일 (public2)
 // ------------------------------------------------------------
 app.use(
   express.static(path.join(__dirname, "public2"), {
@@ -252,43 +289,47 @@ app.use(
 );
 
 // ------------------------------------------------------------
-// 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
+// 9. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
 // ------------------------------------------------------------
 app.use("/uploads", express.static(UPLOAD_ROOT));
 
 // ------------------------------------------------------------
-// 8. 헬스체크
+// 10. 헬스체크
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
 
-
 // ------------------------------------------------------------
-// 9. 에러 핸들러
+// 11. 에러 핸들러
 // ------------------------------------------------------------
 app.use((err, req, res, next) => {
   console.error("[error]", req.id, err);
 
-  if (err.code === "LIMIT_FILE_SIZE")
+  if (err.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({ ok: false, error: "file_too_large" });
+  }
 
-  if (/Unexpected field/.test(err.message))
+  if (/Unexpected field/.test(err.message)) {
     return res.status(400).json({ ok: false, error: "upload_field_error" });
+  }
 
-  res.status(500).json({ ok: false, error: "internal", message: err.message });
+  res
+    .status(500)
+    .json({ ok: false, error: "internal", message: err.message || "error" });
 });
 
 // ------------------------------------------------------------
-// 10. 404 핸들러
+// 12. 404 핸들러
 // ------------------------------------------------------------
 app.use((req, res) => {
-  if (/^(\/store|\/combined|\/api)/.test(req.path))
+  if (/^(\/store|\/combined|\/api)/.test(req.path)) {
     return res.status(404).json({ ok: false, error: "not_found" });
+  }
 
   res.status(404).send("<h1>Not Found</h1>");
 });
 
 // ------------------------------------------------------------
-// 11. 서버 실행
+// 13. 서버 실행
 // ------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
