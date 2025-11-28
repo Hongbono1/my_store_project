@@ -1,3 +1,4 @@
+// routes/ncombinedregister.js
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
@@ -8,7 +9,8 @@ const router = Router();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), "public/uploads")); // 저장 경로
+    // ✅ 서버의 UPLOAD_ROOT(/data/uploads)와 맞추기
+    cb(null, "/data/uploads");
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname); // 원본 확장자 추출 (.jpg, .png)
@@ -19,7 +21,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// [POST] /combined
+// [POST] /combined/store
 router.post(
   "/store",
   upload.fields([

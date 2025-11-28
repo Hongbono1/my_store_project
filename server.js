@@ -167,9 +167,19 @@ app.use(express.urlencoded({ extended: true }));
 // ------------------------------------------------------------
 app.post("/verify-biz", async (req, res) => {
   try {
-    const { bizNo } = req.body;
+    // 👉 두 형태 모두 지원: { bizNo } 또는 { b_no: ["1234567890"] }
+    const { bizNo, b_no } = req.body || {};
 
-    if (!bizNo) {
+    let rawBizNo = bizNo;
+    if (!rawBizNo) {
+      if (Array.isArray(b_no) && b_no.length > 0) {
+        rawBizNo = b_no[0];
+      } else if (typeof b_no === "string") {
+        rawBizNo = b_no;
+      }
+    }
+
+    if (!rawBizNo) {
       return res.status(400).json({
         ok: false,
         message: "사업자등록번호가 없습니다."
@@ -185,7 +195,7 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    const cleanBizNo = bizNo.replace(/-/g, "");
+    const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
 
     const API_URL =
       `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
@@ -207,9 +217,10 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
+    // ✅ 프론트에서 d.data[0] 접근할 수 있게 배열 그대로 내려줌
     return res.json({
       ok: true,
-      data: data.data[0]
+      data: data.data
     });
 
   } catch (err) {
@@ -220,6 +231,7 @@ app.post("/verify-biz", async (req, res) => {
     });
   }
 });
+
 
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
