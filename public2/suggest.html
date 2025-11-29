@@ -141,6 +141,56 @@
         </div>
     </section>
 
+    <!-- ⏰ 자동으로 넘어가는 롤링 광고 박스 (Top4 바로 아래) -->
+    <section class="max-w-6xl mx-auto mb-16 px-5 sm:px-8">
+        <div
+            class="relative bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200 shadow-[8px_8px_20px_rgba(0,0,0,0.08),-8px_-8px_20px_rgba(255,255,255,0.9)] p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6">
+            <!-- 광고 이미지 / 썸네일 -->
+            <div
+                class="w-full sm:w-1/3 rounded-2xl overflow-hidden border border-gray-200 shadow-[4px_4px_12px_rgba(0,0,0,0.08)]">
+                <img id="rollingAdImage" src="https://placehold.co/600x400?text=AD" alt="광고 이미지"
+                    class="w-full h-48 sm:h-56 object-cover" />
+            </div>
+
+            <!-- 텍스트/정보 영역 -->
+            <div class="w-full sm:w-2/3 text-center sm:text-center">
+                <p class="text-xs font-semibold text-indigo-500 mb-2" id="rollingAdTag">
+                    HOT PLACE
+                </p>
+                <h3 id="rollingAdTitle" class="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">
+                    롤링 광고 제목
+                </h3>
+                <p id="rollingAdDesc" class="text-sm sm:text-base text-gray-600 leading-relaxed mb-4">
+                    이 영역에는 가게 설명, 이벤트 내용, 오늘의 추천 문구 등을 짧게 보여줍니다.
+                </p>
+
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <span id="rollingAdBadge"
+                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
+                        오늘의 추천
+                    </span>
+
+                    <a id="rollingAdLink" href="#"
+                        class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow hover:from-blue-600 hover:to-indigo-600 transition">
+                        자세히 보러가기 →
+                    </a>
+                </div>
+
+                <!-- 작은 점 네비게이션 -->
+                <div class="flex items-center justify-center gap-2 mt-5">
+                    <button id="rollingPrev"
+                        class="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 text-xs hover:bg-gray-100">
+                        ‹
+                    </button>
+                    <div class="flex gap-2" id="rollingDots"></div>
+                    <button id="rollingNext"
+                        class="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 text-xs hover:bg-gray-100">
+                        ›
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- 😋 기분/상황별 추천 -->
     <section class="max-w-6xl mx-auto px-5 sm:px-8 py-10">
@@ -337,7 +387,6 @@
                 const storeName = item.store_name || "가게 정보 없음";
                 const menuName = item.name || "메뉴명 없음";
                 const img = item.image_url || "/uploads/default.jpg";
-                // ✅ ndetail + type=food
                 const detailUrl = `/ndetail.html?id=${item.store_id}&type=food`;
 
                 const card = document.createElement("a");
@@ -424,12 +473,196 @@
             });
         }
 
-        // 페이지 로드시: Top4 로드 + "전체" 자동 클릭
+        /* =========================
+           ⏰ 롤링 광고 데이터 정의
+           ========================= */
+        const rollingAds = [
+            {
+                tag: "🔥 많이 찾아본 가게",
+                title: "요즘 가장 많이 조회된 동네 핫플",
+                desc: "최근 일주일 동안 우리동네에서 가장 많이 찾아본 가게입니다. 호기심 폭발, 관심 집중!",
+                badge: "많이 찾아본 가게",
+                image: "https://placehold.co/600x400?text=Hot+Search",
+                link: "/ndetail.html?id=1&type=food",
+            },
+            {
+                tag: "⭐ 많이 찜한 가게",
+                title: "찜이 폭발하는 인기 맛집",
+                desc: "북마크가 가장 많이 쌓인 우리동네 대표 맛집이에요. 단골들이 인정한 바로 그 집!",
+                badge: "많이 찜한 가게",
+                image: "https://placehold.co/600x400?text=Hot+Bookmark",
+                link: "/ndetail.html?id=2&type=food",
+            },
+            {
+                tag: "🌟 오늘의 추천 가게",
+                title: "오늘만 이런 분위기, 오늘의 추천",
+                desc: "데이트, 혼밥, 가족모임까지 오늘 같은 날 딱 어울리는 가게를 골라서 추천합니다.",
+                badge: "오늘의 추천",
+                image: "https://placehold.co/600x400?text=Today+Pick",
+                link: "/ndetail.html?id=3&type=food",
+            },
+            {
+                tag: "📈 주목받는 가게",
+                title: "요즘 갑자기 뜨는 급상승 핫플",
+                desc: "최근 클릭과 검색이 확 늘어난 가게입니다. 사람들이 요즘 자주 이야기하는 바로 그 곳!",
+                badge: "주목받는 가게",
+                image: "https://placehold.co/600x400?text=Rising+Star",
+                link: "/ndetail.html?id=4&type=food",
+            },
+            {
+                tag: "🍽️ 맛집 베스트",
+                title: "우리동네 맛집 TOP",
+                desc: "리뷰와 평점이 가장 높은 동네 맛집! 맛으로 증명된 곳만 모았습니다.",
+                badge: "맛집 베스트",
+                image: "https://placehold.co/600x400?text=Best+Restaurant",
+                link: "/ndetail.html?id=5&type=food",
+            },
+            {
+                tag: "☕ 카페 핫플",
+                title: "분위기 끝내주는 동네 카페",
+                desc: "인스타 감성 가득! 사진 찍기 좋은 우리동네 카페를 소개합니다.",
+                badge: "카페 핫플",
+                image: "https://placehold.co/600x400?text=Cafe+Hotplace",
+                link: "/ndetail.html?id=6&type=food",
+            },
+            {
+                tag: "🛍️ 쇼핑 명소",
+                title: "숨은 쇼핑 명소 발견",
+                desc: "알뜰하게 쇼핑하고 싶다면? 우리동네 숨은 쇼핑 명소를 확인하세요!",
+                badge: "쇼핑 명소",
+                image: "https://placehold.co/600x400?text=Shopping+Spot",
+                link: "/ndetail.html?id=7&type=food",
+            },
+            {
+                tag: "🎉 이벤트 진행중",
+                title: "지금 이벤트 하는 가게",
+                desc: "할인, 1+1, 사은품 증정! 지금 이벤트 중인 가게를 놓치지 마세요.",
+                badge: "이벤트 진행중",
+                image: "https://placehold.co/600x400?text=Event+Now",
+                link: "/ndetail.html?id=8&type=food",
+            },
+            {
+                tag: "🆕 신규 오픈",
+                title: "새로 오픈한 따끈따끈 신상",
+                desc: "우리동네에 새로 오픈한 가게! 남들보다 먼저 방문해보세요.",
+                badge: "신규 오픈",
+                image: "https://placehold.co/600x400?text=New+Open",
+                link: "/ndetail.html?id=9&type=food",
+            },
+            {
+                tag: "👨‍👩‍👧‍👦 가족 추천",
+                title: "온 가족이 함께하기 좋은 곳",
+                desc: "아이들과 함께, 부모님과 함께! 가족 모임에 딱 맞는 장소입니다.",
+                badge: "가족 추천",
+                image: "https://placehold.co/600x400?text=Family+Pick",
+                link: "/ndetail.html?id=10&type=food",
+            },
+            {
+                tag: "💑 데이트 코스",
+                title: "연인과 함께하는 데이트 명소",
+                desc: "로맨틱한 분위기, 맛있는 음식! 데이트하기 좋은 곳을 추천합니다.",
+                badge: "데이트 코스",
+                image: "https://placehold.co/600x400?text=Date+Course",
+                link: "/ndetail.html?id=11&type=food",
+            },
+            {
+                tag: "🌙 야간 핫플",
+                title: "밤에 더 빛나는 야간 명소",
+                desc: "저녁 이후에 가기 좋은 곳! 야경과 함께 즐기는 우리동네 야간 핫플.",
+                badge: "야간 핫플",
+                image: "https://placehold.co/600x400?text=Night+Spot",
+                link: "/ndetail.html?id=12&type=food",
+            },
+        ];
+
+        function setupRollingAds() {
+            const imgEl = document.getElementById("rollingAdImage");
+            const tagEl = document.getElementById("rollingAdTag");
+            const titleEl = document.getElementById("rollingAdTitle");
+            const descEl = document.getElementById("rollingAdDesc");
+            const badgeEl = document.getElementById("rollingAdBadge");
+            const linkEl = document.getElementById("rollingAdLink");
+            const dotsContainer = document.getElementById("rollingDots");
+            const prevBtn = document.getElementById("rollingPrev");
+            const nextBtn = document.getElementById("rollingNext");
+
+            if (!imgEl || !tagEl || !titleEl || !descEl || !badgeEl || !linkEl || !dotsContainer) {
+                console.warn("Rolling ad elements not found. Skipping setup.");
+                return;
+            }
+
+            let current = 0;
+            let timer = null;
+
+            // 점 렌더링
+            dotsContainer.innerHTML = "";
+            rollingAds.forEach((_, idx) => {
+                const dot = document.createElement("button");
+                dot.className = "w-2.5 h-2.5 rounded-full border border-gray-300 transition-all";
+                dot.dataset.index = idx;
+                dot.addEventListener("click", () => {
+                    current = idx;
+                    render();
+                    restartTimer();
+                });
+                dotsContainer.appendChild(dot);
+            });
+
+            function render() {
+                const ad = rollingAds[current];
+                imgEl.src = ad.image;
+                imgEl.alt = ad.title;
+                tagEl.textContent = ad.tag;
+                titleEl.textContent = ad.title;
+                descEl.textContent = ad.desc;
+                badgeEl.textContent = ad.badge;
+                linkEl.href = ad.link || "#";
+
+                // 점 상태 업데이트
+                const dots = dotsContainer.querySelectorAll("button");
+                dots.forEach((dot, idx) => {
+                    if (idx === current) {
+                        dot.classList.add("bg-gray-800");
+                        dot.classList.remove("bg-gray-200");
+                    } else {
+                        dot.classList.add("bg-gray-200");
+                        dot.classList.remove("bg-gray-800");
+                    }
+                });
+            }
+
+            function next() {
+                current = (current + 1) % rollingAds.length;
+                render();
+            }
+
+            function prev() {
+                current = (current - 1 + rollingAds.length) % rollingAds.length;
+                render();
+            }
+
+            function restartTimer() {
+                if (timer) clearInterval(timer);
+                timer = setInterval(next, 8000); // 8초마다 자동 변경
+            }
+
+            // 버튼 이벤트
+            if (prevBtn) prevBtn.addEventListener("click", () => { prev(); restartTimer(); });
+            if (nextBtn) nextBtn.addEventListener("click", () => { next(); restartTimer(); });
+
+            // 초기 렌더 + 타이머 시작
+            render();
+            restartTimer();
+        }
+
+        // 페이지 로드시: Top4 로드 + 롤링 광고 + "전체" 자동 클릭
         document.addEventListener("DOMContentLoaded", () => {
             loadTop4();
 
             const allBtn = document.querySelector('.mood-btn[data-mood="전체"]');
             if (allBtn) allBtn.click();
+
+            setupRollingAds();
         });
 
         // ✅ 네비게이션 버튼
