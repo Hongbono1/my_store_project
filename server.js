@@ -45,6 +45,8 @@ import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
+import hotRouter from "./routes/hotRouter.js";
+
 
 
 import pool from "./db.js";
@@ -273,6 +275,7 @@ app.use("/combined", ncombinedregister);
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
+app.use("/api/hot", hotRouter);
 
 
 // ------------------------------------------------------------

@@ -299,6 +299,7 @@
   <div id="footer"></div>
 
   <script>
+    // 헤더/푸터 불러오기
     fetch('components/header.html')
       .then(r => r.text())
       .then(d => { document.getElementById('header').innerHTML = d; });
@@ -306,6 +307,50 @@
     fetch('components/footer.html')
       .then(r => r.text())
       .then(d => { document.getElementById('footer').innerHTML = d; });
+
+    // 🔥 핫 랭킹용 공통 렌더 함수
+    function renderHotList(containerId, list = []) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
+      el.innerHTML = "";
+
+      if (!list.length) {
+        el.innerHTML = `<li class="text-xs text-gray-400">데이터 없음</li>`;
+        return;
+      }
+
+      list.forEach((item, idx) => {
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between gap-2 text-sm";
+
+        li.innerHTML = `
+        <span class="text-xs text-gray-400 w-5">${idx + 1}.</span>
+        <span class="flex-1 truncate">${item.business_name}</span>
+        <span class="text-[11px] text-gray-500 whitespace-nowrap">#${item.business_category || ""}</span>
+      `;
+        el.appendChild(li);
+      });
+    }
+
+    // 🔥 /api/hot/summary → 4개 박스 채우기
+    async function loadHotSummary() {
+      try {
+        const res = await fetch("/api/hot/summary");
+        if (!res.ok) throw new Error("summary fetch failed");
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "invalid response");
+
+        // ⬇️ hotController에서 내려주는 이름과 매핑
+        renderHotList("popular-list", data.mostViewed);        // 클릭 1~5위
+        renderHotList("bookmark-list", data.mostBookmarked);   // 북마크 1~5위
+        renderHotList("recommend-list", data.todayPick);       // 클릭 6~10위
+        renderHotList("trend-list", data.rising);              // 클릭 11~15위
+      } catch (err) {
+        console.error("HOT SUMMARY LOAD ERROR:", err);
+      }
+    }
 
     document.addEventListener("DOMContentLoaded", async () => {
       let index = 0;
@@ -330,19 +375,19 @@
         clearInterval(interval);
       }
 
-      // ✅ 광고 불러오기
+      // ✅ 파워 광고 불러오기
       async function loadPowerAds() {
         try {
           const res = await fetch("/api/ads/power");
           const ads = await res.json();
 
           slider.innerHTML = ads.map(ad => `
-        <a href="${ad.link}" class="flex-shrink-0 w-full h-64">
-          <img src="${ad.image_url}" 
-               alt="${ad.title}" 
-               class="w-full h-full object-cover cursor-pointer hover:scale-105 transition">
-        </a>
-      `).join("");
+          <a href="${ad.link}" class="flex-shrink-0 w-full h-64">
+            <img src="${ad.image_url}" 
+                 alt="${ad.title}" 
+                 class="w-full h-full object-cover cursor-pointer hover:scale-105 transition">
+          </a>
+        `).join("");
 
           showSlide(0);
           startAutoSlide();
@@ -351,45 +396,31 @@
         }
       }
 
-      // ✅ 추천 가게 불러오기
+      // ✅ 추천 가게 불러오기 (기존 코드 유지)
       async function loadRecommendations() {
         try {
           const res = await fetch("/api/recommend");
           const data = await res.json();
           const list = document.getElementById("recommend-list");
-          list.innerHTML = "";
+          if (!list) return;
 
-          data.recommendations.slice(0, 5).forEach((store, idx) => {
-            const li = document.createElement("li");
-            li.innerHTML = `
-          ${idx + 1}.
-          <a href="detail.html?id=${store.id}" 
-             class="text-blue-600 hover:underline font-medium">
-            ${store.name}
-          </a> – ${store.category}
-        `;
-            list.appendChild(li);
-          });
+          // /api/hot/summary로 오늘의 추천 가게가 이미 채워지는 구조면,
+          // 이 부분은 나중에 분리하거나 다른 섹션으로 옮겨도 됨.
+          console.log("기존 /api/recommend 응답:", data);
         } catch (err) {
           console.error("추천 가게 불러오기 실패:", err);
         }
       }
 
-      // ✅ 랜덤 블로그 불러오기
+      // ✅ 랜덤 블로그 불러오기 (현재 hot.html 구조에서는 사용 안 할 수도 있음)
       async function loadRandomBlog() {
         try {
           const res = await fetch("/api/random-hotblog");
           const data = await res.json();
-          const linkEl = document.getElementById("randomBlogLink");
-          if (data.ok && data.blog) {
-            linkEl.href = `hotblogdetail.html?id=${data.blog.id}`;
-            linkEl.innerText = data.blog.title || "블로그에서 보기";
-          } else {
-            linkEl.innerText = "추천 글 없음";
-          }
+          console.log("랜덤 핫블로그 응답:", data);
+          // 필요하면 나중에 id="randomBlogLink" 같은 엘리먼트를 추가해서 연결
         } catch (e) {
           console.error("랜덤 추천 로드 실패:", e);
-          document.getElementById("randomBlogLink").innerText = "불러오기 실패";
         }
       }
 
@@ -405,17 +436,18 @@
         startAutoSlide();
       });
 
-      // 초기 실행
-      await loadPowerAds();
-      await loadRecommendations();
-      await loadRandomBlog();
+      // 🔽 실행 순서
+      await loadHotSummary();      // 1) 핫 랭킹 4박스 채우기
+      await loadPowerAds();        // 2) 파워 광고
+      await loadRecommendations(); // 3) 기존 추천 API (필요시)
+      await loadRandomBlog();      // 4) 랜덤 핫블로그 (나중 확장용)
     });
 
     // ✅ 네비게이션 버튼
     function goBack() { window.history.back(); }
     function goNext() { window.history.forward(); }
-
   </script>
+
 
 </body>
 
