@@ -8,7 +8,6 @@
     <meta name="color-scheme" content="light" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Apple / Pinterest 감성: 여백 넓게, 라운딩 부드럽게, 섀도우는 아주 은은하게 */
         :root {
             --card-r: 22px;
             --shadow-soft: 0 10px 30px rgba(0, 0, 0, .06);
@@ -70,13 +69,11 @@
             color: transparent;
         }
 
-        /* 슬라이더 아이템 폭 고정 + 부드러운 이동 */
         .slider-item {
             min-width: 240px;
             max-width: 240px;
         }
 
-        /* Pinterest 느낌의 masonry (옵션): 큰 레이아웃엔 grid 유지 */
         @media (min-width:1024px) {
             .masonry {
                 column-count: 2;
@@ -134,53 +131,20 @@
             <button class="mood-btn btn-3d btn-white" data-mood="비 오는 날">비 오는 날</button>
             <button class="mood-btn btn-3d btn-white" data-mood="혼밥할 때">혼밥할 때</button>
         </div>
+
+        <!-- 광고 카드 그리드 -->
+        <div id="mood-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 max-w-screen-xl mx-auto px-5 sm:px-8">
+        </div>
+
+        <!-- 페이지네이션 버튼 -->
+        <div class="flex justify-center gap-3 sm:gap-4 mt-8">
+            <button id="prevPage"
+                class="px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">이전</button>
+            <span id="pageInfo" class="px-4 py-2 text-gray-600"></span>
+            <button id="nextPage"
+                class="px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">다음</button>
+        </div>
     </section>
-
-    <!-- 광고 카드 8개 (샘플) -->
-    <div id="mood-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-        <!-- 기존 정적 카드 8개는 유지 + 동적 렌더링으로 대체 표시 -->
-        <!-- 요청: "코드 빼지 말고" 이므로, 아래 정적 8개는 주석처리 대신 JS 렌더로 동일한 형태 생성 -->
-    </div>
-    </section>
-
-    <!-- 슬라이드 영역 -->
-    <div class="relative w-full max-w-screen-lg mx-auto mb-16 px-5 sm:px-0">
-        <button id="prevBtn"
-            class="absolute -left-6 sm:-left-12 top-1/2 -translate-y-1/2 bg-gray-900/80 text-white p-3 rounded-full shadow-lg hover:bg-black transition"
-            aria-label="이전">&lt;</button>
-        <section class="overflow-hidden card px-5 sm:px-6 py-6 sm:py-8">
-            <div id="suggest-slider" class="flex gap-4 sm:gap-6 transition-transform duration-500 h-56 items-center">
-                <!-- JS에서 슬라이드 카드 삽입 -->
-            </div>
-        </section>
-        <button id="nextBtn"
-            class="absolute -right-6 sm:-right-12 top-1/2 -translate-y-1/2 bg-gray-900/80 text-white p-3 rounded-full shadow-lg hover:bg-black transition"
-            aria-label="다음">&gt;</button>
-    </div>
-
-    <!-- 🔥 홍보의 추천 박스 -->
-    <div class="max-w-screen-xl mx-auto px-5 sm:px-8">
-        <section class="card p-6 sm:p-8 mb-16">
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-center text-gray-900 mb-8">홍보의 추천</h2>
-            <div id="suggest-boxes" class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-                <!-- JS에서 광고 박스 생성 -->
-            </div>
-        </section>
-    </div>
-
-    <!-- (원본에 있었던) 우측 버튼 — ID 중복을 피하기 위해 nextBtn2로 변경만 함 -->
-    <button id="nextBtn2"
-        class="hidden absolute -right-12 top-1/2 -translate-y-1/2 bg-gray-800/70 text-white p-3 rounded-full shadow-lg hover:bg-gray-900/90 transition">
-        &gt;
-    </button>
-
-    <!-- 페이지네이션 버튼 -->
-    <div class="flex justify-center gap-3 sm:gap-4 mt-6">
-        <button id="prevPage"
-            class="px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition">이전</button>
-        <button id="nextPage"
-            class="px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition">다음</button>
-    </div>
 
     <!-- 우측 하단 고정 네비 -->
     <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
@@ -213,70 +177,145 @@
             .then(r => r.text()).then(d => document.getElementById('footer').innerHTML = d);
 
         // ==========================
-        // 😋 오늘 기분/상황별 추천
+        // 😋 오늘 기분/상황별 추천 + 페이지네이션
         // ==========================
         const buttons = document.querySelectorAll(".mood-btn");
         const container = document.getElementById("mood-grid");
+        const prevPageBtn = document.getElementById("prevPage");
+        const nextPageBtn = document.getElementById("nextPage");
+        const pageInfoEl = document.getElementById("pageInfo");
 
+        const PAGE_SIZE = 12;      // 👉 한 페이지에 12개
+        let currentPage = 1;       // 현재 페이지
+        let currentData = [];      // 현재 mood 결과 전체
+
+        // 카드 렌더링 함수 (현재 페이지 기준으로 자르기)
+        function renderPage() {
+            container.innerHTML = "";
+
+            // 데이터 없으면 메시지
+            if (!currentData || currentData.length === 0) {
+                container.innerHTML = `
+                    <p class="text-gray-400 text-center py-10 col-span-full">추천 결과가 없습니다.</p>
+                `;
+                if (prevPageBtn) prevPageBtn.disabled = true;
+                if (nextPageBtn) nextPageBtn.disabled = true;
+                if (pageInfoEl) pageInfoEl.textContent = "";
+                return;
+            }
+
+            const totalPages = Math.max(1, Math.ceil(currentData.length / PAGE_SIZE));
+            if (currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const end = start + PAGE_SIZE;
+            const slice = currentData.slice(start, end);
+
+            slice.forEach(item => {
+                const storeName = item.store_name || "가게 정보 없음";
+                const menuName = item.name || "메뉴명 없음";
+                const img = item.image_url || "/uploads/default.jpg";
+                const detailUrl = `/detail.html?id=${item.store_id}`;
+
+                const card = document.createElement("div");
+                card.className = "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition";
+
+                card.innerHTML = `
+                    <img src="${img}" alt="${menuName}" class="w-full h-48 object-cover">
+                    <div class="p-4 flex flex-col items-center text-center">
+                        <h3 class="text-lg font-semibold mb-2">${menuName}</h3>
+                        <p class="text-gray-700 text-base font-medium mb-4">${storeName}</p>
+                        <button 
+                            onclick="window.location.href='${detailUrl}'"
+                            class="inline-block text-center bg-blue-500 text-white text-base font-semibold px-5 py-2 rounded-lg hover:bg-blue-600 transition">
+                            바로가기
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            // 페이지 정보 표시
+            if (pageInfoEl) pageInfoEl.textContent = `${currentPage} / ${totalPages}`;
+
+            // 페이지 버튼 활성/비활성
+            if (prevPageBtn) prevPageBtn.disabled = (currentPage <= 1);
+            if (nextPageBtn) nextPageBtn.disabled = (currentPage >= totalPages);
+        }
+
+        // mood에 따라 서버에서 데이터 가져오기
+        async function loadMood(moodText) {
+            // active 스타일
+            buttons.forEach(b => b.classList.remove("active"));
+            const clicked = Array.from(buttons).find(b => b.dataset.mood === moodText);
+            if (clicked) clicked.classList.add("active");
+
+            // URL 만들기
+            let url = "/api/suggest";
+            if (moodText && moodText !== "전체") {
+                url += `?mood=${encodeURIComponent(moodText)}`;
+            }
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                console.log("🎯 mood 결과:", data);
+                if (data.ok && Array.isArray(data.data)) {
+                    currentData = data.data;
+                    currentPage = 1;
+                    renderPage();
+                } else {
+                    currentData = [];
+                    currentPage = 1;
+                    renderPage();
+                }
+            } catch (err) {
+                console.error("❌ mood fetch 오류:", err);
+                currentData = [];
+                currentPage = 1;
+                renderPage();
+            }
+        }
+
+        // mood 버튼 클릭 이벤트
         buttons.forEach(btn => {
-            btn.addEventListener("click", async () => {
+            btn.addEventListener("click", () => {
                 const mood = btn.dataset.mood;
-
-                // 🔹 버튼 active 스타일 (선택된 것 표시)
-                buttons.forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-
-                // 🔹 전체는 쿼리 없이, 나머지는 ?mood= 붙여서
-                let url = "/api/suggest";
-                if (mood !== "전체") {
-                    url += `?mood=${encodeURIComponent(mood)}`;
-                }
-
-                try {
-                    const res = await fetch(url);
-                    const data = await res.json();
-
-                    console.log("🎯 mood 결과:", data);
-                    container.innerHTML = ""; // 초기화
-
-                    if (data.ok && data.data.length > 0) {
-                        data.data.forEach(item => {
-                            const storeName = item.store_name || "가게 정보 없음";
-                            const menuName = item.name || "메뉴명 없음";
-                            const img = item.image_url || "/uploads/default.jpg";
-                            const detailUrl = `/detail.html?id=${item.store_id}`;
-
-                            const card = document.createElement("div");
-                            card.className = "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition w-72 mx-auto";
-
-                            card.innerHTML = `
-                                <img src="${img}" alt="${menuName}" class="w-full h-48 object-cover">
-                                <div class="p-4 flex flex-col items-center text-center">
-                                    <h3 class="text-lg font-semibold mb-2">${menuName}</h3>
-                                    <p class="text-gray-700 text-base font-medium mb-4">${storeName}</p>
-                                    <button 
-                                        onclick="window.location.href='${detailUrl}'"
-                                        class="inline-block text-center bg-blue-500 text-white text-base font-semibold px-5 py-2 rounded-lg hover:bg-blue-600 transition">
-                                        바로가기
-                                    </button>
-                                </div>
-                            `;
-                            container.appendChild(card);
-                        });
-                    } else {
-                        container.innerHTML = `<p class="text-gray-400 text-center py-10">추천 결과가 없습니다.</p>`;
-                    }
-                } catch (err) {
-                    console.error("❌ mood fetch 오류:", err);
-                    container.innerHTML = `<p class="text-gray-400 text-center py-10">데이터를 불러오는 중 오류가 발생했습니다.</p>`;
-                }
+                loadMood(mood);
             });
         });
+
+        // 페이지 버튼 이벤트
+        if (prevPageBtn) {
+            prevPageBtn.addEventListener("click", () => {
+                if (currentPage > 1) {
+                    currentPage -= 1;
+                    renderPage();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+        }
+
+        if (nextPageBtn) {
+            nextPageBtn.addEventListener("click", () => {
+                const totalPages = Math.max(1, Math.ceil((currentData?.length || 0) / PAGE_SIZE));
+                if (currentPage < totalPages) {
+                    currentPage += 1;
+                    renderPage();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+        }
 
         // 페이지 로드시 "전체" 자동 클릭
         document.addEventListener("DOMContentLoaded", () => {
             const allBtn = document.querySelector('.mood-btn[data-mood="전체"]');
-            if (allBtn) allBtn.click();
+            if (allBtn) {
+                allBtn.click();
+            }
         });
 
         // ✅ 네비게이션 버튼
