@@ -360,6 +360,36 @@
         function goBack() { window.history.back(); }
         function goNext() { window.history.forward(); }
 
+        async function loadTop4FromApi() {
+            try {
+                const res = await fetch("/api/hotplace/top4");
+                if (!res.ok) throw new Error("TOP4 fetch failed");
+                const data = await res.json();
+                renderTop4(data);     // ✅ 실제 데이터로 Top4 렌더링
+            } catch (e) {
+                console.error("TOP4 ERROR:", e);
+                renderTop4([]);       // 실패 시 placeholder 4개
+            }
+        }
+
+        // ✅ 기존 DOMContentLoaded 통합/수정
+        document.addEventListener("DOMContentLoaded", async () => {
+            // ① 우리가게 자랑 전체 리스트 한번만 가져오기
+            const prideList = await safeFetch("/storepride/list");
+
+            // ② 트윈테일(2장씩) 박스
+            renderAdBoxes("hotNeighborhoodBoxes", prideList);
+
+            // ③ 추천 가게 카드 영역 (지금은 빈 배열, 나중에 기준 만들면 변경)
+            renderAds("recommendedStoreContainer", []);
+
+            // ④ 슬라이드(필요 개수만 골라서)
+            renderSliderAds(prideList);
+
+            // ⑤ Top4 Hot Place 실제 데이터로 채우기
+            await loadTop4FromApi();
+        });
+
 
     </script>
 

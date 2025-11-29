@@ -44,6 +44,8 @@ import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
+import hotplaceRouter from "./routes/hotplaceRouter.js";
+
 
 import pool from "./db.js";
 
@@ -270,6 +272,8 @@ app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
+app.use("/api/hotplace", hotplaceRouter);
+
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
