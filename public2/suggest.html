@@ -177,6 +177,69 @@
             .then(r => r.text()).then(d => document.getElementById('footer').innerHTML = d);
 
         // ==========================
+        // 🏆 오늘의 Top 4 (클릭 수 기준)
+        // ==========================
+        async function loadTop4() {
+            const top4Container = document.getElementById("suggest-top4");
+            if (!top4Container) return;
+
+            try {
+                const res = await fetch("/api/suggest/top4");
+                const json = await res.json();
+
+                console.log("🏆 Top4 응답:", json);
+
+                top4Container.innerHTML = "";
+
+                if (!json.ok || !Array.isArray(json.data) || json.data.length === 0) {
+                    top4Container.innerHTML = `
+                        <p class="text-gray-400 text-center col-span-4 py-10">
+                            아직 Top4 메뉴가 없습니다.
+                        </p>
+                    `;
+                    return;
+                }
+
+                json.data.forEach((item, idx) => {
+                    const menuName = item.name || "메뉴명 없음";
+                    const storeName = item.store_name || "가게 정보 없음";
+                    const img = item.image_url || "/uploads/default.jpg";
+                    const detailUrl = `/detail.html?id=${item.store_id}`;
+                    const rank = idx + 1;
+
+                    const card = document.createElement("a");
+                    card.href = detailUrl;
+                    card.className =
+                        "card block overflow-hidden hover:shadow-xl transition-transform hover:-translate-y-1";
+
+                    card.innerHTML = `
+                        <div class="relative">
+                            <img src="${img}" alt="${menuName}" class="w-full h-40 object-cover">
+                            <span class="absolute left-3 top-3 inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-black/70 text-white">
+                                ${rank}위
+                            </span>
+                        </div>
+                        <div class="p-4 text-center">
+                            <h3 class="text-lg sm:text-xl font-bold mb-1">${menuName}</h3>
+                            <p class="text-sm sm:text-base text-gray-600">${storeName}</p>
+                        </div>
+                    `;
+                    top4Container.appendChild(card);
+                });
+            } catch (err) {
+                console.error("❌ Top4 로드 오류:", err);
+                const top4Container = document.getElementById("suggest-top4");
+                if (top4Container) {
+                    top4Container.innerHTML = `
+                        <p class="text-gray-400 text-center col-span-4 py-10">
+                            Top4 정보를 불러오는 중 오류가 발생했습니다.
+                        </p>
+                    `;
+                }
+            }
+        }
+
+        // ==========================
         // 😋 오늘 기분/상황별 추천 + 페이지네이션
         // ==========================
         const buttons = document.querySelectorAll(".mood-btn");
@@ -185,15 +248,13 @@
         const nextPageBtn = document.getElementById("nextPage");
         const pageInfoEl = document.getElementById("pageInfo");
 
-        const PAGE_SIZE = 12;      // 👉 한 페이지에 12개
-        let currentPage = 1;       // 현재 페이지
-        let currentData = [];      // 현재 mood 결과 전체
+        const PAGE_SIZE = 12;
+        let currentPage = 1;
+        let currentData = [];
 
-        // 카드 렌더링 함수 (현재 페이지 기준으로 자르기)
         function renderPage() {
             container.innerHTML = "";
 
-            // 데이터 없으면 메시지
             if (!currentData || currentData.length === 0) {
                 container.innerHTML = `
                     <p class="text-gray-400 text-center py-10 col-span-full">추천 결과가 없습니다.</p>
@@ -205,9 +266,7 @@
             }
 
             const totalPages = Math.max(1, Math.ceil(currentData.length / PAGE_SIZE));
-            if (currentPage > totalPages) {
-                currentPage = totalPages;
-            }
+            if (currentPage > totalPages) currentPage = totalPages;
 
             const start = (currentPage - 1) * PAGE_SIZE;
             const end = start + PAGE_SIZE;
@@ -220,7 +279,8 @@
                 const detailUrl = `/detail.html?id=${item.store_id}`;
 
                 const card = document.createElement("div");
-                card.className = "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition";
+                card.className =
+                    "bg-white rounded-xl shadow-md overflow-hidden hover:scale-105 transition";
 
                 card.innerHTML = `
                     <img src="${img}" alt="${menuName}" class="w-full h-48 object-cover">
@@ -237,22 +297,16 @@
                 container.appendChild(card);
             });
 
-            // 페이지 정보 표시
             if (pageInfoEl) pageInfoEl.textContent = `${currentPage} / ${totalPages}`;
-
-            // 페이지 버튼 활성/비활성
             if (prevPageBtn) prevPageBtn.disabled = (currentPage <= 1);
             if (nextPageBtn) nextPageBtn.disabled = (currentPage >= totalPages);
         }
 
-        // mood에 따라 서버에서 데이터 가져오기
         async function loadMood(moodText) {
-            // active 스타일
             buttons.forEach(b => b.classList.remove("active"));
             const clicked = Array.from(buttons).find(b => b.dataset.mood === moodText);
             if (clicked) clicked.classList.add("active");
 
-            // URL 만들기
             let url = "/api/suggest";
             if (moodText && moodText !== "전체") {
                 url += `?mood=${encodeURIComponent(moodText)}`;
@@ -280,7 +334,6 @@
             }
         }
 
-        // mood 버튼 클릭 이벤트
         buttons.forEach(btn => {
             btn.addEventListener("click", () => {
                 const mood = btn.dataset.mood;
@@ -288,7 +341,6 @@
             });
         });
 
-        // 페이지 버튼 이벤트
         if (prevPageBtn) {
             prevPageBtn.addEventListener("click", () => {
                 if (currentPage > 1) {
@@ -310,12 +362,12 @@
             });
         }
 
-        // 페이지 로드시 "전체" 자동 클릭
+        // 페이지 로드시: Top4 로드 + "전체" 자동 클릭
         document.addEventListener("DOMContentLoaded", () => {
+            loadTop4();
+
             const allBtn = document.querySelector('.mood-btn[data-mood="전체"]');
-            if (allBtn) {
-                allBtn.click();
-            }
+            if (allBtn) allBtn.click();
         });
 
         // ✅ 네비게이션 버튼

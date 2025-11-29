@@ -10,14 +10,29 @@ const router = express.Router();
  *  - 응답: { ok: true, data: [ { id, store_id, name, image_url, theme, store_name } ] }
  */
 router.get("/", async (req, res) => {
-  let { mood } = req.query;
-  mood = (mood || "").toString().trim();
-
-  console.log("🧩 [/api/suggest] 요청받은 mood:", mood || "(전체)");
-
   try {
-    const baseSelect = `
-      SELECT
+    let { mood } = req.query;
+    console.log("🧩 요청받은 mood:", mood);
+
+    if (!mood || mood === "전체") {
+      const { rows } = await pool.query(`
+        SELECT 
+          sm.id,
+          sm.store_id,
+          sm.name       AS name,
+          sm.image_url  AS image_url,
+          sm.theme      AS theme,
+          si.business_name AS store_name
+        FROM store_menu sm
+        LEFT JOIN store_info si ON sm.store_id = si.id
+        ORDER BY sm.id DESC
+        LIMIT 100
+      `);
+      return res.json({ ok: true, data: rows });
+    }
+
+    const query = `
+      SELECT 
         sm.id,
         sm.store_id,
         sm.name       AS name,
@@ -26,35 +41,69 @@ router.get("/", async (req, res) => {
         si.business_name AS store_name
       FROM store_menu sm
       LEFT JOIN store_info si ON sm.store_id = si.id
+      WHERE sm.theme ILIKE $1
+      ORDER BY sm.id DESC
+      LIMIT 100
     `;
+    const values = [`%${mood.trim()}%`];
+    const { rows } = await pool.query(query, values);
 
-    let sql;
-    let params = [];
+    console.log("🎯 /api/suggest 쿼리 결과:", rows.length);
+    res.json({ ok: true, data: rows });
+  } catch (err) {
+    console.error("❌ /api/suggest 오류:", err);
+    res.status(500).json({ ok: false, error: "server_error", detail: err?.message || String(err) });
+  }
+});
 
-    // ✅ 전체 보기
-    if (!mood || mood === "전체") {
-      sql = `
-        ${baseSelect}
+/**
+ * GET /api/suggest/top4
+ *  - 클릭 수 기준 상위 4개 메뉴
+ *  - sm.click_count 기준, 없으면 id 기준으로 폴백
+ */
+router.get("/top4", async (req, res) => {
+  try {
+    let rows = [];
+
+    // 1차: click_count 기준 정렬 시도
+    try {
+      const { rows: r1 } = await pool.query(`
+        SELECT 
+          sm.id,
+          sm.store_id,
+          sm.name       AS name,
+          sm.image_url  AS image_url,
+          sm.theme      AS theme,
+          si.business_name AS store_name,
+          COALESCE(sm.click_count, 0) AS click_count
+        FROM store_menu sm
+        LEFT JOIN store_info si ON sm.store_id = si.id
+        ORDER BY sm.click_count DESC NULLS LAST, sm.id DESC
+        LIMIT 4
+      `);
+      rows = r1;
+      console.log("🔥 /api/suggest/top4 click_count 기준 개수:", rows.length);
+    } catch (err1) {
+      console.warn("⚠️ click_count 정렬 실패, id 기준 폴백:", err1?.message || err1);
+      const { rows: r2 } = await pool.query(`
+        SELECT 
+          sm.id,
+          sm.store_id,
+          sm.name       AS name,
+          sm.image_url  AS image_url,
+          sm.theme      AS theme,
+          si.business_name AS store_name
+        FROM store_menu sm
+        LEFT JOIN store_info si ON sm.store_id = si.id
         ORDER BY sm.id DESC
-        LIMIT 100
-      `;
-    } else {
-      // ✅ mood 필터
-      sql = `
-        ${baseSelect}
-        WHERE sm.theme ILIKE $1
-        ORDER BY sm.id DESC
-        LIMIT 100
-      `;
-      params = [`%${mood}%`];
+        LIMIT 4
+      `);
+      rows = r2;
     }
-
-    const { rows } = await pool.query(sql, params);
-    console.log("🎯 [/api/suggest] 조회 결과 개수:", rows.length);
 
     return res.json({ ok: true, data: rows });
   } catch (err) {
-    console.error("❌ [/api/suggest] 서버 오류:", err);
+    console.error("❌ /api/suggest/top4 오류:", err);
     return res.status(500).json({
       ok: false,
       error: "server_error",
