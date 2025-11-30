@@ -96,18 +96,15 @@
 
         <!-- 🟦 추천 가게 섹션 (제목만 삭제) -->
         <section class="neo-box glass p-8">
-            <!-- ⛔ 여기 있던 "금주의 추천 가게" 제목만 제거 -->
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
 
                 <!-- 왼쪽 만화 이미지 2개 (그대로 둠) -->
                 <div class="lg:col-span-1 flex flex-col gap-6">
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
                     </div>
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
                     </div>
                 </div>
 
@@ -121,6 +118,22 @@
         <!-- 🔢 스토어 프라이드 페이지네이션 -->
         <div id="storePridePagination" class="mt-10 flex justify-center gap-2"></div>
 
+    </div>
+
+    <!-- 👉 오른쪽 아래 고정 네비게이션 버튼 (이전 / 다음 / 홈) -->
+    <div class="fixed bottom-6 right-6 flex flex-col gap-2 z-40">
+        <button id="storeNavPrev"
+            class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white shadow-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">
+            이전
+        </button>
+        <button id="storeNavNext"
+            class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white shadow-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">
+            다음
+        </button>
+        <button id="storeNavHome"
+            class="px-4 py-2 rounded-full text-sm font-semibold bg-white/90 text-slate-900 shadow-lg border border-slate-200 hover:bg-slate-50">
+            홈
+        </button>
     </div>
 
     <div id="footer"></div>
@@ -247,6 +260,10 @@
             const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
             const paginationEl = document.getElementById("storePridePagination");
 
+            const navPrev = document.getElementById("storeNavPrev");
+            const navNext = document.getElementById("storeNavNext");
+            const navHome = document.getElementById("storeNavHome");
+
             function renderPage() {
                 const start = (currentPage - 1) * PAGE_SIZE;
                 const pageSlice = data.slice(start, start + PAGE_SIZE);
@@ -259,12 +276,26 @@
 
                 renderAdBoxes("hotNeighborhoodBoxes", topData, 2, 8);
                 renderAds("recommendedStoreContainer", bottomData, 8);
+
+                updateNavButtons();
+            }
+
+            function updateNavButtons() {
+                if (!navPrev || !navNext) return;
+                const isFirst = currentPage === 1;
+                const isLast = currentPage === totalPages;
+
+                navPrev.disabled = isFirst;
+                navNext.disabled = isLast;
             }
 
             function renderPagination() {
                 if (!paginationEl) return;
                 paginationEl.innerHTML = "";
-                if (totalPages <= 1) return; // 한 페이지면 버튼 안 보이게
+                if (totalPages <= 1) {
+                    updateNavButtons();
+                    return; // 한 페이지면 버튼 안 보이게
+                }
 
                 for (let i = 1; i <= totalPages; i++) {
                     const btn = document.createElement("button");
@@ -282,6 +313,37 @@
                     });
                     paginationEl.appendChild(btn);
                 }
+
+                updateNavButtons();
+            }
+
+            // 👉 floating 이전/다음/홈 버튼 동작 연결
+            if (navPrev) {
+                navPrev.onclick = () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        renderPage();
+                        renderPagination();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                };
+            }
+
+            if (navNext) {
+                navNext.onclick = () => {
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        renderPage();
+                        renderPagination();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                };
+            }
+
+            if (navHome) {
+                navHome.onclick = () => {
+                    location.href = "/index.html";
+                };
             }
 
             renderPage();
