@@ -9,18 +9,19 @@
 
     <style>
         body {
-            background: linear-gradient(135deg, #eef2ff, #e0e7ff, #f8fafc);
+            /* 🔵 파랑 톤 제거 → 밝은 그레이 톤으로 변경 */
+            background: linear-gradient(135deg, #f9fafb, #e5e7eb, #f9fafb);
             font-family: Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
         }
 
-        /* 🔥 네오모피즘 공통 */
+        /* 🔥 네오모피즘 공통 (파랑 대신 뉴트럴 톤) */
         .neo-box {
-            background: #eef2ff;
+            background: #f9fafb;
             border-radius: 22px;
             box-shadow:
-                10px 10px 20px #c7cffc,
-                -10px -10px 20px #ffffff;
+                10px 10px 20px rgba(148, 163, 184, 0.45),
+                -10px -10px 20px rgba(255, 255, 255, 0.9);
         }
 
         /* 🔥 글래스모피즘 */
@@ -69,7 +70,7 @@
             <div id="hotNeighborhoodBoxes" class="grid grid-cols-1 sm:grid-cols-2 gap-10"></div>
         </section>
 
-        <!-- 🟦 캐러셀 슬라이드 -->
+        <!-- 🟦 캐러셀 슬라이드 (그대로 유지) -->
         <section class="neo-box glass p-4 mb-20">
             <h2 class="text-3xl font-bold text-gray-800 text-center mb-6">오늘의 추천</h2>
 
@@ -93,36 +94,36 @@
             </div>
         </section>
 
-        <!-- 🟦 추천 가게 섹션 -->
+        <!-- 🟦 추천 가게 섹션 (제목만 삭제) -->
         <section class="neo-box glass p-8">
-            <h2 class="text-3xl font-bold text-center text-gray-800 mb-10">금주의 추천 가게</h2>
-
+            <!-- ⛔ 여기 있던 "금주의 추천 가게" 제목만 제거 -->
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
 
-                <!-- 왼쪽 만화 이미지 2개 -->
+                <!-- 왼쪽 만화 이미지 2개 (그대로 둠) -->
                 <div class="lg:col-span-1 flex flex-col gap-6">
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
                     </div>
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
                     </div>
                 </div>
 
-                <!-- 오른쪽 추천 가게 카드 -->
+                <!-- 오른쪽 추천 가게 카드 (페이지네이션/추가 데이터용) -->
                 <div id="recommendedStoreContainer"
                     class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
 
             </div>
         </section>
 
+        <!-- 🔢 스토어 프라이드 페이지네이션 -->
+        <div id="storePridePagination" class="mt-10 flex justify-center gap-2"></div>
+
     </div>
 
     <div id="footer"></div>
 
-    <!-- ========== JS 로직 그대로 유지(기능 정상작동) ========== -->
+    <!-- ========== JS 로직 ========== -->
 
     <script>
         /* Header/Footer */
@@ -140,15 +141,15 @@
             // 이미지 경로 처리
             let imgSrc = '/assets/images/no-thumb.png';
             if (ad.main_image) {
-                imgSrc = ad.main_image.startsWith('/uploads/') || ad.main_image.startsWith('http') 
-                    ? ad.main_image 
+                imgSrc = ad.main_image.startsWith('/uploads/') || ad.main_image.startsWith('http')
+                    ? ad.main_image
                     : `/uploads/${ad.main_image}`;
             }
 
             adBox.innerHTML = `
         <img src="${imgSrc}"
              class="h-40 w-full object-cover rounded-xl mb-4 shadow">
-        <h2 class="text-2xl font-bold text-center text-gray-800 mb-1">${ad.store_name}</h2>
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-1">${ad.store_name || ''}</h2>
         <p class="text-center text-lg text-blue-600 font-bold mb-2">${ad.category || ''}</p>
         <p class="text-center text-gray-600">${ad.phone || ''}</p>
         <a href="/substorepride.html?id=${ad.pride_id}"
@@ -215,8 +216,8 @@
             // 이미지 경로 처리
             let imgSrc = '/assets/images/no-thumb.png';
             if (ad.main_image) {
-                imgSrc = ad.main_image.startsWith('/uploads/') || ad.main_image.startsWith('http') 
-                    ? ad.main_image 
+                imgSrc = ad.main_image.startsWith('/uploads/') || ad.main_image.startsWith('http')
+                    ? ad.main_image
                     : `/uploads/${ad.main_image}`;
             }
 
@@ -229,88 +230,115 @@
         </div>
       `;
 
-            div.onclick = () => location.href = `/substorepride.html?id=${ad.pride_id}`;
+            if (ad.pride_id) {
+                div.onclick = () => location.href = `/substorepride.html?id=${ad.pride_id}`;
+            }
             return div;
         }
 
-        async function renderSliderAds() {
-            const slider = document.getElementById("sliderContainer");
+        /* 🔢 스토어 프라이드 페이지네이션 설정 */
+        const PAGE_SIZE = 16; // 한 페이지: 위 8개 + 아래 8개
 
-            let ads = await safeFetch("/storepride/api");
-            if (!ads.length) ads = Array(5).fill({});
+        function setupStorePridePagination(prideList) {
+            const data = Array.isArray(prideList) ? prideList : [];
+            let currentPage = 1;
+            const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+            const paginationEl = document.getElementById("storePridePagination");
 
-            slider.innerHTML = "";
-            ads.forEach(ad => slider.appendChild(createSimpleSlideAdCard(ad)));
+            function renderPage() {
+                const start = (currentPage - 1) * PAGE_SIZE;
+                const pageSlice = data.slice(start, start + PAGE_SIZE);
 
-            let idx = 0, total = ads.length;
+                // 위쪽 "가게 자랑 BEST" 8개
+                const topData = pageSlice.slice(0, 8);
 
-            const update = () => {
-                // w-72 (18rem) + mx-2 (1rem) = 19rem per card
-                slider.style.transform = `translateX(-${idx * 19}rem)`;
-            };
+                // 아래쪽 영역(추천 가게 섹션) 나머지
+                const bottomData = pageSlice.slice(8);
 
-            prevBtn.onclick = () => { idx = (idx - 1 + total) % total; update(); };
-            nextBtn.onclick = () => { idx = (idx + 1) % total; update(); };
+                renderAdBoxes("hotNeighborhoodBoxes", topData, 2, 8);
+                renderAds("recommendedStoreContainer", bottomData, 8);
+            }
 
-            update();
+            function renderPagination() {
+                if (!paginationEl) return;
+                paginationEl.innerHTML = "";
+                if (totalPages <= 1) return; // 한 페이지면 버튼 안 보이게
+
+                for (let i = 1; i <= totalPages; i++) {
+                    const btn = document.createElement("button");
+                    btn.textContent = i;
+                    btn.className =
+                        "px-4 py-2 rounded-full text-sm font-medium border border-slate-200 bg-white/80 hover:bg-slate-50 transition";
+                    if (i === currentPage) {
+                        btn.classList.add("bg-slate-900", "text-white", "border-slate-900");
+                    }
+                    btn.addEventListener("click", () => {
+                        currentPage = i;
+                        renderPage();
+                        renderPagination();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    });
+                    paginationEl.appendChild(btn);
+                }
+            }
+
+            renderPage();
+            renderPagination();
         }
 
         /* 메인 로딩 */
         document.addEventListener("DOMContentLoaded", async () => {
             const prideList = await safeFetch("/storepride/list");
 
-            // 가게 자랑 BEST - 데이터 받되 8개 칸 채우기
-            renderAdBoxes("hotNeighborhoodBoxes", prideList, 2, 8);
-            
-            // 오늘의 추천 자랑 - 슬라이더 빈 카드 표시 및 버튼 이벤트 연결
+            // 🔹 스토어 프라이드 목록 + 페이지네이션 + 위/아래 칸 분배
+            setupStorePridePagination(prideList);
+
+            // 🔹 오늘의 추천 슬라이더 기본 5칸 자리 만들기
             const slider = document.getElementById("sliderContainer");
             slider.innerHTML = "";
             for (let i = 0; i < 5; i++) {
                 slider.appendChild(createSimpleSlideAdCard({}));
             }
-            
+
             // 슬라이더 버튼 이벤트 연결
             let idx = 0, total = 5;
             const update = () => {
+                // w-72 (18rem) + mx-2 (1rem) = 19rem per card
                 slider.style.transform = `translateX(-${idx * 19}rem)`;
             };
-            
+
             const prevBtn = document.getElementById("prevBtn");
             const nextBtn = document.getElementById("nextBtn");
-            
-            prevBtn.onclick = () => { 
-                idx = (idx - 1 + total) % total; 
-                update(); 
+
+            prevBtn.onclick = () => {
+                idx = (idx - 1 + total) % total;
+                update();
                 resetAutoSlide();
             };
-            nextBtn.onclick = () => { 
-                idx = (idx + 1) % total; 
-                update(); 
+            nextBtn.onclick = () => {
+                idx = (idx + 1) % total;
+                update();
                 resetAutoSlide();
             };
-            
+
             // 자동 슬라이드 - 7초마다 2칸씩 이동
             let autoSlideInterval;
-            
+
             const startAutoSlide = () => {
                 autoSlideInterval = setInterval(() => {
                     idx = (idx + 2) % total;
                     update();
                 }, 7000);
             };
-            
+
             const resetAutoSlide = () => {
                 clearInterval(autoSlideInterval);
                 startAutoSlide();
             };
-            
+
             update();
             startAutoSlide();
-            
-            // 금주의 추천 가게 - 빈 카드로 (관리자 페이지용)
-            renderAds("recommendedStoreContainer", [], 8);
         });
-
     </script>
 
 </body>
