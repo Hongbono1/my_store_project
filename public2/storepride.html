@@ -9,13 +9,13 @@
 
     <style>
         body {
-            /* 🔵 파랑 톤 제거 → 밝은 그레이 톤으로 변경 */
+            /* 🔵 파랑 톤 제거 → 밝은 그레이 톤 */
             background: linear-gradient(135deg, #f9fafb, #e5e7eb, #f9fafb);
             font-family: Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
         }
 
-        /* 🔥 네오모피즘 공통 (파랑 대신 뉴트럴 톤) */
+        /* 🔥 네오모피즘 공통 (뉴트럴 톤) */
         .neo-box {
             background: #f9fafb;
             border-radius: 22px;
@@ -49,7 +49,7 @@
     <!-- Header -->
     <div id="header"></div>
 
-    <div class="max-w-screen-xl mx-auto px-4 sm:px-8 mt-12 mb-20">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-8 mt-12 mb-32">
 
         <!-- 🟦 타이틀 영역 -->
         <section class="glass neo-box p-10 mb-16 relative">
@@ -70,7 +70,7 @@
             <div id="hotNeighborhoodBoxes" class="grid grid-cols-1 sm:grid-cols-2 gap-10"></div>
         </section>
 
-        <!-- 🟦 캐러셀 슬라이드 (그대로 유지) -->
+        <!-- 🟦 캐러셀 슬라이드 -->
         <section class="neo-box glass p-4 mb-20">
             <h2 class="text-3xl font-bold text-gray-800 text-center mb-6">오늘의 추천</h2>
 
@@ -94,17 +94,19 @@
             </div>
         </section>
 
-        <!-- 🟦 추천 가게 섹션 (제목만 삭제) -->
+        <!-- 🟦 추천 가게 섹션 (제목 제거) -->
         <section class="neo-box glass p-8">
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
 
-                <!-- 왼쪽 만화 이미지 2개 (그대로 둠) -->
+                <!-- 왼쪽 만화 이미지 2개 -->
                 <div class="lg:col-span-1 flex flex-col gap-6">
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png"
+                             class="w-full h-full object-cover rounded-xl">
                     </div>
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl">
+                        <img src="/assets/images/no-thumb.png"
+                             class="w-full h-full object-cover rounded-xl">
                     </div>
                 </div>
 
@@ -115,24 +117,24 @@
             </div>
         </section>
 
-        <!-- 🔢 스토어 프라이드 페이지네이션 -->
+        <!-- 🔢 스토어 프라이드 페이지네이션 숫자 -->
         <div id="storePridePagination" class="mt-10 flex justify-center gap-2"></div>
 
     </div>
 
-    <!-- 👉 오른쪽 아래 고정 네비게이션 버튼 (이전 / 다음 / 홈) -->
-    <div class="fixed bottom-6 right-6 flex flex-col gap-2 z-40">
+    <!-- 👉 오른쪽 세로 네비게이션 (이전 / 다음 / 홈) -->
+    <div class="fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-40">
         <button id="storeNavPrev"
-            class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white shadow-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">
-            이전
+            class="glass neo-box px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-slate-800 shadow-lg hover:-translate-y-1 hover:shadow-xl transition disabled:opacity-40 disabled:cursor-not-allowed">
+            ↑ 이전
         </button>
         <button id="storeNavNext"
-            class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white shadow-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">
-            다음
+            class="glass neo-box px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-slate-800 shadow-lg hover:-translate-y-1 hover:shadow-xl transition disabled:opacity-40 disabled:cursor-not-allowed">
+            ↓ 다음
         </button>
         <button id="storeNavHome"
-            class="px-4 py-2 rounded-full text-sm font-semibold bg-white/90 text-slate-900 shadow-lg border border-slate-200 hover:bg-slate-50">
-            홈
+            class="glass neo-box px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-slate-800 shadow-lg hover:-translate-y-1 hover:shadow-xl transition">
+            ⌂ 홈
         </button>
     </div>
 
@@ -145,7 +147,7 @@
         fetch('components/header.html').then(r => r.text()).then(d => header.innerHTML = d);
         fetch('components/footer.html').then(r => r.text()).then(d => footer.innerHTML = d);
 
-        /* 카드 생성 */
+        /* 공통 카드 생성 */
         function createAdCard(ad) {
             if (!ad) return createEmptyAdCard();
 
@@ -251,103 +253,69 @@
             return div;
         }
 
-        /* 🔢 스토어 프라이드 페이지네이션 설정 */
+        /* 🔢 스토어 프라이드 페이지네이션 (전역 상태) */
         const PAGE_SIZE = 16; // 한 페이지: 위 8개 + 아래 8개
+        let prideData = [];
+        let prideCurrentPage = 1;
+        let prideTotalPages = 1;
+
+        function renderStorePridePage() {
+            const start = (prideCurrentPage - 1) * PAGE_SIZE;
+            const pageSlice = prideData.slice(start, start + PAGE_SIZE);
+
+            // 위쪽 "가게 자랑 BEST" 8개
+            const topData = pageSlice.slice(0, 8);
+
+            // 아래쪽 영역 나머지
+            const bottomData = pageSlice.slice(8);
+
+            renderAdBoxes("hotNeighborhoodBoxes", topData, 2, 8);
+            renderAds("recommendedStoreContainer", bottomData, 8);
+        }
+
+        function updateStoreNavButtons() {
+            const prevBtn = document.getElementById("storeNavPrev");
+            const nextBtn = document.getElementById("storeNavNext");
+            if (!prevBtn || !nextBtn) return;
+
+            prevBtn.disabled = prideCurrentPage <= 1;
+            nextBtn.disabled = prideCurrentPage >= prideTotalPages;
+        }
+
+        function renderStorePridePagination() {
+            const paginationEl = document.getElementById("storePridePagination");
+            if (!paginationEl) return;
+
+            paginationEl.innerHTML = "";
+            if (prideTotalPages <= 1) return;
+
+            for (let i = 1; i <= prideTotalPages; i++) {
+                const btn = document.createElement("button");
+                btn.textContent = i;
+                btn.className =
+                    "px-4 py-2 rounded-full text-sm font-medium border border-slate-200 bg-white/80 hover:bg-slate-50 transition";
+                if (i === prideCurrentPage) {
+                    btn.classList.add("bg-slate-900", "text-white", "border-slate-900");
+                }
+                btn.addEventListener("click", () => {
+                    prideCurrentPage = i;
+                    renderStorePridePage();
+                    renderStorePridePagination();
+                    updateStoreNavButtons();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                });
+                paginationEl.appendChild(btn);
+            }
+        }
 
         function setupStorePridePagination(prideList) {
-            const data = Array.isArray(prideList) ? prideList : [];
-            let currentPage = 1;
-            const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
-            const paginationEl = document.getElementById("storePridePagination");
+            prideData = Array.isArray(prideList) ? prideList : [];
+            prideTotalPages = Math.max(1, Math.ceil(prideData.length / PAGE_SIZE));
+            prideCurrentPage = 1;
 
-            const navPrev = document.getElementById("storeNavPrev");
-            const navNext = document.getElementById("storeNavNext");
-            const navHome = document.getElementById("storeNavHome");
-
-            function renderPage() {
-                const start = (currentPage - 1) * PAGE_SIZE;
-                const pageSlice = data.slice(start, start + PAGE_SIZE);
-
-                // 위쪽 "가게 자랑 BEST" 8개
-                const topData = pageSlice.slice(0, 8);
-
-                // 아래쪽 영역(추천 가게 섹션) 나머지
-                const bottomData = pageSlice.slice(8);
-
-                renderAdBoxes("hotNeighborhoodBoxes", topData, 2, 8);
-                renderAds("recommendedStoreContainer", bottomData, 8);
-
-                updateNavButtons();
-            }
-
-            function updateNavButtons() {
-                if (!navPrev || !navNext) return;
-                const isFirst = currentPage === 1;
-                const isLast = currentPage === totalPages;
-
-                navPrev.disabled = isFirst;
-                navNext.disabled = isLast;
-            }
-
-            function renderPagination() {
-                if (!paginationEl) return;
-                paginationEl.innerHTML = "";
-                if (totalPages <= 1) {
-                    updateNavButtons();
-                    return; // 한 페이지면 버튼 안 보이게
-                }
-
-                for (let i = 1; i <= totalPages; i++) {
-                    const btn = document.createElement("button");
-                    btn.textContent = i;
-                    btn.className =
-                        "px-4 py-2 rounded-full text-sm font-medium border border-slate-200 bg-white/80 hover:bg-slate-50 transition";
-                    if (i === currentPage) {
-                        btn.classList.add("bg-slate-900", "text-white", "border-slate-900");
-                    }
-                    btn.addEventListener("click", () => {
-                        currentPage = i;
-                        renderPage();
-                        renderPagination();
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    });
-                    paginationEl.appendChild(btn);
-                }
-
-                updateNavButtons();
-            }
-
-            // 👉 floating 이전/다음/홈 버튼 동작 연결
-            if (navPrev) {
-                navPrev.onclick = () => {
-                    if (currentPage > 1) {
-                        currentPage--;
-                        renderPage();
-                        renderPagination();
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                };
-            }
-
-            if (navNext) {
-                navNext.onclick = () => {
-                    if (currentPage < totalPages) {
-                        currentPage++;
-                        renderPage();
-                        renderPagination();
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                };
-            }
-
-            if (navHome) {
-                navHome.onclick = () => {
-                    location.href = "/index.html";
-                };
-            }
-
-            renderPage();
-            renderPagination();
+            renderStorePridePage();
+            renderStorePridePagination();
+            updateStoreNavButtons();
         }
 
         /* 메인 로딩 */
@@ -366,22 +334,22 @@
 
             // 슬라이더 버튼 이벤트 연결
             let idx = 0, total = 5;
-            const update = () => {
+            const updateSlider = () => {
                 // w-72 (18rem) + mx-2 (1rem) = 19rem per card
                 slider.style.transform = `translateX(-${idx * 19}rem)`;
             };
 
-            const prevBtn = document.getElementById("prevBtn");
-            const nextBtn = document.getElementById("nextBtn");
+            const slidePrevBtn = document.getElementById("prevBtn");
+            const slideNextBtn = document.getElementById("nextBtn");
 
-            prevBtn.onclick = () => {
+            slidePrevBtn.onclick = () => {
                 idx = (idx - 1 + total) % total;
-                update();
+                updateSlider();
                 resetAutoSlide();
             };
-            nextBtn.onclick = () => {
+            slideNextBtn.onclick = () => {
                 idx = (idx + 1) % total;
-                update();
+                updateSlider();
                 resetAutoSlide();
             };
 
@@ -391,7 +359,7 @@
             const startAutoSlide = () => {
                 autoSlideInterval = setInterval(() => {
                     idx = (idx + 2) % total;
-                    update();
+                    updateSlider();
                 }, 7000);
             };
 
@@ -400,8 +368,44 @@
                 startAutoSlide();
             };
 
-            update();
+            updateSlider();
             startAutoSlide();
+
+            // 🔹 오른쪽 세로 네비 버튼 연결
+            const navPrev = document.getElementById("storeNavPrev");
+            const navNext = document.getElementById("storeNavNext");
+            const navHome = document.getElementById("storeNavHome");
+
+            if (navPrev) {
+                navPrev.onclick = () => {
+                    if (prideCurrentPage > 1) {
+                        prideCurrentPage--;
+                        renderStorePridePage();
+                        renderStorePridePagination();
+                        updateStoreNavButtons();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                };
+            }
+
+            if (navNext) {
+                navNext.onclick = () => {
+                    if (prideCurrentPage < prideTotalPages) {
+                        prideCurrentPage++;
+                        renderStorePridePage();
+                        renderStorePridePagination();
+                        updateStoreNavButtons();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                };
+            }
+
+            if (navHome) {
+                navHome.onclick = () => {
+                    // 메인 인덱스 페이지로 이동 (필요하면 경로 바꿔도 됨)
+                    location.href = "/index.html";
+                };
+            }
         });
     </script>
 
