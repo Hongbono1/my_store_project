@@ -9,7 +9,7 @@
 
     <style>
         body {
-            /* 🔹 파란 톤 제거하고 중립적인 그레이 계열로 변경 */
+            /* 파란 배경 삭제 → 중립적인 그레이 계열 */
             background: linear-gradient(135deg, #f9fafb, #f3f4f6, #e5e7eb);
             font-family: Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
@@ -41,11 +41,6 @@
             transform: translateY(-8px);
             box-shadow: 0 20px 40px rgba(0, 0, 0, .15);
         }
-
-        .badge-open {
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
     </style>
 </head>
 
@@ -57,7 +52,7 @@
     <div class="max-w-screen-xl mx-auto px-4 sm:px-8 mt-12 mb-24">
 
         <!-- 🟦 타이틀 영역 -->
-        <section class="glass neo-box p-10 mb-10 relative">
+        <section class="glass neo-box p-10 mb-12 relative">
             <h1 class="text-4xl md:text-5xl font-extrabold text-gray-800 text-center tracking-tight drop-shadow-md">
                 ✨ 우리가게 자랑 모음
             </h1>
@@ -70,31 +65,6 @@
                 class="absolute right-6 top-6 bg-blue-600 text-white px-5 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition text-sm font-semibold">
                 + 등록하기
             </a>
-        </section>
-
-        <!-- 🔍 필터바 (카테고리 / 지역) -->
-        <section class="neo-box glass p-5 mb-12">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div class="font-semibold text-gray-800 text-base">
-                    🔎 원하는 가게만 골라보기
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <select id="filterCategory"
-                        class="px-3 py-2 rounded-full bg-white/80 border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="all">카테고리 전체</option>
-                    </select>
-
-                    <select id="filterRegion"
-                        class="px-3 py-2 rounded-full bg-white/80 border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="all">지역 전체</option>
-                    </select>
-
-                    <button id="filterReset"
-                        class="px-3 py-2 rounded-full bg-gray-800 text-white text-xs font-semibold shadow hover:bg-gray-900">
-                        초기화
-                    </button>
-                </div>
-            </div>
         </section>
 
         <!-- 🟦 우리가게 자랑 박스 그룹 (2개씩 묶음) -->
@@ -115,7 +85,7 @@
                     ◀
                 </button>
 
-                <!-- 슬라이더 컨테이너 (카드 3개 영역) -->
+                <!-- 슬라이더 컨테이너 -->
                 <div class="relative overflow-hidden w-full max-w-4xl">
                     <div id="sliderContainer"
                         class="flex transition-transform duration-500 h-60 items-center w-max mx-auto"></div>
@@ -129,24 +99,23 @@
             </div>
         </section>
 
-        <!-- 🟦 추가 가게 카드 섹션 (남는 자랑들 채우기) -->
+        <!-- 🟦 추가 가게 카드 섹션 (자랑 많아지면 여기로도 채우기) -->
         <section class="neo-box glass p-8">
-            <!-- ⛔️ 제목 “금주의 추천 가게” 삭제 요청 → 제거 -->
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
 
-                <!-- 왼쪽 이미지 2개는 유지 (분위기용) -->
+                <!-- 왼쪽 이미지 2개 -->
                 <div class="lg:col-span-1 flex flex-col gap-6">
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl" alt="placeholder 1">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl"
+                            alt="placeholder 1">
                     </div>
                     <div class="flex-1 neo-box overflow-hidden">
-                        <img src="/assets/images/no-thumb.png"
-                            class="w-full h-full object-cover rounded-xl" alt="placeholder 2">
+                        <img src="/assets/images/no-thumb.png" class="w-full h-full object-cover rounded-xl"
+                            alt="placeholder 2">
                     </div>
                 </div>
 
-                <!-- 오른쪽 추천 가게 카드 (자랑이 많아지면 여기까지 채움) -->
+                <!-- 오른쪽 추천 가게 카드 (추가 자랑들) -->
                 <div id="recommendedStoreContainer"
                     class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
 
@@ -182,8 +151,6 @@
 
     <div id="footer"></div>
 
-    <!-- ========== JS 로직 ========== -->
-
     <script>
         /* Header/Footer */
         fetch('components/header.html').then(r => r.text()).then(d => header.innerHTML = d);
@@ -194,15 +161,7 @@
         function goNext() { window.history.forward(); }
         function goHome() { window.location.href = "/index.html"; }
 
-        // ========= 공통 유틸 =========
-        function extractRegionFromAddress(addr) {
-            if (!addr) return "";
-            const tokens = addr.trim().replace(/\s+/g, " ").split(" ");
-            // 예: "경기 의정부시 부용로213번길 16" → "경기 의정부시"
-            return tokens.slice(0, 2).join(" ");
-        }
-
-        // ========= 카드 생성 =========
+        /* 카드 생성 */
         function createAdCard(ad) {
             if (!ad) return createEmptyAdCard();
 
@@ -218,21 +177,12 @@
                     : `/uploads/${ad.main_image}`;
             }
 
-            const hasOpenBadge = ad.open_id || ad.is_open_soon;
-
             adBox.innerHTML = `
-        <div class="relative mb-4">
-          <img src="${imgSrc}"
-               class="h-40 w-full object-cover rounded-xl shadow"
-               alt="${ad.store_name || '가게 이미지'}">
-          ${hasOpenBadge ? `
-            <span class="badge-open absolute left-3 top-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500 text-white font-semibold shadow">
-              🔔 오픈 예정
-            </span>
-          ` : ``}
-        </div>
+        <img src="${imgSrc}"
+             class="h-40 w-full object-cover rounded-xl mb-4 shadow"
+             alt="${ad.store_name || '가게 이미지'}">
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-1">${ad.store_name || '-'}</h2>
-        <p class="text-center text-lg text-blue-600 font-bold mb-1">${ad.category || ''}</p>
+        <p class="text-center text-lg text-blue-600 font-bold mb-2">${ad.category || ''}</p>
         <p class="text-center text-gray-600 text-sm mb-3">${ad.phone || ''}</p>
         <a href="/substorepride.html?id=${ad.pride_id}"
            class="mt-auto bg-blue-600 text-white text-center py-2 rounded-xl shadow hover:bg-blue-700 transition text-sm font-semibold">
@@ -276,14 +226,12 @@
             }
         }
 
-        // 아래쪽 추가 섹션 (그냥 카드 나열)
+        // 아래쪽 추가 섹션
         function renderAds(containerId, ads) {
             const container = document.getElementById(containerId);
             container.innerHTML = "";
 
-            if (!ads || !ads.length) {
-                return; // 아래는 비어 있어도 됨
-            }
+            if (!ads || !ads.length) return;
 
             ads.forEach(ad => container.appendChild(createAdCard(ad)));
         }
@@ -299,12 +247,10 @@
             return [];
         }
 
-        // ========= 슬라이드 카드 =========
+        /* 슬라이드 카드 */
         function createSimpleSlideAdCard(ad) {
             const div = document.createElement("div");
             div.className = "flex-shrink-0 w-72 mx-2 cursor-pointer card-3d";
-
-            const hasOpenBadge = ad && (ad.open_id || ad.is_open_soon);
 
             // 이미지 경로 처리
             let imgSrc = '/assets/images/no-thumb.png';
@@ -315,17 +261,10 @@
             }
 
             div.innerHTML = `
-        <div class="neo-box glass p-4 rounded-2xl shadow flex flex-col items-center relative">
-          <div class="relative w-full mb-3">
-            <img src="${imgSrc}"
-                 class="w-full h-44 object-cover rounded-xl"
-                 alt="${(ad && ad.store_name) || '가게 이미지'}">
-            ${hasOpenBadge ? `
-              <span class="badge-open absolute left-3 top-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500 text-white font-semibold shadow">
-                🔔 오픈 예정
-              </span>
-            ` : ``}
-          </div>
+        <div class="neo-box glass p-4 rounded-2xl shadow flex flex-col items-center">
+          <img src="${imgSrc}"
+               class="w-full h-44 object-cover rounded-xl mb-3"
+               alt="${(ad && ad.store_name) || '가게 이미지'}">
           <h3 class="font-bold text-center text-gray-700 text-lg">${(ad && ad.store_name) || '가게 이름 미정'}</h3>
           <p class="text-base text-blue-600 font-semibold text-center">${(ad && ad.category) || ''}</p>
         </div>
@@ -350,7 +289,6 @@
             let idx = 0, total = ads.length;
 
             const update = () => {
-                // 19rem 정도 간격으로 슬라이드
                 slider.style.transform = `translateX(-${idx * 19}rem)`;
             };
 
@@ -360,7 +298,6 @@
             prevBtn.onclick = () => { idx = (idx - 1 + total) % total; update(); resetAutoSlide(); };
             nextBtn.onclick = () => { idx = (idx + 1) % total; update(); resetAutoSlide(); };
 
-            // 자동 슬라이드 - 7초마다 2칸씩 이동
             let autoSlideInterval;
 
             const startAutoSlide = () => {
@@ -379,86 +316,20 @@
             startAutoSlide();
         }
 
-        // ========= 필터 & 렌더링 =========
-        let originalPrideList = [];
-        let filteredPrideList = [];
-
-        function setupFilterOptions(list) {
-            const catSelect = document.getElementById("filterCategory");
-            const regionSelect = document.getElementById("filterRegion");
-            if (!catSelect || !regionSelect) return;
-
-            const categories = Array.from(
-                new Set(list.map(v => v.category).filter(Boolean))
-            ).sort();
-
-            const regions = Array.from(
-                new Set(list.map(v => extractRegionFromAddress(v.address)).filter(Boolean))
-            ).sort();
-
-            // 카테고리 옵션 채우기
-            categories.forEach(cat => {
-                const opt = document.createElement("option");
-                opt.value = cat;
-                opt.textContent = cat;
-                catSelect.appendChild(opt);
-            });
-
-            // 지역 옵션 채우기
-            regions.forEach(r => {
-                const opt = document.createElement("option");
-                opt.value = r;
-                opt.textContent = r;
-                regionSelect.appendChild(opt);
-            });
-
-            document.getElementById("filterReset").addEventListener("click", () => {
-                catSelect.value = "all";
-                regionSelect.value = "all";
-                applyFilterAndRender();
-            });
-
-            catSelect.addEventListener("change", applyFilterAndRender);
-            regionSelect.addEventListener("change", applyFilterAndRender);
-        }
-
-        function applyFilterAndRender() {
-            const catSelect = document.getElementById("filterCategory");
-            const regionSelect = document.getElementById("filterRegion");
-            const cat = catSelect ? catSelect.value : "all";
-            const region = regionSelect ? regionSelect.value : "all";
-
-            filteredPrideList = originalPrideList.filter(item => {
-                let ok = true;
-                if (cat !== "all") ok = ok && item.category === cat;
-                if (region !== "all") ok = ok && extractRegionFromAddress(item.address) === region;
-                return ok;
-            });
-
-            // 위쪽 BEST: 최대 8개
-            const topList = filteredPrideList.slice(0, 8);
-            const bottomList = filteredPrideList.slice(8); // 남는 건 아래 추천 컨테이너로
-
-            renderAdBoxes("hotNeighborhoodBoxes", topList, 2);
-            renderAds("recommendedStoreContainer", bottomList);
-        }
-
         /* 메인 로딩 */
         document.addEventListener("DOMContentLoaded", async () => {
             const prideList = await safeFetch("/storepride/list");
+            const list = Array.isArray(prideList) ? prideList : [];
 
-            if (Array.isArray(prideList)) {
-                originalPrideList = prideList;
-                filteredPrideList = prideList;
-            } else {
-                originalPrideList = [];
-                filteredPrideList = [];
-            }
+            // 위쪽 BEST: 최대 8개
+            const topList = list.slice(0, 8);
+            // 남은 것들은 아래 칸으로
+            const bottomList = list.slice(8);
 
-            setupFilterOptions(originalPrideList);
-            applyFilterAndRender();
+            renderAdBoxes("hotNeighborhoodBoxes", topList, 2);
+            renderAds("recommendedStoreContainer", bottomList);
 
-            // 슬라이더: 실제 데이터 기반으로 다시 렌더
+            // 슬라이더 렌더
             renderSliderAds();
         });
 
