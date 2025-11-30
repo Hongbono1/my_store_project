@@ -313,7 +313,10 @@
   </style>
 </head>
 
-<body class="flex flex-col items-center py-10">
+<body class="bg-gray-50">
+  <!-- ✅ 헤더 추가 -->
+  <div id="header"></div>
+
   <main class="w-full max-w-3xl p-8 neo-card mt-10">
     <h1
       class="text-3xl font-extrabold text-center mb-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-transparent bg-clip-text">
@@ -535,6 +538,16 @@
 
   <!-- 페이지 전용 스크립트 -->
   <script>
+    fetch("/components/header.html")
+      .then(res => res.text())
+      .then(data => document.getElementById("header").innerHTML = data)
+      .catch(err => console.error("헤더 로딩 실패:", err));
+
+    fetch("/components/footer.html")
+      .then(res => res.text())
+      .then(data => document.getElementById("footer").innerHTML = data)
+      .catch(err => console.error("푸터 로딩 실패:", err));
+
     // 1) 주소 검색 + 지도
     const btnSearchAddr = document.getElementById("btnSearchAddr");
     btnSearchAddr.addEventListener("click", () => {
@@ -666,7 +679,7 @@
       }
 
       // CSS 인라인 적용 강제
-      try { document.execCommand('styleWithCSS', false, true); } catch (_) { }
+      try { document.execCommand('styleWithCSS', false, true); } catch (e) { }
 
       let savedRange = null;
 
@@ -859,303 +872,5 @@
       console.log('🎯 리치 텍스트 에디터 초기화 완료');
     });
   </script>
-
 </body>
-</html>
-        var r = newRange(); if (!r) return;
-        var s = getSel(); if (!s) return;
-        var target = (node.nodeType === 3) ? node : (node.lastChild || node.firstChild || node);
-        if (!target) return;
-        var len = (target.nodeType === 3 && target.nodeValue) ? target.nodeValue.length : 0;
-        try { r.setStart(target, atEnd ? len : 0); r.collapse(true); s.removeAllRanges(); s.addRange(r); } catch (e) { }
-      }
-
-      function caretToTail() {
-        var s = getSel(); if (!s) return;
-        var r = newRange(); if (!r) return;
-        var node = editor;
-        while (node && node.lastChild) node = node.lastChild;
-        if (!node || node === editor) { var br = document.createElement('br'); editor.appendChild(br); node = br; }
-        if (node.nodeType === 3) {
-          var len = node.nodeValue ? node.nodeValue.length : 0;
-          r.setStart(node, len);
-        } else {
-          r.setStartAfter(node);
-        }
-        r.collapse(true); s.removeAllRanges(); s.addRange(r);
-      }
-
-      function applyInlineStyle(styleObj) {
-        if (!styleObj) styleObj = {};
-        editor.focus();
-        var s = getSel(); if (!s || s.rangeCount === 0) return;
-
-        if (!s.isCollapsed) {
-          var r = s.getRangeAt(0);
-          var span = document.createElement('span');
-          for (var k in styleObj) if (styleObj.hasOwnProperty(k)) span.style[k] = styleObj[k];
-          try { r.surroundContents(span); }
-          catch (e) { var frag = r.extractContents(); span.appendChild(frag); r.insertNode(span); }
-          var after = newRange(); if (!after) return;
-          after.setStartAfter(span); after.collapse(true);
-          s.removeAllRanges(); s.addRange(after);
-          typingSpan = span;
-          return;
-        }
-
-        if (typingSpan && editor.contains(typingSpan)) {
-          for (var k2 in styleObj) if (styleObj.hasOwnProperty(k2)) typingSpan.style[k2] = styleObj[k2];
-          var endNode = typingSpan.lastChild || typingSpan;
-          placeCaretInside(endNode, true);
-          return;
-        }
-
-        caretToTail();
-        s = getSel(); if (!s || s.rangeCount === 0) return;
-        var r2 = s.getRangeAt(0);
-
-        var marker = document.createElement('span');
-        marker.style.display = 'inline-block'; marker.style.width = '0'; marker.style.height = '0';
-        marker.appendChild(document.createTextNode('\uFEFF'));
-        r2.insertNode(marker);
-
-        var span2 = document.createElement('span');
-        span2.setAttribute('data-typing-span', 'true');
-        for (var k3 in styleObj) if (styleObj.hasOwnProperty(k3)) span2.style[k3] = styleObj[k3];
-        var tn = document.createTextNode(ZWSP); span2.appendChild(tn);
-        if (marker.parentNode) marker.parentNode.insertBefore(span2, marker.nextSibling);
-        if (marker.parentNode) marker.parentNode.removeChild(marker);
-        placeCaretInside(tn, true);
-        typingSpan = span2;
-      }
-
-      function insertImage(src) {
-        editor.focus();
-        var s = getSel(); if (!s || s.rangeCount === 0) caretToTail();
-        s = getSel(); if (!s || s.rangeCount === 0) return;
-        var r = s.getRangeAt(0);
-        var image = document.createElement('img');
-        image.src = src; image.alt = 'image';
-        image.style.maxWidth = '100%'; image.style.height = 'auto'; image.style.margin = '8px 0';
-        image.style.borderRadius = '6px';
-        r.insertNode(image);
-        r.setStartAfter(image); r.collapse(true);
-        s.removeAllRanges(); s.addRange(r);
-      }
-
-      // ✅ 툴바 이벤트 (폼 밖이므로 안전) - 커서 점프 방지
-      if (toolbar) {
-        toolbar.addEventListener('mousedown', function (e) {
-          var target = e.target || e.srcElement;
-          if (target && (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.type === 'color')) {
-            e.preventDefault(); // 포커스 이동 방지
-            if (editor) editor.focus();
-          }
-        });
-      }
-
-      if (toolbar) {
-        toolbar.addEventListener('click', function (e) {
-          var target = e.target || e.srcElement;
-          if (!target) return;
-
-          var cmd = target.getAttribute('data-cmd');
-          if (cmd && !composing) {
-            try { document.execCommand('styleWithCSS', false, true); } catch (e) { }
-            document.execCommand(cmd, false, null);
-            if (editor) editor.focus();
-          }
-        });
-      }
-
-      // IME 한글 조합 처리
-      editor.addEventListener('compositionstart', function () { composing = true; });
-      editor.addEventListener('compositionend', function () {
-        composing = false;
-        if (typingSpan && editor.contains(typingSpan)) {
-          var t = typingSpan.lastChild || typingSpan.firstChild;
-          if (t && t.nodeType === 3) {
-            var v = t.nodeValue || '';
-            if (v.indexOf(ZWSP) === 0) t.nodeValue = v.replace(/\u200B/g, '');
-            placeCaretInside(t, true);
-          } else {
-            var tn2 = document.createTextNode('');
-            typingSpan.appendChild(tn2);
-            placeCaretInside(tn2, true);
-          }
-        }
-      });
-
-      editor.addEventListener('input', function () {
-        if (!typingSpan) return;
-        var t = typingSpan.firstChild;
-        if (t && t.nodeType === 3 && t.nodeValue && t.nodeValue.indexOf(ZWSP) === 0) {
-          t.nodeValue = t.nodeValue.replace(ZWSP, '');
-        }
-      });
-
-      // 글자 크기 / 색상
-      if (fontSizeSelector) {
-        fontSizeSelector.addEventListener('change', function () {
-          if (composing) return;
-          var val = fontSizeSelector.value;
-          if (!val) return;
-          applyInlineStyle({ fontSize: val });
-          editor.focus();
-        });
-      }
-
-      if (fontColorPicker) {
-        fontColorPicker.addEventListener('input', function () {
-          if (composing) return;
-          var val = fontColorPicker.value;
-          if (!val) return;
-          applyInlineStyle({ color: val });
-          editor.focus();
-        });
-      }
-
-      // 이미지 삽입
-      if (btnImage) {
-        btnImage.addEventListener('click', function () {
-          if (imageInput) imageInput.click();
-        });
-      }
-
-      if (imageInput) {
-        imageInput.addEventListener('change', function (e) {
-          if (composing) return;
-          var file = (e.target && e.target.files && e.target.files[0]) ? e.target.files[0] : null;
-          if (!file) return;
-          var url = (window.URL && window.URL.createObjectURL) ? window.URL.createObjectURL(file) : null;
-          if (!url) return;
-          insertImage(url);
-          imageInput.value = '';
-        });
-      }
-
-      // ✅ 폼 제출 직전 동기화 (안전한 방식)
-      if (form && editor && hidden) {
-        form.addEventListener('submit', function () {
-          hidden.value = editor.innerHTML.replace(/\u200B/g, '') || '';
-        });
-      }
-
-      // 에디터 전역 접근용 (디버깅/확장 가능)
-      window.keditor = {
-        getHTML: function () {
-          return editor ? editor.innerHTML.replace(/\u200B/g, '') : '';
-        },
-        setHTML: function (html) {
-          if (editor) editor.innerHTML = html || '';
-        },
-        focus: function () {
-          if (editor) editor.focus();
-        }
-      };
-
-    })();
-  </script>
-
-  <!-- 🚨 툴바 강제 복구 와치독 (최후의 보루) -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      let watchdogCount = 0;
-
-      function showToolbar() {
-        let tb = document.getElementById('k-toolbar');
-        if (!tb) {
-          console.warn('⚠️ 툴바 요소를 찾을 수 없습니다. 응급 재생성 시도...');
-
-          // 🚨 응급 재생성: 설명 영역 위에 툴바 삽입
-          const descSection = document.querySelector('label[for="customEditor"]');
-          if (descSection && descSection.parentNode) {
-            const toolbarHTML = `
-          <div class="k-toolbar mb-2" id="k-toolbar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:12px;background:#f7f7fa;border:1px solid #e5e7eb;border-radius:12px 12px 0 0;">
-            <button type="button" data-cmd="bold"><b>굵게</b></button>
-            <button type="button" data-cmd="italic"><i>기울임</i></button>
-            <button type="button" data-cmd="underline"><u>밑줄</u></button>
-            <button type="button" data-cmd="justifyLeft">좌</button>
-            <button type="button" data-cmd="justifyCenter">중</button>
-            <button type="button" data-cmd="justifyRight">우</button>
-            <button type="button" data-cmd="insertUnorderedList">● 목록</button>
-            <button type="button" data-cmd="insertOrderedList">1. 목록</button>
-            <select id="font-size-selector">
-              <option value="">글자 크기</option>
-              <option value="14px">14</option><option value="16px">16</option>
-              <option value="18px">18</option><option value="20px">20</option>
-              <option value="24px">24</option><option value="28px">28</option>
-            </select>
-            <input type="color" id="font-color-picker" title="글자색" />
-            <input type="file" id="image-input" accept="image/*" style="display:none" />
-            <button type="button" id="btn-image">이미지</button>
-          </div>
-        `;
-
-            descSection.insertAdjacentHTML('afterend', toolbarHTML);
-            console.log('✅ 툴바 응급 재생성 완료');
-            tb = document.getElementById('k-toolbar'); // 새로 생성된 툴바 참조
-          } else {
-            console.error('❌ 설명 영역을 찾을 수 없어 툴바 재생성 실패');
-            return;
-          }
-        }
-
-        const prevDisplay = tb.style.display;
-        const prevVisibility = tb.style.visibility;
-        const prevOpacity = tb.style.opacity;
-
-        tb.style.display = 'flex';
-        tb.style.visibility = 'visible';
-        tb.style.opacity = '1';
-        tb.style.position = 'sticky';
-        tb.style.top = '0';
-        tb.style.zIndex = '50';
-
-        // 숨김 클래스들 제거
-        const removedClasses = [];
-        ['hidden', 'sr-only', 'opacity-0', 'invisible'].forEach(cls => {
-          if (tb.classList.contains(cls)) {
-            tb.classList.remove(cls);
-            removedClasses.push(cls);
-          }
-        });
-
-        watchdogCount++;
-
-        // 변경사항이 있으면 로그
-        if (prevDisplay !== 'flex' || prevVisibility !== 'visible' || prevOpacity !== '1' || removedClasses.length > 0) {
-          console.log(`🔧 툴바 복구 #${watchdogCount}:`, {
-            display: `${prevDisplay} → flex`,
-            visibility: `${prevVisibility} → visible`,
-            opacity: `${prevOpacity} → 1`,
-            removedClasses: removedClasses
-          });
-        }
-      }
-
-      console.log('🛡️ 툴바 와치독 활성화 - 매 500ms 체크');
-      showToolbar();
-
-      // 누가 display:none 주거나 DOM 이동해도 되살리기
-      window.__kToolbarWatchdog = setInterval(showToolbar, 500);
-
-      // 10초 후 와치독 빈도 줄이기 (성능 최적화)
-      setTimeout(() => {
-        if (window.__kToolbarWatchdog) {
-          clearInterval(window.__kToolbarWatchdog);
-          window.__kToolbarWatchdog = setInterval(showToolbar, 2000);
-          console.log('🛡️ 툴바 와치독 - 2초 간격으로 변경 (성능 최적화)');
-        }
-      }, 10000);
-    });
-  </script>
-
-  <style>
-    #k-toolbar {
-      display: flex !important;
-    }
-  </style>
-</body>
-
 </html>
