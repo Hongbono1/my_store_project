@@ -75,17 +75,30 @@
     async function fetchMarkets() {
       try {
         const res = await fetch('/api/market');
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
         const data = await res.json();
 
         // DB의 컬럼명에 맞게 가공
-        traditionalMarkets = data.map(m => {
-          // 이미지 경로 처리: 이미 /uploads로 시작하면 그대로, 아니면 경로 추가
+        traditionalMarkets = data.map((m) => {
+          // 기본값: 기본 이미지
           let imgPath = "/uploads/traditionalmarket/default.jpg";
+
           if (m.main_img) {
-            if (m.main_img.startsWith('/uploads')) {
-              imgPath = m.main_img;
-            } else {
-              imgPath = `/uploads/traditionalmarket/${m.main_img}`;
+            let raw = String(m.main_img).trim();
+
+            // 1) 절대 URL(https://...)이면 그대로 사용
+            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+              imgPath = raw;
+            }
+            // 2) 이미 /uploads 로 시작하면 그대로 사용
+            else if (raw.startsWith("/uploads")) {
+              imgPath = raw;
+            }
+            // 3) 그 외(파일명만 있는 경우) → /uploads/traditionalmarket/ 붙이기
+            else {
+              imgPath = `/uploads/traditionalmarket/${raw}`;
             }
           }
 
@@ -103,28 +116,29 @@
 
         renderTraditionalMarkets(currentIndex);
       } catch (e) {
-        alert('시장 데이터를 불러오지 못했습니다.');
-        console.error(e);
+        console.error("시장 데이터를 불러오는 중 오류:", e);
+        alert("시장 데이터를 불러오지 못했습니다.");
       }
     }
 
     function renderTraditionalMarkets(limit) {
       const container = document.getElementById("market-container");
       container.innerHTML = "";
-      traditionalMarkets.slice(0, limit).forEach(market => {
+      traditionalMarkets.slice(0, limit).forEach((market) => {
         const card = document.createElement("div");
-        card.className = "bg-gradient-to-br from-white to-gray-100 border-2 border-gray-400 shadow-xl rounded-xl overflow-hidden p-6 transform transition-all hover:scale-105 hover:shadow-2xl";
+        card.className =
+          "bg-gradient-to-br from-white to-gray-100 border-2 border-gray-400 shadow-xl rounded-xl overflow-hidden p-6 transform transition-all hover:scale-105 hover:shadow-2xl";
         card.innerHTML = `
-          <img class="h-48 w-full object-cover rounded-lg" src="${market.img}" alt="${market.name}">
-          <div class="mt-4 text-center">
-            <h4 class="text-2xl font-bold text-gray-900">${market.name}</h4>
-            <p class="text-gray-700 mt-2">${market.address}</p>
-            <p class="text-gray-500 mt-1 font-semibold">☎ ${market.phone}</p>
-            <a href="/traditionalmarketdetail.html?id=${market.id}" class="mt-4 inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 px-5 rounded-lg shadow-md hover:scale-105 transition">
-              자세히 보기
-            </a>
-          </div>
-        `;
+      <img class="h-48 w-full object-cover rounded-lg" src="${market.img}" alt="${market.name}">
+      <div class="mt-4 text-center">
+        <h4 class="text-2xl font-bold text-gray-900">${market.name}</h4>
+        <p class="text-gray-700 mt-2">${market.address}</p>
+        <p class="text-gray-500 mt-1 font-semibold">☎ ${market.phone}</p>
+        <a href="/traditionalmarketdetail.html?id=${market.id}" class="mt-4 inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 px-5 rounded-lg shadow-md hover:scale-105 transition">
+          자세히 보기
+        </a>
+      </div>
+    `;
         container.appendChild(card);
       });
 
@@ -144,6 +158,7 @@
       currentIndex += 2;
       renderTraditionalMarkets(currentIndex);
     });
+
 
   </script>
 </body>
