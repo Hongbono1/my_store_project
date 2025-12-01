@@ -275,6 +275,7 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
+app.use("/manager/ad", indexmanagerAdRouter); // 둘 다 같은 라우터 사용
 app.use("/index/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
