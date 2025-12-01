@@ -164,7 +164,15 @@
         <main class="flex-1 p-8">
             <!-- 상단 헤더 -->
             <header class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold drop-shadow-sm">사장님 페이지</h1>
+                <div class="space-y-1">
+                    <h1 class="text-3xl font-bold drop-shadow-sm">사장님 페이지</h1>
+                    <!-- 실시간 주문 알림 표시 -->
+                    <span id="realtime-order-indicator"
+                        class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600 font-semibold">
+                        실시간 주문 알림:
+                        <span id="realtime-order-count" class="ml-1 font-bold">없음</span>
+                    </span>
+                </div>
                 <button
                     class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow hover:opacity-90 transition">로그아웃</button>
             </header>
@@ -174,7 +182,7 @@
                 <h2 class="text-xl font-bold mb-4">📊 오늘의 요약</h2>
 
                 <!-- ✅ 통계 카드 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-10">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
                     <div class="p-6 rounded-2xl bg-white shadow text-center hover:-translate-y-1 transition">
                         <p class="text-gray-500 text-sm">오늘 방문자</p>
                         <p id="today-visitors" class="text-2xl font-extrabold text-blue-600">0</p>
@@ -251,14 +259,14 @@
                         </li>
                         <li class="flex items-center gap-2">
                             <input type="checkbox" class="rounded text-blue-500">
-                            <span>영업시간 / 휴무일 정보 최신화 확인</span>
+                            <span>영업시간 / 브레이크타임 정보 최신화 확인</span>
                         </li>
                     </ul>
                 </div>
 
                 <!-- 📈 그래프 -->
                 <div class="bg-white rounded-2xl shadow p-6 mb-10">
-                    <h3 class="text-lg font-bold mb-4">📅 최근 7일간 추이</h3>
+                    <h3 class="text-lg font-bold mb-4">📅 매출 추이 (일/주/월 등)</h3>
                     <canvas id="statsChart" height="100"></canvas>
 
                     <!-- ✅ 기간 선택 버튼 -->
@@ -280,7 +288,13 @@
 
                 <!-- 📦 최근 주문 내역 -->
                 <div class="bg-white rounded-2xl shadow p-6">
-                    <h3 class="text-lg font-bold mb-4">🧾 최근 주문 내역</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">🧾 최근 주문 내역</h3>
+                        <button id="go-order-from-dashboard"
+                            class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-blue-50">
+                            주문 관리로 이동
+                        </button>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm text-gray-700">
                             <thead>
@@ -337,7 +351,7 @@
                 <div class="bg-white rounded-2xl shadow p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800">주문 목록</h3>
-                        <span class="text-xs text-gray-500">주문 상태 변경은 나중에 서버와 연동 예정</span>
+                        <span class="text-xs text-gray-500">상태 변경 / 취소 기능은 나중에 서버와 연동 예정입니다.</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm text-gray-700">
@@ -362,7 +376,7 @@
                 </div>
             </section>
 
-            <!-- 🏪 가게 관리 (수정 버전) -->
+            <!-- 🏪 가게 관리 -->
             <section id="store" class="content-section hidden-section">
                 <h2 class="text-xl font-bold mb-6">🏪 가게 등록 / 관리</h2>
 
@@ -400,11 +414,24 @@
                         <label class="block font-bold mb-2">주소</label>
                         <input type="text" name="storeAddress" class="w-full p-2 border rounded">
                     </div>
+
                     <div>
                         <label class="block font-bold mb-2">영업시간</label>
                         <input type="text" name="openHours" class="w-full p-2 border rounded"
                             placeholder="예: 10:00 ~ 22:00">
                     </div>
+
+                    <!-- 브레이크 타임 / 쉬는 시간 -->
+                    <div>
+                        <label class="block font-bold mb-2">브레이크 타임 (쉬는 시간)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="time" name="breakStart" class="p-2 border rounded">
+                            <span class="text-sm text-gray-600">~</span>
+                            <input type="time" name="breakEnd" class="p-2 border rounded">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">예) 15:00 ~ 17:00 (준비 시간 등으로 주문을 받지 않는 시간)</p>
+                    </div>
+
                     <div>
                         <label class="block font-bold mb-2">가게 설명</label>
                         <textarea name="description" rows="3" class="w-full p-2 border rounded"></textarea>
@@ -463,13 +490,69 @@
                         <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">음료</span>
                         <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">주류</span>
                     </div>
-                    <button class="px-4 py-2 bg-green-500 text-white rounded-full shadow text-sm">
+                    <button id="btn-add-menu" class="px-4 py-2 bg-green-500 text-white rounded-full shadow text-sm">
                         + 메뉴 추가
                     </button>
                 </div>
 
                 <div id="menu-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- JS에서 메뉴 카드 채움 -->
+                </div>
+
+                <!-- 메뉴 추가/수정 모달 (UI만, 추후 서버 연동) -->
+                <div id="menu-modal"
+                    class="fixed inset-0 bg-black/40 flex items-center justify-center z-40 hidden px-4">
+                    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-bold text-gray-800">🍜 메뉴 등록 / 수정</h3>
+                            <button id="menu-modal-close"
+                                class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <label class="block text-gray-700 mb-1">메뉴명</label>
+                                <input type="text" id="menu-name-input" class="w-full p-2 border rounded"
+                                    placeholder="예: 김치찌개 정식">
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-gray-700 mb-1">카테고리</label>
+                                    <input type="text" id="menu-category-input" class="w-full p-2 border rounded"
+                                        placeholder="예: 식사류 / 사이드">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 mb-1">가격(원)</label>
+                                    <input type="number" id="menu-price-input" class="w-full p-2 border rounded"
+                                        placeholder="예: 9000">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-1">옵션 / 추가 설정 (간단 메모)</label>
+                                <input type="text" id="menu-option-input" class="w-full p-2 border rounded"
+                                    placeholder="예: 곱빼기 +2000, 치즈추가 +1500">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-1">설명</label>
+                                <textarea id="menu-desc-input" rows="2" class="w-full p-2 border rounded"
+                                    placeholder="예: 국내산 돼지고기를 사용한 구수한 김치찌개입니다."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-2 mt-4">
+                            <button id="menu-modal-cancel"
+                                class="px-4 py-2 rounded-full border border-gray-300 text-gray-700 text-sm">
+                                취소
+                            </button>
+                            <button id="menu-modal-save"
+                                class="px-4 py-2 rounded-full bg-green-500 text-white text-sm shadow">
+                                저장 (UI만 동작)
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">
+                            실제 DB 저장/수정/삭제는 추후 API 연동 시 구현합니다.
+                        </p>
+                    </div>
                 </div>
             </section>
 
@@ -530,6 +613,22 @@
             <section id="review" class="content-section hidden-section">
                 <h2 class="text-xl font-bold mb-4">💬 리뷰 · 문의 관리</h2>
 
+                <!-- 리뷰 통계 카드 -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+                    <div class="p-4 bg-white rounded-2xl shadow">
+                        <p class="text-gray-500 mb-1">평균 별점</p>
+                        <p class="text-2xl font-extrabold text-yellow-500">0.0 ★</p>
+                    </div>
+                    <div class="p-4 bg-white rounded-2xl shadow">
+                        <p class="text-gray-500 mb-1">전체 리뷰 수</p>
+                        <p class="text-2xl font-extrabold text-blue-600">0</p>
+                    </div>
+                    <div class="p-4 bg-white rounded-2xl shadow">
+                        <p class="text-gray-500 mb-1">미답변 리뷰</p>
+                        <p class="text-2xl font-extrabold text-red-500">0</p>
+                    </div>
+                </div>
+
                 <div class="bg-white rounded-2xl shadow p-6">
                     <!-- 탭 -->
                     <div class="flex gap-3 border-b pb-3 mb-4 text-sm">
@@ -586,8 +685,9 @@
                             </div>
                             <p class="text-gray-700 mb-2">여기에 실제 리뷰 내용이 표시됩니다.</p>
                             <button
-                                class="mt-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-200">답글
-                                달기</button>
+                                class="mt-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-200">
+                                답글 달기
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -622,7 +722,7 @@
                 <div class="bg-white rounded-2xl shadow p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800">일별 매출 내역</h3>
-                        <span class="text-xs text-gray-400">실제 매출 데이터 연동은 나중에 추가 예정입니다.</span>
+                        <span class="text-xs text-gray-400">실제 매출/정산 데이터 연동은 나중에 추가 예정입니다.</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm text-gray-700">
@@ -631,7 +731,7 @@
                                     <th class="text-left py-2 px-3">날짜</th>
                                     <th class="text-left py-2 px-3">주문 건수</th>
                                     <th class="text-left py-2 px-3">총 매출</th>
-                                    <th class="text-left py-2 px-3">비고</th>
+                                    <th class="text-left py-2 px-3">정산 상태</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -704,6 +804,10 @@
                                 <input type="checkbox" name="notifyChannelEmail" class="rounded">
                                 <span>이메일 알림 (정산 안내 / 공지 메일)</span>
                             </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700 mt-2">
+                                <input type="checkbox" name="notifyChannelPush" class="rounded" disabled>
+                                <span>앱 푸시 알림 (추후 지원 예정)</span>
+                            </label>
                         </div>
 
                         <!-- 알림 종류 on/off -->
@@ -730,7 +834,7 @@
                     <div>
                         <h3 class="font-semibold mb-3 text-gray-800">🏪 가게 운영 기본값</h3>
 
-                        <!-- 영업 상태 토글 -->
+                        <!-- 영업 상태 토글 (임시 휴무/일시 정지 포함) -->
                         <div class="mb-4">
                             <p class="block text-sm text-gray-600 mb-1">영업 상태</p>
                             <div class="flex items-center gap-4">
@@ -740,7 +844,7 @@
                                 </label>
                                 <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                     <input type="radio" name="storeStatus" value="pause" class="accent-blue-500">
-                                    <span>일시 정지</span>
+                                    <span>일시 정지 (임시 휴무)</span>
                                 </label>
                             </div>
                             <p class="text-xs text-gray-400 mt-1">
@@ -771,6 +875,19 @@
                             </div>
                             <p class="text-xs text-gray-400 mt-1">
                                 예) 배달 15,000원 이상부터 주문 가능. 포장은 나중에 따로 설정 가능.
+                            </p>
+                        </div>
+
+                        <!-- 배달팁 설정 -->
+                        <div class="mb-4">
+                            <label class="block text-sm text-gray-600 mb-1">배달팁 설정</label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" name="deliveryTip" class="p-2 border rounded w-40"
+                                    placeholder="3000">
+                                <span class="text-sm text-gray-600">원 (기본 배달팁)</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">
+                                추후 세부 조건(거리별/시간대별 배달팁)은 별도 페이지로 확장 가능합니다.
                             </p>
                         </div>
 
@@ -837,6 +954,25 @@
             }
 
             return res.json();
+        }
+
+        // 실시간 주문 알림용 전역 상태
+        let latestOrderId = 0;
+
+        function updateRealtimeIndicator(count) {
+            const wrap = document.getElementById("realtime-order-indicator");
+            const cnt = document.getElementById("realtime-order-count");
+            if (!wrap || !cnt) return;
+
+            if (count > 0) {
+                cnt.textContent = `${count}건`;
+                wrap.classList.remove("bg-gray-100", "text-gray-600");
+                wrap.classList.add("bg-red-100", "text-red-700");
+            } else {
+                cnt.textContent = "없음";
+                wrap.classList.remove("bg-red-100", "text-red-700");
+                wrap.classList.add("bg-gray-100", "text-gray-600");
+            }
         }
 
         // ===============================
@@ -928,6 +1064,7 @@
                         manageBody.innerHTML =
                             `<tr><td colspan="6" class="py-6 text-center text-gray-400">표시할 주문이 없습니다.</td></tr>`;
                     }
+                    updateRealtimeIndicator(0);
                     return;
                 }
 
@@ -955,9 +1092,17 @@
               <td class="py-2 px-3">${formatTime(o.created_at)}</td>
               <td class="py-2 px-3">${formatStatus(o.status)}</td>
               <td class="py-2 px-3">
-                <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-blue-50 border border-gray-200">
-                  상세 보기
-                </button>
+                <div class="flex flex-wrap gap-1">
+                  <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-blue-50 border border-gray-200">
+                    상세
+                  </button>
+                  <button class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs hover:bg-blue-100 border border-blue-200">
+                    다음 단계
+                  </button>
+                  <button class="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs hover:bg-red-100 border border-red-200">
+                    취소
+                  </button>
+                </div>
               </td>
             </tr>
           `
@@ -966,6 +1111,25 @@
 
                 if (tbody) tbody.innerHTML = rowsForDashboard;
                 if (manageBody) manageBody.innerHTML = rowsForManage;
+
+                // 실시간 알림용 latestOrderId 업데이트
+                const ids = json.orders
+                    .map((o) => Number(o.id))
+                    .filter((n) => Number.isFinite(n));
+                if (ids.length) {
+                    const maxId = Math.max(...ids);
+                    // 첫 로딩이면 기준만 잡고 알림 X
+                    if (latestOrderId === 0) {
+                        latestOrderId = maxId;
+                        updateRealtimeIndicator(0);
+                    } else if (maxId > latestOrderId) {
+                        const diff = maxId - latestOrderId;
+                        latestOrderId = maxId;
+                        updateRealtimeIndicator(diff);
+                    } else {
+                        updateRealtimeIndicator(0);
+                    }
+                }
             } catch (err) {
                 console.error("[loadRecentOrders]", err);
                 if (tbody) {
@@ -976,6 +1140,40 @@
                     manageBody.innerHTML =
                         `<tr><td colspan="6" class="py-6 text-center text-red-500">주문 불러오기 실패</td></tr>`;
                 }
+                updateRealtimeIndicator(0);
+            }
+        }
+
+        // 주기적으로 새 주문 체크 (실시간 알림 느낌)
+        async function checkNewOrders() {
+            try {
+                const json = await fetchJson(`/owner/orders?store_id=${storeId}`);
+                if (!json.ok || !json.orders || !json.orders.length) {
+                    updateRealtimeIndicator(0);
+                    return;
+                }
+
+                const ids = json.orders
+                    .map((o) => Number(o.id))
+                    .filter((n) => Number.isFinite(n));
+                if (!ids.length) {
+                    updateRealtimeIndicator(0);
+                    return;
+                }
+
+                const maxId = Math.max(...ids);
+                if (latestOrderId === 0) {
+                    latestOrderId = maxId;
+                    updateRealtimeIndicator(0);
+                } else if (maxId > latestOrderId) {
+                    const diff = maxId - latestOrderId;
+                    latestOrderId = maxId;
+                    updateRealtimeIndicator(diff);
+                } else {
+                    updateRealtimeIndicator(0);
+                }
+            } catch (err) {
+                console.error("[checkNewOrders]", err);
             }
         }
 
@@ -1066,13 +1264,38 @@
 
                 data.menus.forEach((m) => {
                     const div = document.createElement("div");
-                    div.className = "p-4 bg-white rounded-xl shadow flex flex-col gap-1";
+                    div.className = "p-4 bg-white rounded-xl shadow flex flex-col gap-2";
                     div.innerHTML = `
               <div class="flex items-center justify-between">
-                <h3 class="font-bold text-gray-800">${m.name}</h3>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">${m.category || "기타"}</span>
+                <div>
+                  <h3 class="font-bold text-gray-800">${m.name}</h3>
+                  <p class="text-gray-600 text-sm">₩${Number(m.price).toLocaleString()}</p>
+                </div>
+                <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">${m.category || "기타"}</span>
               </div>
-              <p class="text-gray-600">₩${Number(m.price).toLocaleString()}</p>
+              <div class="flex flex-wrap items-center justify-between gap-2 mt-2 text-xs text-gray-700">
+                <label class="inline-flex items-center gap-1">
+                  <input type="checkbox" class="rounded text-red-500">
+                  <span>품절 처리</span>
+                </label>
+                <div class="flex flex-wrap gap-1">
+                  <button class="px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100">
+                    ▲ 위로
+                  </button>
+                  <button class="px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100">
+                    ▼ 아래로
+                  </button>
+                  <button class="px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-700">
+                    옵션 관리
+                  </button>
+                  <button class="px-2 py-1 rounded-full border border-gray-200 bg-white">
+                    수정
+                  </button>
+                  <button class="px-2 py-1 rounded-full border border-red-200 bg-red-50 text-red-600">
+                    삭제
+                  </button>
+                </div>
+              </div>
             `;
                     container.appendChild(div);
                 });
@@ -1118,6 +1341,16 @@
         document
             .querySelector('[data-section="dashboard"]')
             .classList.add("active-link");
+
+        // 대시보드 → 주문 관리 이동 버튼
+        const goOrderBtn = document.getElementById("go-order-from-dashboard");
+        if (goOrderBtn) {
+            goOrderBtn.addEventListener("click", () => {
+                const orderLink = document.querySelector('[data-section="order"]');
+                if (!orderLink) return;
+                orderLink.click();
+            });
+        }
 
         // ===============================
         // 8. 하위 등록 메뉴 클릭 시 각 등록 페이지로 이동
@@ -1166,14 +1399,45 @@
         });
 
         // ===============================
-        // 9. 페이지 로드시 한 번에 로딩
+        // 9. 메뉴 추가 모달 오픈/닫기 (UI만)
+        // ===============================
+        const menuAddBtn = document.getElementById("btn-add-menu");
+        const menuModal = document.getElementById("menu-modal");
+        const menuModalClose = document.getElementById("menu-modal-close");
+        const menuModalCancel = document.getElementById("menu-modal-cancel");
+        const menuModalSave = document.getElementById("menu-modal-save");
+
+        function openMenuModal() {
+            if (menuModal) menuModal.classList.remove("hidden");
+        }
+        function closeMenuModal() {
+            if (menuModal) menuModal.classList.add("hidden");
+        }
+
+        if (menuAddBtn) menuAddBtn.addEventListener("click", openMenuModal);
+        if (menuModalClose) menuModalClose.addEventListener("click", closeMenuModal);
+        if (menuModalCancel) menuModalCancel.addEventListener("click", closeMenuModal);
+        if (menuModalSave) {
+            menuModalSave.addEventListener("click", () => {
+                // 실제 저장은 추후 API 연동 시 구현
+                alert("메뉴 정보는 UI 상에서만 입력됩니다. 실제 저장은 나중에 서버 연동 시 구현합니다.");
+                closeMenuModal();
+            });
+        }
+
+        // ===============================
+        // 10. 페이지 로드시 한 번에 로딩 + 실시간 체크
         // ===============================
         window.addEventListener("DOMContentLoaded", async () => {
+            updateRealtimeIndicator(0);
             await loadDashboard();
             await loadStats("weekly");
             await loadStoreInfo();
             await loadMenuList();
             await loadRecentOrders();
+
+            // 30초마다 새 주문 확인 (실시간 주문 알림)
+            setInterval(checkNewOrders, 30000);
         });
     </script>
 
