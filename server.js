@@ -277,7 +277,7 @@ app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 app.use("/manager/ad", managerAdRouter);
-app.use("/manager/ad", indexmanagerAdRouter);
+app.use("/index/ad", indexmanagerAdRouter);  // 다른 경로로 변경
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
