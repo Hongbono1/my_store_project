@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 import pool from "../db.js";
-import { uploadManagerAd } from "../controllers/managerAdController.js";
+import { uploadManagerAd, saveBannerSlot, saveTextSlot, getSlot, getTextSlot } from "../controllers/indexmanagerAdController.js";  // ✅ 올바른 파일명
 
 const router = express.Router();
 
