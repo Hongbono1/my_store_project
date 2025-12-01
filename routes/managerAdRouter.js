@@ -58,6 +58,34 @@ router.get("/random", async (req, res) => {
 });
 
 // ==============================
+// 📌 🔥 통합 슬롯 조회 API (배너용)
+// ==============================
+router.get("/slot", async (req, res) => {
+    try {
+        const { page, position } = req.query;
+
+        if (!page || !position) {
+            return res.json({ ok: false, message: "page와 position 필요" });
+        }
+
+        const sql = `
+            SELECT id, page, position, image_url, link_url, created_at
+            FROM manager_ads
+            WHERE page = $1 AND position = $2
+            ORDER BY created_at DESC
+            LIMIT 1
+        `;
+
+        const result = await pool.query(sql, [page, position]);
+        return res.json({ ok: true, slot: result.rows[0] || null });
+
+    } catch (err) {
+        console.error("SLOT GET ERROR:", err);
+        return res.json({ ok: false, slot: null });
+    }
+});
+
+// ==============================
 // 📌 텍스트 저장 (UPSERT)
 // ==============================
 router.post("/text/save", async (req, res) => {
@@ -68,7 +96,6 @@ router.post("/text/save", async (req, res) => {
             return res.json({ ok: false, message: "page와 position이 필요합니다." });
         }
 
-        // UPSERT: 이미 있으면 업데이트, 없으면 삽입
         const sql = `
             INSERT INTO manager_texts (page, position, content)
             VALUES ($1, $2, $3)
