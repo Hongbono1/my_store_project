@@ -46,7 +46,6 @@ import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
 import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
-import managerAdRouter from "./routes/managerAdRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
 import pool from "./db.js";
@@ -276,7 +275,6 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-app.use("/manager/ad", managerAdRouter);
 app.use("/index/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
