@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import pool from "../db.js";  // ✅ pool import 추가
 import { uploadManagerAd } from "../controllers/managerAdController.js";
 
 const router = express.Router();
@@ -33,4 +34,28 @@ router.post(
     uploadManagerAd
 );
 
-export default router;
+// ==============================
+// 📌 랜덤 광고 가져오기
+// ==============================
+router.get("/random", async (req, res) => {
+    try {
+        const { page, position } = req.query;
+
+        const sql = `
+            SELECT * FROM manager_ads
+            WHERE page = $1 AND position = $2
+            ORDER BY RANDOM()
+            LIMIT 1
+        `;
+
+        const result = await pool.query(sql, [page, position]);
+        return res.json({ ok: true, ad: result.rows[0] || null });
+
+    } catch (err) {
+        console.error("MANAGER AD RANDOM ERROR:", err);
+        return res.json({ ok: false });
+    }
+});
+
+export default router;  // ✅ export는 맨 마지막에!
+

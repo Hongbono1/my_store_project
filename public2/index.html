@@ -34,8 +34,19 @@
     <!-- 헤더 -->
     <div id="header-placeholder"></div>
 
-    <!-- 상단 띠배너 -->
+    <!-- 상단 띠배너 (광고) -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
+        <div id="mainTopBannerContainer" class="neo-card h-28 flex flex-col items-center justify-center text-center cursor-pointer">
+            <img id="mainTopBanner" src="" alt="광고" class="w-full h-full object-cover rounded-lg hidden">
+            <div id="mainTopBannerDefault">
+                <p class="text-lg sm:text-xl md:text-2xl font-bold">네이버에 새집마련</p>
+                <p class="text-gray-600 text-sm sm:text-base">내 취향을 기록할 새로운 공간</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 상단 띠배너 (기본) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-16 hidden" id="defaultTopBanner">
         <div class="neo-card h-28 flex flex-col items-center justify-center text-center cursor-pointer">
             <p class="text-lg sm:text-xl md:text-2xl font-bold">네이버에 새집마련</p>
             <p class="text-gray-600 text-sm sm:text-base">내 취향을 기록할 새로운 공간</p>
@@ -50,21 +61,24 @@
             </div>
         </div>
 
-        <!-- 우측 프로모 -->
+        <!-- 우측 프로모 (롤링 광고) -->
         <div class="flex flex-col gap-4 h-full">
-            <div class="flex-1">
-                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full">
-                    Promo 1
+            <div class="flex-1 cursor-pointer" id="promo1Container">
+                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full overflow-hidden">
+                    <img id="rollingAd1" src="" alt="광고" class="w-full h-full object-cover hidden">
+                    <span id="promo1Default">Promo 1</span>
                 </div>
             </div>
-            <div class="flex-1">
-                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full">
-                    Promo 2
+            <div class="flex-1 cursor-pointer" id="promo2Container">
+                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full overflow-hidden">
+                    <img id="rollingAd2" src="" alt="광고" class="w-full h-full object-cover hidden">
+                    <span id="promo2Default">Promo 2</span>
                 </div>
             </div>
-            <div class="flex-1">
-                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full">
-                    Promo 3
+            <div class="flex-1 cursor-pointer" id="promo3Container">
+                <div class="bg-gray-200 rounded-lg flex items-center justify-center h-full overflow-hidden">
+                    <img id="rollingAd3" src="" alt="광고" class="w-full h-full object-cover hidden">
+                    <span id="promo3Default">Promo 3</span>
                 </div>
             </div>
         </div>
@@ -302,7 +316,69 @@
     </div>
 
     <script>
+        // ==============================
+        // 📌 광고 로드 함수들
+        // ==============================
+        
+        // 메인 상단 배너 광고
+        async function loadMainTopBanner() {
+            try {
+                const res = await fetch("/manager/ad/random?page=index&position=index_main_top");
+                const data = await res.json();
+
+                if (data.ok && data.ad) {
+                    const img = document.getElementById("mainTopBanner");
+                    const defaultEl = document.getElementById("mainTopBannerDefault");
+                    
+                    img.src = data.ad.image_url;
+                    img.classList.remove("hidden");
+                    defaultEl.classList.add("hidden");
+                    
+                    img.onclick = () => {
+                        if (data.ad.link_url) location.href = data.ad.link_url;
+                    };
+                }
+            } catch (err) {
+                console.error("메인 상단 배너 로드 실패:", err);
+            }
+        }
+
+        // 롤링 광고 (Promo 1, 2, 3)
+        async function loadRollingAds() {
+            const positions = [
+                { position: "index_promo_1", imgId: "rollingAd1", defaultId: "promo1Default", containerId: "promo1Container" },
+                { position: "index_promo_2", imgId: "rollingAd2", defaultId: "promo2Default", containerId: "promo2Container" },
+                { position: "index_promo_3", imgId: "rollingAd3", defaultId: "promo3Default", containerId: "promo3Container" }
+            ];
+
+            for (const p of positions) {
+                try {
+                    const res = await fetch(`/manager/ad/random?page=index&position=${p.position}`);
+                    const data = await res.json();
+
+                    if (data.ok && data.ad) {
+                        const img = document.getElementById(p.imgId);
+                        const defaultEl = document.getElementById(p.defaultId);
+                        
+                        img.src = data.ad.image_url;
+                        img.classList.remove("hidden");
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                        
+                        document.getElementById(p.containerId).onclick = () => {
+                            if (data.ad.link_url) location.href = data.ad.link_url;
+                        };
+                    }
+                } catch (err) {
+                    console.error(`${p.position} 광고 로드 실패:`, err);
+                }
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", async () => {
+            // 🔥 광고 로드
+            loadMainTopBanner();
+            loadRollingAds();
+
             /* ───────── header/footer 불러오기 ───────── */
             fetch("/components/header.html")
                 .then(res => res.text())
