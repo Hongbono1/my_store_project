@@ -233,16 +233,18 @@
                         </p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
 
-                            <!-- 검색어 -->
-                            <div class="slot-card cursor-pointer border border-dashed border-emerald-200 rounded-lg p-2 js-slot"
-                                data-page="index" data-position="index_sub_keywords" data-label="상단 서브: 검색어 박스">
+                            <!-- 검색어 (텍스트 슬롯) -->
+                            <div class="slot-card cursor-pointer border border-dashed border-emerald-200 rounded-lg p-2 js-text-slot"
+                                data-page="index" data-position="index_sub_keywords" data-slot-type="text"
+                                data-label="상단 서브: 검색어 박스">
                                 <div class="flex items-center justify-between">
                                     <p class="font-semibold mb-1">검색어 박스</p>
                                     <span
-                                        class="badge-info text-[10px] border border-emerald-200 px-2 py-0.5 rounded-full">텍스트/콘텐츠</span>
+                                        class="badge-info text-[10px] border border-emerald-200 px-2 py-0.5 rounded-full">텍스트
+                                        슬롯</span>
                                 </div>
                                 <p class="text-slate-500">
-                                    실시간 검색어 리스트 또는 관련 이미지/배너 설정 가능.
+                                    이 박스에 들어갈 문구/리스트를 관리자 페이지에서 텍스트로 입력합니다.
                                 </p>
                             </div>
 
@@ -314,19 +316,20 @@
                         </div>
                     </div>
 
-                    <!-- 5. 우리동네 한마디 -->
-                    <div class="slot-card cursor-pointer border border-dashed border-emerald-300 rounded-xl p-3 bg-white/90 js-slot"
-                        data-page="index" data-position="index_oneword" data-label="우리동네 한마디 텍스트 박스">
+                    <!-- 우리동네 한마디 (텍스트 슬롯) -->
+                    <div class="slot-card cursor-pointer border border-dashed border-emerald-300 rounded-xl p-3 bg-white/90 js-text-slot"
+                        data-page="index" data-position="index_oneword" data-slot-type="text"
+                        data-label="우리동네 한마디 텍스트 박스">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="font-semibold">⑧ 우리동네 한마디</p>
                                 <p class="text-[11px] text-slate-500">
-                                    지역별 한 줄 메시지가 크게 노출되는 텍스트 박스. 관리자 페이지에서 문구/콘텐츠를 수정 가능하게 사용하는 영역.
+                                    여기 문장은 관리자 페이지에서 직접 글로 입력해서 보여주는 영역입니다.
                                 </p>
                             </div>
                             <span
                                 class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] badge-info border border-emerald-200">
-                                텍스트/정보 슬롯
+                                텍스트 슬롯
                             </span>
                         </div>
                     </div>
@@ -604,6 +607,45 @@
         </div>
     </div>
 
+    <!-- ======================== -->
+    <!-- 🟢 텍스트 입력 전용 모달 -->
+    <!-- ======================== -->
+    <div id="textModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-7 max-w-lg w-full border border-slate-200">
+            <h2 id="textModalTitle" class="text-lg font-bold mb-3">
+                텍스트 설정
+            </h2>
+
+            <form id="textForm" class="space-y-3">
+                <div class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3" id="textSlotInfo">
+                    상단 서브 박스나 '우리동네 한마디'처럼<br>
+                    <span class="font-semibold">글만 들어가는 영역</span>을 설정합니다.
+                </div>
+
+                <div>
+                    <label class="block font-semibold mb-1 text-sm">표시할 텍스트</label>
+                    <textarea id="textContentInput"
+                        class="w-full border border-slate-300 rounded-lg p-2 text-sm min-h-[120px]"
+                        placeholder="예) 오늘 우리동네는 '붕어빵'이 대세예요! 따끈한 간식, 지금 바로 만나보세요."></textarea>
+                </div>
+
+                <input type="hidden" id="textSelectedPage">
+                <input type="hidden" id="textSelectedPosition">
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" id="closeTextModal"
+                        class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+                        취소
+                    </button>
+                    <button type="button" id="saveTextBtn"
+                        class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow text-sm hover:bg-emerald-700">
+                        저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // ============================
         // 페이지 리스트 (왼쪽)
@@ -663,28 +705,31 @@
         // ============================
         function setupSlotClick() {
             document.addEventListener("click", (e) => {
-                const slotEl = e.target.closest(".js-slot");
+                const slotEl = e.target.closest(".js-slot, .js-text-slot");
                 if (!slotEl) return;
 
                 const page = slotEl.dataset.page || "index";
                 const position = slotEl.dataset.position || "";
                 const label = slotEl.dataset.label || "선택된 슬롯";
+                const slotType = slotEl.dataset.slotType ||
+                    (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
 
-                document.getElementById("selectedPage").value = page;
-                document.getElementById("selectedPosition").value = position;
+                if (slotType === "text") {
+                    // 🟢 텍스트 전용 모달 열기
+                    document.getElementById("textSelectedPage").value = page;
+                    document.getElementById("textSelectedPosition").value = position;
+                    document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
 
-                document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
-                document.getElementById("slotInfo").innerHTML = `
-          <div class="font-semibold text-slate-700 mb-1">${label}</div>
-          <div class="text-[11px] text-slate-500">
-            · page: <code class="font-mono text-[11px] bg-slate-100 px-1 rounded">${page}</code><br>
-            · position: <code class="font-mono text-[11px] bg-slate-100 px-1 rounded">${position}</code><br>
-            이 위치에 사용할 이미지와 클릭 링크(또는 텍스트용 설정)를 관리합니다.
-          </div>
-        `;
-
-                document.getElementById("adModal").classList.remove("hidden");
-                document.getElementById("adModal").classList.add("flex");
+                    document.getElementById("textModal").classList.remove("hidden");
+                    document.getElementById("textModal").classList.add("flex");
+                } else {
+                    // 🔵 이미지/배너 모달 열기 (기존 동작)
+                    document.getElementById("selectedPage").value = page;
+                    document.getElementById("selectedPosition").value = position;
+                    document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
+                    document.getElementById("adModal").classList.remove("hidden");
+                    document.getElementById("adModal").classList.add("flex");
+                }
             });
         }
 
@@ -701,6 +746,23 @@
                 if (e.target === e.currentTarget) {
                     document.getElementById("adModal").classList.add("hidden");
                     document.getElementById("adModal").classList.remove("flex");
+                }
+            });
+        }
+
+        // ============================
+        // 텍스트 모달 닫기
+        // ============================
+        function setupTextModalClose() {
+            document.getElementById("closeTextModal").addEventListener("click", () => {
+                document.getElementById("textModal").classList.add("hidden");
+                document.getElementById("textModal").classList.remove("flex");
+            });
+
+            document.getElementById("textModal").addEventListener("click", (e) => {
+                if (e.target === e.currentTarget) {
+                    document.getElementById("textModal").classList.add("hidden");
+                    document.getElementById("textModal").classList.remove("flex");
                 }
             });
         }
@@ -756,11 +818,55 @@
             });
         }
 
+        // ============================
+        // 텍스트 저장 → /manager/ad/text/save
+        // ============================
+        function setupSaveText() {
+            document.getElementById("saveTextBtn").addEventListener("click", async () => {
+                const page = document.getElementById("textSelectedPage").value;
+                const position = document.getElementById("textSelectedPosition").value;
+                const content = document.getElementById("textContentInput").value.trim();
+
+                if (!page || !position) {
+                    alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
+                    return;
+                }
+                if (!content) {
+                    alert("표시할 텍스트를 입력해주세요.");
+                    return;
+                }
+
+                const body = { page, position, content };
+
+                try {
+                    const res = await fetch("/manager/ad/text/save", {  // ✅ 경로 수정
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        alert("텍스트가 저장되었습니다.");
+                        document.getElementById("textModal").classList.add("hidden");
+                        document.getElementById("textModal").classList.remove("flex");
+                        document.getElementById("textContentInput").value = "";
+                    } else {
+                        alert("오류: " + (data.message || "저장에 실패했습니다."));
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("저장 중 오류가 발생했습니다.");
+                }
+            });
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             renderPageList();
             setupSlotClick();
             setupModalClose();
+            setupTextModalClose();
             setupSave();
+            setupSaveText();
         });
     </script>
 </body>

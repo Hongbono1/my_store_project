@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
-import pool from "../db.js";  // ✅ pool import 추가
+import pool from "../db.js";
 import { uploadManagerAd } from "../controllers/managerAdController.js";
 
 const router = express.Router();
@@ -57,5 +57,56 @@ router.get("/random", async (req, res) => {
     }
 });
 
-export default router;  // ✅ export는 맨 마지막에!
+// ==============================
+// 📌 텍스트 저장 (UPSERT)
+// ==============================
+router.post("/text/save", async (req, res) => {
+    try {
+        const { page, position, content } = req.body;
+
+        if (!page || !position) {
+            return res.json({ ok: false, message: "page와 position이 필요합니다." });
+        }
+
+        // UPSERT: 이미 있으면 업데이트, 없으면 삽입
+        const sql = `
+            INSERT INTO manager_texts (page, position, content)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (page, position)
+            DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()
+            RETURNING id
+        `;
+
+        const result = await pool.query(sql, [page, position, content || ""]);
+        return res.json({ ok: true, id: result.rows[0].id });
+
+    } catch (err) {
+        console.error("MANAGER TEXT SAVE ERROR:", err);
+        return res.json({ ok: false, message: "서버 오류" });
+    }
+});
+
+// ==============================
+// 📌 텍스트 조회 (특정 슬롯)
+// ==============================
+router.get("/text/get", async (req, res) => {
+    try {
+        const { page, position } = req.query;
+
+        const sql = `
+            SELECT * FROM manager_texts
+            WHERE page = $1 AND position = $2
+            LIMIT 1
+        `;
+
+        const result = await pool.query(sql, [page, position]);
+        return res.json({ ok: true, text: result.rows[0] || null });
+
+    } catch (err) {
+        console.error("MANAGER TEXT GET ERROR:", err);
+        return res.json({ ok: false });
+    }
+});
+
+export default router;
 
