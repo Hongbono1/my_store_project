@@ -279,6 +279,11 @@ app.use("/api/hot", hotRouter);
 app.use("/manager/ad", managerAdRouter);
 app.use("/index/ad", indexmanagerAdRouter);  // 다른 경로로 변경
 
+// ✅ 카테고리 관리자 페이지 정적 서빙
+app.get("/admin/categorymanager.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public2", "admin", "categorymanager.html"));
+});
+
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
 // ------------------------------------------------------------
