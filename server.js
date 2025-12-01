@@ -47,7 +47,7 @@ import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import managerAdRouter from "./routes/managerAdRouter.js";
-
+import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
 import pool from "./db.js";
 
@@ -277,7 +277,7 @@ app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 app.use("/manager/ad", managerAdRouter);
-
+app.use("/manager/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
@@ -302,6 +302,9 @@ app.use("/uploads", express.static(UPLOAD_ROOT));
 
 // public2/uploads도 서빙 (폴백)
 app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
+
+// 정적 파일 (이미지) - 이미 있으면 생략
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 // ------------------------------------------------------------
 // 8. 헬스체크
