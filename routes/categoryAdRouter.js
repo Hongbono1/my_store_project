@@ -89,6 +89,16 @@ router.get("/category-manager/ad/text", (req, res, next) => {
 router.delete("/api/food-categories/:id", deleteFoodCategory);
 
 // ===============================
+// 🍱 FOOD CATEGORY API
+// ===============================
+
+// 목록 조회
+router.get("/api/food-categories", getFoodCategories);
+
+// 추가
+router.post("/api/food-categories", express.json(), createFoodCategory);
+
+// ===============================
 // 🏪 가게 연결 API
 // ===============================
 
