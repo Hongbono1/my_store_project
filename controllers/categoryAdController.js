@@ -209,3 +209,123 @@ export async function getSlots(req, res) {
     });
   }
 }
+
+// ===============================
+// 🏪 사업자번호 + 상호로 가게를 슬롯에 연결
+// ===============================
+export async function assignStoreToSlot(req, res) {
+  const { page, position, business_no, business_name } = req.body || {};
+
+  if (!page || !position) {
+    return res.status(400).json({ ok: false, message: "슬롯 정보가 없습니다." });
+  }
+  if (!business_no || !business_name) {
+    return res.status(400).json({ ok: false, message: "사업자번호와 상호를 모두 입력해주세요." });
+  }
+
+  try {
+    // 1) 사업자번호 + 상호명으로 가게 검색
+    const storeResult = await pool.query(
+      `
+      SELECT id, business_name, business_no, main_image_url
+      FROM food_stores
+      WHERE business_no = $1
+        AND business_name = $2
+      LIMIT 1
+      `,
+      [business_no.trim(), business_name.trim()]
+    );
+
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        message: "일치하는 가게를 찾을 수 없습니다.",
+      });
+    }
+
+    const store = storeResult.rows[0];
+
+    // 2) 이 가게의 상세 링크 자동 생성 (예: ndetail.html)
+    const linkUrl = `/ndetail.html?id=${store.id}&type=food`;
+
+    // 3) admin_ad_slots에 저장 (이미지/링크는 가게 기준으로)
+    await pool.query(
+      `
+      INSERT INTO admin_ad_slots (page, position, slot_mode, store_id, business_no, business_name, link_url, image_url)
+      VALUES ($1, $2, 'store', $3, $4, $5, $6, $7)
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_mode = 'store',
+        store_id = EXCLUDED.store_id,
+        business_no = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        link_url = EXCLUDED.link_url,
+        image_url = EXCLUDED.image_url,
+        updated_at = NOW()
+      `,
+      [
+        page,
+        position,
+        store.id,
+        store.business_no,
+        store.business_name,
+        linkUrl,
+        store.main_image_url || null,
+      ]
+    );
+
+    return res.json({ 
+      ok: true, 
+      store: {
+        id: store.id,
+        business_name: store.business_name,
+        business_no: store.business_no,
+        link_url: linkUrl,
+        image_url: store.main_image_url
+      }
+    });
+  } catch (err) {
+    console.error("assignStoreToSlot ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "광고 슬롯에 가게를 연결하는 중 오류가 발생했습니다.",
+      error: err.message,
+    });
+  }
+}
+
+// ===============================
+// 🔍 사업자번호로 가게 검색 (자동완성용)
+// ===============================
+export async function searchStoreByBusiness(req, res) {
+  const { business_no } = req.query || {};
+
+  if (!business_no || business_no.length < 3) {
+    return res.json({ ok: true, stores: [] });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT id, business_name, business_no, main_image_url
+      FROM food_stores
+      WHERE business_no LIKE $1
+      ORDER BY business_name ASC
+      LIMIT 10
+      `,
+      [`%${business_no.trim()}%`]
+    );
+
+    return res.json({ 
+      ok: true, 
+      stores: result.rows 
+    });
+  } catch (err) {
+    console.error("searchStoreByBusiness ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "가게 검색 중 오류가 발생했습니다.",
+      error: err.message,
+    });
+  }
+}

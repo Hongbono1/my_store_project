@@ -9,6 +9,11 @@ import {
   saveTextSlot,
   getSlot,
   getTextSlot,
+  getFoodCategories,
+  createFoodCategory,
+  deleteFoodCategory,
+  assignStoreToSlot,
+  searchStoreByBusiness,
 } from "../controllers/categoryAdController.js";
 
 const router = express.Router();
@@ -79,5 +84,18 @@ router.get("/category-manager/ad/text", (req, res, next) => {
   ensureFoodCategoryQuery(req);
   getTextSlot(req, res, next);
 });
+
+// 삭제
+router.delete("/api/food-categories/:id", deleteFoodCategory);
+
+// ===============================
+// 🏪 가게 연결 API
+// ===============================
+
+// 사업자번호 + 상호로 가게를 슬롯에 연결
+router.post("/api/assign-store", express.json(), assignStoreToSlot);
+
+// 사업자번호로 가게 검색 (자동완성)
+router.get("/api/search-store", searchStoreByBusiness);
 
 export default router;

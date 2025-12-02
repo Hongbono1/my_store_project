@@ -10,6 +10,7 @@ import {
   saveTextSlot,
   getSlot,
   getTextSlot,
+  assignStoreSlot, // ✅ 새로 추가 (controller에도 필요)
 } from "../controllers/managerAdController.js";
 
 const router = express.Router();
@@ -45,37 +46,41 @@ const upload = multer({
 
 /**
  * 🔵 인덱스/메인 관리자용 배너/이미지 저장
- * - POST /manager/ad/upload
+ * - POST /index/ad/upload
  * - form-data: image(선택), page, position, link_url(선택)
  */
-router.post(
-  "/manager/ad/upload",
-  upload.single("image"),
-  uploadManagerAd
-);
+router.post("/index/ad/upload", upload.single("image"), uploadManagerAd);
 
 /**
  * 🟢 인덱스/메인 관리자용 텍스트 저장
- * - POST /manager/ad/text/save
+ * - POST /index/ad/text/save
  * - JSON: { page, position, content }
  */
-router.post(
-  "/manager/ad/text/save",
-  express.json(),
-  saveTextSlot
-);
+router.post("/index/ad/text/save", express.json(), saveTextSlot);
 
 /**
  * (옵션) 슬롯 조회
- * GET /manager/ad/slot?page=index_main&position=main_top_banner
+ * GET /index/ad/slot?page=index&position=index_main_top
  */
-router.get("/manager/ad/slot", getSlot);
+router.get("/index/ad/slot", getSlot);
 
 /**
  * (옵션) 텍스트 슬롯 조회
- * GET /manager/ad/text?page=index_main&position=index_main_text
+ * GET /index/ad/text?page=index&position=index_oneword
  */
-router.get("/manager/ad/text", getTextSlot);
+router.get("/index/ad/text", getTextSlot);
+
+/**
+ * 🍽 등록된 가게를 슬롯에 연결 (사업자번호 + 상호)
+ * - POST /index/ad/assign-store
+ * - JSON: { page, position, business_no, business_name }
+ */
+router.post("/index/ad/assign-store", express.json(), assignStoreSlot);
+
+// (선택) 기존 /manager/ad/... 경로도 유지하고 싶다면 아래처럼 alias로 남겨둘 수도 있음.
+// router.post("/manager/ad/upload", upload.single("image"), uploadManagerAd);
+// router.post("/manager/ad/text/save", express.json(), saveTextSlot);
+// router.get("/manager/ad/slot", getSlot);
+// router.get("/manager/ad/text", getTextSlot);
 
 export default router;
-
