@@ -170,3 +170,42 @@ export async function getTextSlot(req, res) {
     });
   }
 }
+
+/**
+ * (옵션) 슬롯 조회 – 나중에 category.html / index.html에서 사용
+ * GET /manager/ad/slot?page=food_category&position=category_power_1
+ */
+export async function getSlots(req, res) {
+  const { page, position } = req.query || {};
+
+  if (!page || !position) {
+    return res.status(400).json({
+      ok: false,
+      message: "page와 position은 필수입니다.",
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM admin_ad_slots
+      WHERE page = $1
+        AND position = $2
+      `,
+      [page, position]
+    );
+
+    return res.json({
+      ok: true,
+      items: result.rows,
+    });
+  } catch (err) {
+    console.error("getSlots ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "슬롯 조회 중 오류가 발생했습니다.",
+      error: err.message,
+    });
+  }
+}
