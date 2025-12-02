@@ -462,6 +462,28 @@
           </p>
         </div>
 
+        <!-- 사업자번호 + 상호명 입력 (가게 연결용) -->
+        <div class="border-t border-slate-200 pt-3 mt-3">
+          <p class="text-sm font-semibold mb-2 text-slate-700">또는 등록된 가게 연결</p>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-medium mb-1 text-xs">사업자번호</label>
+              <input id="bizNumberInput" type="text" placeholder="123-45-67890"
+                class="w-full border border-slate-300 p-2 rounded-lg text-xs">
+            </div>
+            <div>
+              <label class="block font-medium mb-1 text-xs">상호명</label>
+              <input id="bizNameInput" type="text" placeholder="맛있는 한식집"
+                class="w-full border border-slate-300 p-2 rounded-lg text-xs">
+            </div>
+          </div>
+          
+          <p class="text-[10px] text-slate-400 mt-1">
+            사업자번호와 상호명을 입력하면 등록된 가게 정보로 슬롯을 채웁니다.
+          </p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-3">
           <button type="button" id="closeModal"
             class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
@@ -556,14 +578,14 @@
 
   <script>
     // ============================
-    // 슬롯 클릭 → 모달 열기 (indexmanager와 동일 방식)
+    // 슬롯 클릭 → 모달 열기
     // ============================
     function setupSlotClick() {
       document.addEventListener("click", (e) => {
         const slotEl = e.target.closest(".js-slot, .js-text-slot");
         if (!slotEl) return;
 
-        const page = slotEl.dataset.page || "food_category";   // ✅ 기본 페이지 키
+        const page = slotEl.dataset.page || "category_page";
         const position = slotEl.dataset.position || "";
         const label = slotEl.dataset.label || "선택된 슬롯";
         const slotType =
@@ -571,7 +593,6 @@
           (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
 
         if (slotType === "text") {
-          // 🟢 텍스트 전용 모달
           document.getElementById("textSelectedPage").value = page;
           document.getElementById("textSelectedPosition").value = position;
           document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
@@ -581,7 +602,6 @@
           document.getElementById("textModal").classList.remove("hidden");
           document.getElementById("textModal").classList.add("flex");
         } else {
-          // 🔵 이미지/배너 모달
           document.getElementById("selectedPage").value = page;
           document.getElementById("selectedPosition").value = position;
           document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
@@ -594,93 +614,30 @@
     }
 
     // ============================
-    // 이미지/배너 모달 닫기
+    // 모달 닫기 공통
     // ============================
     function setupModalClose() {
-      const adModal = document.getElementById("adModal");
-      const closeBtn = document.getElementById("closeModal");
-
-      if (closeBtn) {
-        closeBtn.addEventListener("click", () => {
-          adModal.classList.add("hidden");
-          adModal.classList.remove("flex");
-        });
-      }
-
-      if (adModal) {
-        adModal.addEventListener("click", (e) => {
+      ["adModal", "textModal"].forEach((id) => {
+        const modal = document.getElementById(id);
+        modal?.addEventListener("click", (e) => {
           if (e.target === e.currentTarget) {
-            adModal.classList.add("hidden");
-            adModal.classList.remove("flex");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
           }
         });
-      }
+      });
+      document.getElementById("closeModal")?.addEventListener("click", () => {
+        adModal.classList.add("hidden");
+        adModal.classList.remove("flex");
+      });
+      document.getElementById("closeTextModal")?.addEventListener("click", () => {
+        textModal.classList.add("hidden");
+        textModal.classList.remove("flex");
+      });
     }
 
     // ============================
-    // 텍스트 모달 닫기
-    // ============================
-    function setupTextModalClose() {
-      const textModal = document.getElementById("textModal");
-      const closeTextBtn = document.getElementById("closeTextModal");
-
-      if (closeTextBtn) {
-        closeTextBtn.addEventListener("click", () => {
-          textModal.classList.add("hidden");
-          textModal.classList.remove("flex");
-        });
-      }
-
-      if (textModal) {
-        textModal.addEventListener("click", (e) => {
-          if (e.target === e.currentTarget) {
-            textModal.classList.add("hidden");
-            textModal.classList.remove("flex");
-          }
-        });
-      }
-    }
-
-    // ============================
-    // 탭 전환 기능 설정
-    // ============================
-    function setupTabs() {
-      const imageTab = document.getElementById("imageTab");
-      const storeTab = document.getElementById("storeTab");
-      const adForm = document.getElementById("adForm");
-      const storeForm = document.getElementById("storeForm");
-
-      if (imageTab) {
-        imageTab.addEventListener("click", () => {
-          // 탭 활성화
-          imageTab.classList.add("active", "border-blue-500", "text-blue-600");
-          imageTab.classList.remove("text-slate-500");
-          storeTab.classList.remove("active", "border-blue-500", "text-blue-600");
-          storeTab.classList.add("text-slate-500");
-          
-          // 폼 전환
-          adForm.classList.remove("hidden");
-          storeForm.classList.add("hidden");
-        });
-      }
-
-      if (storeTab) {
-        storeTab.addEventListener("click", () => {
-          // 탭 활성화
-          storeTab.classList.add("active", "border-blue-500", "text-blue-600");
-          storeTab.classList.remove("text-slate-500");
-          imageTab.classList.remove("active", "border-blue-500", "text-blue-600");
-          imageTab.classList.add("text-slate-500");
-          
-          // 폼 전환
-          storeForm.classList.remove("hidden");
-          adForm.classList.add("hidden");
-        });
-      }
-    }
-
-    // ============================
-    // 이미지/배너 저장 → /category-manager/ad/upload
+    // 이미지/배너 저장
     // ============================
     function setupSaveBanner() {
       const saveBtn = document.getElementById("saveAdBtn");
@@ -692,52 +649,48 @@
         const imageFile = document.getElementById("imageInput").files[0];
         const link = document.getElementById("linkInput").value.trim();
 
-        if (!page || !position) {
-          alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-          return;
-        }
+        const bizNum = document.getElementById("bizNumberInput").value.trim();
+        const bizName = document.getElementById("bizNameInput").value.trim();
 
-        if (!imageFile && !link) {
-          const ok = confirm(
-            "이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?"
-          );
-          if (!ok) return;
-        }
+        const useBizMode = bizNum && bizName; // 사업자 입력 있으면 이 모드
 
         const formData = new FormData();
         formData.append("page", page);
         formData.append("position", position);
         formData.append("link_url", link || "");
-        if (imageFile) {
+
+        if (useBizMode) {
+          formData.append("biz_number", bizNum);
+          formData.append("biz_name", bizName);
+        } else if (imageFile) {
           formData.append("image", imageFile);
         }
 
+        const url = useBizMode
+          ? "/category/ad/store" // 가게 슬롯 지정 모드
+          : "/category/ad/upload"; // 단순 배너 업로드
+
         try {
-          const res = await fetch("/category-manager/ad/upload", {
+          const res = await fetch(url, {
             method: "POST",
             body: formData,
           });
           const data = await res.json();
-
           if (data.ok) {
             alert("저장 완료되었습니다.");
-            const adModal = document.getElementById("adModal");
-            adModal.classList.add("hidden");
-            adModal.classList.remove("flex");
-            document.getElementById("imageInput").value = "";
-            document.getElementById("linkInput").value = "";
+            document.getElementById("adModal").classList.add("hidden");
           } else {
-            alert("오류: " + (data.message || "저장에 실패했습니다."));
+            alert("오류: " + (data.message || "저장 실패"));
           }
         } catch (err) {
           console.error(err);
-          alert("저장 중 오류가 발생했습니다.");
+          alert("저장 중 오류 발생");
         }
       });
     }
 
     // ============================
-    // 텍스트 저장 → /category-manager/ad/text/save
+    // 텍스트 슬롯 저장
     // ============================
     function setupSaveText() {
       const saveTextBtn = document.getElementById("saveTextBtn");
@@ -746,235 +699,27 @@
       saveTextBtn.addEventListener("click", async () => {
         const page = document.getElementById("textSelectedPage").value;
         const position = document.getElementById("textSelectedPosition").value;
-        const content = document
-          .getElementById("textContentInput")
-          .value.trim();
-
-        if (!page || !position) {
-          alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-          return;
-        }
-        if (!content) {
-          alert("표시할 텍스트를 입력해주세요.");
-          return;
-        }
+        const content = document.getElementById("textContentInput").value.trim();
 
         const body = { page, position, content };
-
-        try {
-          const res = await fetch("/category-manager/ad/text/save", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const data = await res.json();
-
-          if (data.ok) {
-            alert("텍스트가 저장되었습니다.");
-            const textModal = document.getElementById("textModal");
-            textModal.classList.add("hidden");
-            textModal.classList.remove("flex");
-            document.getElementById("textContentInput").value = "";
-          } else {
-            alert("오류: " + (data.message || "저장에 실패했습니다."));
-          }
-        } catch (err) {
-          console.error(err);
-          alert("저장 중 오류가 발생했습니다.");
+        const res = await fetch("/category/ad/text/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert("텍스트 저장 완료");
+          document.getElementById("textModal").classList.add("hidden");
         }
       });
     }
 
-    // ============================
-    // 가게 연결 기능
-    // ============================
-    function setupStoreConnection() {
-      const closeStoreModal = document.getElementById("closeStoreModal");
-      const saveStoreBtn = document.getElementById("saveStoreBtn");
-
-      // 가게 연결 모달 닫기
-      if (closeStoreModal) {
-        closeStoreModal.addEventListener("click", () => {
-          const adModal = document.getElementById("adModal");
-          adModal.classList.add("hidden");
-          adModal.classList.remove("flex");
-        });
-      }
-
-      // 가게 연결 저장
-      if (saveStoreBtn) {
-        saveStoreBtn.addEventListener("click", async () => {
-          const page = document.getElementById("selectedPage").value;
-          const position = document.getElementById("selectedPosition").value;
-          const businessNo = document.getElementById("businessNoInput").value.trim();
-          const businessName = document.getElementById("businessNameInput").value.trim();
-
-          if (!page || !position) {
-            alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-            return;
-          }
-
-          if (!businessNo || !businessName) {
-            alert("사업자번호와 상호명을 모두 입력해주세요.");
-            return;
-          }
-
-          try {
-            const res = await fetch("/api/assign-store", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                page,
-                position,
-                business_no: businessNo,
-                business_name: businessName
-              }),
-            });
-
-            const data = await res.json();
-            if (data.ok) {
-              alert(`가게 연결 완료!\n상호: ${data.store.business_name}\n사업자번호: ${data.store.business_no}`);
-              const adModal = document.getElementById("adModal");
-              adModal.classList.add("hidden");
-              adModal.classList.remove("flex");
-              document.getElementById("businessNoInput").value = "";
-              document.getElementById("businessNameInput").value = "";
-            } else {
-              alert("오류: " + (data.message || "가게 연결에 실패했습니다."));
-            }
-          } catch (err) {
-            console.error("가게 연결 ERROR:", err);
-            alert("가게 연결 중 오류가 발생했습니다.");
-          }
-        });
-      }
-    }
-
-    // ============================
-    // 🍱 FOOD CATEGORY 관리 (추가/삭제)
-    // ============================
-    function setupFoodCategoryManagement() {
-      // loadFoodCategories 함수를 setupFoodCategoryManagement 내부에 정의
-      async function loadFoodCategories() {
-        const listEl = document.getElementById("categoryList");
-        if (!listEl) return;
-
-        try {
-          const res = await fetch("/api/food-categories");
-          const data = await res.json();
-
-          listEl.innerHTML = "";
-
-          if (!data.ok) {
-            console.warn("FOOD CATEGORY 불러오기 실패:", data.message);
-            listEl.innerHTML =
-              '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 실패</li>';
-            return;
-          }
-
-          if (!data.items || data.items.length === 0) {
-            listEl.innerHTML =
-              '<li class="text-[11px] text-slate-400 px-2 py-1">등록된 카테고리가 없습니다.</li>';
-            return;
-          }
-
-          for (const cat of data.items) {
-            const li = document.createElement("li");
-            li.className =
-              "flex items-center justify-between px-2 py-1 rounded-lg bg-slate-50 border border-slate-200";
-
-            li.innerHTML = `
-              <span class="text-[12px]">${cat.name}</span>
-              <button
-                type="button"
-                class="text-[10px] text-red-500 hover:text-red-600"
-                data-id="${cat.id}"
-              >
-                삭제
-              </button>
-            `;
-
-            const deleteBtn = li.querySelector("button");
-            deleteBtn.addEventListener("click", async () => {
-              const ok = confirm(`'${cat.name}' 카테고리를 삭제하시겠습니까?`);
-              if (!ok) return;
-
-              try {
-                const res = await fetch(`/api/food-categories/${cat.id}`, {
-                  method: "DELETE",
-                });
-                const data = await res.json();
-                if (!data.ok) {
-                  alert(data.message || "삭제에 실패했습니다.");
-                  return;
-                }
-                await loadFoodCategories();
-              } catch (err) {
-                console.error("deleteFoodCategory ERROR:", err);
-                alert("삭제 중 오류가 발생했습니다.");
-              }
-            });
-
-            listEl.appendChild(li);
-          }
-        } catch (err) {
-          console.error("loadFoodCategories ERROR:", err);
-          listEl.innerHTML =
-            '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 중 오류</li>';
-        }
-      }
-
-      const addCategoryBtn = document.getElementById("addCategoryBtn");
-      if (addCategoryBtn) {
-        addCategoryBtn.addEventListener("click", async () => {
-          const input = document.getElementById("newCategoryName");
-          if (!input) return;
-
-          const name = input.value.trim();
-          if (!name) {
-            alert("카테고리 이름을 입력해주세요.");
-            input.focus();
-            return;
-          }
-
-          try {
-            const res = await fetch("/api/food-categories", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name }),
-            });
-
-            const data = await res.json();
-            if (!data.ok) {
-              alert(data.message || "카테고리 추가에 실패했습니다.");
-              return;
-            }
-
-            input.value = "";
-            await loadFoodCategories();
-          } catch (err) {
-            console.error("createFoodCategory ERROR:", err);
-            alert("카테고리 추가 중 오류가 발생했습니다.");
-          }
-        });
-      }
-
-      // 페이지 로딩 시 카테고리 목록 불러오기
-      loadFoodCategories();
-    }
-
-    // ============================
-    // 초기화
-    // ============================
     document.addEventListener("DOMContentLoaded", () => {
-      setupSlotClick();              // 슬롯 클릭 → 모달 열기
-      setupModalClose();             // 배너 모달 닫기
-      setupTextModalClose();         // 텍스트 모달 닫기
-      setupTabs();                   // 탭 전환 기능
-      setupSaveBanner();             // 배너 저장
-      setupSaveText();               // 텍스트 저장
-      setupStoreConnection();        // 가게 연결 기능
-      setupFoodCategoryManagement(); // FOOD CATEGORY 관리 (loadFoodCategories 포함)
+      setupSlotClick();
+      setupModalClose();
+      setupSaveBanner();
+      setupSaveText();
     });
   </script>
 </body>

@@ -215,39 +215,11 @@ export async function getSlots(req, res) {
 // ===============================
 export async function getFoodCategories(req, res) {
   try {
-    // 먼저 테이블이 존재하는지 확인하고 없으면 생성
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS food_categories (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        slug VARCHAR(255) UNIQUE NOT NULL,
-        sort_order INTEGER DEFAULT 999,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    const result = await pool.query(
-      `
-      SELECT id, name, slug, sort_order, is_active
-      FROM food_categories
-      WHERE is_active = TRUE
-      ORDER BY sort_order ASC, id ASC
-      `
-    );
-
-    return res.json({
-      ok: true,
-      items: result.rows,
-    });
+    const result = await pool.query("SELECT * FROM food_categories ORDER BY id ASC");
+    res.json({ ok: true, categories: result.rows });
   } catch (err) {
     console.error("getFoodCategories ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "FOOD CATEGORY 목록 조회 중 오류가 발생했습니다.",
-      error: err.message,
-    });
+    res.status(500).json({ ok: false, message: "DB 조회 오류" });
   }
 }
 
@@ -255,60 +227,17 @@ export async function getFoodCategories(req, res) {
 // 🍱 FOOD CATEGORY 추가
 // ===============================
 export async function createFoodCategory(req, res) {
-  const { name } = req.body || {};
-
-  if (!name || !name.trim()) {
-    return res.status(400).json({
-      ok: false,
-      message: "카테고리 이름을 입력해주세요.",
-    });
-  }
-
-  const trimmedName = name.trim();
-  const slug = trimmedName.toLowerCase().replace(/\s+/g, "-"); // 간단 slug
-
   try {
-    // 먼저 테이블이 존재하는지 확인하고 없으면 생성
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS food_categories (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        slug VARCHAR(255) UNIQUE NOT NULL,
-        sort_order INTEGER DEFAULT 999,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ ok: false, message: "이름 누락" });
     const result = await pool.query(
-      `
-      INSERT INTO food_categories (name, slug)
-      VALUES ($1, $2)
-      ON CONFLICT (slug) DO NOTHING
-      RETURNING id, name, slug, sort_order, is_active
-      `,
-      [trimmedName, slug]
+      "INSERT INTO food_categories (name) VALUES ($1) RETURNING id",
+      [name]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(409).json({
-        ok: false,
-        message: "이미 같은 카테고리가 존재합니다.",
-      });
-    }
-
-    return res.json({
-      ok: true,
-      item: result.rows[0],
-    });
+    res.json({ ok: true, id: result.rows[0].id });
   } catch (err) {
     console.error("createFoodCategory ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "카테고리 추가 중 오류가 발생했습니다.",
-      error: err.message,
-    });
+    res.status(500).json({ ok: false, message: "추가 오류" });
   }
 }
 
@@ -316,48 +245,45 @@ export async function createFoodCategory(req, res) {
 // 🍱 FOOD CATEGORY 삭제 (소프트 삭제)
 // ===============================
 export async function deleteFoodCategory(req, res) {
-  const { id } = req.params || {};
-
-  const numId = Number.parseInt(id, 10);
-  if (!Number.isSafeInteger(numId)) {
-    return res.status(400).json({
-      ok: false,
-      message: "유효하지 않은 ID입니다.",
-    });
-  }
-
   try {
-    const result = await pool.query(
-      `
-      UPDATE food_categories
-      SET is_active = FALSE
-      WHERE id = $1
-      RETURNING id
-      `,
-      [numId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        message: "해당 카테고리를 찾을 수 없습니다.",
-      });
-    }
-
-    return res.json({ ok: true });
+    const { id } = req.params;
+    await pool.query("DELETE FROM food_categories WHERE id = $1", [id]);
+    res.json({ ok: true });
   } catch (err) {
     console.error("deleteFoodCategory ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "카테고리 삭제 중 오류가 발생했습니다.",
-      error: err.message,
-    });
+    res.status(500).json({ ok: false, message: "삭제 오류" });
   }
 }
 
 // ===============================
-// 🏪 사업자번호 + 상호로 가게를 슬롯에 연결
+// 🔗 단순 이미지/링크 업로드
 // ===============================
+export async function saveCategoryBanner(req, res) {
+  try {
+    const { page, position, link_url } = req.body;
+    const file = req.file;
+    const imageUrl = file ? `/uploads/category_ad/${file.filename}` : null;
+
+    const sql = `
+      INSERT INTO category_ad_slots (page, position, slot_type, image_url, link_url)
+      VALUES ($1, $2, 'banner', $3, $4)
+      ON CONFLICT (page, position)
+      DO UPDATE SET image_url = EXCLUDED.image_url, link_url = EXCLUDED.link_url, updated_at = NOW()
+      RETURNING id;
+    `;
+    const result = await pool.query(sql, [page, position, imageUrl, link_url]);
+    res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("saveCategoryBanner ERROR:", err);
+    res.status(500).json({ ok: false, message: "배너 저장 오류" });
+  }
+}
+
+/**
+ * (옵션) 사업자번호 + 상호로 가게를 슬롯에 연결
+ * - POST /manager/ad/assign/store
+ * - body: page, position, business_no, business_name
+ */
 export async function assignStoreToSlot(req, res) {
   const { page, position, business_no, business_name } = req.body || {};
 
