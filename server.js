@@ -47,6 +47,7 @@ import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
+import categoryAdRouter from "./routes/categoryAdRouter.js";  // ✅ 추가
 
 import pool from "./db.js";
 
@@ -275,8 +276,9 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-app.use("/manager/ad", indexmanagerAdRouter); // 둘 다 같은 라우터 사용
+app.use("/manager/ad", indexmanagerAdRouter);  // 기존 index 전용
 app.use("/index/ad", indexmanagerAdRouter);
+app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
