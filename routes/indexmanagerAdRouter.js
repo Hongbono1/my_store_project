@@ -14,7 +14,7 @@ import {
 const router = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__dirname);
+const __dirname = path.dirname(__filename); // ✅ 수정: path.dirname(__filename)
 
 // 🔹 업로드 폴더: public/uploads/manager_ad
 const storage = multer.diskStorage({
