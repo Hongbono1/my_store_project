@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 import {
   uploadManagerAd,
@@ -13,13 +14,21 @@ import {
 
 const router = express.Router();
 
+// ES6 모듈에서 __dirname 설정
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename); // ✅ 수정: path.dirname(__filename)
+const __dirname = path.dirname(__filename);
+
+// 업로드 폴더 확인 및 생성
+const uploadDir = path.join(__dirname, "..", "public", "uploads", "manager_ad");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("📁 manager_ad 폴더 생성:", uploadDir);
+}
 
 // 🔹 업로드 폴더: public/uploads/manager_ad
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "..", "public", "uploads", "manager_ad"));
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const ts = Date.now();
@@ -29,7 +38,10 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
 
 /**
  * 🔵 인덱스/메인 관리자용 배너/이미지 저장
