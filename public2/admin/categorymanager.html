@@ -853,76 +853,77 @@
     // ============================
     // 🍱 FOOD CATEGORY 관리 (추가/삭제)
     // ============================
-    async function loadFoodCategories() {
-      const listEl = document.getElementById("categoryList");
-      if (!listEl) return;
-
-      try {
-        const res = await fetch("/api/food-categories");
-        const data = await res.json();
-
-        listEl.innerHTML = "";
-
-        if (!data.ok) {
-          console.warn("FOOD CATEGORY 불러오기 실패:", data.message);
-          listEl.innerHTML =
-            '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 실패</li>';
-          return;
-        }
-
-        if (!data.items || data.items.length === 0) {
-          listEl.innerHTML =
-            '<li class="text-[11px] text-slate-400 px-2 py-1">등록된 카테고리가 없습니다.</li>';
-          return;
-        }
-
-        for (const cat of data.items) {
-          const li = document.createElement("li");
-          li.className =
-            "flex items-center justify-between px-2 py-1 rounded-lg bg-slate-50 border border-slate-200";
-
-          li.innerHTML = `
-            <span class="text-[12px]">${cat.name}</span>
-            <button
-              type="button"
-              class="text-[10px] text-red-500 hover:text-red-600"
-              data-id="${cat.id}"
-            >
-              삭제
-            </button>
-          `;
-
-          const deleteBtn = li.querySelector("button");
-          deleteBtn.addEventListener("click", async () => {
-            const ok = confirm(`'${cat.name}' 카테고리를 삭제하시겠습니까?`);
-            if (!ok) return;
-
-            try {
-              const res = await fetch(`/api/food-categories/${cat.id}`, {
-                method: "DELETE",
-              });
-              const data = await res.json();
-              if (!data.ok) {
-                alert(data.message || "삭제에 실패했습니다.");
-                return;
-              }
-              await loadFoodCategories();
-            } catch (err) {
-              console.error("deleteFoodCategory ERROR:", err);
-              alert("삭제 중 오류가 발생했습니다.");
-            }
-          });
-
-          listEl.appendChild(li);
-        }
-      } catch (err) {
-        console.error("loadFoodCategories ERROR:", err);
-        listEl.innerHTML =
-          '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 중 오류</li>';
-      }
-    }
-
     function setupFoodCategoryManagement() {
+      // loadFoodCategories 함수를 setupFoodCategoryManagement 내부에 정의
+      async function loadFoodCategories() {
+        const listEl = document.getElementById("categoryList");
+        if (!listEl) return;
+
+        try {
+          const res = await fetch("/api/food-categories");
+          const data = await res.json();
+
+          listEl.innerHTML = "";
+
+          if (!data.ok) {
+            console.warn("FOOD CATEGORY 불러오기 실패:", data.message);
+            listEl.innerHTML =
+              '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 실패</li>';
+            return;
+          }
+
+          if (!data.items || data.items.length === 0) {
+            listEl.innerHTML =
+              '<li class="text-[11px] text-slate-400 px-2 py-1">등록된 카테고리가 없습니다.</li>';
+            return;
+          }
+
+          for (const cat of data.items) {
+            const li = document.createElement("li");
+            li.className =
+              "flex items-center justify-between px-2 py-1 rounded-lg bg-slate-50 border border-slate-200";
+
+            li.innerHTML = `
+              <span class="text-[12px]">${cat.name}</span>
+              <button
+                type="button"
+                class="text-[10px] text-red-500 hover:text-red-600"
+                data-id="${cat.id}"
+              >
+                삭제
+              </button>
+            `;
+
+            const deleteBtn = li.querySelector("button");
+            deleteBtn.addEventListener("click", async () => {
+              const ok = confirm(`'${cat.name}' 카테고리를 삭제하시겠습니까?`);
+              if (!ok) return;
+
+              try {
+                const res = await fetch(`/api/food-categories/${cat.id}`, {
+                  method: "DELETE",
+                });
+                const data = await res.json();
+                if (!data.ok) {
+                  alert(data.message || "삭제에 실패했습니다.");
+                  return;
+                }
+                await loadFoodCategories();
+              } catch (err) {
+                console.error("deleteFoodCategory ERROR:", err);
+                alert("삭제 중 오류가 발생했습니다.");
+              }
+            });
+
+            listEl.appendChild(li);
+          }
+        } catch (err) {
+          console.error("loadFoodCategories ERROR:", err);
+          listEl.innerHTML =
+            '<li class="text-[11px] text-red-400 px-2 py-1">카테고리 불러오기 중 오류</li>';
+        }
+      }
+
       const addCategoryBtn = document.getElementById("addCategoryBtn");
       if (addCategoryBtn) {
         addCategoryBtn.addEventListener("click", async () => {
@@ -957,6 +958,9 @@
           }
         });
       }
+
+      // 페이지 로딩 시 카테고리 목록 불러오기
+      loadFoodCategories();
     }
 
     // ============================
@@ -970,8 +974,7 @@
       setupSaveBanner();             // 배너 저장
       setupSaveText();               // 텍스트 저장
       setupStoreConnection();        // 가게 연결 기능
-      setupFoodCategoryManagement(); // FOOD CATEGORY 관리
-      loadFoodCategories();          // 페이지 로딩 시 카테고리 목록 불러오기
+      setupFoodCategoryManagement(); // FOOD CATEGORY 관리 (loadFoodCategories 포함)
     });
   </script>
 </body>
