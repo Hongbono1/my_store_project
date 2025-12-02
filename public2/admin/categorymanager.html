@@ -555,171 +555,304 @@
   </div>
 
   <script>
-    // 슬롯 클릭 → 모달 열기 (이미지/배너 & 텍스트 공통)
-    document.addEventListener("click", (e) => {
-      const slotEl = e.target.closest(".js-slot, .js-text-slot");
-      if (!slotEl) return;
+    // ============================
+    // 슬롯 클릭 → 모달 열기 (indexmanager와 동일 방식)
+    // ============================
+    function setupSlotClick() {
+      document.addEventListener("click", (e) => {
+        const slotEl = e.target.closest(".js-slot, .js-text-slot");
+        if (!slotEl) return;
 
-      const page = slotEl.dataset.page || "food_category";
-      const position = slotEl.dataset.position || "";
-      const label = slotEl.dataset.label || "선택된 슬롯";
-      const slotType = slotEl.dataset.slotType ||
-        (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
+        const page = slotEl.dataset.page || "food_category";   // ✅ 기본 페이지 키
+        const position = slotEl.dataset.position || "";
+        const label = slotEl.dataset.label || "선택된 슬롯";
+        const slotType =
+          slotEl.dataset.slotType ||
+          (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
 
-      if (slotType === "text") {
-        // 텍스트 모달
-        document.getElementById("textSelectedPage").value = page;
-        document.getElementById("textSelectedPosition").value = position;
-        document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
-        document.getElementById("textModal").classList.remove("hidden");
-        document.getElementById("textModal").classList.add("flex");
-      } else {
-        // 이미지/배너 모달
-        document.getElementById("selectedPage").value = page;
-        document.getElementById("selectedPosition").value = position;
-        document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
-        document.getElementById("slotInfo").textContent = `${page} / ${position}`;
-        document.getElementById("adModal").classList.remove("hidden");
-        document.getElementById("adModal").classList.add("flex");
+        if (slotType === "text") {
+          // 🟢 텍스트 전용 모달
+          document.getElementById("textSelectedPage").value = page;
+          document.getElementById("textSelectedPosition").value = position;
+          document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
+          document.getElementById("textSlotInfo").innerHTML =
+            `${page} / ${position} 슬롯에 표시될 텍스트를 입력합니다.`;
+
+          document.getElementById("textModal").classList.remove("hidden");
+          document.getElementById("textModal").classList.add("flex");
+        } else {
+          // 🔵 이미지/배너 모달
+          document.getElementById("selectedPage").value = page;
+          document.getElementById("selectedPosition").value = position;
+          document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
+          document.getElementById("slotInfo").textContent = `${page} / ${position}`;
+
+          document.getElementById("adModal").classList.remove("hidden");
+          document.getElementById("adModal").classList.add("flex");
+        }
+      });
+    }
+
+    // ============================
+    // 이미지/배너 모달 닫기
+    // ============================
+    function setupModalClose() {
+      const adModal = document.getElementById("adModal");
+      const closeBtn = document.getElementById("closeModal");
+
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          adModal.classList.add("hidden");
+          adModal.classList.remove("flex");
+        });
       }
-    });
 
-    // 모달 닫기
-    document.getElementById("closeModal").addEventListener("click", () => {
-      document.getElementById("adModal").classList.add("hidden");
-      document.getElementById("adModal").classList.remove("flex");
-    });
-    document.getElementById("adModal").addEventListener("click", (e) => {
-      if (e.target === e.currentTarget) {
-        document.getElementById("adModal").classList.add("hidden");
-        document.getElementById("adModal").classList.remove("flex");
+      if (adModal) {
+        adModal.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) {
+            adModal.classList.add("hidden");
+            adModal.classList.remove("flex");
+          }
+        });
       }
-    });
+    }
 
+    // ============================
     // 텍스트 모달 닫기
-    document.getElementById("closeTextModal").addEventListener("click", () => {
-      document.getElementById("textModal").classList.add("hidden");
-      document.getElementById("textModal").classList.remove("flex");
-    });
-    document.getElementById("textModal").addEventListener("click", (e) => {
-      if (e.target === e.currentTarget) {
-        document.getElementById("textModal").classList.add("hidden");
-        document.getElementById("textModal").classList.remove("flex");
-      }
-    });
+    // ============================
+    function setupTextModalClose() {
+      const textModal = document.getElementById("textModal");
+      const closeTextBtn = document.getElementById("closeTextModal");
 
-    // 탭 전환 기능
-    document.getElementById("imageTab").addEventListener("click", () => {
-      // 탭 활성화
-      document.getElementById("imageTab").classList.add("active", "border-blue-500", "text-blue-600");
-      document.getElementById("imageTab").classList.remove("text-slate-500");
-      document.getElementById("storeTab").classList.remove("active", "border-blue-500", "text-blue-600");
-      document.getElementById("storeTab").classList.add("text-slate-500");
-      
-      // 폼 전환
-      document.getElementById("adForm").classList.remove("hidden");
-      document.getElementById("storeForm").classList.add("hidden");
-    });
-
-    document.getElementById("storeTab").addEventListener("click", () => {
-      // 탭 활성화
-      document.getElementById("storeTab").classList.add("active", "border-blue-500", "text-blue-600");
-      document.getElementById("storeTab").classList.remove("text-slate-500");
-      document.getElementById("imageTab").classList.remove("active", "border-blue-500", "text-blue-600");
-      document.getElementById("imageTab").classList.add("text-slate-500");
-      
-      // 폼 전환
-      document.getElementById("storeForm").classList.remove("hidden");
-      document.getElementById("adForm").classList.add("hidden");
-    });
-
-    // 이미지/배너 저장 → /category-manager/ad/upload (예시: 라우터에서 이 경로 처리)
-    document.getElementById("saveAdBtn").addEventListener("click", async () => {
-      const page = document.getElementById("selectedPage").value;
-      const position = document.getElementById("selectedPosition").value;
-      const imageFile = document.getElementById("imageInput").files[0];
-      const link = document.getElementById("linkInput").value.trim();
-
-      if (!page || !position) {
-        alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-        return;
-      }
-
-      if (!imageFile && !link) {
-        const ok = confirm("이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
-        if (!ok) return;
-      }
-
-      const formData = new FormData();
-      formData.append("page", page);
-      formData.append("position", position);
-      formData.append("link_url", link || "");
-      if (imageFile) {
-        formData.append("image", imageFile);
-      }
-
-      try {
-        const res = await fetch("/category-manager/ad/upload", {
-          method: "POST",
-          body: formData
+      if (closeTextBtn) {
+        closeTextBtn.addEventListener("click", () => {
+          textModal.classList.add("hidden");
+          textModal.classList.remove("flex");
         });
-        const data = await res.json();
-        if (data.ok) {
-          alert("저장 완료되었습니다.");
-          document.getElementById("adModal").classList.add("hidden");
-          document.getElementById("adModal").classList.remove("flex");
-          document.getElementById("imageInput").value = "";
-          document.getElementById("linkInput").value = "";
-        } else {
-          alert("오류: " + (data.message || "저장에 실패했습니다."));
-        }
-      } catch (err) {
-        console.error(err);
-        alert("저장 중 오류가 발생했습니다.");
       }
-    });
 
+      if (textModal) {
+        textModal.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) {
+            textModal.classList.add("hidden");
+            textModal.classList.remove("flex");
+          }
+        });
+      }
+    }
+
+    // ============================
+    // 탭 전환 기능 설정
+    // ============================
+    function setupTabs() {
+      const imageTab = document.getElementById("imageTab");
+      const storeTab = document.getElementById("storeTab");
+      const adForm = document.getElementById("adForm");
+      const storeForm = document.getElementById("storeForm");
+
+      if (imageTab) {
+        imageTab.addEventListener("click", () => {
+          // 탭 활성화
+          imageTab.classList.add("active", "border-blue-500", "text-blue-600");
+          imageTab.classList.remove("text-slate-500");
+          storeTab.classList.remove("active", "border-blue-500", "text-blue-600");
+          storeTab.classList.add("text-slate-500");
+          
+          // 폼 전환
+          adForm.classList.remove("hidden");
+          storeForm.classList.add("hidden");
+        });
+      }
+
+      if (storeTab) {
+        storeTab.addEventListener("click", () => {
+          // 탭 활성화
+          storeTab.classList.add("active", "border-blue-500", "text-blue-600");
+          storeTab.classList.remove("text-slate-500");
+          imageTab.classList.remove("active", "border-blue-500", "text-blue-600");
+          imageTab.classList.add("text-slate-500");
+          
+          // 폼 전환
+          storeForm.classList.remove("hidden");
+          adForm.classList.add("hidden");
+        });
+      }
+    }
+
+    // ============================
+    // 이미지/배너 저장 → /category-manager/ad/upload
+    // ============================
+    function setupSaveBanner() {
+      const saveBtn = document.getElementById("saveAdBtn");
+      if (!saveBtn) return;
+
+      saveBtn.addEventListener("click", async () => {
+        const page = document.getElementById("selectedPage").value;
+        const position = document.getElementById("selectedPosition").value;
+        const imageFile = document.getElementById("imageInput").files[0];
+        const link = document.getElementById("linkInput").value.trim();
+
+        if (!page || !position) {
+          alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
+          return;
+        }
+
+        if (!imageFile && !link) {
+          const ok = confirm(
+            "이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?"
+          );
+          if (!ok) return;
+        }
+
+        const formData = new FormData();
+        formData.append("page", page);
+        formData.append("position", position);
+        formData.append("link_url", link || "");
+        if (imageFile) {
+          formData.append("image", imageFile);
+        }
+
+        try {
+          const res = await fetch("/category-manager/ad/upload", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+
+          if (data.ok) {
+            alert("저장 완료되었습니다.");
+            const adModal = document.getElementById("adModal");
+            adModal.classList.add("hidden");
+            adModal.classList.remove("flex");
+            document.getElementById("imageInput").value = "";
+            document.getElementById("linkInput").value = "";
+          } else {
+            alert("오류: " + (data.message || "저장에 실패했습니다."));
+          }
+        } catch (err) {
+          console.error(err);
+          alert("저장 중 오류가 발생했습니다.");
+        }
+      });
+    }
+
+    // ============================
     // 텍스트 저장 → /category-manager/ad/text/save
-    document.getElementById("saveTextBtn").addEventListener("click", async () => {
-      const page = document.getElementById("textSelectedPage").value;
-      const position = document.getElementById("textSelectedPosition").value;
-      const content = document.getElementById("textContentInput").value.trim();
+    // ============================
+    function setupSaveText() {
+      const saveTextBtn = document.getElementById("saveTextBtn");
+      if (!saveTextBtn) return;
 
-      if (!page || !position) {
-        alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-        return;
-      }
-      if (!content) {
-        alert("표시할 텍스트를 입력해주세요.");
-        return;
-      }
+      saveTextBtn.addEventListener("click", async () => {
+        const page = document.getElementById("textSelectedPage").value;
+        const position = document.getElementById("textSelectedPosition").value;
+        const content = document
+          .getElementById("textContentInput")
+          .value.trim();
 
-      const body = { page, position, content };
-
-      try {
-        const res = await fetch("/category-manager/ad/text/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          alert("텍스트가 저장되었습니다.");
-          document.getElementById("textModal").classList.add("hidden");
-          document.getElementById("textModal").classList.remove("flex");
-          document.getElementById("textContentInput").value = "";
-        } else {
-          alert("오류: " + (data.message || "저장에 실패했습니다."));
+        if (!page || !position) {
+          alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
+          return;
         }
-      } catch (err) {
-        console.error(err);
-        alert("저장 중 오류가 발생했습니다.");
-      }
-    });
+        if (!content) {
+          alert("표시할 텍스트를 입력해주세요.");
+          return;
+        }
 
-    // ===========================
+        const body = { page, position, content };
+
+        try {
+          const res = await fetch("/category-manager/ad/text/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+
+          if (data.ok) {
+            alert("텍스트가 저장되었습니다.");
+            const textModal = document.getElementById("textModal");
+            textModal.classList.add("hidden");
+            textModal.classList.remove("flex");
+            document.getElementById("textContentInput").value = "";
+          } else {
+            alert("오류: " + (data.message || "저장에 실패했습니다."));
+          }
+        } catch (err) {
+          console.error(err);
+          alert("저장 중 오류가 발생했습니다.");
+        }
+      });
+    }
+
+    // ============================
+    // 가게 연결 기능
+    // ============================
+    function setupStoreConnection() {
+      const closeStoreModal = document.getElementById("closeStoreModal");
+      const saveStoreBtn = document.getElementById("saveStoreBtn");
+
+      // 가게 연결 모달 닫기
+      if (closeStoreModal) {
+        closeStoreModal.addEventListener("click", () => {
+          const adModal = document.getElementById("adModal");
+          adModal.classList.add("hidden");
+          adModal.classList.remove("flex");
+        });
+      }
+
+      // 가게 연결 저장
+      if (saveStoreBtn) {
+        saveStoreBtn.addEventListener("click", async () => {
+          const page = document.getElementById("selectedPage").value;
+          const position = document.getElementById("selectedPosition").value;
+          const businessNo = document.getElementById("businessNoInput").value.trim();
+          const businessName = document.getElementById("businessNameInput").value.trim();
+
+          if (!page || !position) {
+            alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
+            return;
+          }
+
+          if (!businessNo || !businessName) {
+            alert("사업자번호와 상호명을 모두 입력해주세요.");
+            return;
+          }
+
+          try {
+            const res = await fetch("/api/assign-store", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                page,
+                position,
+                business_no: businessNo,
+                business_name: businessName
+              }),
+            });
+
+            const data = await res.json();
+            if (data.ok) {
+              alert(`가게 연결 완료!\n상호: ${data.store.business_name}\n사업자번호: ${data.store.business_no}`);
+              const adModal = document.getElementById("adModal");
+              adModal.classList.add("hidden");
+              adModal.classList.remove("flex");
+              document.getElementById("businessNoInput").value = "";
+              document.getElementById("businessNameInput").value = "";
+            } else {
+              alert("오류: " + (data.message || "가게 연결에 실패했습니다."));
+            }
+          } catch (err) {
+            console.error("가게 연결 ERROR:", err);
+            alert("가게 연결 중 오류가 발생했습니다.");
+          }
+        });
+      }
+    }
+
+    // ============================
     // 🍱 FOOD CATEGORY 관리 (추가/삭제)
-    // ===========================
+    // ============================
     async function loadFoodCategories() {
       const listEl = document.getElementById("categoryList");
       if (!listEl) return;
@@ -789,43 +922,56 @@
       }
     }
 
-    const addCategoryBtn = document.getElementById("addCategoryBtn");
-    if (addCategoryBtn) {
-      addCategoryBtn.addEventListener("click", async () => {
-        const input = document.getElementById("newCategoryName");
-        if (!input) return;
+    function setupFoodCategoryManagement() {
+      const addCategoryBtn = document.getElementById("addCategoryBtn");
+      if (addCategoryBtn) {
+        addCategoryBtn.addEventListener("click", async () => {
+          const input = document.getElementById("newCategoryName");
+          if (!input) return;
 
-        const name = input.value.trim();
-        if (!name) {
-          alert("카테고리 이름을 입력해주세요.");
-          input.focus();
-          return;
-        }
-
-        try {
-          const res = await fetch("/api/food-categories", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
-          });
-
-          const data = await res.json();
-          if (!data.ok) {
-            alert(data.message || "카테고리 추가에 실패했습니다.");
+          const name = input.value.trim();
+          if (!name) {
+            alert("카테고리 이름을 입력해주세요.");
+            input.focus();
             return;
           }
 
-          input.value = "";
-          await loadFoodCategories();
-        } catch (err) {
-          console.error("createFoodCategory ERROR:", err);
-          alert("카테고리 추가 중 오류가 발생했습니다.");
-        }
-      });
+          try {
+            const res = await fetch("/api/food-categories", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name }),
+            });
+
+            const data = await res.json();
+            if (!data.ok) {
+              alert(data.message || "카테고리 추가에 실패했습니다.");
+              return;
+            }
+
+            input.value = "";
+            await loadFoodCategories();
+          } catch (err) {
+            console.error("createFoodCategory ERROR:", err);
+            alert("카테고리 추가 중 오류가 발생했습니다.");
+          }
+        });
+      }
     }
 
+    // ============================
+    // 초기화
+    // ============================
     document.addEventListener("DOMContentLoaded", () => {
-      loadFoodCategories();
+      setupSlotClick();              // 슬롯 클릭 → 모달 열기
+      setupModalClose();             // 배너 모달 닫기
+      setupTextModalClose();         // 텍스트 모달 닫기
+      setupTabs();                   // 탭 전환 기능
+      setupSaveBanner();             // 배너 저장
+      setupSaveText();               // 텍스트 저장
+      setupStoreConnection();        // 가게 연결 기능
+      setupFoodCategoryManagement(); // FOOD CATEGORY 관리
+      loadFoodCategories();          // 페이지 로딩 시 카테고리 목록 불러오기
     });
   </script>
 </body>
