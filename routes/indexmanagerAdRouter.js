@@ -1,32 +1,32 @@
-// routes/managerAdRouter.js
+// routes/indexmanagerAdRouter.js
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
+import { fileURLToPath } from "url";
 
 import {
-  uploadManagerAd,
+  saveBannerSlot,
   saveTextSlot,
   getSlot,
   getTextSlot,
-  assignStoreSlot, // ✅ 새로 추가 (controller에도 필요)
-} from "../controllers/managerAdController.js";
+} from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
 
-// ES6 모듈에서 __dirname 설정
+// ✅ ES 모듈용 __dirname 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 업로드 폴더 확인 및 생성
+// ✅ 업로드 폴더: public/uploads/manager_ad
 const uploadDir = path.join(__dirname, "..", "public", "uploads", "manager_ad");
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   console.log("📁 manager_ad 폴더 생성:", uploadDir);
 }
 
-// 🔹 업로드 폴더: public/uploads/manager_ad
+// ✅ Multer 저장 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -45,14 +45,14 @@ const upload = multer({
 });
 
 /**
- * 🔵 인덱스/메인 관리자용 배너/이미지 저장
+ * 🔵 인덱스 레이아웃 배너/이미지 저장
  * - POST /index/ad/upload
  * - form-data: image(선택), page, position, link_url(선택)
  */
-router.post("/index/ad/upload", upload.single("image"), uploadManagerAd);
+router.post("/index/ad/upload", upload.single("image"), saveBannerSlot);
 
 /**
- * 🟢 인덱스/메인 관리자용 텍스트 저장
+ * 🟢 인덱스 레이아웃 텍스트 슬롯 저장
  * - POST /index/ad/text/save
  * - JSON: { page, position, content }
  */
@@ -69,18 +69,5 @@ router.get("/index/ad/slot", getSlot);
  * GET /index/ad/text?page=index&position=index_oneword
  */
 router.get("/index/ad/text", getTextSlot);
-
-/**
- * 🍽 등록된 가게를 슬롯에 연결 (사업자번호 + 상호)
- * - POST /index/ad/assign-store
- * - JSON: { page, position, business_no, business_name }
- */
-router.post("/index/ad/assign-store", express.json(), assignStoreSlot);
-
-// (선택) 기존 /manager/ad/... 경로도 유지하고 싶다면 아래처럼 alias로 남겨둘 수도 있음.
-// router.post("/manager/ad/upload", upload.single("image"), uploadManagerAd);
-// router.post("/manager/ad/text/save", express.json(), saveTextSlot);
-// router.get("/manager/ad/slot", getSlot);
-// router.get("/manager/ad/text", getTextSlot);
 
 export default router;
