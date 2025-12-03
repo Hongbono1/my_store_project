@@ -122,20 +122,14 @@
         // =============================
         async function loadData() {
             try {
-                if (TYPE === "food") {
-                    const res = await fetch(`/api/subcategory/food?category=${encodeURIComponent(CATEGORY || "")}`);
-                    const json = await res.json();
-                    DATA = { ...DEFAULT_DATA, stores: json.stores || [] };
+                const response = await fetch(`/api/subcategory/${type}?category=${encodeURIComponent(category)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                // ✅ beauty / combined 모두 여기서 처리
-                else if (TYPE === "beauty" || TYPE === "combined") {
-                    const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY || "")}`);
-                    const json = await res.json();
-                    DATA = { ...DEFAULT_DATA, stores: json.stores || [] };
-                }
-                else {
-                    DATA = DEFAULT_DATA;
-                }
+                
+                const result = await response.json();
+                DATA = { ...DEFAULT_DATA, stores: result.stores || [] };
 
                 // ✅ 한식 하위 카테고리(밥/찌개/국밥 등)용 hero/필터 보정
                 if (TYPE === "food" && CATEGORY === "한식") {
@@ -169,9 +163,10 @@
                     DATA.filters = SUB ? [SUB] : ["한식"];
                 }
 
-            } catch (e) {
-                console.error("데이터 불러오기 실패:", e);
-                DATA = DEFAULT_DATA;
+            } catch (error) {
+                console.error("데이터 로드 실패:", error);
+                // 기본 데이터로 폴백
+                displayFallbackData();
             }
             init();
         }
@@ -391,7 +386,7 @@
             document.getElementById("heroTitle").innerHTML =
                 (DATA.hero?.title || "").replace(/\n/g, "<br>");
             document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
-            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
+            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/no-image.png";
         }
 
         function renderFilters() {
