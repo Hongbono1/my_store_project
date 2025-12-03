@@ -48,6 +48,8 @@ import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import categoryAdRouter from "./routes/categoryAdRouter.js";  // ✅ 추가
+import foodSubAdRouter from "./routes/foodSubAdRouter.js";
+
 
 import pool from "./db.js";
 
@@ -279,6 +281,8 @@ app.use("/api/hot", hotRouter);
 app.use("/manager/ad", indexmanagerAdRouter);  // 기존 index 전용
 app.use("/index/ad", indexmanagerAdRouter);
 app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
+app.use("/api/subcategory", foodSubAdRouter);
+
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
