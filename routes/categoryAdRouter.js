@@ -9,7 +9,7 @@ import {
   createFoodCategory,
   deleteFoodCategory,
   saveCategoryBanner,
-  assignStoreSlot,
+  assignStoreToSlot, // ✅ assignStoreSlot → assignStoreToSlot로 수정
   saveTextSlot,
 } from "../controllers/categoryAdController.js";
 
@@ -40,7 +40,7 @@ router.delete("/api/food-categories/:id", deleteFoodCategory);
 router.post("/category/ad/upload", upload.single("image"), saveCategoryBanner);
 
 // 가게 지정
-router.post("/category/ad/store", upload.none(), assignStoreSlot);
+router.post("/category/ad/store", upload.none(), assignStoreToSlot); // ✅ 수정
 
 // 텍스트 저장
 router.post("/category/ad/text/save", express.json(), saveTextSlot);
