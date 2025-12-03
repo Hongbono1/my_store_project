@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MALL HANKOOK 관리자 | 음식 서브 카테고리 관리</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-white text-gray-800 min-h-screen flex flex-col">
+
+    <!-- 🔹 관리자 콘텐츠 영역 -->
+    <main class="flex-1 w-full max-w-6xl mx-auto py-10 px-4">
+
+        <!-- 상단 제목 -->
+        <header class="mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                음식 서브 카테고리 관리
+            </h1>
+            <p class="mt-2 text-sm text-gray-500">
+                한식 &gt; 밥 / 찌개탕 / 국밥 / 기타한식 등 서브 카테고리별 등록 가게를 확인하는 관리자 전용 페이지입니다.
+            </p>
+        </header>
+
+        <!-- 메인 배너 -->
+        <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-4 md:px-8 bg-gray-50 rounded-2xl border">
+            <div class="flex-1 flex justify-center">
+                <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너"
+                    class="h-[240px] md:h-[280px] object-contain">
+            </div>
+            <div class="flex-1 text-left">
+                <h2 id="heroTitle" class="text-2xl md:text-4xl font-bold mb-4">카테고리 제목</h2>
+                <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
+                <button id="btnMore"
+                    class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg text-sm md:text-base">
+                    MORE VIEW
+                </button>
+            </div>
+        </section>
+
+        <!-- All of the items Section -->
+        <section id="aboutSection" class="mt-10 w-full">
+            <h3 class="text-xl md:text-2xl font-bold text-center mb-6">All of the items</h3>
+
+            <!-- 필터 버튼 -->
+            <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
+
+            <!-- 라인 카드 -->
+            <div id="lineGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- Best Seller -->
+        <section class="mt-12">
+            <h3 class="text-xl md:text-2xl font-bold text-center mb-8">Best Seller</h3>
+            <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+        </section>
+
+        <!-- New registration -->
+        <section class="mt-12 mb-10">
+            <h3 class="text-xl md:text-2xl font-bold text-center mb-8">New registration</h3>
+            <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+        </section>
+
+    </main>
+
+    <!-- =============================
+         JS 영역
+    ============================== -->
+    <script>
+        // =============================
+        // URL 파라미터
+        // =============================
+        const params = new URLSearchParams(window.location.search);
+        const TYPE = (params.get("type") || "food").toLowerCase();
+        const CATEGORY = params.get("category");   // 카테고리명
+        const SUB = params.get("sub") || "";       // 한식 하위 카테고리 (밥/찌개탕/...)
+
+        // =============================
+        // 기본 데이터
+        // =============================
+        const DEFAULT_DATA = {
+            hero: {
+                title: "샘플 카테고리",
+                subtitle: "기본 설명 텍스트",
+                image: "/uploads/sample-banner-product.png"
+            },
+            filters: ["기본"],
+            stores: [],
+            best: [],
+            new: []
+        };
+        let DATA = DEFAULT_DATA;
+
+        // =============================
+        // 폴백 데이터 표시 함수
+        // =============================
+        function displayFallbackData() {
+            DATA = {
+                ...DEFAULT_DATA,
+                hero: {
+                    title: CATEGORY || "카테고리",
+                    subtitle: "데이터를 불러오는 중 문제가 발생했습니다. 기본 데이터를 표시합니다.",
+                    image: "/uploads/no-image.png"
+                },
+                filters: [CATEGORY || "기본"],
+                stores: [],
+                best: [],
+                new: []
+            };
+        }
+
+        // =============================
+        // 서버 데이터 불러오기
+        // =============================
+        async function loadData() {
+            try {
+                const response = await fetch(`/api/subcategory/${TYPE}?category=${encodeURIComponent(CATEGORY)}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                DATA = { ...DEFAULT_DATA, stores: result.stores || [] };
+
+                // ✅ 한식 하위 카테고리(밥/찌개/국밥 등)용 hero/필터 보정
+                if (TYPE === "food" && CATEGORY === "한식") {
+                    const titleBase = "한식";
+                    const subLabel = SUB ? ` · ${SUB}` : "";
+
+                    DATA.hero = {
+                        title: `${titleBase}${subLabel}`,
+                        subtitle:
+                            SUB === "밥"
+                                ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
+                                : SUB === "찌개탕"
+                                    ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
+                                    : SUB === "고기구이"
+                                        ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
+                                        : SUB === "생선"
+                                            ? "구이 · 조림 · 회 등 다양한 생선 요리"
+                                            : SUB === "족발보쌈"
+                                                ? "족발 · 보쌈 · 수육까지 푸짐하게"
+                                                : SUB === "국밥"
+                                                    ? "뜨끈한 국밥 한 그릇으로 든든하게"
+                                                    : SUB === "반찬"
+                                                        ? "집밥 느낌 나는 반찬/도시락 가게 모음"
+                                                        : SUB === "기타한식"
+                                                            ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
+                                                            : "우리동네 한식 맛집들을 모았습니다.",
+                        image: "/uploads/sample-banner-product.png"
+                    };
+
+                    DATA.filters = SUB ? [SUB] : ["한식"];
+                }
+
+            } catch (error) {
+                console.error("데이터 로드 실패:", error);
+                displayFallbackData();
+            }
+            init();
+        }
+
+
+        // =============================
+        // 광고 카드 (12개 단위 페이징 + 드래그)
+        // =============================
+        function renderPagedAdStores(stores) {
+            const grid = document.getElementById("lineGrid");
+            let currentPage = 0;
+            const perPage = 12;
+
+            function renderPage(page) {
+                grid.innerHTML = "";
+                const start = page * perPage;
+                const end = start + perPage;
+                const pageItems = stores.slice(start, end);
+
+                if (!pageItems.length) {
+                    grid.innerHTML = `
+        <div class="col-span-full flex justify-center items-center py-16">
+          <div class="border rounded-2xl p-8 text-center max-w-md bg-white shadow-sm">
+            <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M9 13h6m-3-3v6m9-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">
+              등록된 가게가 없습니다
+            </h3>
+            <p class="text-sm text-gray-500">
+              빠른 시일 내에 새로운 가게가 추가될 예정입니다.
+            </p>
+          </div>
+        </div>`;
+                    return;
+                }
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
+
+                pageItems.forEach(store => {
+                    const card = document.createElement("div");
+                    const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
+                    const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
+                    const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
+
+                    const imgNorm = normalizeSrc(imgSrc);
+                    card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white border";
+
+                    card.innerHTML = `
+          <div class="relative h-[260px]">
+             <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
+             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
+               <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
+               <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
+             </div>
+           </div>`;
+
+                    card.addEventListener("click", () => {
+                        const bt = store.business_type ?? store.businessType ?? store.business_category ?? "";
+                        const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
+                        window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
+                    });
+                    wrapper.appendChild(card);
+                });
+
+                grid.appendChild(wrapper);
+
+                if (stores.length > perPage) {
+                    const controls = document.createElement("div");
+                    controls.className = "col-span-full flex justify-center gap-4 mt-6";
+                    controls.innerHTML = `
+          <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="ad-prev">이전</button>
+          <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="ad-next">다음</button>`;
+                    grid.appendChild(controls);
+
+                    document.getElementById("ad-prev").onclick = () => {
+                        if (currentPage > 0) { currentPage--; renderPage(currentPage); }
+                    };
+                    document.getElementById("ad-next").onclick = () => {
+                        if ((currentPage + 1) * perPage < stores.length) { currentPage++; renderPage(currentPage); }
+                    };
+
+                    let startX = 0;
+                    grid.onmousedown = (e) => (startX = e.clientX);
+                    grid.onmouseup = (e) => {
+                        const diff = e.clientX - startX;
+                        if (diff > 50 && currentPage > 0) {
+                            currentPage--; renderPage(currentPage);
+                        } else if (diff < -50 && (currentPage + 1) * perPage < stores.length) {
+                            currentPage++; renderPage(currentPage);
+                        }
+                    };
+                }
+            }
+
+            renderPage(currentPage);
+        }
+
+        // =============================
+        // Best/New (8개 단위 페이징 + 드래그)
+        // =============================
+        function renderPagedProductGrid(gridId, items) {
+            const grid = document.getElementById(gridId);
+            let currentPage = 0;
+            const perPage = 8;
+
+            function renderPage(page) {
+                grid.innerHTML = "";
+                const start = page * perPage;
+                const end = start + perPage;
+                const pageItems = items.slice(start, end);
+
+                if (!pageItems.length) {
+                    grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
+                    return;
+                }
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6";
+
+                pageItems.forEach(p => {
+                    const dispName = p?.name ?? p?.business_name ?? p?.businessName ?? p?.title ?? "-";
+                    const dispCategory = p?.category ?? p?.business_category ?? p?.businessCategory ?? "";
+                    const imgSrc = p?.image ?? p?.image_url ?? p?.url ?? "/uploads/no-image.png";
+                    const safeImg = normalizeSrc(imgSrc);
+
+                    const card = document.createElement("div");
+                    card.className = "bg-white rounded-xl shadow p-0 text-center hover:shadow-lg transition cursor-pointer overflow-hidden h-auto border";
+                    card.innerHTML = `
+          <div class="w-full mb-0 relative h-[260px]">
+             <img src="${safeImg}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-lg">
+             <div class="absolute left-0 right-0 bottom-0 bg-white/90 px-3 py-2">
+               <h3 class="font-semibold text-sm md:text-base text-gray-800 truncate mb-0">${escapeHtml(dispName)}</h3>
+               <p class="text-gray-600 text-xs md:text-sm mb-0">${escapeHtml(dispCategory)}</p>
+             </div>
+           </div>`;
+
+                    card.addEventListener("click", () => {
+                        const bt = p?.business_type ?? p?.businessType ?? p?.business_category ?? "";
+                        const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
+                        window.location.href = `/ndetail.html?id=${p.id}&type=${type}`;
+                    });
+                    wrapper.appendChild(card);
+                });
+
+                grid.appendChild(wrapper);
+
+                if (items.length > perPage) {
+                    const controls = document.createElement("div");
+                    controls.className = "col-span-full flex justify-center gap-4 mt-6";
+                    controls.innerHTML = `
+          <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="${gridId}-prev">이전</button>
+          <button class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" id="${gridId}-next">다음</button>`;
+                    grid.appendChild(controls);
+
+                    document.getElementById(`${gridId}-prev`).onclick = () => {
+                        if (currentPage > 0) { currentPage--; renderPage(currentPage); }
+                    };
+                    document.getElementById(`${gridId}-next`).onclick = () => {
+                        if ((currentPage + 1) * perPage < items.length) { currentPage++; renderPage(currentPage); }
+                    };
+
+                    let startX = 0;
+                    grid.onmousedown = (e) => (startX = e.clientX);
+                    grid.onmouseup = (e) => {
+                        const diff = e.clientX - startX;
+                        if (diff > 50 && currentPage > 0) {
+                            currentPage--; renderPage(currentPage);
+                        } else if (diff < -50 && (currentPage + 1) * perPage < items.length) {
+                            currentPage++; renderPage(currentPage);
+                        }
+                    };
+                }
+            }
+
+            renderPage(currentPage);
+        }
+
+        // =============================
+        // 헬퍼 + 필터
+        // =============================
+        function escapeHtml(input) {
+            const s = input == null ? "" : String(input);
+            return s
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function normalizeSrc(src) {
+            if (!src) return "/uploads/no-image.png";
+            if (/^https?:\/\//i.test(src)) return src;
+            return src.startsWith("/") ? src : "/" + src;
+        }
+
+        function bindHero() {
+            document.getElementById("heroTitle").innerHTML =
+                (DATA.hero?.title || "").replace(/\n/g, "<br>");
+            document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
+            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/no-image.png";
+        }
+
+        function renderFilters() {
+            const wrap = document.getElementById("filterContainer");
+            wrap.innerHTML = "";
+            const allBtn = makeFilterBtn("All", "");
+            wrap.appendChild(allBtn);
+            (DATA.filters || []).forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
+        }
+
+        function makeFilterBtn(label, tagVal) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
+            btn.textContent = label;
+            btn.onclick = () => {
+                renderPagedAdStores(DATA.stores || []);
+            };
+            return btn;
+        }
+
+        function renderProducts() {
+            renderPagedProductGrid("bestGrid", DATA.best || []);
+            renderPagedProductGrid("newGrid", DATA.new || []);
+        }
+
+        function init() {
+            bindHero();
+            renderFilters();
+            renderPagedAdStores(DATA.stores || []);
+            renderProducts();
+        }
+
+        document.addEventListener("DOMContentLoaded", loadData);
+    </script>
+
+    <!-- 기존 마지막 IIFE (data-store-id 보정용) 그대로 유지 -->
+    <script>
+        (async function () {
+            let list;
+            try {
+                const q = new URLSearchParams(location.search);
+                const category = q.get("category") || "";
+                const type = q.get("type") || "food";
+
+                const apiEndpoint = type === "food" ? "food" : "beauty";
+                const res = await fetch(`/api/subcategory/${apiEndpoint}?category=${encodeURIComponent(category)}`);
+                list = res.ok ? await res.json() : null;
+            } catch (e) {
+                console.warn("subcategory list fetch failed", e);
+                list = null;
+            }
+
+            function mapName(store) {
+                return store?.business_name ?? store?.businessName ?? store?.name ?? store?.title ?? "";
+            }
+            function mapType(store) {
+                return store?.business_type ?? store?.businessType ?? store?.type ?? store?.category ?? "";
+            }
+
+            document.querySelectorAll("[data-store-id]").forEach(async (card) => {
+                const id = card.dataset.storeId;
+                if (!id) return;
+                const nameEl = card.querySelector(".store-name");
+                const typeEl = card.querySelector(".store-type");
+
+                let store = null;
+                if (list && list.ok && Array.isArray(list.stores)) {
+                    store = list.stores.find(s => String(s.id) === String(id)) ?? null;
+                }
+
+                if (!store) {
+                    try {
+                        const typeParam = new URLSearchParams(location.search).get("type") || "combined";
+                        const api = typeParam === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+                        const r = await fetch(api);
+                        if (r.ok) {
+                            const j = await r.json();
+                            store = j.store ?? j;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                if (nameEl && store) nameEl.textContent = mapName(store) || nameEl.textContent || "-";
+                if (typeEl && store) typeEl.textContent = mapType(store) || typeEl.textContent || "-";
+            });
+
+            if (!document.querySelector("#subcategory-container") && list && list.ok && Array.isArray(list.stores)) {
+                const container = document.createElement("div");
+                container.id = "subcategory-container";
+                container.className = "grid grid-cols-3 gap-6";
+                list.stores.forEach(s => {
+                    const name = mapName(s) || "-";
+                    const type = mapType(s) || "-";
+                    const img = s.image || "/uploads/no-image.png";
+                    container.innerHTML += `
+            <div class="card p-4 bg-white rounded border" data-store-id="${s.id}">
+              <img src="${img}" class="w-full h-40 object-cover rounded mb-3" />
+              <div class="text-lg font-semibold store-name">${escapeHtml(name)}</div>
+              <div class="text-sm text-gray-500 store-type">${escapeHtml(type)}</div>
+            </div>
+          `;
+                });
+                document.querySelector("main")?.appendChild(container);
+            }
+        })();
+    </script>
+</body>
+
+</html>
