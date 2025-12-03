@@ -82,7 +82,6 @@
     </div>
 
     <script>
-
         // =============================
         // 헤더/푸터 로드
         // =============================
@@ -118,11 +117,30 @@
         let DATA = DEFAULT_DATA;
 
         // =============================
+        // 폴백 데이터 표시 함수 추가
+        // =============================
+        function displayFallbackData() {
+            DATA = {
+                ...DEFAULT_DATA,
+                hero: {
+                    title: CATEGORY || "카테고리",
+                    subtitle: "데이터를 불러오는 중 문제가 발생했습니다. 기본 데이터를 표시합니다.",
+                    image: "/uploads/no-image.png"
+                },
+                filters: [CATEGORY || "기본"],
+                stores: [],
+                best: [],
+                new: []
+            };
+        }
+
+        // =============================
         // 서버 데이터 불러오기
         // =============================
         async function loadData() {
             try {
-                const response = await fetch(`/api/subcategory/${type}?category=${encodeURIComponent(category)}`);
+                // ✅ TYPE 변수 사용 (대문자)
+                const response = await fetch(`/api/subcategory/${TYPE}?category=${encodeURIComponent(CATEGORY)}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -165,7 +183,7 @@
 
             } catch (error) {
                 console.error("데이터 로드 실패:", error);
-                // 기본 데이터로 폴백
+                // ✅ 폴백 데이터 함수 호출
                 displayFallbackData();
             }
             init();
@@ -441,12 +459,16 @@
     </script>
     <script>
         (async function () {
-            // 1) API로 목록을 가져오는 경우
+            // ✅ 마지막 스크립트 블록도 수정
             let list;
             try {
                 const q = new URLSearchParams(location.search);
                 const category = q.get("category") || "";
-                const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(category)}`);
+                const type = q.get("type") || "food"; // ✅ type 파라미터 사용
+                
+                // ✅ URL 파라미터에 따라 올바른 API 호출
+                const apiEndpoint = type === "food" ? "food" : "beauty";
+                const res = await fetch(`/api/subcategory/${apiEndpoint}?category=${encodeURIComponent(category)}`);
                 list = res.ok ? await res.json() : null;
             } catch (e) {
                 console.warn("subcategory list fetch failed", e);
