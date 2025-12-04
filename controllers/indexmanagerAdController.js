@@ -19,107 +19,102 @@ function ensurePagePosition(page, position) {
  * - 필드: page, position, link_url, start_date, end_date, start_time, end_time
  * - 파일: image
  */
+// ==============================
+// 🔸 인덱스 광고 슬롯 업로드
+// ==============================
 export async function uploadIndexAd(req, res) {
   try {
+    // 폼에서 넘어오는 값들 (name 기준)
     const {
       page,
       position,
-      link_url,
-      start_date,
-      end_date,
-      start_time,
-      end_time,
+      slotType,
+      slotMode,
+      linkUrl,
+      textContent,
+      storeId,
+      businessNo,
+      businessName,
+      startDate,
+      endDate,
     } = req.body;
 
-    ensurePagePosition(page, position);
+    // 파일 업로드 (multer: upload.single("image"))
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-    // 이미지 파일 경로 (/uploads/파일명 형태)
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    // slot_type 제약조건 맞추기 ('banner' 또는 'text'만 허용)
+    const slot_type = slotType === "text" ? "text" : "banner";
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
+    // slot_mode 기본값
+    const slot_mode = slotMode || "custom";
 
-      // 기존 슬롯 존재 여부 확인 (page + position 기준 최신 1개)
-      const existing = await client.query(
-        `
-        SELECT id
-        FROM admin_ad_slots
-        WHERE page = $1 AND position = $2
-        ORDER BY updated_at DESC NULLS LAST, id DESC
-        LIMIT 1
-      `,
-        [page, position]
-      );
+    // store_id는 integer라서 숫자/NULL로 정리
+    const store_id =
+      storeId && storeId.toString().trim() !== ""
+        ? Number(storeId)
+        : null;
 
-      if (existing.rowCount > 0) {
-        const id = existing.rows[0].id;
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page,
+        position,
+        slot_type,
+        image_url,
+        link_url,
+        text_content,
+        slot_mode,
+        store_id,
+        business_no,
+        business_name,
+        start_date,
+        end_date
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+      )
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type     = EXCLUDED.slot_type,
+        image_url     = EXCLUDED.image_url,
+        link_url      = EXCLUDED.link_url,
+        text_content  = EXCLUDED.text_content,
+        slot_mode     = EXCLUDED.slot_mode,
+        store_id      = EXCLUDED.store_id,
+        business_no   = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        start_date    = EXCLUDED.start_date,
+        end_date      = EXCLUDED.end_date,
+        updated_at    = now()
+      RETURNING *;
+    `;
 
-        await client.query(
-          `
-          UPDATE admin_ad_slots
-          SET
-            image_url = COALESCE($1, image_url),
-            link_url = $2,
-            start_date = $3,
-            end_date   = $4,
-            start_time = $5,
-            end_time   = $6,
-            updated_at = NOW()
-          WHERE id = $7
-        `,
-          [
-            imagePath, // 새 이미지가 있으면 교체, 없으면 기존 유지
-            link_url || null,
-            start_date || null,
-            end_date || null,
-            start_time || null,
-            end_time || null,
-            id,
-          ]
-        );
-      } else {
-        await client.query(
-          `
-          INSERT INTO admin_ad_slots
-            (page, position, image_url, link_url,
-             start_date, end_date, start_time, end_time,
-             created_at, updated_at)
-          VALUES
-            ($1, $2, $3, $4,
-             $5, $6, $7, $8,
-             NOW(), NOW())
-        `,
-          [
-            page,
-            position,
-            imagePath,
-            link_url || null,
-            start_date || null,
-            end_date || null,
-            start_time || null,
-            end_time || null,
-          ]
-        );
-      }
+    const params = [
+      page,
+      position,
+      slot_type,
+      imageUrl,
+      linkUrl || null,
+      textContent || null,
+      slot_mode,
+      store_id,
+      businessNo || null,
+      businessName || null,
+      startDate || null, // "YYYY-MM-DD" 문자열이면 date 컬럼에 바로 저장 가능
+      endDate || null,
+    ];
 
-      await client.query("COMMIT");
-      return res.json({ ok: true });
-    } catch (err) {
-      await client.query("ROLLBACK");
-      console.error("UPLOAD INDEX AD ERROR:", err);
-      return res
-        .status(500)
-        .json({ ok: false, message: "slot 저장 오류", code: "INDEX_AD_SAVE_ERROR" });
-    } finally {
-      client.release();
-    }
+    const { rows } = await pool.query(sql, params);
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
   } catch (err) {
-    console.error("UPLOAD INDEX AD FATAL:", err);
-    const status = err.statusCode || 500;
-    return res
-      .status(status)
-      .json({ ok: false, message: err.message || "server error" });
+    console.error("UPLOAD INDEX AD ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "slot 저장 오류",
+      code: "INDEX_AD_SAVE_ERROR",
+    });
   }
 }
 
