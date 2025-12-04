@@ -283,6 +283,7 @@ app.use("/upload", uploadRouter);
 
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
+app.use("/manager", indexmanagerAdRouter);  // 이 한 줄만 추가
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);

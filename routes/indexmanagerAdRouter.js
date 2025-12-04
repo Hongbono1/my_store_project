@@ -1,26 +1,34 @@
 // routes/indexmanagerAdRouter.js
-import { Router } from "express";
+import express from "express";
 import multer from "multer";
 import path from "path";
+import { fileURLToPath } from "url";
 
 import {
-  getSlot,
-  getText,
-  uploadSlot,
-  saveStoreSlot,
-  saveText,
+  uploadIndexAd,
+  saveIndexStoreAd,
+  getIndexSlot,
+  getIndexText,
+  saveIndexText,
 } from "../controllers/indexmanagerAdController.js";
 
-const router = Router();
+const router = express.Router();
 
-// === multer 설정: public/uploads에 저장 ===
+// ==============================
+// 📂 multer 설정 (public/uploads)
+// ==============================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const uploadDir = path.join(__dirname, "..", "public", "uploads");
+
 const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    cb(null, "public/uploads");
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
   },
-  filename(req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext);
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "");
+    const base = path.basename(file.originalname || "banner", ext);
     const unique = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     cb(null, `${base}_${unique}${ext}`);
   },
@@ -28,19 +36,27 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// ==============================
+// 🔗 라우터 매핑
+// base: /manager
+// ==============================
+
 // 배너/프로모 슬롯 조회
-router.get("/ad/slot", getSlot);
+// GET /manager/ad/slot?page=index&position=index_main_top
+router.get("/ad/slot", getIndexSlot);
 
-// 텍스트 슬롯 조회
-router.get("/ad/text/get", getText);
+// 배너/프로모 이미지 업로드 + 저장
+// POST /manager/ad/upload (multipart/form-data)
+router.post("/ad/upload", upload.single("image"), uploadIndexAd);
 
-// 배너/프로모 저장 (이미지 + 링크)
-router.post("/ad/upload", upload.single("image"), uploadSlot);
+// 등록된 가게로 연결
+// POST /manager/ad/store (JSON)
+router.post("/ad/store", saveIndexStoreAd);
 
-// 등록된 가게 연결 모드 (사업자번호 + 상호)
-router.post("/ad/store", saveStoreSlot);
-
-// 텍스트 슬롯 저장
-router.post("/ad/text/save", saveText);
+// 텍스트 슬롯 조회 / 저장
+// GET  /manager/ad/text/get
+router.get("/ad/text/get", getIndexText);
+// POST /manager/ad/text/save
+router.post("/ad/text/save", saveIndexText);
 
 export default router;
