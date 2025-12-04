@@ -2,7 +2,11 @@
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
-import { uploadIndexAd, getIndexSlot } from "../controllers/indexmanagerAdController.js";
+import {
+  uploadIndexAd,
+  getIndexSlot,
+  getIndexTextSlot,
+} from "../controllers/indexmanagerAdController.js";
 
 const router = Router();
 
@@ -26,8 +30,11 @@ const upload = multer({
   },
 });
 
-// 라우트 설정
+// 배너/이미지 슬롯 업로드 & 조회
 router.post("/upload", upload.single("image"), uploadIndexAd);
 router.get("/slot", getIndexSlot);
+
+// 텍스트 슬롯 조회
+router.get("/text/get", getIndexTextSlot);
 
 export default router;

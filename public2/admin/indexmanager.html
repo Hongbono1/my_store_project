@@ -570,30 +570,103 @@
             }
         }
 
-        async function loadTextSlot(slotId, page, position, defaultRender) {
-            const container = document.getElementById(slotId);
-            if (!container) return;
+        // 텍스트 슬롯 로드 함수 (방어 코드 강화)
+        async function loadTextSlot(page, position, els) {
+  try {
+    const res = await fetch(`/manager/ad/text/get?page=${page}&position=${position}`);
+    if (!res.ok) {
+      console.warn("텍스트 슬롯 로드 실패:", page, position, res.status);
+      if (els.text) els.text.textContent = "";
+      return;
+    }
 
-            try {
-                const res = await fetch(`/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
-                if (!res.ok) {
-                    defaultRender(container);
-                    return;
-                }
+    const data = await res.json();
 
-                const json = await res.json();
+    if (!data || !data.ok || !data.slot) {
+      // 아직 텍스트 슬롯 등록 안 된 경우
+      if (els.text) els.text.textContent = "";
+      return;
+    }
 
-                if (json.ok && json.text && json.text.content) {
-                    const textEl = container.querySelector(".slot-default-text") || container;
-                    textEl.innerHTML = json.text.content;
-                } else {
-                    defaultRender(container);
-                }
-            } catch (err) {
-                console.error(`텍스트 슬롯 로드 실패 [${position}]:`, err);
-                defaultRender(container);
-            }
-        }
+    const slot = data.slot;
+    if (els.text) {
+      els.text.textContent = slot.text_content || "";
+    }
+  } catch (err) {
+    console.error("loadTextSlot error:", err);
+    if (els.text) els.text.textContent = "";
+  }
+}
+
+// 배너 슬롯 로드 함수 (기존 방어 코드 유지)
+async function loadBannerSlot(page, position, els) {
+  try {
+    const res = await fetch(`/manager/ad/slot?page=${page}&position=${position}`);
+    if (!res.ok) {
+      console.warn("슬롯 로드 실패:", page, position, res.status);
+      // 서버 에러일 때는 그냥 no-image만 세팅하고 끝
+      if (els.img) els.img.src = "/no-image.png";
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data || !data.ok || !data.slot) {
+      // 슬롯이 아직 등록 안 된 상태
+      if (els.img) els.img.src = "/no-image.png";
+      if (els.text) els.text.textContent = "";
+      return;
+    }
+
+    const slot = data.slot;
+
+    if (els.img) {
+      els.img.src = slot.image_url || "/no-image.png";
+    }
+    if (els.link) {
+      if (slot.link_url) {
+        els.link.href = slot.link_url;
+        els.link.target = "_blank";
+      } else {
+        els.link.removeAttribute("href");
+      }
+    }
+    if (els.text) {
+      els.text.textContent = slot.text_content || "";
+    }
+
+  } catch (err) {
+    console.error("loadBannerSlot error:", err);
+    if (els.img) els.img.src = "/no-image.png";
+  }
+}
+
+// 모달 닫기 설정 (안전한 패턴)
+function setupModalClose() {
+  const modal = document.getElementById("indexAdModal");
+  const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
+
+  if (!modal || !closeBtn) {
+    console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
+    return;
+  }
+
+  closeBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+}
+
+// DOM 로드 완료 후 초기화
+document.addEventListener("DOMContentLoaded", () => {
+  setupModalClose();
+  
+  // 기존 슬롯 로드 로직이 있다면 여기서 호출
+  // loadTextSlot("index", "sub_keywords", { text: document.getElementById("keywordsText") });
+  // loadBannerSlot("index", "main_banner", { 
+  //   img: document.getElementById("mainBannerImg"),
+  //   link: document.getElementById("mainBannerLink")
+  // });
+});
 
         const DEFAULT_DATA = {
             keywords: ["검색어1", "검색어2", "검색어3", "검색어4", "검색어5"],
@@ -781,18 +854,20 @@
         }
 
         function setupModalClose() {
-            const modal = document.getElementById("adModal");
-            document.getElementById("closeModal").addEventListener("click", () => {
-                modal.classList.add("hidden");
-                modal.classList.remove("flex");
-            });
-            modal.addEventListener("click", (e) => {
-                if (e.target === e.currentTarget) {
-                    modal.classList.add("hidden");
-                    modal.classList.remove("flex");
-                }
-            });
-        }
+  // 모달 요소와 닫기 버튼을 찾음
+  const modal = document.getElementById("indexAdModal");
+  const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
+
+  // 둘 중 하나라도 없으면 아무것도 하지 않고 그냥 종료 (에러 방지)
+  if (!modal || !closeBtn) {
+    console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
+    return;
+  }
+
+  closeBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+}
 
         function setupTextModalClose() {
             const modal = document.getElementById("textModal");

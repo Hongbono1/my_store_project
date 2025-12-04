@@ -406,3 +406,64 @@ export async function saveIndexText(req, res) {
       .json({ ok: false, message: err.message || "server error" });
   }
 }
+
+// ==============================
+// 🔹 인덱스 텍스트 슬롯 조회 API
+// GET /manager/ad/text/get?page=index&position=index_sub_keywords
+// ==============================
+export async function getIndexTextSlot(req, res) {
+  try {
+    const { page, position } = req.query;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page, position이 필요합니다.",
+      });
+    }
+
+    const sql = `
+      SELECT
+        id,
+        page,
+        position,
+        slot_type,
+        image_url,
+        link_url,
+        text_content,
+        slot_mode,
+        store_id,
+        business_no,
+        business_name,
+        start_date,
+        end_date
+      FROM admin_ad_slots
+      WHERE page = $1
+        AND position = $2
+        AND slot_type = 'text'
+      LIMIT 1
+    `;
+
+    const { rows } = await pool.query(sql, [page, position]);
+
+    if (rows.length === 0) {
+      // 아직 등록된 텍스트 슬롯이 없으면 slot=null로 응답
+      return res.json({
+        ok: true,
+        slot: null,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
+  } catch (err) {
+    console.error("GET INDEX TEXT SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "텍스트 슬롯 조회 오류",
+      code: "INDEX_TEXT_LOAD_ERROR",
+    });
+  }
+}
