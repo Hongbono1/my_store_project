@@ -1064,6 +1064,49 @@
         // 네비게이션 버튼
         function goBack() { return false; }
         function goNext() { window.history.forward(); }
+
+        // indexmanager.html 내부 JavaScript에 추가할 함수
+        async function loadBannerSlot(page, position, els) {
+            try {
+                const res = await fetch(`/manager/ad/slot?page=${page}&position=${position}`);
+                if (!res.ok) {
+                    console.warn("슬롯 로드 실패:", page, position, res.status);
+                    // 서버 에러일 때는 그냥 no-image만 세팅하고 끝
+                    if (els.img) els.img.src = "/no-image.png";
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (!data || !data.ok || !data.slot) {
+                    // 슬롯이 아직 등록 안 된 상태
+                    if (els.img) els.img.src = "/no-image.png";
+                    if (els.text) els.text.textContent = "";
+                    return;
+                }
+
+                const slot = data.slot;
+
+                if (els.img) {
+                    els.img.src = slot.image_url || "/no-image.png";
+                }
+                if (els.link) {
+                    if (slot.link_url) {
+                        els.link.href = slot.link_url;
+                        els.link.target = "_blank";
+                    } else {
+                        els.link.removeAttribute("href");
+                    }
+                }
+                if (els.text) {
+                    els.text.textContent = slot.text_content || "";
+                }
+
+            } catch (err) {
+                console.error("loadBannerSlot error:", err);
+                if (els.img) els.img.src = "/no-image.png";
+            }
+        }
     </script>
 
 </body>

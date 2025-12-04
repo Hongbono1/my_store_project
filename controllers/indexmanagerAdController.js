@@ -236,40 +236,63 @@ export async function saveIndexStoreAd(req, res) {
 }
 
 /**
+ * ==============================
+ * 🔹 인덱스 광고 슬롯 조회 API
  * GET /manager/ad/slot?page=index&position=index_main_top
- * indexmanager.html에서 배너/프로모 불러올 때 사용
+ * ==============================
  */
 export async function getIndexSlot(req, res) {
   try {
     const { page, position } = req.query;
-    ensurePagePosition(page, position);
 
-    const { rows } = await pool.query(
-      `
-      SELECT
-        id, page, position,
-        image_url, link_url,
-        biz_number, biz_name,
-        start_date, end_date,
-        start_time, end_time
-      FROM admin_ad_slots
-      WHERE page = $1 AND position = $2
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `,
-      [page, position]
-    );
-
-    if (rows.length === 0) {
-      return res.json({ ok: true, slot: null });
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page, position이 필요합니다.",
+      });
     }
 
-    return res.json({ ok: true, slot: rows[0] });
+    const sql = `
+      SELECT
+        id,
+        page,
+        position,
+        slot_type,
+        image_url,
+        link_url,
+        text_content,
+        slot_mode,
+        store_id,
+        business_no,
+        business_name,
+        start_date,
+        end_date
+      FROM admin_ad_slots
+      WHERE page = $1 AND position = $2
+      LIMIT 1
+    `;
+
+    const { rows } = await pool.query(sql, [page, position]);
+
+    // 슬롯이 아직 등록되지 않은 경우: slot = null
+    if (rows.length === 0) {
+      return res.json({
+        ok: true,
+        slot: null,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
   } catch (err) {
     console.error("GET INDEX SLOT ERROR:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "slot 조회 오류", code: "INDEX_SLOT_GET_ERROR" });
+    return res.status(500).json({
+      ok: false,
+      message: "슬롯 조회 오류",
+      code: "INDEX_AD_LOAD_ERROR",
+    });
   }
 }
 
