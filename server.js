@@ -49,7 +49,7 @@ import hotRouter from "./routes/hotRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import categoryAdRouter from "./routes/categoryAdRouter.js";  // ✅ 추가
 import foodSubAdRouter from "./routes/foodSubAdRouter.js";
-
+import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
 
 import pool from "./db.js";
 
@@ -168,6 +168,15 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public2")));
+
+// 업로드 이미지
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "public", "uploads"))
+);
+
 // ------------------------------------------------------------
 // 3-1. 표준화된 국세청 사업자번호 인증 API
 // ------------------------------------------------------------
@@ -278,11 +287,12 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-app.use("/manager/ad", indexmanagerAdRouter);  // 기존 index 전용
-app.use("/index/ad", indexmanagerAdRouter);
 app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
 app.use("/api/subcategory", foodSubAdRouter);
+app.use("/category", ncategory2managerAdRouter);
 
+// 인덱스 레이아웃 관리자 API 추가
+app.use("/manager/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)

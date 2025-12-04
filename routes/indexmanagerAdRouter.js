@@ -6,68 +6,60 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 import {
-  saveBannerSlot,
-  saveTextSlot,
   getSlot,
+  uploadSlot,
+  linkStoreSlot,
   getTextSlot,
+  saveTextSlot,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
 
-// ✅ ES 모듈용 __dirname 설정
+// __dirname 대체 (ESM)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ 업로드 폴더: public/uploads/manager_ad
-const uploadDir = path.join(__dirname, "..", "public", "uploads", "manager_ad");
-
+// 업로드 폴더: 프로젝트 루트 기준 public/uploads
+const uploadDir = path.join(__dirname, "..", "public", "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log("📁 manager_ad 폴더 생성:", uploadDir);
 }
 
-// ✅ Multer 저장 설정
+// multer 설정
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination(req, file, cb) {
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
-    const ts = Date.now();
-    const rnd = Math.random().toString(36).slice(2, 8);
-    const ext = path.extname(file.originalname) || "";
-    cb(null, `${ts}_${rnd}${ext}`);
+  filename(req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    const unique = Date.now() + "_" + Math.round(Math.random() * 1e6);
+    cb(null, `${basename}_${unique}${ext}`);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
 });
 
-/**
- * 🔵 인덱스 레이아웃 배너/이미지 저장
- * - POST /index/ad/upload
- * - form-data: image(선택), page, position, link_url(선택)
- */
-router.post("/index/ad/upload", upload.single("image"), saveBannerSlot);
+// ===============================
+// base: /manager/ad
+// ===============================
 
-/**
- * 🟢 인덱스 레이아웃 텍스트 슬롯 저장
- * - POST /index/ad/text/save
- * - JSON: { page, position, content }
- */
-router.post("/index/ad/text/save", express.json(), saveTextSlot);
+// 인덱스 레이아웃 배너/이미지 슬롯 조회
+router.get("/slot", getSlot);
 
-/**
- * (옵션) 슬롯 조회
- * GET /index/ad/slot?page=index&position=index_main_top
- */
-router.get("/index/ad/slot", getSlot);
+// 이미지 + 링크 업로드
+router.post("/upload", upload.single("image"), uploadSlot);
 
-/**
- * (옵션) 텍스트 슬롯 조회
- * GET /index/ad/text?page=index&position=index_oneword
- */
-router.get("/index/ad/text", getTextSlot);
+// 등록된 가게 연결 (사업자번호 + 상호)
+router.post("/store", linkStoreSlot);
+
+// 텍스트 슬롯 조회/저장
+router.get("/text/get", getTextSlot);
+router.post("/text/save", saveTextSlot);
 
 export default router;
