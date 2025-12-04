@@ -854,11 +854,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function setupModalClose() {
-  // 모달 요소와 닫기 버튼을 찾음
   const modal = document.getElementById("indexAdModal");
   const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
 
-  // 둘 중 하나라도 없으면 아무것도 하지 않고 그냥 종료 (에러 방지)
   if (!modal || !closeBtn) {
     console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
     return;
@@ -907,119 +905,51 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function setupSave() {
-            document.getElementById("saveAdBtn").addEventListener("click", async () => {
-                const page = document.getElementById("selectedPage").value || "index";
-                const position = document.getElementById("selectedPosition").value;
-                const modeInput = document.querySelector('input[name="adMode"]:checked');
-                const mode = modeInput ? modeInput.value : "custom";
+  // 폼 요소를 안전하게 찾기
+  const form = document.getElementById("slotForm");
+  
+  // 폼이 없으면 경고 후 종료 (에러 방지)
+  if (!form) {
+    console.warn("setupSave: slotForm을 찾지 못했습니다.");
+    return;
+  }
 
-                const startDate = document.getElementById("startDateInput").value;
-                const endDate = document.getElementById("endDateInput").value;
-                const startTime = document.getElementById("startTimeInput").value;
-                const endTime = document.getElementById("endTimeInput").value;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    try {
+      const formData = new FormData(form);
+      
+      const response = await fetch("/manager/ad/upload", {
+        method: "POST",
+        body: formData
+      });
 
-                if (!page || !position) {
-                    alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-                    return;
-                }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-                // 등록된 가게 연결 모드
-                if (mode === "store") {
-                    const businessNo = (document.getElementById("businessNoInput").value || "").trim();
-                    const businessName = (document.getElementById("businessNameInput").value || "").trim();
-
-                    if (!businessNo || !businessName) {
-                        alert("사업자번호와 상호를 모두 입력해주세요.");
-                        return;
-                    }
-
-                    const body = {
-                        page,
-                        position,
-                        biz_number: businessNo,
-                        biz_name: businessName,
-                        start_date: startDate || null,
-                        end_date: endDate || null,
-                        start_time: startTime || null,
-                        end_time: endTime || null,
-                    };
-
-                    try {
-                        const res = await fetch("/manager/ad/store", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(body),
-                        });
-                        const data = await res.json();
-                        if (data.ok) {
-                            alert("가게가 이 슬롯에 연결되었습니다.");
-                            document.getElementById("adModal").classList.add("hidden");
-                            document.getElementById("adModal").classList.remove("flex");
-                            document.getElementById("businessNoInput").value = "";
-                            document.getElementById("businessNameInput").value = "";
-                            document.getElementById("startDateInput").value = "";
-                            document.getElementById("endDateInput").value = "";
-                            document.getElementById("startTimeInput").value = "";
-                            document.getElementById("endTimeInput").value = "";
-                        } else {
-                            alert("오류: " + (data.message || "가게 연결에 실패했습니다."));
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert("가게 연결 중 오류가 발생했습니다.");
-                    }
-
-                    return;
-                }
-
-                // 이미지 + 링크 직접 입력 모드
-                const imageFile = document.getElementById("imageInput").files[0];
-                const link = document.getElementById("linkInput").value.trim();
-
-                if (!imageFile && !link) {
-                    const ok = confirm("이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
-                    if (!ok) return;
-                }
-
-                const formData = new FormData();
-                formData.append("page", page);
-                formData.append("position", position);
-                formData.append("link_url", link);
-                if (startDate) formData.append("start_date", startDate);
-                if (endDate) formData.append("end_date", endDate);
-                if (startTime) formData.append("start_time", startTime);
-                if (endTime) formData.append("end_time", endTime);
-                if (imageFile) {
-                    formData.append("image", imageFile);
-                }
-
-                try {
-                    const res = await fetch("/manager/ad/upload", {
-                        method: "POST",
-                        body: formData
-                    });
-                    const data = await res.json();
-                    if (data.ok) {
-                        alert("저장 완료되었습니다.");
-                        document.getElementById("adModal").classList.add("hidden");
-                        document.getElementById("adModal").classList.remove("flex");
-                        document.getElementById("imageInput").value = "";
-                        document.getElementById("linkInput").value = "";
-                        document.getElementById("startDateInput").value = "";
-                        document.getElementById("endDateInput").value = "";
-                        document.getElementById("startTimeInput").value = "";
-                        document.getElementById("endTimeInput").value = "";
-                        // 변경사항 반영을 위해 다시 로드해도 됨 (선택)
-                        // location.reload();
-                    } else {
-                        alert("오류: " + (data.message || "저장에 실패했습니다."));
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert("저장 중 오류가 발생했습니다.");
-                }
-            });
+      const data = await response.json();
+      
+      if (data.ok) {
+        alert("슬롯이 성공적으로 저장되었습니다!");
+        // 모달 닫기
+        const modal = document.getElementById("indexAdModal");
+        if (modal) {
+          modal.classList.add("hidden");
         }
+        // 페이지 새로고침 또는 슬롯 다시 로드
+        location.reload();
+      } else {
+        throw new Error(data.message || "저장 실패");
+      }
+      
+    } catch (err) {
+      console.error("슬롯 저장 오류:", err);
+      alert(`저장 중 오류가 발생했습니다: ${err.message}`);
+    }
+  });
+}
 
         function setupSaveText() {
             document.getElementById("saveTextBtn").addEventListener("click", async () => {
@@ -1163,18 +1093,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 const slot = data.slot;
 
                 if (els.img) {
-                    els.img.src = slot.image_url || "/no-image.png";
+                  els.img.src = slot.image_url || "/no-image.png";
                 }
                 if (els.link) {
-                    if (slot.link_url) {
-                        els.link.href = slot.link_url;
-                        els.link.target = "_blank";
-                    } else {
-                        els.link.removeAttribute("href");
-                    }
+                  if (slot.link_url) {
+                    els.link.href = slot.link_url;
+                    els.link.target = "_blank";
+                  } else {
+                    els.link.removeAttribute("href");
+                  }
                 }
                 if (els.text) {
-                    els.text.textContent = slot.text_content || "";
+                  els.text.textContent = slot.text_content || "";
                 }
 
             } catch (err) {
