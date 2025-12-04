@@ -1,65 +1,46 @@
 // routes/indexmanagerAdRouter.js
-import express from "express";
+import { Router } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
 
 import {
   getSlot,
+  getText,
   uploadSlot,
-  linkStoreSlot,
-  getTextSlot,
-  saveTextSlot,
+  saveStoreSlot,
+  saveText,
 } from "../controllers/indexmanagerAdController.js";
 
-const router = express.Router();
+const router = Router();
 
-// __dirname 대체 (ESM)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// 업로드 폴더: 프로젝트 루트 기준 public/uploads
-const uploadDir = path.join(__dirname, "..", "public", "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// multer 설정
+// === multer 설정: public/uploads에 저장 ===
 const storage = multer.diskStorage({
   destination(req, file, cb) {
-    cb(null, uploadDir);
+    cb(null, "public/uploads");
   },
   filename(req, file, cb) {
     const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    const unique = Date.now() + "_" + Math.round(Math.random() * 1e6);
-    cb(null, `${basename}_${unique}${ext}`);
+    const base = path.basename(file.originalname, ext);
+    const unique = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    cb(null, `${base}_${unique}${ext}`);
   },
 });
 
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-  },
-});
+const upload = multer({ storage });
 
-// ===============================
-// base: /manager/ad
-// ===============================
+// 배너/프로모 슬롯 조회
+router.get("/ad/slot", getSlot);
 
-// 인덱스 레이아웃 배너/이미지 슬롯 조회
-router.get("/slot", getSlot);
+// 텍스트 슬롯 조회
+router.get("/ad/text/get", getText);
 
-// 이미지 + 링크 업로드
-router.post("/upload", upload.single("image"), uploadSlot);
+// 배너/프로모 저장 (이미지 + 링크)
+router.post("/ad/upload", upload.single("image"), uploadSlot);
 
-// 등록된 가게 연결 (사업자번호 + 상호)
-router.post("/store", linkStoreSlot);
+// 등록된 가게 연결 모드 (사업자번호 + 상호)
+router.post("/ad/store", saveStoreSlot);
 
-// 텍스트 슬롯 조회/저장
-router.get("/text/get", getTextSlot);
-router.post("/text/save", saveTextSlot);
+// 텍스트 슬롯 저장
+router.post("/ad/text/save", saveText);
 
 export default router;

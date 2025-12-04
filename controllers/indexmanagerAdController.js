@@ -1,236 +1,285 @@
 // controllers/indexmanagerAdController.js
 import pool from "../db.js";
+import path from "path";
 
 /**
- * GET /manager/ad/slot?page=index&position=index_main_top
- * 인덱스 메인에서 이미지/링크 로딩
+ * GET /manager/ad/slot
+ * 쿼리: ?page=index&position=index_main_top
  */
 export async function getSlot(req, res) {
-  const page = (req.query.page || "").trim();
-  const position = (req.query.position || "").trim();
+  const { page, position } = req.query;
 
   if (!page || !position) {
-    return res.status(400).json({ ok: false, message: "page, position 필수" });
+    return res.status(400).json({
+      ok: false,
+      message: "page / position 파라미터가 필요합니다.",
+    });
   }
 
   try {
     const { rows } = await pool.query(
       `
-      SELECT *
+      SELECT
+        id,
+        page,
+        position,
+        image_url,
+        link_url,
+        biz_number,
+        biz_name,
+        start_date,
+        end_date,
+        start_time,
+        end_time,
+        is_active
       FROM admin_ad_slots
-      WHERE page = $1 AND position = $2
-      ORDER BY updated_at DESC
+      WHERE page = $1
+        AND position = $2
+      ORDER BY created_at DESC
       LIMIT 1
       `,
       [page, position]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
       return res.json({ ok: true, slot: null });
     }
 
     return res.json({ ok: true, slot: rows[0] });
   } catch (err) {
-    console.error("getSlot error:", err);
-    return res.status(500).json({ ok: false, message: "slot 조회 오류" });
+    console.error("GET SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "slot 조회 오류",
+    });
   }
 }
 
 /**
- * POST /manager/ad/upload
- * multipart/form-data
- * fields: page, position, link_url, start_date, end_date, start_time, end_time
- * file: image
+ * GET /manager/ad/text/get
+ * 쿼리: ?page=index&position=index_sub_keywords
  */
-export async function uploadSlot(req, res) {
-  const page = (req.body.page || "").trim();
-  const position = (req.body.position || "").trim();
-  const linkUrl = (req.body.link_url || "").trim() || null;
-  const startDate = req.body.start_date || null;
-  const endDate = req.body.end_date || null;
-  const startTime = req.body.start_time || null;
-  const endTime = req.body.end_time || null;
+export async function getText(req, res) {
+  const { page, position } = req.query;
 
   if (!page || !position) {
-    return res.status(400).json({ ok: false, message: "page, position 필수" });
-  }
-
-  let imageUrl = null;
-  if (req.file) {
-    // /uploads → public/uploads 정적 서빙 가정
-    imageUrl = `/uploads/${req.file.filename}`;
-  }
-
-  try {
-    const params = [
-      page,
-      position,
-      imageUrl,
-      linkUrl,
-      startDate,
-      endDate,
-      startTime,
-      endTime,
-    ];
-
-    const query = `
-      INSERT INTO admin_ad_slots
-        (page, position, image_url, link_url, start_date, end_date, start_time, end_time)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        image_url = COALESCE(EXCLUDED.image_url, admin_ad_slots.image_url),
-        link_url = EXCLUDED.link_url,
-        start_date = EXCLUDED.start_date,
-        end_date = EXCLUDED.end_date,
-        start_time = EXCLUDED.start_time,
-        end_time = EXCLUDED.end_time,
-        updated_at = NOW()
-      RETURNING *;
-    `;
-
-    const { rows } = await pool.query(query, params);
-    return res.json({ ok: true, slot: rows[0] });
-  } catch (err) {
-    console.error("uploadSlot error:", err);
-    return res.status(500).json({ ok: false, message: "slot 저장 오류" });
-  }
-}
-
-/**
- * POST /manager/ad/store
- * body: { page, position, biz_number, biz_name, start_date, end_date, start_time, end_time }
- * 지금 단계에서는 “가게 DB에서 찾아 자동 링크”가 아니라
- * 우선 슬롯에 biz_number, biz_name + 기간만 저장하는 구조.
- * 나중에 스토어 DB랑 연동할 때 이 부분만 확장하면 됨.
- */
-export async function linkStoreSlot(req, res) {
-  const page = (req.body.page || "").trim();
-  const position = (req.body.position || "").trim();
-  const bizNumber = (req.body.biz_number || "").trim();
-  const bizName = (req.body.biz_name || "").trim();
-  const startDate = req.body.start_date || null;
-  const endDate = req.body.end_date || null;
-  const startTime = req.body.start_time || null;
-  const endTime = req.body.end_time || null;
-
-  if (!page || !position) {
-    return res.status(400).json({ ok: false, message: "page, position 필수" });
-  }
-  if (!bizNumber || !bizName) {
-    return res.status(400).json({ ok: false, message: "사업자번호, 상호 필수" });
-  }
-
-  try {
-    const params = [
-      page,
-      position,
-      bizNumber,
-      bizName,
-      startDate,
-      endDate,
-      startTime,
-      endTime,
-    ];
-
-    const query = `
-      INSERT INTO admin_ad_slots
-        (page, position, biz_number, biz_name, start_date, end_date, start_time, end_time)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        biz_number = EXCLUDED.biz_number,
-        biz_name = EXCLUDED.biz_name,
-        start_date = EXCLUDED.start_date,
-        end_date = EXCLUDED.end_date,
-        start_time = EXCLUDED.start_time,
-        end_time = EXCLUDED.end_time,
-        updated_at = NOW()
-      RETURNING *;
-    `;
-
-    const { rows } = await pool.query(query, params);
-    return res.json({ ok: true, slot: rows[0] });
-  } catch (err) {
-    console.error("linkStoreSlot error:", err);
-    return res.status(500).json({ ok: false, message: "가게 연결 슬롯 저장 오류" });
-  }
-}
-
-/**
- * GET /manager/ad/text/get?page=index&position=index_sub_keywords
- */
-export async function getTextSlot(req, res) {
-  const page = (req.query.page || "").trim();
-  const position = (req.query.position || "").trim();
-
-  if (!page || !position) {
-    return res.status(400).json({ ok: false, message: "page, position 필수" });
+    return res.status(400).json({
+      ok: false,
+      message: "page / position 파라미터가 필요합니다.",
+    });
   }
 
   try {
     const { rows } = await pool.query(
       `
-      SELECT *
-      FROM admin_text_slots
-      WHERE page = $1 AND position = $2
-      ORDER BY updated_at DESC
+      SELECT id, page, position, content
+      FROM admin_ad_texts
+      WHERE page = $1
+        AND position = $2
+      ORDER BY updated_at DESC, created_at DESC
       LIMIT 1
       `,
       [page, position]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
       return res.json({ ok: true, text: null });
     }
 
     return res.json({ ok: true, text: rows[0] });
   } catch (err) {
-    console.error("getTextSlot error:", err);
-    return res.status(500).json({ ok: false, message: "텍스트 슬롯 조회 오류" });
+    console.error("GET TEXT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "텍스트 조회 오류",
+    });
+  }
+}
+
+/**
+ * POST /manager/ad/upload
+ * FormData: page, position, link_url, start_date, end_date, start_time, end_time, image(파일)
+ * indexmanager.html의 "이미지 + 링크 직접 입력" 모드
+ */
+export async function uploadSlot(req, res) {
+  try {
+    const {
+      page,
+      position,
+      link_url = "",
+      start_date = "",
+      end_date = "",
+      start_time = "",
+      end_time = "",
+    } = req.body;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page / position 값이 없습니다.",
+      });
+    }
+
+    // 업로드된 파일 경로 -> /uploads/파일명
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    // 기존 슬롯 삭제 후 새로 저장(단순 upsert)
+    await pool.query(
+      `DELETE FROM admin_ad_slots WHERE page = $1 AND position = $2`,
+      [page, position]
+    );
+
+    await pool.query(
+      `
+      INSERT INTO admin_ad_slots (
+        page,
+        position,
+        image_url,
+        link_url,
+        start_date,
+        end_date,
+        start_time,
+        end_time,
+        is_active
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        NULLIF($4, ''),
+        NULLIF($5, '')::date,
+        NULLIF($6, '')::date,
+        NULLIF($7, '')::time,
+        NULLIF($8, '')::time,
+        TRUE
+      )
+      `,
+      [page, position, imageUrl, link_url, start_date, end_date, start_time, end_time]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("UPLOAD SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "slot 저장 오류",
+    });
+  }
+}
+
+/**
+ * POST /manager/ad/store
+ * JSON: { page, position, biz_number, biz_name, start_date, ... }
+ * (지금은 가게 상세 링크를 아직 안 붙이고, 일단 번호/상호만 저장)
+ */
+export async function saveStoreSlot(req, res) {
+  try {
+    const {
+      page,
+      position,
+      biz_number = "",
+      biz_name = "",
+      start_date = "",
+      end_date = "",
+      start_time = "",
+      end_time = "",
+    } = req.body;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page / position 값이 없습니다.",
+      });
+    }
+    if (!biz_number || !biz_name) {
+      return res.status(400).json({
+        ok: false,
+        message: "사업자번호와 상호명을 모두 입력해야 합니다.",
+      });
+    }
+
+    // 일단 이미지/링크는 비워두고, 향후 가게 테이블과 연동해서 자동 세팅 예정
+    await pool.query(
+      `DELETE FROM admin_ad_slots WHERE page = $1 AND position = $2`,
+      [page, position]
+    );
+
+    await pool.query(
+      `
+      INSERT INTO admin_ad_slots (
+        page,
+        position,
+        biz_number,
+        biz_name,
+        start_date,
+        end_date,
+        start_time,
+        end_time,
+        is_active
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        NULLIF($5, '')::date,
+        NULLIF($6, '')::date,
+        NULLIF($7, '')::time,
+        NULLIF($8, '')::time,
+        TRUE
+      )
+      `,
+      [page, position, biz_number, biz_name, start_date, end_date, start_time, end_time]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("SAVE STORE SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "가게 슬롯 저장 오류",
+    });
   }
 }
 
 /**
  * POST /manager/ad/text/save
- * body: { page, position, content }
+ * JSON: { page, position, content }
  */
-export async function saveTextSlot(req, res) {
-  const page = (req.body.page || "").trim();
-  const position = (req.body.position || "").trim();
-  const content = (req.body.content || "").trim();
-
-  if (!page || !position || !content) {
-    return res.status(400).json({ ok: false, message: "page, position, content 필수" });
-  }
-
+export async function saveText(req, res) {
   try {
-    const { rows } = await pool.query(
+    const { page, position, content } = req.body;
+
+    if (!page || !position || !content) {
+      return res.status(400).json({
+        ok: false,
+        message: "page / position / content 모두 필요합니다.",
+      });
+    }
+
+    // 기존 텍스트 삭제 후 새로 저장
+    await pool.query(
+      `DELETE FROM admin_ad_texts WHERE page = $1 AND position = $2`,
+      [page, position]
+    );
+
+    await pool.query(
       `
-      INSERT INTO admin_text_slots (page, position, content)
+      INSERT INTO admin_ad_texts (page, position, content)
       VALUES ($1, $2, $3)
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        content = EXCLUDED.content,
-        updated_at = NOW()
-      RETURNING *;
       `,
       [page, position, content]
     );
 
-    return res.json({ ok: true, text: rows[0] });
+    return res.json({ ok: true });
   } catch (err) {
-    console.error("saveTextSlot error:", err);
-    return res.status(500).json({ ok: false, message: "텍스트 슬롯 저장 오류" });
+    console.error("SAVE TEXT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "텍스트 저장 오류",
+    });
   }
 }
-
-export default {
-  getSlot,
-  uploadSlot,
-  linkStoreSlot,
-  getTextSlot,
-  saveTextSlot,
-};
