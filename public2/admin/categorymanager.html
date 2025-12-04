@@ -492,6 +492,47 @@
           </div>
         </div>
 
+        <!-- 🕒 광고 기간 설정 -->
+        <div class="mt-2 border-t border-slate-100 pt-3">
+          <p class="block font-semibold mb-2 text-sm">광고 기간 설정</p>
+
+          <div class="space-y-2 text-xs">
+            <!-- 시작 -->
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <span class="w-20 text-slate-600 shrink-0">시작 시점</span>
+              <div class="flex-1 flex gap-2">
+                <input id="startDateInput" type="date"
+                  class="w-1/2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs" />
+                <input id="startTimeInput" type="time"
+                  class="w-1/2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs" />
+              </div>
+            </div>
+
+            <!-- 종료 -->
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <span class="w-20 text-slate-600 shrink-0">종료 시점</span>
+              <div class="flex-1 flex gap-2 items-center">
+                <div class="flex-1 flex gap-2">
+                  <input id="endDateInput" type="date"
+                    class="w-1/2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs" />
+                  <input id="endTimeInput" type="time"
+                    class="w-1/2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs" />
+                </div>
+                <label class="inline-flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
+                  <input id="noEndCheckbox" type="checkbox" class="rounded border-slate-300" />
+                  <span>종료 없음</span>
+                </label>
+              </div>
+            </div>
+
+            <p class="text-[11px] text-slate-400">
+              시작/종료 시점은 <span class="font-semibold">광고 노출 기간</span>과
+              메인/대시보드의 <span class="font-semibold">기간 알림</span> 기능과 연동될 예정입니다.
+              종료 시점을 비워두거나 ‘종료 없음’을 선택하면 상시 노출로 처리할 수 있습니다.
+            </p>
+          </div>
+        </div>
+
         <input type="hidden" id="selectedPage">
         <input type="hidden" id="selectedPosition">
 
@@ -548,6 +589,68 @@
 
   <script>
     // ============================
+    // 공통: 광고 기간 필드 수집/검증
+    // ============================
+    function collectAdPeriod() {
+      const startDate = (document.getElementById("startDateInput").value || "").trim();
+      const startTime = (document.getElementById("startTimeInput").value || "").trim();
+      const endDate = (document.getElementById("endDateInput").value || "").trim();
+      const endTime = (document.getElementById("endTimeInput").value || "").trim();
+      const noEnd = document.getElementById("noEndCheckbox").checked;
+
+      // 시작: 둘 중 하나만 채워진 경우 경고
+      if ((startDate && !startTime) || (!startDate && startTime)) {
+        alert("광고 시작 시점은 날짜와 시간을 함께 입력해주세요.");
+        return null;
+      }
+
+      // 종료: noEnd가 아니면, 둘 중 하나만 채워진 경우 경고
+      if (!noEnd && ((endDate && !endTime) || (!endDate && endTime))) {
+        alert("광고 종료 시점은 날짜와 시간을 함께 입력하거나, '종료 없음'을 선택해주세요.");
+        return null;
+      }
+
+      return {
+        startDate,
+        startTime,
+        endDate: noEnd ? "" : endDate,
+        endTime: noEnd ? "" : endTime,
+        noEnd
+      };
+    }
+
+    function resetAdPeriodFields() {
+      document.getElementById("startDateInput").value = "";
+      document.getElementById("startTimeInput").value = "";
+      document.getElementById("endDateInput").value = "";
+      document.getElementById("endTimeInput").value = "";
+      document.getElementById("noEndCheckbox").checked = false;
+      // 종료 없음 해제 시 필드 다시 활성화
+      document.getElementById("endDateInput").disabled = false;
+      document.getElementById("endTimeInput").disabled = false;
+    }
+
+    function setupNoEndToggle() {
+      const noEnd = document.getElementById("noEndCheckbox");
+      const endDate = document.getElementById("endDateInput");
+      const endTime = document.getElementById("endTimeInput");
+
+      if (!noEnd || !endDate || !endTime) return;
+
+      noEnd.addEventListener("change", () => {
+        if (noEnd.checked) {
+          endDate.value = "";
+          endTime.value = "";
+          endDate.disabled = true;
+          endTime.disabled = true;
+        } else {
+          endDate.disabled = false;
+          endTime.disabled = false;
+        }
+      });
+    }
+
+    // ============================
     // 슬롯 클릭 → 모달 열기
     // ============================
     function setupSlotClick() {
@@ -579,6 +682,13 @@
           document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
           document.getElementById("slotInfo").textContent = `${page} / ${position}`;
 
+          // 모달 열 때 이전 입력값(이미지/링크/기간) 초기화
+          document.getElementById("imageInput").value = "";
+          document.getElementById("linkInput").value = "";
+          document.getElementById("businessNoInput").value = "";
+          document.getElementById("businessNameInput").value = "";
+          resetAdPeriodFields();
+
           document.getElementById("adModal").classList.remove("hidden");
           document.getElementById("adModal").classList.add("flex");
         }
@@ -592,12 +702,23 @@
       document.getElementById("closeModal").addEventListener("click", () => {
         document.getElementById("adModal").classList.add("hidden");
         document.getElementById("adModal").classList.remove("flex");
+        // 닫을 때도 입력값 정리
+        document.getElementById("imageInput").value = "";
+        document.getElementById("linkInput").value = "";
+        document.getElementById("businessNoInput").value = "";
+        document.getElementById("businessNameInput").value = "";
+        resetAdPeriodFields();
       });
 
       document.getElementById("adModal").addEventListener("click", (e) => {
         if (e.target === e.currentTarget) {
           document.getElementById("adModal").classList.add("hidden");
           document.getElementById("adModal").classList.remove("flex");
+          document.getElementById("imageInput").value = "";
+          document.getElementById("linkInput").value = "";
+          document.getElementById("businessNoInput").value = "";
+          document.getElementById("businessNameInput").value = "";
+          resetAdPeriodFields();
         }
       });
     }
@@ -609,12 +730,14 @@
       document.getElementById("closeTextModal").addEventListener("click", () => {
         document.getElementById("textModal").classList.add("hidden");
         document.getElementById("textModal").classList.remove("flex");
+        document.getElementById("textContentInput").value = "";
       });
 
       document.getElementById("textModal").addEventListener("click", (e) => {
         if (e.target === e.currentTarget) {
           document.getElementById("textModal").classList.add("hidden");
           document.getElementById("textModal").classList.remove("flex");
+          document.getElementById("textContentInput").value = "";
         }
       });
     }
@@ -662,6 +785,10 @@
           return;
         }
 
+        // 광고 기간 수집/검증
+        const period = collectAdPeriod();
+        if (!period) return;
+
         // 🍽 등록된 가게로 연결 모드
         if (mode === "store") {
           const businessNo = (document.getElementById("businessNoInput").value || "").trim();
@@ -677,6 +804,12 @@
             position,
             biz_number: businessNo,
             biz_name: businessName,
+            // 기간 정보 같이 전송
+            start_date: period.startDate || null,
+            start_time: period.startTime || null,
+            end_date: period.noEnd ? null : (period.endDate || null),
+            end_time: period.noEnd ? null : (period.endTime || null),
+            no_end: period.noEnd
           };
 
           try {
@@ -692,6 +825,7 @@
               document.getElementById("adModal").classList.remove("flex");
               document.getElementById("businessNoInput").value = "";
               document.getElementById("businessNameInput").value = "";
+              resetAdPeriodFields();
             } else {
               alert("오류: " + (data.message || "가게 연결에 실패했습니다."));
             }
@@ -708,8 +842,8 @@
         const link = document.getElementById("linkInput").value.trim();
 
         // 이미지 없이 링크만 저장하는 것도 허용
-        if (!imageFile && !link) {
-          const ok = confirm("이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
+        if (!imageFile && !link && !period.startDate && !period.endDate && !period.noEnd) {
+          const ok = confirm("이미지, 링크, 기간 정보가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
           if (!ok) return;
         }
 
@@ -717,6 +851,17 @@
         formData.append("page", page);
         formData.append("position", position);
         formData.append("link_url", link);
+
+        // 기간 정보도 같이 전송 (백엔드에서 필요시 사용)
+        if (period.startDate) formData.append("start_date", period.startDate);
+        if (period.startTime) formData.append("start_time", period.startTime);
+        if (period.noEnd) {
+          formData.append("no_end", "true");
+        } else {
+          if (period.endDate) formData.append("end_date", period.endDate);
+          if (period.endTime) formData.append("end_time", period.endTime);
+        }
+
         if (imageFile) {
           formData.append("image", imageFile);
         }
@@ -733,6 +878,7 @@
             document.getElementById("adModal").classList.remove("flex");
             document.getElementById("imageInput").value = "";
             document.getElementById("linkInput").value = "";
+            resetAdPeriodFields();
           } else {
             alert("오류: " + (data.message || "저장에 실패했습니다."));
           }
@@ -905,6 +1051,7 @@
       setupModalClose();
       setupTextModalClose();
       setupModeToggle();
+      setupNoEndToggle();
       setupSave();
       setupSaveText();
       setupFoodCategoryManagement();
