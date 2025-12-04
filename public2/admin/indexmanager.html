@@ -632,6 +632,33 @@
                     </div>
                 </div>
 
+                <!-- 광고 기간 설정 -->
+                <div class="space-y-2 border-t border-slate-100 pt-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="block font-semibold text-sm">광고 기간 설정 (선택)</label>
+                        <label class="inline-flex items-center gap-1 text-xs text-slate-500">
+                            <input type="checkbox" id="noPeriodCheckbox" class="text-blue-600" checked>
+                            <span>기간 설정 안 함 (항상 노출)</span>
+                        </label>
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        기간을 설정하지 않으면 광고는 별도 종료일 없이 계속 노출됩니다.<br>
+                        기간을 설정하면 <span class="font-semibold">mainmanager.html</span>에서 종료 1일 전 / 20분 전 / 10분 전에 알림을 받을 수 있습니다.
+                    </p>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                            <label for="adStartInput" class="block text-xs font-medium text-slate-600 mb-1">광고 시작일시</label>
+                            <input id="adStartInput" type="datetime-local"
+                                class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-100" disabled>
+                        </div>
+                        <div>
+                            <label for="adEndInput" class="block text-xs font-medium text-slate-600 mb-1">광고 종료일시</label>
+                            <input id="adEndInput" type="datetime-local"
+                                class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-100" disabled>
+                        </div>
+                    </div>
+                </div>
+
                 <input type="hidden" id="selectedPage">
                 <input type="hidden" id="selectedPosition">
 
@@ -774,7 +801,7 @@
                     document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
                     document.getElementById("slotInfo").textContent = `${label} (${page} / ${position})`;
 
-                    // 모드/입력값 초기화
+                    // 모드/입력값/기간 초기화
                     const imageInput = document.getElementById("imageInput");
                     const linkInput = document.getElementById("linkInput");
                     const businessNoInput = document.getElementById("businessNoInput");
@@ -783,6 +810,9 @@
                     const modeStore = document.getElementById("modeStore");
                     const customFields = document.getElementById("customModeFields");
                     const storeFields = document.getElementById("storeModeFields");
+                    const noPeriod = document.getElementById("noPeriodCheckbox");
+                    const adStart = document.getElementById("adStartInput");
+                    const adEnd = document.getElementById("adEndInput");
 
                     if (imageInput) imageInput.value = "";
                     if (linkInput) linkInput.value = "";
@@ -796,6 +826,16 @@
                     if (customFields && storeFields) {
                         customFields.classList.remove("hidden");
                         storeFields.classList.add("hidden");
+                    }
+
+                    if (noPeriod && adStart && adEnd) {
+                        noPeriod.checked = true;
+                        adStart.value = "";
+                        adEnd.value = "";
+                        adStart.disabled = true;
+                        adEnd.disabled = true;
+                        adStart.classList.add("bg-slate-100");
+                        adEnd.classList.add("bg-slate-100");
                     }
 
                     document.getElementById("adModal").classList.remove("hidden");
@@ -867,6 +907,33 @@
         }
 
         // ============================
+        // 광고 기간 토글 (기간 사용/미사용)
+        // ============================
+        function setupPeriodToggle() {
+            const noPeriod = document.getElementById("noPeriodCheckbox");
+            const adStart = document.getElementById("adStartInput");
+            const adEnd = document.getElementById("adEndInput");
+
+            if (!noPeriod || !adStart || !adEnd) return;
+
+            const update = () => {
+                const disabled = noPeriod.checked;
+                adStart.disabled = disabled;
+                adEnd.disabled = disabled;
+                if (disabled) {
+                    adStart.classList.add("bg-slate-100");
+                    adEnd.classList.add("bg-slate-100");
+                } else {
+                    adStart.classList.remove("bg-slate-100");
+                    adEnd.classList.remove("bg-slate-100");
+                }
+            };
+
+            noPeriod.addEventListener("change", update);
+            update();
+        }
+
+        // ============================
         // 저장 버튼 → /index/ad/upload 또는 /index/ad/assign-store
         // ============================
         function setupSave() {
@@ -876,9 +943,25 @@
                 const modeInput = document.querySelector('input[name="adMode"]:checked');
                 const mode = modeInput ? modeInput.value : "custom";
 
+                const noPeriod = document.getElementById("noPeriodCheckbox");
+                const adStart = document.getElementById("adStartInput");
+                const adEnd = document.getElementById("adEndInput");
+
+                const usePeriod = noPeriod ? !noPeriod.checked : false;
+                const adStartVal = adStart ? adStart.value : "";
+                const adEndVal = adEnd ? adEnd.value : "";
+
                 if (!page || !position) {
                     alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
                     return;
+                }
+
+                if (usePeriod) {
+                    if (!adStartVal || !adEndVal) {
+                        alert("광고 기간을 사용하려면 시작일시와 종료일시를 모두 입력해주세요.");
+                        return;
+                    }
+                    // 필요하면 여기에서 시작 < 종료 여부도 나중에 체크 가능
                 }
 
                 // 🍽 등록된 가게로 연결 모드
@@ -896,6 +979,9 @@
                         position,
                         business_no: businessNo,
                         business_name: businessName,
+                        use_period: usePeriod,
+                        ad_start_at: usePeriod ? adStartVal : null,
+                        ad_end_at: usePeriod ? adEndVal : null,
                     };
 
                     try {
@@ -927,8 +1013,8 @@
                 const link = document.getElementById("linkInput").value.trim();
 
                 // 이미지 없이 링크만 저장하는 것도 허용
-                if (!imageFile && !link) {
-                    const ok = confirm("이미지와 링크가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
+                if (!imageFile && !link && !usePeriod) {
+                    const ok = confirm("이미지, 링크, 기간 정보가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?");
                     if (!ok) return;
                 }
 
@@ -936,6 +1022,11 @@
                 formData.append("page", page);
                 formData.append("position", position);
                 formData.append("link_url", link);
+                formData.append("use_period", usePeriod ? "true" : "false");
+                if (usePeriod) {
+                    formData.append("ad_start_at", adStartVal);
+                    formData.append("ad_end_at", adEndVal);
+                }
                 if (imageFile) {
                     formData.append("image", imageFile);
                 }
@@ -1010,6 +1101,7 @@
             setupModalClose();
             setupTextModalClose();
             setupModeToggle();
+            setupPeriodToggle();
             setupSave();
             setupSaveText();
         });
