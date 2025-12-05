@@ -818,46 +818,17 @@
 
                 stores.forEach(store => {
                     const card = document.createElement("a");
-
-                    // ✅ admin/detail 같은 잘못된 링크까지 교정하는 안전 링크
-                    function normalizeStoreLink(raw) {
-                        if (!raw) return "";
-
-                        // 1) admin detail로 들어오면 ndetail로 교정
-                        if (raw.includes("/admin/detail.html") || raw.includes("admin/detail.html")) {
-                            try {
-                                const u = new URL(raw, location.origin);
-                                u.pathname = "/ndetail.html";
-                                return u.href;
-                            } catch {
-                                const replaced = raw.replace(/\/?admin\/detail\.html/i, "ndetail.html");
-                                return replaced.startsWith("/") ? replaced : `/${replaced}`;
-                            }
-                        }
-
-                        // 2) 절대 URL이면 그대로
-                        if (/^https?:\/\//i.test(raw)) return raw;
-
-                        // 3) 루트 절대경로면 그대로
-                        if (raw.startsWith("/")) return raw;
-
-                        // 4) 상대경로면 루트 기준으로 보정
-                        return `/${raw.replace(/^\.?\//, "")}`;
-                    }
-
-                    const safeLink = normalizeStoreLink(store.link);
-
-                    const fallback =
-                        `/ndetail.html?id=${store.id}` +
-                        (store.type ? `&type=${encodeURIComponent(store.type)}` : "");
-
-                    // ✅ 최종 링크
-                    card.href = safeLink || fallback;
-
+                    
+                    // ✅ 개선된 링크 생성
+                    const safeLink = normalizeStoreLink(store.link, store);
+                    card.href = safeLink;
+                    
                     card.className = "block text-center w-28 sm:w-40";
                     card.innerHTML = `
       <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-        <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
+        <img src="${store.image || '/uploads/no-image.png'}" 
+             alt="${store.name}" 
+             class="w-full h-full object-cover">
       </div>
       <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
       <p class="text-xs sm:text-sm text-gray-400">${store.category}</p>
@@ -1373,6 +1344,38 @@
             setupSave();
             setupSaveText();
         });
+
+        // ✅ 개선된 링크 정규화 함수
+        function normalizeStoreLink(raw, store) {
+  if (!raw) {
+    // link가 없으면 id와 type으로 생성
+    return `/ndetail.html?id=${store.id}&type=${store.type || 'food'}`;
+  }
+
+  // 1) admin/detail 경로 자동 수정
+  if (raw.includes("/admin/detail") || raw.includes("admin/detail")) {
+    try {
+      const url = new URL(raw, location.origin);
+      const id = url.searchParams.get("id");
+      const type = url.searchParams.get("type") || store.type || "food";
+      return `/ndetail.html?id=${id}&type=${type}`;
+    } catch {
+      // URL 파싱 실패 시 정규식으로 처리
+      const idMatch = raw.match(/[?&]id=(\d+)/);
+      const id = idMatch ? idMatch[1] : store.id;
+      return `/ndetail.html?id=${id}&type=${store.type || 'food'}`;
+    }
+  }
+
+  // 2) 절대 URL
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  // 3) 루트 절대경로
+  if (raw.startsWith("/")) return raw;
+
+  // 4) 상대경로 → 루트 기준 변환
+  return `/${raw.replace(/^\.?\//, "")}`;
+}
     </script>
 
 </body>
