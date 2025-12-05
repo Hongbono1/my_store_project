@@ -4,111 +4,88 @@ async function initAdSlotsTable() {
   try {
     console.log("📋 admin_ad_slots 테이블 확인 중...");
 
-    // 1. 테이블 존재 여부 확인
-    const tableCheck = await pool.query(`
+    const tableCheck = await pool.query(` await pool.query(`
       SELECT EXISTS (
-        SELECT FROM information_schema.tables 
+        SELECT FROM information_schema.tables nformation_schema.tables 
         WHERE table_name = 'admin_ad_slots'
       );
     `);
 
-    if (!tableCheck.rows[0].exists) {
-      // 2. 테이블이 없으면 생성
-      console.log("📝 admin_ad_slots 테이블 생성 중...");
+    if (!tableCheck.rows[0].exists) {    if (!tableCheck.rows[0].exists) {
+      console.log("📝 admin_ad_slots 테이블 생성 중...");테이블 생성 중...");
       
       await pool.query(`
-        CREATE TABLE admin_ad_slots (
-          id SERIAL PRIMARY KEY,
+        CREATE TABLE admin_ad_slots (  CREATE TABLE admin_ad_slots (
+          id SERIAL PRIMARY KEY,ARY KEY,
           page VARCHAR(100) NOT NULL,
-          position VARCHAR(100) NOT NULL,
-          slot_type VARCHAR(50) DEFAULT 'image',
+          position VARCHAR(100) NOT NULL,NOT NULL,
+          slot_type VARCHAR(50) DEFAULT 'image',LT 'image',
           image_url TEXT,
           link_url TEXT,
-          text_content TEXT,
-          slot_mode VARCHAR(50) DEFAULT 'admin',
+          text_content TEXT,XT,
+          slot_mode VARCHAR(50) DEFAULT 'admin',HAR(50) DEFAULT 'admin',
           store_id INTEGER,
           business_no VARCHAR(20),
-          business_name VARCHAR(255),
+          business_name VARCHAR(255),CHAR(255),
           start_date DATE,
           end_date DATE,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW(),
+          created_at TIMESTAMP DEFAULT NOW(),TAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),ESTAMP DEFAULT NOW(),
           UNIQUE(page, position)
         );
 
-        CREATE INDEX idx_ad_slots_page_position 
-        ON admin_ad_slots(page, position);
+        CREATE INDEX idx_ad_slots_page_position EATE INDEX idx_ad_slots_page_position 
+        ON admin_ad_slots(page, position);        ON admin_ad_slots(page, position);
       `);
 
-      console.log("✅ admin_ad_slots 테이블 생성 완료");
-    } else {
-      // 3. 테이블이 있으면 컬럼 확인 및 추가
-      console.log("✅ admin_ad_slots 테이블이 존재합니다.");
+      console.log("✅ admin_ad_slots 테이블 생성 완료");sole.log("✅ admin_ad_slots 테이블 생성 완료");
+    } else {    } else {
+      console.log("✅ 테이블 존재 - 컬럼 확인 중...");
       
-      const columns = await pool.query(`
+      const columns = await pool.query(`l.query(`
         SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'admin_ad_slots'
+        FROM information_schema.columns   FROM information_schema.columns 
+        WHERE table_name = 'admin_ad_slots'ts'
       `);
 
-      const columnNames = columns.rows.map(r => r.column_name);
-      console.log("📋 기존 컬럼:", columnNames.join(", "));
+      const columnNames = columns.rows.map(r => r.column_name);r => r.column_name);
 
-      // slot_type 컬럼이 없으면 추가
-      if (!columnNames.includes('slot_type')) {
-        console.log("➕ slot_type 컬럼 추가 중...");
-        await pool.query(`
-          ALTER TABLE admin_ad_slots 
-          ADD COLUMN slot_type VARCHAR(50) DEFAULT 'image'
-        `);
-        console.log("✅ slot_type 컬럼 추가 완료");
-      }
-
-      // 다른 필수 컬럼들도 체크
+      // 필수 컬럼 추가      // 필수 컬럼 추가
       const requiredColumns = {
-        slot_mode: "VARCHAR(50) DEFAULT 'admin'",
+        slot_type: "VARCHAR(50) DEFAULT 'image'",
+        slot_mode: "VARCHAR(50) DEFAULT 'admin'",        slot_mode: "VARCHAR(50) DEFAULT 'admin'",
         store_id: "INTEGER",
         business_no: "VARCHAR(20)",
         business_name: "VARCHAR(255)",
-        start_date: "DATE",
+        start_date: "DATE",,
         end_date: "DATE"
       };
 
-      for (const [colName, colType] of Object.entries(requiredColumns)) {
-        if (!columnNames.includes(colName)) {
-          console.log(`➕ ${colName} 컬럼 추가 중...`);
-          await pool.query(`
-            ALTER TABLE admin_ad_slots 
+      for (const [colName, colType] of Object.entries(requiredColumns)) {t.entries(requiredColumns)) {
+        if (!columnNames.includes(colName)) { if (!columnNames.includes(colName)) {
+          console.log(`➕ ${colName} 컬럼 추가 중...`);          console.log(`➕ ${colName} 컬럼 추가 중...`);
+          await pool.query(`uery(`
+            ALTER TABLE admin_ad_slots d_slots 
             ADD COLUMN ${colName} ${colType}
           `);
-          console.log(`✅ ${colName} 컬럼 추가 완료`);
         }
       }
     }
 
-    // 4. 인덱스 확인 및 생성
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_ad_slots_page_position 
-      ON admin_ad_slots(page, position)
-    `);
-
-    console.log("\n✅ 테이블 초기화 완료!");
-    console.log("📊 현재 스키마:");
-    
-    const finalSchema = await pool.query(`
-      SELECT column_name, data_type, column_default
+    console.log("\n✅ 테이블 초기화 완료!");ole.log("\n✅ 테이블 초기화 완료!");
+        
+    const schema = await pool.query(`
+      SELECT column_name, data_type 
       FROM information_schema.columns 
-      WHERE table_name = 'admin_ad_slots'
+      WHERE table_name = 'admin_ad_slots'min_ad_slots'
       ORDER BY ordinal_position
     `);
-
-    console.table(finalSchema.rows);
-
-    process.exit(0);
-  } catch (err) {
-    console.error("❌ 테이블 초기화 오류:", err.message);
-    console.error(err);
-    process.exit(1);
+    
+    console.table(schema.rows);
+    process.exit(0);ss.exit(0);
+  } catch (err) {ch (err) {
+    console.error("❌ 오류:", err.message);onsole.error("❌ 오류:", err.message);
+    process.exit(1);    process.exit(1);
   }
 }
 
