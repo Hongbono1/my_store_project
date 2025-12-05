@@ -407,6 +407,58 @@ export async function saveIndexText(req, res) {
   }
 }
 
+/**
+ * POST /manager/ad/text/save
+ * 텍스트 슬롯 저장
+ */
+export async function saveIndexTextSlot(req, res) {
+  try {
+    const { page, position, content } = req.body;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page와 position은 필수입니다.",
+      });
+    }
+
+    if (!content || content.trim() === "") {
+      return res.status(400).json({
+        ok: false,
+        message: "텍스트 내용을 입력해주세요.",
+      });
+    }
+
+    // UPSERT - 텍스트 슬롯 저장
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page, position, slot_type, text_content, updated_at
+      )
+      VALUES ($1, $2, 'text', $3, NOW())
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type = 'text',
+        text_content = EXCLUDED.text_content,
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const { rows } = await pool.query(sql, [page, position, content.trim()]);
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
+  } catch (err) {
+    console.error("SAVE TEXT SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "텍스트 저장 실패",
+      error: err.message,
+    });
+  }
+}
+
 // ==============================
 // 🔹 인덱스 텍스트 슬롯 조회 API
 // GET /manager/ad/text/get?page=index&position=index_sub_keywords

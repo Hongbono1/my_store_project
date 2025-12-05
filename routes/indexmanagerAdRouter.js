@@ -6,6 +6,7 @@ import {
   uploadIndexAd,
   getIndexSlot,
   getIndexTextSlot,
+  saveIndexTextSlot,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
@@ -66,5 +67,8 @@ router.get("/slot", getIndexSlot);
 
 // 텍스트 슬롯 조회 (slot_type='text' 전용)
 router.get("/text/get", getIndexTextSlot);
+
+// 텍스트 슬롯 저장
+router.post("/text/save", saveIndexTextSlot);
 
 export default router;
