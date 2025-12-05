@@ -16,6 +16,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fetch from "node-fetch";
+import multer from "multer";
 
 // Routers
 import foodregisterRouter from "./routes/foodregister.js";
@@ -168,15 +169,16 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// ------------------------------------------------------------
 // 정적 파일 서빙 설정
+// ------------------------------------------------------------
 app.use(express.static(path.join(__dirname, "public")));
-app.use(express.static(path.join(__dirname, "public2")));
 
-// ✅ 업로드 이미지 정적 서빙 - public/uploads 폴더 참조
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "public", "uploads"))
-);
+// ✅ /uploads → /data/uploads (새 구조)
+app.use("/uploads", express.static(UPLOAD_ROOT));
+
+// (옵션) 예전 public/uploads 파일도 살리고 싶으면 backup용으로:
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // ------------------------------------------------------------
 // 3-1. 표준화된 국세청 사업자번호 인증 API
@@ -286,8 +288,6 @@ app.use("/upload", uploadRouter);
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 app.use("/category", ncategory2managerAdRouter);
-app.use("/manager", indexmanagerAdRouter);  // 인덱스 레이아웃 관리자
-
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
@@ -295,11 +295,11 @@ app.use("/api/hot", hotRouter);
 app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
 app.use("/api/subcategory", foodSubAdRouter);
 
-// 인덱스 레이아웃 관리자 API 추가
+// ✅ 인덱스 레이아웃 관리자 API (중복 제거 - 한 줄만)
 app.use("/manager/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
-// 6. 정적 파일 (public2)
+// 6. 정적 파일 (public2) - HTML 캐시 설정
 // ------------------------------------------------------------
 app.use(
   express.static(path.join(__dirname, "public2"), {
@@ -317,13 +317,10 @@ app.use(
 // ------------------------------------------------------------
 // 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
 // ------------------------------------------------------------
-app.use("/uploads", express.static(UPLOAD_ROOT));
-
-// public2/uploads도 서빙 (폴백)
-app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
-
-// 정적 파일 (이미지) - 이미 있으면 생략
-app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
+// ❌ 기존 중복 코드들 제거 또는 주석 처리
+// app.use("/uploads", express.static(UPLOAD_ROOT));
+// app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
+// app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 // ------------------------------------------------------------
 // 8. 헬스체크
@@ -371,4 +368,16 @@ app.listen(PORT, () => {
   console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
   console.log(`📁 Static root: public2/`);
   console.log(`📤 Upload folder (persistent): /data/uploads/`);
+});
+
+// routes/indexmanagerAdRouter.js 예시
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_ROOT);  // ← "/data/uploads"
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const ext = path.extname(file.originalname);
+    cb(null, unique + ext);
+  },
 });
