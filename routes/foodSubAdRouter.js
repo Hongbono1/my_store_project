@@ -2,7 +2,11 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { uploadSubAd, getSubSlot } from "../controllers/foodSubAdController.js";
+import { 
+  uploadSubAd, 
+  getSubSlot,
+  getFoodSubcategoryStores 
+} from "../controllers/foodSubAdController.js";
 
 const router = express.Router();
 
@@ -24,13 +28,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-/**
- * /api/subcategory/:type
- *  - /api/subcategory/food?category=분식
- *  - /api/subcategory/beauty?category=네일
- */
+// 서브카테고리 가게 목록
 router.get("/:type", getFoodSubcategoryStores);
 
+// 광고 슬롯 관리
 router.post("/ad/upload", upload.single("image"), uploadSubAd);
 router.get("/ad/slot", getSubSlot);
 

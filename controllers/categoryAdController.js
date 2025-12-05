@@ -400,3 +400,134 @@ export async function searchStoreByBusiness(req, res) {
     });
   }
 }
+
+// ==============================
+// 🔹 카테고리 광고 슬롯 업로드 API
+// ==============================
+export async function uploadCategoryAd(req, res) {
+  try {
+    const {
+      page,
+      position,
+      slotType = "image",
+      linkUrl,
+      textContent,
+      slotMode = "admin",
+      storeId,
+      businessNo,
+      businessName,
+      startDate,
+      endDate,
+    } = req.body;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page, position이 필요합니다.",
+      });
+    }
+
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    // UPSERT 쿼리
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page, position, slot_type, image_url, link_url, text_content,
+        slot_mode, store_id, business_no, business_name,
+        start_date, end_date
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type = EXCLUDED.slot_type,
+        image_url = EXCLUDED.image_url,
+        link_url = EXCLUDED.link_url,
+        text_content = EXCLUDED.text_content,
+        slot_mode = EXCLUDED.slot_mode,
+        store_id = EXCLUDED.store_id,
+        business_no = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const values = [
+      page,
+      position,
+      slotType,
+      imageUrl,
+      linkUrl || null,
+      textContent || null,
+      slotMode,
+      storeId || null,
+      businessNo || null,
+      businessName || null,
+      startDate || null,
+      endDate || null,
+    ];
+
+    const { rows } = await pool.query(sql, values);
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
+  } catch (err) {
+    console.error("UPLOAD CATEGORY AD ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "광고 업로드 오류",
+      code: "CATEGORY_AD_UPLOAD_ERROR",
+    });
+  }
+}
+
+/**
+ * (옵션) 카테고리 광고 슬롯 조회 API
+ * GET /manager/ad/category/slot?page=food_category&position=category_power_1
+ */
+export async function getCategorySlot(req, res) {
+  try {
+    const { page, position } = req.query;
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page, position이 필요합니다.",
+      });
+    }
+
+    const sql = `
+      SELECT
+        id, page, position, slot_type, image_url, link_url, text_content,
+        slot_mode, store_id, business_no, business_name,
+        start_date, end_date, created_at, updated_at
+      FROM admin_ad_slots
+      WHERE page = $1 AND position = $2
+      LIMIT 1
+    `;
+
+    const { rows } = await pool.query(sql, [page, position]);
+
+    if (rows.length === 0) {
+      return res.json({
+        ok: true,
+        slot: null,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
+  } catch (err) {
+    console.error("GET CATEGORY SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "슬롯 조회 오류",
+      code: "CATEGORY_SLOT_LOAD_ERROR",
+    });
+  }
+}
