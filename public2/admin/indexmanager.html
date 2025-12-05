@@ -404,16 +404,26 @@
     <!-- 🎛 광고/이미지/텍스트 등록 모달 -->
     <!-- ======================== -->
 
-    <!-- 이미지/가게 연결 모달 -->
+    <!-- 이미지/가게 연결 모달 (이전 스타일 복구 버전) -->
     <div id="adModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-7 max-w-lg w-full border border-slate-200">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-7 max-w-2xl w-full border border-slate-200">
+            <!-- 헤더 영역 -->
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h2 id="modalTitle" class="text-lg font-bold mb-1">슬롯 설정</h2>
+                    <p class="text-xs text-slate-500">
+                        인덱스 메인의 선택된 영역에 노출될 광고/이미지를 설정합니다.
+                        <span id="slotInfo" class="ml-1 font-mono text-[11px] text-slate-400"></span>
+                    </p>
+                </div>
+                <button type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none"
+                    onclick="document.getElementById('adModal').classList.add('hidden');document.getElementById('adModal').classList.remove('flex');">
+                    ×
+                </button>
+            </div>
 
-            <h2 id="modalTitle" class="text-lg font-bold mb-4">
-                슬롯 설정
-            </h2>
-
-            <!-- 슬롯 설정 모달 내부의 폼 -->
-            <form id="slotForm" enctype="multipart/form-data" class="space-y-4">
+            <!-- ★ 실제 전송되는 폼: 이름들은 서버(indexmanagerAdController)에서 기대하는 값 그대로 유지 ★ -->
+            <form id="slotForm" enctype="multipart/form-data" class="space-y-5">
                 <!-- 기본 정보 (hidden) -->
                 <input type="hidden" name="page" value="index" />
                 <input type="hidden" name="position" value="" />
@@ -421,106 +431,99 @@
                 <!-- 슬롯 타입 -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">슬롯 타입</label>
-                    <select name="slotType" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                        <option value="banner">배너</option>
+                    <select name="slotType" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        <option value="banner">배너 (이미지)</option>
                         <option value="text">텍스트</option>
                     </select>
                 </div>
 
-                <!-- 슬롯 모드 -->
+                <!-- 설정 방식 (예전처럼 직접 설정 / 가게 자동연결 토글) -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">슬롯 모드</label>
-                    <select name="slotMode" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                        <option value="custom">직접 설정</option>
-                        <option value="auto">자동</option>
-                    </select>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">설정 방식</label>
+                    <div class="inline-flex rounded-full bg-slate-100 p-1 text-xs gap-1">
+                        <label
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white shadow-sm cursor-pointer">
+                            <input type="radio" id="modeCustom" name="slotMode" value="custom" class="accent-blue-600"
+                                checked />
+                            <span>직접 설정</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1 px-3 py-1 rounded-full cursor-pointer">
+                            <input type="radio" id="modeStore" name="slotMode" value="auto" class="accent-blue-600" />
+                            <span>가게 자동 연결</span>
+                        </label>
+                    </div>
                 </div>
 
-                <!-- 이미지 업로드 -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">이미지</label>
-                    <input type="file" name="image" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <!-- 🔵 직접 설정 영역 (커스텀 모드) -->
+                <div id="customModeFields" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">이미지 파일</label>
+                        <input type="file" name="image" accept="image/*"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                        <p class="mt-1 text-[11px] text-slate-400">
+                            권장: 1200×400 이상 JPG/PNG
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">클릭 시 이동할 링크(URL)</label>
+                        <input type="text" name="linkUrl" placeholder="예) https://www.hongbono1.com/xxxx"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">보조 텍스트(선택)</label>
+                        <textarea name="textContent" rows="3" placeholder="배너 위에 함께 표시할 문구가 있다면 입력하세요."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></textarea>
+                    </div>
                 </div>
 
-                <!-- 링크 URL -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">링크 URL</label>
-                    <input type="text" name="linkUrl" placeholder="http://..." class="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                </div>
-
-                <!-- 텍스트 내용 -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">텍스트 내용</label>
-                    <textarea name="textContent" rows="3" placeholder="텍스트 내용을 입력하세요" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
-                </div>
-
-                <!-- 가게 정보 -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">가게 ID</label>
-                    <input type="text" name="storeId" placeholder="가게 ID (숫자)" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">사업자번호</label>
-                    <input type="text" name="businessNo" placeholder="123-45-67890" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">상호명</label>
-                    <input type="text" name="businessName" placeholder="상호명" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <!-- 🟢 가게 자동 연결 영역 (store 모드) -->
+                <div id="storeModeFields" class="space-y-4 hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">가게 ID</label>
+                            <input type="text" name="storeId" placeholder="예) 12"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">사업자번호</label>
+                            <input type="text" name="businessNo" placeholder="123-45-67890"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">상호명</label>
+                            <input type="text" name="businessName" placeholder="상호명"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        추후 가게 정보 테이블과 연동하여 자동으로 배너 이미지/링크를 채우는 용도로 사용됩니다.
+                    </p>
                 </div>
 
                 <!-- 노출 기간 -->
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
-                        <input type="date" name="startDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                        <label class="block text-sm font-medium text-gray-700 mb-1">노출 시작일</label>
+                        <input type="date" name="startDate"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
-                        <input type="date" name="endDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                        <label class="block text-sm font-medium text-gray-700 mb-1">노출 종료일</label>
+                        <input type="date" name="endDate"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
                     </div>
                 </div>
 
-                <!-- 폼 버튼들 -->
-                <div class="flex justify-end space-x-2 pt-4">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300">취소</button>
-                    <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700">저장</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 텍스트 전용 모달 -->
-    <div id="textModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-7 max-w-lg w-full border border-slate-200">
-            <h2 id="textModalTitle" class="text-lg font-bold mb-3">
-                텍스트 설정
-            </h2>
-
-            <form id="textForm" class="space-y-3">
-                <div class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3"
-                    id="textSlotInfo">
-                    인덱스 페이지의 <span class="font-semibold">텍스트 슬롯</span> 내용을 설정합니다.
-                </div>
-
-                <div>
-                    <label class="block font-semibold mb-1 text-sm">표시할 텍스트</label>
-                    <textarea id="textContentInput"
-                        class="w-full border border-slate-300 rounded-lg p-2 text-sm min-h-[120px]"
-                        placeholder="예) 오늘은 우리동네 숨은 맛집을 둘러보는 날입니다."></textarea>
-                </div>
-
-                <input type="hidden" id="textSelectedPage">
-                <input type="hidden" id="textSelectedPosition">
-
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" id="closeTextModal"
-                        class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+                <!-- 버튼들 -->
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button"
+                        class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                        onclick="document.getElementById('adModal').classList.add('hidden');document.getElementById('adModal').classList.remove('flex');">
                         취소
                     </button>
-                    <button type="button" id="saveTextBtn"
-                        class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow text-sm hover:bg-emerald-700">
+                    <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">
                         저장
                     </button>
                 </div>
@@ -528,23 +531,7 @@
         </div>
     </div>
 
-    <!-- 모달 트리거 요소 (슬롯) -->
-    <div data-slot-position="main_top_banner" class="cursor-pointer">
-        클릭하여 편집
-    </div>
-
-    <!-- 모달 구조 -->
-    <div id="indexAdModal" class="hidden fixed inset-0 z-50">
-        <div class="modal-content">
-            <form id="slotForm">
-                <!-- 폼 필드들 -->
-                <button type="button" data-role="modal-close">×</button>
-                <button type="submit">저장</button>
-            </form>
-        </div>
-    </div>
-
-        <script>
+    <script>
         // ================================
         // 공통 상수 / 기본 데이터
         // ================================
