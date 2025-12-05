@@ -168,10 +168,11 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// 정적 파일 서빙 설정
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(path.join(__dirname, "public2")));
 
-// 업로드 이미지
+// ✅ 업로드 이미지 정적 서빙 - public/uploads 폴더 참조
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "public", "uploads"))
@@ -281,16 +282,18 @@ app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
 app.use("/upload", uploadRouter);
 
+// 라우터 설정
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
-app.use("/manager", indexmanagerAdRouter);  // 이 한 줄만 추가
+app.use("/category", ncategory2managerAdRouter);
+app.use("/manager", indexmanagerAdRouter);  // 인덱스 레이아웃 관리자
+
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
 app.use("/api/subcategory", foodSubAdRouter);
-app.use("/category", ncategory2managerAdRouter);
 
 // 인덱스 레이아웃 관리자 API 추가
 app.use("/manager/ad", indexmanagerAdRouter);
