@@ -2,7 +2,7 @@
  *  MALL HANKOOK SERVER - PERSISTENT UPLOAD VERSION (A 방식)
  *  이미지 경로 /data/uploads 로 영구 저장
  *  public2/uploads와 충돌 제거
- *  기존 라우터 / 기능 절대 변경 없음
+ *  기존 라우터 / 기능은 유지
  *  ---------------------------------------------------------- */
 
 // .env 를 가장 먼저 로드 (cwd 기준)
@@ -15,8 +15,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
-import fetch from "node-fetch";
-import multer from "multer";
+import fetch from "node-fetch";   // 국세청 API 사용
+import multer from "multer";      // (다른 라우터에서 사용 가능하도록 남겨둠)
 
 // Routers
 import foodregisterRouter from "./routes/foodregister.js";
@@ -44,11 +44,12 @@ import onewordRouter from "./routes/onewordRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
-import localRankRouter from "./routes/localRankRouter.js";
+import localRankRouter from "./routes/localRankRouter.js"; // 나중에 사용할 여지
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
-import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
+// 🔵 인덱스 레이아웃 관리자 라우터
+import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
 import pool from "./db.js";
 
@@ -132,7 +133,7 @@ const uploadDirs = [
   UPLOAD_ROOT,
   path.join(UPLOAD_ROOT, "inquiry"),
   path.join(UPLOAD_ROOT, "traditionalmarket"),
-  path.join(UPLOAD_ROOT, "performingart")
+  path.join(UPLOAD_ROOT, "performingart"),
 ];
 
 uploadDirs.forEach((dir) => {
@@ -149,11 +150,13 @@ uploadDirs.forEach((dir) => {
 // ------------------------------------------------------------
 const app = express();
 
+// 요청 ID 부여
 app.use((req, res, next) => {
   req.id = randomUUID();
   next();
 });
 
+// 간단 로깅
 app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
@@ -170,6 +173,7 @@ app.use(express.urlencoded({ extended: true }));
 // ------------------------------------------------------------
 // 정적 파일 서빙 설정
 // ------------------------------------------------------------
+// 기존 public (이미지, js 등)
 app.use(express.static(path.join(__dirname, "public")));
 
 // ✅ /uploads → /data/uploads (A 방식, 영구 저장만 사용)
@@ -195,7 +199,7 @@ app.post("/verify-biz", async (req, res) => {
     if (!rawBizNo) {
       return res.status(400).json({
         ok: false,
-        message: "사업자등록번호가 없습니다."
+        message: "사업자등록번호가 없습니다.",
       });
     }
 
@@ -204,19 +208,20 @@ app.post("/verify-biz", async (req, res) => {
       console.error("❌ BIZ_API_KEY 환경변수가 없습니다. (.env 확인 필요)");
       return res.status(500).json({
         ok: false,
-        message: "서버 설정 오류(BIZ_API_KEY 미설정)"
+        message: "서버 설정 오류(BIZ_API_KEY 미설정)",
       });
     }
 
     const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
 
-    const API_URL =
-      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(
+      serviceKey
+    )}`;
 
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ b_no: [cleanBizNo] })
+      body: JSON.stringify({ b_no: [cleanBizNo] }),
     });
 
     const data = await response.json();
@@ -226,25 +231,23 @@ app.post("/verify-biz", async (req, res) => {
       return res.status(500).json({
         ok: false,
         message: "국세청 응답 없음",
-        raw: data
+        raw: data,
       });
     }
 
     // ✅ 프론트에서 d.data[0] 접근할 수 있게 배열 그대로 내려줌
     return res.json({
       ok: true,
-      data: data.data
+      data: data.data,
     });
-
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
     return res.status(500).json({
       ok: false,
-      message: "서버 오류"
+      message: "서버 오류",
     });
   }
 });
-
 
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
@@ -256,40 +259,54 @@ app.use("/api/inquiry", inquiryBoardRouter);
 // 5. 주요 API 라우트
 // ------------------------------------------------------------
 app.use("/owner", ownerRouter);
+
 app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
+
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
+
 app.use("/api/market", traditionalmarketregisterRouter);
 app.use("/api/market", traditionalmarketdetailRouter);
+
 app.use("/api/performingart", performingartRouter);
 app.use("/api/performingart", performingartregisterRouter);
 app.use("/api/performingart", performingartdetailRouter);
+
 app.use("/api/events", eventregisterRouter);
 app.use("/api/localboard", localboardRouter);
 app.use("/api/oneword", onewordRouter);
+
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
+
 app.use("/api/best-pick", bestpickRouter);
+
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
 app.use("/api/open", opendetailRouter);
 app.use("/open", openRouter);
 app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
+
 app.use("/upload", uploadRouter);
 
-// 라우터 설정
+// 가게 등록 / 통합 등록
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
+
+// 서브카테고리, 핫블로그, 핫플레이스
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 
-
-// ✅ 인덱스 레이아웃 관리자 API (중복 제거 - 한 줄만)
+// 🔵 인덱스 레이아웃 관리자 API
+//   실제 엔드포인트 예: POST /manager/ad/upload, /manager/ad/store, /manager/ad/text/save
 app.use("/manager/ad", indexmanagerAdRouter);
+
+// (localRankRouter 는 나중에 연결 가능)
+// app.use("/api/local-rank", localRankRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2) - HTML 캐시 설정
@@ -303,14 +320,14 @@ app.use(
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
       }
-    }
+    },
   })
 );
 
 // ------------------------------------------------------------
 // 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
 // ------------------------------------------------------------
-// ❌ 기존 중복 코드들 제거 또는 주석 처리
+// ❌ 예전 중복 코드들은 이미 제거됨
 // app.use("/uploads", express.static(UPLOAD_ROOT));
 // app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
 // app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
@@ -320,11 +337,11 @@ app.use(
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
 
-// (선택) ENV 체크 라우트 (필요하면 사용)
+// (선택) ENV 체크 라우트 (필요하면 주석 해제)
 // app.get("/__env-check", (req, res) => {
 //   res.json({
 //     BIZ_API_KEY: !!process.env.BIZ_API_KEY,
-//     DATABASE_URL: !!process.env.DATABASE_URL
+//     DATABASE_URL: !!process.env.DATABASE_URL,
 //   });
 // });
 
@@ -361,16 +378,4 @@ app.listen(PORT, () => {
   console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
   console.log(`📁 Static root: public2/`);
   console.log(`📤 Upload folder (persistent): /data/uploads/`);
-});
-
-// routes/indexmanagerAdRouter.js 예시
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_ROOT);  // ← "/data/uploads"
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    const ext = path.extname(file.originalname);
-    cb(null, unique + ext);
-  },
 });

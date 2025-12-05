@@ -10,17 +10,18 @@ import {
 
 const router = express.Router();
 
-// ✅ 서버와 동일한 업로드 루트 경로 (A 방식)
+// ✅ 서버와 동일한 업로드 루트 경로 (A 방식: /data/uploads)
 const UPLOAD_ROOT = "/data/uploads";
 
 // Multer 스토리지 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, UPLOAD_ROOT); // ← "/data/uploads" 로 통일
+    // /data/uploads 에 저장 → https://www.hongbono1.com/uploads/파일명 으로 접근
+    cb(null, UPLOAD_ROOT);
   },
   filename: (req, file, cb) => {
     const unique = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname || "");
     cb(null, unique + ext);
   },
 });
@@ -49,15 +50,21 @@ const upload = multer({
 
 /* ============================
  *  인덱스 레이아웃 광고 관리 API
+ *  (server.js: app.use("/manager/ad", indexmanagerAdRouter);)
+ *  최종 경로 예:
+ *    POST /manager/ad/upload
+ *    GET  /manager/ad/slot
+ *    GET  /manager/ad/text/get
  * ============================ */
 
 // 배너/이미지 슬롯 업로드 (이미지 파일 포함)
+// FormData: image + page + position + link_url + (기간필드 등)
 router.post("/upload", upload.single("image"), uploadIndexAd);
 
-// 배너/이미지 슬롯 조회
+// 배너/이미지 슬롯 조회 (page, position 쿼리로 조회)
 router.get("/slot", getIndexSlot);
 
-// 텍스트 슬롯 조회 (slot_type='text'만)
+// 텍스트 슬롯 조회 (slot_type='text' 전용)
 router.get("/text/get", getIndexTextSlot);
 
 export default router;
