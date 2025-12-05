@@ -48,9 +48,7 @@ import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
-import categoryAdRouter from "./routes/categoryAdRouter.js";  // ✅ 추가
-import foodSubAdRouter from "./routes/foodSubAdRouter.js";
-import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
+
 
 import pool from "./db.js";
 
@@ -284,13 +282,11 @@ app.use("/upload", uploadRouter);
 // 라우터 설정
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
-app.use("/category", ncategory2managerAdRouter);
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-app.use(categoryAdRouter);  // ✅ 카테고리 전용 라우터 추가
-app.use("/api/subcategory", foodSubAdRouter);
+
 
 // ✅ 인덱스 레이아웃 관리자 API (중복 제거 - 한 줄만)
 app.use("/manager/ad", indexmanagerAdRouter);
