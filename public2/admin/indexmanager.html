@@ -815,22 +815,36 @@
             function createGroup(stores) {
                 const group = document.createElement("div");
                 group.className = "flex justify-center gap-6 basis-full shrink-0";
+
                 stores.forEach(store => {
                     const card = document.createElement("a");
 
-                    // ✅ FIX: 절대경로로 변경
-                    card.href = store.link || `/ndetail.html?id=${store.id}${store.type ? `&type=${store.type}` : ""}`;
+                    const safeLink = store.link
+                        ? (store.link.startsWith("http")
+                            ? store.link
+                            : (store.link.startsWith("/")
+                                ? store.link
+                                : `/${store.link}`))
+                        : null;
+
+                    const fallback =
+                        `/ndetail.html?id=${store.id}` +
+                        (store.type ? `&type=${encodeURIComponent(store.type)}` : "");
+
+                    // ✅ 최종: 링크가 있으면 절대경로로 보정된 safeLink 사용
+                    card.href = safeLink || fallback;
 
                     card.className = "block text-center w-28 sm:w-40";
                     card.innerHTML = `
-              <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+            <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
                 <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
-              </div>
-              <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
-              <p class="text-xs sm:text-sm text-gray-400">${store.category}</p>
-            `;
+            </div>
+            <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
+            <p class="text-xs sm:text-sm text-gray-400">${store.category}</p>
+        `;
                     group.appendChild(card);
                 });
+
                 return group;
             }
 
