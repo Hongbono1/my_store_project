@@ -174,11 +174,8 @@ app.use(express.urlencoded({ extended: true }));
 // ------------------------------------------------------------
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ /uploads → /data/uploads (새 구조)
+// ✅ /uploads → /data/uploads (A 방식, 영구 저장만 사용)
 app.use("/uploads", express.static(UPLOAD_ROOT));
-
-// (옵션) 예전 public/uploads 파일도 살리고 싶으면 backup용으로:
-app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // ------------------------------------------------------------
 // 3-1. 표준화된 국세청 사업자번호 인증 API
