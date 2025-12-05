@@ -544,167 +544,10 @@
         </div>
     </div>
 
-    <script>
-function setupModalClose() {
-  // 모달 요소와 닫기 버튼을 찾음
-  const modal = document.getElementById("indexAdModal");
-  const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
-
-  // 둘 중 하나라도 없으면 아무것도 하지 않고 그냥 종료 (에러 방지)
-  if (!modal || !closeBtn) {
-    console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
-    return;
-  }
-
-  closeBtn.addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  setupModalClose();
-  // ... 다른 초기화들
-});
-
-        // ============================================================
-        // 🔥 인덱스용 슬롯 로더 (프론트와 동일하게 유지)
-        // ============================================================
-
-        async function loadBannerSlot(slotId, page, position) {
-            const container = document.getElementById(slotId);
-            if (!container) return;
-
-            const img = container.querySelector(".slot-img");
-            const defaultEl = container.querySelector(".slot-default");
-
-            try {
-                const res = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
-                if (!res.ok) return;
-
-                const json = await res.json();
-
-                if (json.ok && json.slot && json.slot.image_url) {
-                    if (img) {
-                        img.src = json.slot.image_url;
-                        img.classList.remove("hidden");
-                    }
-                    if (defaultEl) defaultEl.classList.add("hidden");
-
-                    if (json.slot.link_url) {
-                        container.style.cursor = "pointer";
-                        container.addEventListener("click", (e) => {
-                            // 관리자 모달용 클릭과 충돌 방지를 위해 js-slot 핸들러에서 처리
-                            if (e.defaultPrevented) return;
-                            if (!e.target.closest(".js-slot, .js-text-slot")) {
-                                e.preventDefault();
-                                location.href = json.slot.link_url;
-                            }
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error(`슬롯 로드 실패 [${position}]:`, err);
-            }
-        }
-
-        // 텍스트 슬롯 로드 함수 (방어 코드 강화)
-        async function loadTextSlot(page, position, els) {
-  try {
-    const res = await fetch(`/manager/ad/text/get?page=${page}&position=${position}`);
-    if (!res.ok) {
-      console.warn("텍스트 슬롯 로드 실패:", page, position, res.status);
-      if (els.text) els.text.textContent = "";
-      return;
-    }
-
-    const data = await res.json();
-
-    if (!data || !data.ok || !data.slot) {
-      // 아직 텍스트 슬롯 등록 안 된 경우
-      if (els.text) els.text.textContent = "";
-      return;
-    }
-
-    const slot = data.slot;
-    if (els.text) {
-      els.text.textContent = slot.text_content || "";
-    }
-  } catch (err) {
-    console.error("loadTextSlot error:", err);
-    if (els.text) els.text.textContent = "";
-  }
-}
-
-// 배너 슬롯 로드 함수 (기존 방어 코드 유지)
-async function loadBannerSlot(page, position, els) {
-  try {
-    const res = await fetch(`/manager/ad/slot?page=${page}&position=${position}`);
-    if (!res.ok) {
-      console.warn("슬롯 로드 실패:", page, position, res.status);
-      // 서버 에러일 때는 그냥 no-image만 세팅하고 끝
-      if (els.img) els.img.src = "/no-image.png";
-      return;
-    }
-
-    const data = await res.json();
-
-    if (!data || !data.ok || !data.slot) {
-      // 슬롯이 아직 등록 안 된 상태
-      if (els.img) els.img.src = "/no-image.png";
-      if (els.text) els.text.textContent = "";
-      return;
-    }
-
-    const slot = data.slot;
-
-    if (els.img) {
-      els.img.src = slot.image_url || "/no-image.png";
-    }
-    if (els.link) {
-      if (slot.link_url) {
-        els.link.href = slot.link_url;
-        els.link.target = "_blank";
-      } else {
-        els.link.removeAttribute("href");
-      }
-    }
-    if (els.text) {
-      els.text.textContent = slot.text_content || "";
-    }
-
-  } catch (err) {
-    console.error("loadBannerSlot error:", err);
-    if (els.img) els.img.src = "/no-image.png";
-  }
-}
-
-// 모달 닫기 설정 (안전한 패턴)
-function setupModalClose() {
-  const modal = document.getElementById("indexAdModal");
-  const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
-
-  if (!modal || !closeBtn) {
-    console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
-    return;
-  }
-
-  closeBtn.addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
-}
-
-// DOM 로드 완료 후 초기화
-document.addEventListener("DOMContentLoaded", () => {
-  setupModalClose();
-  
-  // 기존 슬롯 로드 로직이 있다면 여기서 호출
-  // loadTextSlot("index", "sub_keywords", { text: document.getElementById("keywordsText") });
-  // loadBannerSlot("index", "main_banner", { 
-  //   img: document.getElementById("mainBannerImg"),
-  //   link: document.getElementById("mainBannerLink")
-  // });
-});
-
+        <script>
+        // ================================
+        // 공통 상수 / 기본 데이터
+        // ================================
         const DEFAULT_DATA = {
             keywords: ["검색어1", "검색어2", "검색어3", "검색어4", "검색어5"],
             news: ["신제품 출시", "업데이트 소식", "공지사항", "점검 안내", "서비스 개선"],
@@ -713,15 +556,103 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         function renderDefaultList(container, items) {
-            const textEl = container.querySelector(".slot-default-text") || container;
-            textEl.innerHTML = items.map(t => `<p class="text-xl leading-relaxed tracking-wide">${t}</p>`).join("");
+            const target = container.querySelector(".slot-default-text") || container;
+            target.innerHTML = items
+                .map(t => `<p class="text-xl leading-relaxed tracking-wide">${t}</p>`)
+                .join("");
         }
 
+        // ================================
+        // 배너 슬롯 로드 (이미지)
+        // ================================
+        async function loadAllBannerSlots() {
+            const slotEls = document.querySelectorAll(".js-slot");
+            const tasks = Array.from(slotEls).map(async (slotEl) => {
+                const page = slotEl.dataset.page || "index";
+                const position = slotEl.dataset.position || "";
+                if (!position) return;
+
+                const img = slotEl.querySelector(".slot-img");
+                const defaultEl = slotEl.querySelector(".slot-default");
+
+                try {
+                    const res = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+                    if (!res.ok) return;
+
+                    const json = await res.json();
+                    const slot = json && json.ok ? json.slot : null;
+
+                    if (slot && slot.image_url && img) {
+                        img.src = slot.image_url;
+                        img.classList.remove("hidden");
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    }
+                } catch (err) {
+                    console.error(`슬롯 로드 실패 [${page}/${position}]`, err);
+                }
+            });
+
+            await Promise.all(tasks);
+        }
+
+        // ================================
+        // 텍스트 슬롯 로드
+        // ================================
+        function getDefaultTexts(position) {
+            switch (position) {
+                case "index_sub_keywords":
+                    return DEFAULT_DATA.keywords;
+                case "index_sub_news":
+                    return DEFAULT_DATA.news;
+                case "index_sub_events":
+                    return DEFAULT_DATA.events;
+                case "index_sub_recommends":
+                    return DEFAULT_DATA.recommends;
+                default:
+                    return null;
+            }
+        }
+
+        async function loadAllTextSlots() {
+            const textSlots = document.querySelectorAll(".js-text-slot");
+
+            for (const slotEl of textSlots) {
+                const page = slotEl.dataset.page || "index";
+                const position = slotEl.dataset.position || "";
+                const target = slotEl.querySelector(".slot-default-text") || slotEl;
+
+                try {
+                    const res = await fetch(`/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.ok && data.slot && data.slot.text_content) {
+                            target.textContent = data.slot.text_content;
+                            continue;
+                        }
+                    }
+                } catch (err) {
+                    console.error("텍스트 슬롯 로드 오류:", page, position, err);
+                }
+
+                // 등록된 텍스트가 없으면 기본값 렌더링
+                const defaults = getDefaultTexts(position);
+                if (defaults && defaults.length > 0) {
+                    renderDefaultList(slotEl, defaults);
+                } else {
+                    target.textContent = "";
+                }
+            }
+        }
+
+        // ================================
+        // 우리동네 한마디
+        // ================================
         async function loadOneWord() {
             const contentEl = document.getElementById("oneword-content");
             if (!contentEl) return;
 
             try {
+                // 1) 관리자 텍스트 슬롯 우선
                 const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
                 if (slotRes.ok) {
                     const slotJson = await slotRes.json();
@@ -731,6 +662,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
 
+                // 2) API에서 가져오기
                 const userRegion = localStorage.getItem("userRegion") || "의정부";
                 const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
 
@@ -755,6 +687,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        // ================================
+        // Best Pick
+        // ================================
         async function loadBestPick() {
             let allStores = [];
             try {
@@ -825,21 +760,121 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderGroup();
             }
 
-            document.getElementById("bestNext").addEventListener("click", nextSlide);
-            document.getElementById("bestPrev").addEventListener("click", () => {
-                index = index > 0 ? index - 1 : 0;
-                renderGroup();
-            });
+            const nextBtn = document.getElementById("bestNext");
+            const prevBtn = document.getElementById("bestPrev");
+
+            if (nextBtn) nextBtn.addEventListener("click", nextSlide);
+            if (prevBtn) {
+                prevBtn.addEventListener("click", () => {
+                    index = index > 0 ? index - 1 : 0;
+                    renderGroup();
+                });
+            }
 
             setInterval(nextSlide, 4000);
             groups = makeGroups();
             renderGroup();
         }
 
-        // ============================================================
-        // 🛠 관리자 슬롯 편집용 기능 (모달/저장)
-        // ============================================================
+        // ================================
+        // 모달 관련
+        // ================================
+        function openAdModal(page, position, label) {
+            const modal = document.getElementById("adModal");
+            const form = document.getElementById("slotForm");
+            const title = document.getElementById("modalTitle");
 
+            if (title) {
+                title.textContent = `슬롯 설정: ${label}`;
+            }
+
+            if (form) {
+                const pageInput = form.querySelector("input[name='page']");
+                const posInput = form.querySelector("input[name='position']");
+                if (pageInput) pageInput.value = page;
+                if (posInput) posInput.value = position;
+
+                // 기본값 초기화 (필요 시)
+                const imageInput = form.querySelector("input[name='image']");
+                const linkInput = form.querySelector("input[name='linkUrl']");
+                const textArea = form.querySelector("textarea[name='textContent']");
+                const storeIdInput = form.querySelector("input[name='storeId']");
+                const bizNoInput = form.querySelector("input[name='businessNo']");
+                const bizNameInput = form.querySelector("input[name='businessName']");
+                const startDateInput = form.querySelector("input[name='startDate']");
+                const endDateInput = form.querySelector("input[name='endDate']");
+
+                if (imageInput) imageInput.value = "";
+                if (linkInput) linkInput.value = "";
+                if (textArea) textArea.value = "";
+                if (storeIdInput) storeIdInput.value = "";
+                if (bizNoInput) bizNoInput.value = "";
+                if (bizNameInput) bizNameInput.value = "";
+
+                // 날짜 기본값 (오늘 ~ +7일)
+                const today = new Date();
+                const toYYYYMMDD = (d) => d.toISOString().slice(0, 10);
+                const end = new Date(today);
+                end.setDate(end.getDate() + 7);
+
+                if (startDateInput && !startDateInput.value) {
+                    startDateInput.value = toYYYYMMDD(today);
+                }
+                if (endDateInput && !endDateInput.value) {
+                    endDateInput.value = toYYYYMMDD(end);
+                }
+            }
+
+            if (modal) {
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById("adModal");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.classList.remove("flex");
+            }
+        }
+
+        function setupAdModalClose() {
+            const modal = document.getElementById("adModal");
+            if (!modal) return;
+
+            // 바깥 영역 클릭 시 닫기
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        function setupTextModalClose() {
+            const modal = document.getElementById("textModal");
+            const closeBtn = document.getElementById("closeTextModal");
+
+            if (closeBtn) {
+                closeBtn.addEventListener("click", () => {
+                    modal.classList.add("hidden");
+                    modal.classList.remove("flex");
+                });
+            }
+
+            if (modal) {
+                modal.addEventListener("click", (e) => {
+                    if (e.target === e.currentTarget) {
+                        modal.classList.add("hidden");
+                        modal.classList.remove("flex");
+                    }
+                });
+            }
+        }
+
+        // ================================
+        // 슬롯 클릭 → 모달 열기
+        // ================================
         function setupSlotClick() {
             document.addEventListener("click", (e) => {
                 const slotEl = e.target.closest(".js-slot, .js-text-slot");
@@ -850,149 +885,105 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (linkParent) {
                     e.preventDefault();
                 }
-
                 e.preventDefault();
 
                 const page = slotEl.dataset.page || "index";
                 const position = slotEl.dataset.position || "";
                 const label = slotEl.dataset.label || position || "선택된 슬롯";
-                const slotType =
-                    slotEl.dataset.slotType ||
-                    (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
+                const isTextSlot =
+                    slotEl.classList.contains("js-text-slot") ||
+                    slotEl.dataset.slotType === "text";
 
-                if (slotType === "text") {
+                if (isTextSlot) {
                     // 텍스트 편집 모달
-                    document.getElementById("textSelectedPage").value = page;
-                    document.getElementById("textSelectedPosition").value = position;
-                    document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
-                    document.getElementById("textSlotInfo").innerHTML =
-                        `index 페이지의 <span class="font-semibold">${position}</span> 슬롯에 표시될 텍스트를 입력합니다.`;
+                    const pageInput = document.getElementById("textSelectedPage");
+                    const posInput = document.getElementById("textSelectedPosition");
+                    const contentInput = document.getElementById("textContentInput");
+                    const titleEl = document.getElementById("textModalTitle");
+                    const infoEl = document.getElementById("textSlotInfo");
 
-                    // 현재 텍스트를 기본값으로 채우기
+                    if (pageInput) pageInput.value = page;
+                    if (posInput) posInput.value = position;
+                    if (titleEl) titleEl.textContent = `텍스트 설정: ${label}`;
+                    if (infoEl) {
+                        infoEl.innerHTML =
+                            `index 페이지의 <span class="font-semibold">${position}</span> 슬롯에 표시될 텍스트를 입력합니다.`;
+                    }
+
                     const currentTextEl = slotEl.querySelector(".slot-default-text") || slotEl;
-                    const currentText = currentTextEl.innerText.trim();
-                    document.getElementById("textContentInput").value = currentText;
+                    const currentText = currentTextEl ? currentTextEl.innerText.trim() : "";
+                    if (contentInput) contentInput.value = currentText;
 
                     const textModal = document.getElementById("textModal");
-                    textModal.classList.remove("hidden");
-                    textModal.classList.add("flex");
+                    if (textModal) {
+                        textModal.classList.remove("hidden");
+                        textModal.classList.add("flex");
+                    }
                 } else {
-                    // 배너/이미지 모달
-                    document.getElementById("selectedPage").value = page;
-                    document.getElementById("selectedPosition").value = position;
-                    document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
-                    document.getElementById("slotInfo").textContent = `${page} / ${position}`;
-
-                    const adModal = document.getElementById("adModal");
-                    adModal.classList.remove("hidden");
-                    adModal.classList.add("flex");
+                    // 배너/이미지 슬롯 모달
+                    openAdModal(page, position, label);
                 }
             });
         }
 
-        function setupModalClose() {
-  const modal = document.getElementById("indexAdModal");
-  const closeBtn = modal ? modal.querySelector("[data-role='modal-close']") : null;
-
-  if (!modal || !closeBtn) {
-    console.warn("setupModalClose: 모달 또는 닫기 버튼을 찾지 못했습니다.");
-    return;
-  }
-
-  closeBtn.addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
-}
-
-        function setupTextModalClose() {
-            const modal = document.getElementById("textModal");
-            document.getElementById("closeTextModal").addEventListener("click", () => {
-                modal.classList.add("hidden");
-                modal.classList.remove("flex");
-            });
-            modal.addEventListener("click", (e) => {
-                if (e.target === e.currentTarget) {
-                    modal.classList.add("hidden");
-                    modal.classList.remove("flex");
-                }
-            });
-        }
-
-        function setupModeToggle() {
-            const customFields = document.getElementById("customModeFields");
-            const storeFields = document.getElementById("storeModeFields");
-            const modeCustom = document.getElementById("modeCustom");
-            const modeStore = document.getElementById("modeStore");
-
-            if (!customFields || !storeFields || !modeCustom || !modeStore) return;
-
-            const updateVisibility = () => {
-                if (modeStore.checked) {
-                    storeFields.classList.remove("hidden");
-                    customFields.classList.add("hidden");
-                } else {
-                    customFields.classList.remove("hidden");
-                    storeFields.classList.add("hidden");
-                }
-            };
-
-            modeCustom.addEventListener("change", updateVisibility);
-            modeStore.addEventListener("change", updateVisibility);
-            updateVisibility();
-        }
-
+        // ================================
+        // 저장 (배너 슬롯)
+        // ================================
         function setupSave() {
-  // 폼 요소를 안전하게 찾기
-  const form = document.getElementById("slotForm");
-  
-  // 폼이 없으면 경고 후 종료 (에러 방지)
-  if (!form) {
-    console.warn("setupSave: slotForm을 찾지 못했습니다.");
-    return;
-  }
+            const form = document.getElementById("slotForm");
+            if (!form) {
+                console.warn("setupSave: slotForm을 찾지 못했습니다.");
+                return;
+            }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    
-    try {
-      const formData = new FormData(form);
-      
-      const response = await fetch("/manager/ad/upload", {
-        method: "POST",
-        body: formData
-      });
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+                try {
+                    const formData = new FormData(form);
 
-      const data = await response.json();
-      
-      if (data.ok) {
-        alert("슬롯이 성공적으로 저장되었습니다!");
-        // 모달 닫기
-        const modal = document.getElementById("indexAdModal");
-        if (modal) {
-          modal.classList.add("hidden");
+                    const response = await fetch("/manager/ad/upload", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (data.ok) {
+                        alert("슬롯이 성공적으로 저장되었습니다!");
+                        closeModal();
+                        // 페이지 전체 새로고침 대신, 슬롯만 다시 로드해도 됨
+                        await loadAllBannerSlots();
+                    } else {
+                        throw new Error(data.message || "저장 실패");
+                    }
+
+                } catch (err) {
+                    console.error("슬롯 저장 오류:", err);
+                    alert(`저장 중 오류가 발생했습니다: ${err.message}`);
+                }
+            });
         }
-        // 페이지 새로고침 또는 슬롯 다시 로드
-        location.reload();
-      } else {
-        throw new Error(data.message || "저장 실패");
-      }
-      
-    } catch (err) {
-      console.error("슬롯 저장 오류:", err);
-      alert(`저장 중 오류가 발생했습니다: ${err.message}`);
-    }
-  });
-}
 
+        // ================================
+        // 저장 (텍스트 슬롯)
+        // ================================
         function setupSaveText() {
-            document.getElementById("saveTextBtn").addEventListener("click", async () => {
-                const page = document.getElementById("textSelectedPage").value || "index";
-                const position = document.getElementById("textSelectedPosition").value;
-                const content = document.getElementById("textContentInput").value.trim();
+            const btn = document.getElementById("saveTextBtn");
+            if (!btn) return;
+
+            btn.addEventListener("click", async () => {
+                const pageInput = document.getElementById("textSelectedPage");
+                const posInput = document.getElementById("textSelectedPosition");
+                const contentInput = document.getElementById("textContentInput");
+
+                const page = pageInput ? pageInput.value || "index" : "index";
+                const position = posInput ? posInput.value : "";
+                const content = contentInput ? contentInput.value.trim() : "";
 
                 if (!page || !position) {
                     alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
@@ -1014,8 +1005,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     const data = await res.json();
                     if (data.ok) {
                         alert("텍스트가 저장되었습니다.");
-                        document.getElementById("textModal").classList.add("hidden");
-                        document.getElementById("textModal").classList.remove("flex");
+
+                        const textModal = document.getElementById("textModal");
+                        if (textModal) {
+                            textModal.classList.add("hidden");
+                            textModal.classList.remove("flex");
+                        }
+
                         // 화면에도 바로 반영
                         const target = document.querySelector(
                             `.js-text-slot[data-page="${page}"][data-position="${position}"] .slot-default-text`
@@ -1031,11 +1027,19 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // ============================================================
-        // 🚀 초기화
-        // ============================================================
-        document.addEventListener("DOMContentLoaded", async () => {
+        // ================================
+        // 기타 네비게이션
+        // ================================
+        function goBack() { window.history.back(); }
+        function goNext() { window.history.forward(); }
+        window.goBack = goBack;
+        window.goNext = goNext;
+        window.closeModal = closeModal; // HTML onclick용
 
+        // ================================
+        // 🚀 초기화
+        // ================================
+        document.addEventListener("DOMContentLoaded", async () => {
             // Header/Footer 로드
             fetch("/components/header.html")
                 .then(r => r.text())
@@ -1043,6 +1047,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const el = document.getElementById("header-placeholder");
                     if (el) el.innerHTML = d;
                 });
+
             fetch("/components/footer.html")
                 .then(r => r.text())
                 .then(d => {
@@ -1050,43 +1055,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (el) el.innerHTML = d;
                 });
 
-            // 배너 슬롯들 로드
-            const bannerSlots = [
-                ["slot_index_main_top", "index", "index_main_top"],
-                ["slot_index_main_visual", "index", "index_main_visual"],
-                ["slot_index_promo_1", "index", "index_promo_1"],
-                ["slot_index_promo_2", "index", "index_promo_2"],
-                ["slot_index_promo_3", "index", "index_promo_3"],
-                ["slot_index_food_delivery", "index", "index_food_delivery"],
-                ["slot_index_all_stores", "index", "index_all_stores"],
-                ["slot_index_hot_place", "index", "index_hot_place"],
-                ["slot_index_suggest", "index", "index_suggest"],
-                ["slot_index_open", "index", "index_open"],
-                ["slot_index_store_pride", "index", "index_store_pride"],
-                ["slot_index_traditional", "index", "index_traditional"],
-                ["slot_index_performing", "index", "index_performing"],
-                ["slot_index_event", "index", "index_event"],
-                ["slot_index_localboard", "index", "index_localboard"],
-                ["slot_index_season", "index", "index_season"],
-                ["slot_index_join", "index", "index_join"],
-                ["slot_index_d2c_banner", "index", "index_d2c_banner"],
-                ["slot_index_d2c_shop", "index", "index_d2c_shop"],
-                ["slot_index_support_review", "index", "index_support_review"],
-                ["slot_index_support_empty", "index", "index_support_empty"],
-                ["slot_index_support_inquiry", "index", "index_support_inquiry"],
-            ];
-
-            await Promise.all(bannerSlots.map(([id, page, pos]) => loadBannerSlot(id, page, pos)));
-
-            // 텍스트 슬롯 로드
-            loadTextSlot("slot_index_sub_keywords", "index", "index_sub_keywords",
-                (c) => renderDefaultList(c, DEFAULT_DATA.keywords));
-            loadTextSlot("slot_index_sub_news", "index", "index_sub_news",
-                (c) => renderDefaultList(c, DEFAULT_DATA.news));
-            loadTextSlot("slot_index_sub_events", "index", "index_sub_events",
-                (c) => renderDefaultList(c, DEFAULT_DATA.events));
-            loadTextSlot("slot_index_sub_recommends", "index", "index_sub_recommends",
-                (c) => renderDefaultList(c, DEFAULT_DATA.recommends));
+            // 슬롯 로드
+            await loadAllBannerSlots();
+            await loadAllTextSlots();
 
             // 우리동네 한마디
             loadOneWord();
@@ -1094,62 +1065,15 @@ document.addEventListener("DOMContentLoaded", () => {
             // Best Pick
             loadBestPick();
 
-            // 관리자용 모달/저장 기능
+            // 관리자용 기능 세팅
             setupSlotClick();
-            setupModalClose();
+            setupAdModalClose();
             setupTextModalClose();
-            setupModeToggle();
             setupSave();
             setupSaveText();
         });
-
-        // 네비게이션 버튼
-        function goBack() { return false; }
-        function goNext() { window.history.forward(); }
-
-        // indexmanager.html 내부 JavaScript에 추가할 함수
-        async function loadBannerSlot(page, position, els) {
-            try {
-                const res = await fetch(`/manager/ad/slot?page=${page}&position=${position}`);
-                if (!res.ok) {
-                    console.warn("슬롯 로드 실패:", page, position, res.status);
-                    // 서버 에러일 때는 그냥 no-image만 세팅하고 끝
-                    if (els.img) els.img.src = "/no-image.png";
-                    return;
-                }
-
-                const data = await res.json();
-
-                if (!data || !data.ok || !data.slot) {
-                    // 슬롯이 아직 등록 안 된 상태
-                    if (els.img) els.img.src = "/no-image.png";
-                    if (els.text) els.text.textContent = "";
-                    return;
-                }
-
-                const slot = data.slot;
-
-                if (els.img) {
-                  els.img.src = slot.image_url || "/no-image.png";
-                }
-                if (els.link) {
-                  if (slot.link_url) {
-                    els.link.href = slot.link_url;
-                    els.link.target = "_blank";
-                  } else {
-                    els.link.removeAttribute("href");
-                  }
-                }
-                if (els.text) {
-                  els.text.textContent = slot.text_content || "";
-                }
-
-            } catch (err) {
-                console.error("loadBannerSlot error:", err);
-                if (els.img) els.img.src = "/no-image.png";
-            }
-        }
     </script>
+
 
 </body>
 
