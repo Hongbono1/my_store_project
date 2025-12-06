@@ -34,7 +34,8 @@ import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.
 import storeprideRouter from "./routes/storeprideRouter.js";
 import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterRouter.js";
 import traditionalmarketdetailRouter from "./routes/traditionalmarketdetailRouter.js";
-import bestpickRouter from "./routes/bestpickRouter.js";
+// ❌ Best Pick 기존 전용 라우터는 제거(인덱스 관리자에 흡수)
+// import bestpickRouter from "./routes/bestpickRouter.js";
 import performingartRouter from "./routes/performingartRouter.js";
 import performingartregisterRouter from "./routes/performingartregisterRouter.js";
 import performingartdetailRouter from "./routes/performingartdetailRouter.js";
@@ -161,7 +162,9 @@ app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - started;
-    console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
+    console.log(
+      `[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`
+    );
   });
   next();
 });
@@ -280,7 +283,8 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 
-app.use("/api/best-pick", bestpickRouter);
+// ❌ Best Pick 기존 전용 API 제거
+// app.use("/api/best-pick", bestpickRouter);
 
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
@@ -302,7 +306,7 @@ app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 
 // 🔵 인덱스 레이아웃 관리자 API
-//   실제 엔드포인트 예: POST /manager/ad/upload, /manager/ad/store, /manager/ad/text/save
+//   실제 엔드포인트 예: POST /manager/ad/upload, /manager/ad/store, /manager/ad/text/save, /manager/ad/best-pick
 app.use("/manager/ad", indexmanagerAdRouter);
 
 // (localRankRouter 는 나중에 연결 가능)

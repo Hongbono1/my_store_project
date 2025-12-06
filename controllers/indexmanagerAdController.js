@@ -13,18 +13,48 @@ function ensurePagePosition(page, position) {
 }
 
 /**
- * INDEX 메인 배너 / 프로모 등 이미지 + 링크 저장
+ * 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
+ */
+function pickBody(req) {
+  const b = req.body || {};
+
+  return {
+    page: b.page,
+    position: b.position,
+
+    // 모드/타입
+    slotType: b.slotType || b.slot_type,
+    slotMode: b.slotMode || b.slot_mode,
+
+    // 링크
+    linkUrl: b.linkUrl || b.link_url || b.link,
+
+    // 텍스트
+    textContent: b.textContent || b.text_content || b.content,
+
+    // 가게 연결용(현재는 메타 저장만)
+    storeId: b.storeId || b.store_id,
+    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo,
+    businessName: b.businessName || b.business_name || b.biz_name,
+
+    // 기간(현재 컬럼이 없을 수 있어 date만 저장)
+    startDate: b.startDate || b.start_date || null,
+    endDate: b.endDate || b.end_date || null,
+    noEnd: b.noEnd || b.no_end || false,
+  };
+}
+
+/**
+ * ==============================
+ * 🔸 인덱스 광고 슬롯 업로드
  * POST /manager/ad/upload
  * - multipart/form-data
- * - 필드: page, position, link_url, start_date, end_date, start_time, end_time
- * - 파일: image
+ * - file: image
+ * - fields: page, position, link_url, (start_date/end_date...), slotType?, slotMode?
+ * ==============================
  */
-// ==============================
-// 🔸 인덱스 광고 슬롯 업로드
-// ==============================
 export async function uploadIndexAd(req, res) {
   try {
-    // 폼에서 넘어오는 값들 (name 기준)
     const {
       page,
       position,
@@ -37,22 +67,26 @@ export async function uploadIndexAd(req, res) {
       businessName,
       startDate,
       endDate,
-    } = req.body;
+      noEnd,
+    } = pickBody(req);
+
+    ensurePagePosition(page, position);
 
     // 파일 업로드 (multer: upload.single("image"))
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-    // slot_type 제약조건 맞추기 ('banner' 또는 'text'만 허용)
+    // slot_type: banner/text만 허용
     const slot_type = slotType === "text" ? "text" : "banner";
 
-    // slot_mode 기본값
     const slot_mode = slotMode || "custom";
 
-    // store_id는 integer라서 숫자/NULL로 정리
     const store_id =
-      storeId && storeId.toString().trim() !== ""
+      storeId && String(storeId).trim() !== ""
         ? Number(storeId)
         : null;
+
+    // 종료 없음 체크 시 end_date는 null로 저장
+    const finalEndDate = noEnd ? null : (endDate || null);
 
     const sql = `
       INSERT INTO admin_ad_slots (
@@ -98,8 +132,8 @@ export async function uploadIndexAd(req, res) {
       store_id,
       businessNo || null,
       businessName || null,
-      startDate || null, // "YYYY-MM-DD" 문자열이면 date 컬럼에 바로 저장 가능
-      endDate || null,
+      startDate || null,
+      finalEndDate,
     ];
 
     const { rows } = await pool.query(sql, params);
@@ -110,134 +144,97 @@ export async function uploadIndexAd(req, res) {
     });
   } catch (err) {
     console.error("UPLOAD INDEX AD ERROR:", err);
-    return res.status(500).json({
+    const status = err.statusCode || 500;
+    return res.status(status).json({
       ok: false,
-      message: "slot 저장 오류",
+      message: err.message || "slot 저장 오류",
       code: "INDEX_AD_SAVE_ERROR",
     });
   }
 }
 
 /**
- * 등록된 가게(사업자번호 + 상호)로 슬롯 연결
+ * ==============================
+ * 🔸 등록된 가게(사업자번호 + 상호)로 슬롯 연결
  * POST /manager/ad/store
- * - JSON: { page, position, biz_number, biz_name, start_date, ... }
- *   (지금은 DB에 정보만 저장하고, 실제 상세 링크 연결은 나중에 구현해도 됨)
+ * - JSON: { page, position, biz_number, biz_name, start_date, end_date, no_end }
+ * ==============================
  */
 export async function saveIndexStoreAd(req, res) {
   try {
     const {
       page,
       position,
-      biz_number,
-      biz_name,
-      start_date,
-      end_date,
-      start_time,
-      end_time,
-    } = req.body;
+      businessNo,
+      businessName,
+      startDate,
+      endDate,
+      noEnd,
+    } = pickBody(req);
 
     ensurePagePosition(page, position);
 
-    if (!biz_number || !biz_name) {
+    if (!businessNo || !businessName) {
       return res.status(400).json({
         ok: false,
         message: "사업자번호와 상호명을 모두 입력해야 합니다.",
       });
     }
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
+    const finalEndDate = noEnd ? null : (endDate || null);
 
-      const existing = await client.query(
-        `
-        SELECT id
-        FROM admin_ad_slots
-        WHERE page = $1 AND position = $2
-        ORDER BY updated_at DESC NULLS LAST, id DESC
-        LIMIT 1
-      `,
-        [page, position]
-      );
+    // store 모드는 일단 메타만 저장
+    // 이미지/링크 자동연결은 나중에 구현해도 됨
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page, position,
+        slot_type,
+        slot_mode,
+        business_no, business_name,
+        start_date, end_date
+      )
+      VALUES (
+        $1, $2,
+        'banner',
+        'store',
+        $3, $4,
+        $5, $6
+      )
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_mode     = 'store',
+        business_no   = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        start_date    = EXCLUDED.start_date,
+        end_date      = EXCLUDED.end_date,
+        updated_at    = NOW()
+      RETURNING *;
+    `;
 
-      if (existing.rowCount > 0) {
-        const id = existing.rows[0].id;
-        await client.query(
-          `
-          UPDATE admin_ad_slots
-          SET
-            biz_number = $1,
-            biz_name   = $2,
-            start_date = $3,
-            end_date   = $4,
-            start_time = $5,
-            end_time   = $6,
-            updated_at = NOW()
-          WHERE id = $7
-        `,
-          [
-            biz_number,
-            biz_name,
-            start_date || null,
-            end_date || null,
-            start_time || null,
-            end_time || null,
-            id,
-          ]
-        );
-      } else {
-        await client.query(
-          `
-          INSERT INTO admin_ad_slots
-            (page, position,
-             biz_number, biz_name,
-             start_date, end_date, start_time, end_time,
-             created_at, updated_at)
-          VALUES
-            ($1, $2,
-             $3, $4,
-             $5, $6, $7, $8,
-             NOW(), NOW())
-        `,
-          [
-            page,
-            position,
-            biz_number,
-            biz_name,
-            start_date || null,
-            end_date || null,
-            start_time || null,
-            end_time || null,
-          ]
-        );
-      }
+    const { rows } = await pool.query(sql, [
+      page,
+      position,
+      businessNo,
+      businessName,
+      startDate || null,
+      finalEndDate,
+    ]);
 
-      await client.query("COMMIT");
-      return res.json({ ok: true });
-    } catch (err) {
-      await client.query("ROLLBACK");
-      console.error("SAVE INDEX STORE AD ERROR:", err);
-      return res.status(500).json({
-        ok: false,
-        message: "slot 저장 오류",
-        code: "INDEX_STORE_AD_SAVE_ERROR",
-      });
-    } finally {
-      client.release();
-    }
+    return res.json({ ok: true, slot: rows[0] });
   } catch (err) {
-    console.error("SAVE INDEX STORE AD FATAL:", err);
+    console.error("SAVE INDEX STORE AD ERROR:", err);
     const status = err.statusCode || 500;
-    return res
-      .status(status)
-      .json({ ok: false, message: err.message || "server error" });
+    return res.status(status).json({
+      ok: false,
+      message: err.message || "slot 저장 오류",
+      code: "INDEX_STORE_AD_SAVE_ERROR",
+    });
   }
 }
 
 /**
  * ==============================
- * 🔹 인덱스 광고 슬롯 조회 API
+ * 🔹 인덱스 광고 슬롯 조회
  * GET /manager/ad/slot?page=index&position=index_main_top
  * ==============================
  */
@@ -274,18 +271,11 @@ export async function getIndexSlot(req, res) {
 
     const { rows } = await pool.query(sql, [page, position]);
 
-    // 슬롯이 아직 등록되지 않은 경우: slot = null
     if (rows.length === 0) {
-      return res.json({
-        ok: true,
-        slot: null,
-      });
+      return res.json({ ok: true, slot: null });
     }
 
-    return res.json({
-      ok: true,
-      slot: rows[0],
-    });
+    return res.json({ ok: true, slot: rows[0] });
   } catch (err) {
     console.error("GET INDEX SLOT ERROR:", err);
     return res.status(500).json({
@@ -297,172 +287,11 @@ export async function getIndexSlot(req, res) {
 }
 
 /**
- * 텍스트 슬롯 가져오기
+ * ==============================
+ * 🔹 텍스트 슬롯 조회 (admin_ad_slots 기준 통일)
  * GET /manager/ad/text/get?page=index&position=index_sub_keywords
+ * ==============================
  */
-export async function getIndexText(req, res) {
-  try {
-    const { page, position } = req.query;
-    ensurePagePosition(page, position);
-
-    const { rows } = await pool.query(
-      `
-      SELECT
-        id, page, position, content,
-        created_at, updated_at
-      FROM admin_ad_texts
-      WHERE page = $1 AND position = $2
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `,
-      [page, position]
-    );
-
-    if (rows.length === 0) {
-      return res.json({ ok: true, text: null });
-    }
-
-    return res.json({ ok: true, text: rows[0] });
-  } catch (err) {
-    console.error("GET INDEX TEXT ERROR:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "텍스트 조회 오류", code: "INDEX_TEXT_GET_ERROR" });
-  }
-}
-
-/**
- * 텍스트 슬롯 저장
- * POST /manager/ad/text/save
- * - JSON: { page, position, content }
- */
-export async function saveIndexText(req, res) {
-  try {
-    const { page, position, content } = req.body;
-    ensurePagePosition(page, position);
-
-    if (!content || !content.trim()) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "내용을 입력해야 합니다." });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      const existing = await client.query(
-        `
-        SELECT id
-        FROM admin_ad_texts
-        WHERE page = $1 AND position = $2
-        ORDER BY updated_at DESC NULLS LAST, id DESC
-        LIMIT 1
-      `,
-        [page, position]
-      );
-
-      if (existing.rowCount > 0) {
-        const id = existing.rows[0].id;
-        await client.query(
-          `
-          UPDATE admin_ad_texts
-          SET content = $1,
-              updated_at = NOW()
-          WHERE id = $2
-        `,
-          [content, id]
-        );
-      } else {
-        await client.query(
-          `
-          INSERT INTO admin_ad_texts
-            (page, position, content, created_at, updated_at)
-          VALUES
-            ($1, $2, $3, NOW(), NOW())
-        `,
-          [page, position, content]
-        );
-      }
-
-      await client.query("COMMIT");
-      return res.json({ ok: true });
-    } catch (err) {
-      await client.query("ROLLBACK");
-      console.error("SAVE INDEX TEXT ERROR:", err);
-      return res.status(500).json({
-        ok: false,
-        message: "텍스트 저장 오류",
-        code: "INDEX_TEXT_SAVE_ERROR",
-      });
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error("SAVE INDEX TEXT FATAL:", err);
-    const status = err.statusCode || 500;
-    return res
-      .status(status)
-      .json({ ok: false, message: err.message || "server error" });
-  }
-}
-
-/**
- * POST /manager/ad/text/save
- * 텍스트 슬롯 저장
- */
-export async function saveIndexTextSlot(req, res) {
-  try {
-    const { page, position, content } = req.body;
-
-    if (!page || !position) {
-      return res.status(400).json({
-        ok: false,
-        message: "page와 position은 필수입니다.",
-      });
-    }
-
-    if (!content || content.trim() === "") {
-      return res.status(400).json({
-        ok: false,
-        message: "텍스트 내용을 입력해주세요.",
-      });
-    }
-
-    // UPSERT - 텍스트 슬롯 저장
-    const sql = `
-      INSERT INTO admin_ad_slots (
-        page, position, slot_type, text_content, updated_at
-      )
-      VALUES ($1, $2, 'text', $3, NOW())
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        slot_type = 'text',
-        text_content = EXCLUDED.text_content,
-        updated_at = NOW()
-      RETURNING *
-    `;
-
-    const { rows } = await pool.query(sql, [page, position, content.trim()]);
-
-    return res.json({
-      ok: true,
-      slot: rows[0],
-    });
-  } catch (err) {
-    console.error("SAVE TEXT SLOT ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "텍스트 저장 실패",
-      error: err.message,
-    });
-  }
-}
-
-// ==============================
-// 🔹 인덱스 텍스트 슬롯 조회 API
-// GET /manager/ad/text/get?page=index&position=index_sub_keywords
-// ==============================
 export async function getIndexTextSlot(req, res) {
   try {
     const { page, position } = req.query;
@@ -480,15 +309,10 @@ export async function getIndexTextSlot(req, res) {
         page,
         position,
         slot_type,
-        image_url,
-        link_url,
         text_content,
-        slot_mode,
-        store_id,
-        business_no,
-        business_name,
         start_date,
-        end_date
+        end_date,
+        updated_at
       FROM admin_ad_slots
       WHERE page = $1
         AND position = $2
@@ -499,17 +323,10 @@ export async function getIndexTextSlot(req, res) {
     const { rows } = await pool.query(sql, [page, position]);
 
     if (rows.length === 0) {
-      // 아직 등록된 텍스트 슬롯이 없으면 slot=null로 응답
-      return res.json({
-        ok: true,
-        slot: null,
-      });
+      return res.json({ ok: true, slot: null });
     }
 
-    return res.json({
-      ok: true,
-      slot: rows[0],
-    });
+    return res.json({ ok: true, slot: rows[0] });
   } catch (err) {
     console.error("GET INDEX TEXT SLOT ERROR:", err);
     return res.status(500).json({
@@ -521,14 +338,74 @@ export async function getIndexTextSlot(req, res) {
 }
 
 /**
+ * ==============================
+ * 🔹 텍스트 슬롯 저장 (admin_ad_slots 기준 통일)
+ * POST /manager/ad/text/save
+ * - JSON: { page, position, content }
+ * ==============================
+ */
+export async function saveIndexTextSlot(req, res) {
+  try {
+    const { page, position, content } = req.body || {};
+
+    if (!page || !position) {
+      return res.status(400).json({
+        ok: false,
+        message: "page와 position은 필수입니다.",
+      });
+    }
+
+    if (!content || String(content).trim() === "") {
+      return res.status(400).json({
+        ok: false,
+        message: "텍스트 내용을 입력해주세요.",
+      });
+    }
+
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page, position, slot_type, text_content, updated_at
+      )
+      VALUES ($1, $2, 'text', $3, NOW())
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type = 'text',
+        text_content = EXCLUDED.text_content,
+        updated_at = NOW()
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(sql, [
+      page,
+      position,
+      String(content).trim(),
+    ]);
+
+    return res.json({
+      ok: true,
+      slot: rows[0],
+    });
+  } catch (err) {
+    console.error("SAVE TEXT SLOT ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "텍스트 저장 실패",
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * ==============================
+ * ✅ Best Pick 광고 슬롯 조회 (관리자 슬롯만)
  * GET /manager/ad/best-pick
- * Best Pick 광고 슬롯 조회 (등록된 항목만 반환)
+ * ==============================
+ * - food_stores 등 다른 테이블 의존 제거
+ * - 1~18번 중 "등록된 슬롯만" 반환
+ * - 빈 상태는 프론트가 더미로 처리
  */
 export async function getBestPickSlots(req, res) {
   try {
-    const slots = [];
-
-    // ✅ 1순위: 광고 슬롯 (등록된 것만)
     const adSlotsQuery = `
       SELECT 
         position,
@@ -543,6 +420,7 @@ export async function getBestPickSlots(req, res) {
           image_url IS NOT NULL 
           OR business_name IS NOT NULL 
           OR link_url IS NOT NULL
+          OR slot_mode IS NOT NULL
         )
       ORDER BY 
         CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
@@ -550,74 +428,27 @@ export async function getBestPickSlots(req, res) {
 
     const { rows: adSlots } = await pool.query(adSlotsQuery);
 
-    adSlots.forEach(slot => {
-      const match = slot.position.match(/best_pick_(\d+)/);
-      const slotNumber = match ? parseInt(match[1]) : 999;
+    const slots = adSlots.map((slot) => {
+      const match = String(slot.position).match(/best_pick_(\d+)/);
+      const slotNumber = match ? parseInt(match[1], 10) : 999;
 
-      slots.push({
-        id: slotNumber, // ✅ 숫자 ID로 변경
-        name: slot.business_name || `광고 슬롯 ${slotNumber}`,
+      return {
+        id: slotNumber,
+        name: slot.business_name || `Best Pick ${slotNumber}`,
         category: "광고",
-        image: slot.image_url,
-        link: slot.link_url || "#",
+        image: slot.image_url || "",
+        link: slot.link_url || "",
         type: "ad",
-        slotNumber
-      });
+        slotNumber,
+      };
     });
 
-    // ✅ 2순위: 실제 Best Pick 가게 (빈 슬롯 채우기용)
-    if (slots.length < 18) {
-      const remainingCount = Math.min(18 - slots.length, 12); // 최대 12개까지만
-      
-      const bestPickQuery = `
-        SELECT 
-          id,
-          business_name as name,
-          category,
-          main_image as image,
-          'food' as type
-        FROM food_stores
-        WHERE is_best_pick = true
-          AND id IS NOT NULL
-          AND business_name IS NOT NULL
-        ORDER BY created_at DESC
-        LIMIT $1
-      `;
-
-      const { rows: bestPickStores } = await pool.query(bestPickQuery, [remainingCount]);
-
-      bestPickStores.forEach(store => {
-        // ✅ 이미 등록된 광고 슬롯과 중복 방지
-        const existingSlotNumbers = slots.map(s => s.slotNumber);
-        let nextSlotNumber = 1;
-        while (existingSlotNumbers.includes(nextSlotNumber) && nextSlotNumber <= 18) {
-          nextSlotNumber++;
-        }
-
-        if (nextSlotNumber <= 18) {
-          slots.push({
-            id: store.id, // ✅ 실제 store ID
-            name: store.name,
-            category: store.category || "기타",
-            image: store.image || "/uploads/no-image.png",
-            link: `/ndetail.html?id=${store.id}&type=${store.type}`,
-            type: store.type,
-            slotNumber: nextSlotNumber
-          });
-        }
-      });
-    }
-
-    // ✅ 정렬 후 반환 (빈 슬롯 더미 데이터 제거)
-    slots.sort((a, b) => a.slotNumber - b.slotNumber);
-
     return res.json(slots);
-
   } catch (err) {
     console.error("BEST PICK ERROR:", err);
-    return res.status(500).json({ 
-      success: false, 
-      error: "Best Pick 조회 실패" 
+    return res.status(500).json({
+      success: false,
+      error: "Best Pick 조회 실패",
     });
   }
 }
