@@ -7,18 +7,15 @@ import {
   getIndexSlot,
   getIndexTextSlot,
   saveIndexTextSlot,
-  getBestPickSlots,
+  getBestPickSlots,  // ✅ 추가
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
 
-// ✅ 서버와 동일한 업로드 루트 경로 (A 방식: /data/uploads)
 const UPLOAD_ROOT = "/data/uploads";
 
-// Multer 스토리지 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // /data/uploads 에 저장 → https://www.hongbono1.com/uploads/파일명 으로 접근
     cb(null, UPLOAD_ROOT);
   },
   filename: (req, file, cb) => {
@@ -28,14 +25,12 @@ const storage = multer.diskStorage({
   },
 });
 
-// Multer 인스턴스 생성
 const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: (req, file, cb) => {
-    // 이미지 파일만 허용
     const allowedMimes = [
       "image/jpeg",
       "image/png",
@@ -73,6 +68,6 @@ router.get("/text/get", getIndexTextSlot);
 router.post("/text/save", saveIndexTextSlot);
 
 // ✅ Best Pick 광고 슬롯
-router.get("/best-pick", getBestPickSlots);
+router.get("/best-pick", getBestPickSlots);  // ✅ 추가
 
 export default router;
