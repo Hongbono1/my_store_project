@@ -32,27 +32,170 @@ function pickBody(req) {
     // 텍스트
     textContent: b.textContent || b.text_content || b.content,
 
-    // 가게 연결용(현재는 메타 저장만)
+    // 가게 연결용
     storeId: b.storeId || b.store_id,
     businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo,
     businessName: b.businessName || b.business_name || b.biz_name,
 
-    // 기간(현재 컬럼이 없을 수 있어 date만 저장)
+    // 기간
     startDate: b.startDate || b.start_date || null,
     endDate: b.endDate || b.end_date || null,
     noEnd: b.noEnd || b.no_end || false,
   };
 }
 
+/* ============================================================
+ * ✅ A안 핵심 유틸
+ * - slot_mode === "store" 이면
+ *   business_name / store_id 기반으로 가게를 찾아
+ *   image_url, link_url을 서버에서 보강
+ * ============================================================ */
+
 /**
- * ==============================
+ * 다양한 컬럼/형태를 고려해 대표 이미지 후보를 뽑아주는 방어형 함수
+ */
+function pickStoreImage(storeRow) {
+  if (!storeRow) return "";
+
+  const candidates = [
+    // 흔한 단일 대표 이미지 케이스
+    "image_url",
+    "thumbnail_url",
+    "thumb_url",
+    "main_image_url",
+    "banner_image_url",
+    "main_img",
+    "main_image",
+
+    // 예전/다른 모듈 호환
+    "image1",
+    "img1",
+  ];
+
+  for (const key of candidates) {
+    const v = storeRow[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+
+  // 배열 형태 후보
+  const images = storeRow.images;
+  if (Array.isArray(images) && images[0]) return String(images[0]);
+
+  // 문자열 JSON 배열 후보
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
+    } catch (_) {}
+  }
+
+  return "";
+}
+
+async function findFoodStoreById(id) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM food_stores WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function findFoodStoreByName(name) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * 
+         FROM food_stores 
+        WHERE business_name = $1 
+        ORDER BY created_at DESC NULLS LAST 
+        LIMIT 1`,
+      [name]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * (있어도 되고 없어도 됨) 통합 테이블 후보
+ * - 테이블이 없거나 컬럼이 다르면 자동 무시
+ */
+async function findCombinedStoreByName(name) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * 
+         FROM combined_store_info 
+        WHERE business_name = $1 
+        ORDER BY created_at DESC NULLS LAST 
+        LIMIT 1`,
+      [name]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * store 모드 슬롯 해석기
+ * - slot 자체를 mutate해서 image_url/link_url/store_id 보강
+ */
+async function resolveStoreModeSlot(slot) {
+  if (!slot || slot.slot_mode !== "store") return slot;
+
+  let storeRow = null;
+  let resolvedType = "food";
+
+  // 1) store_id 우선
+  if (slot.store_id) {
+    storeRow = await findFoodStoreById(slot.store_id);
+  }
+
+  // 2) business_name 기반 food_stores
+  if (!storeRow && slot.business_name) {
+    storeRow = await findFoodStoreByName(slot.business_name);
+  }
+
+  // 3) (선택) 통합 테이블 후보
+  if (!storeRow && slot.business_name) {
+    const combined = await findCombinedStoreByName(slot.business_name);
+    if (combined) {
+      storeRow = combined;
+      resolvedType = "store";
+    }
+  }
+
+  // store_id 보강
+  if (storeRow?.id && !slot.store_id) {
+    slot.store_id = storeRow.id;
+  }
+
+  // image_url 보강
+  if (!slot.image_url) {
+    const picked = pickStoreImage(storeRow);
+    if (picked) slot.image_url = picked;
+  }
+
+  // link_url 보강
+  if (!slot.link_url && storeRow?.id) {
+    slot.link_url =
+      `/ndetail.html?id=${storeRow.id}&type=${resolvedType === "food" ? "food" : "store"}`;
+  }
+
+  return slot;
+}
+
+/* ============================================================
  * 🔸 인덱스 광고 슬롯 업로드
  * POST /manager/ad/upload
  * - multipart/form-data
  * - file: image
  * - fields: page, position, link_url, (start_date/end_date...), slotType?, slotMode?
- * ==============================
- */
+ * ============================================================ */
 export async function uploadIndexAd(req, res) {
   try {
     const {
@@ -153,13 +296,11 @@ export async function uploadIndexAd(req, res) {
   }
 }
 
-/**
- * ==============================
+/* ============================================================
  * 🔸 등록된 가게(사업자번호 + 상호)로 슬롯 연결
  * POST /manager/ad/store
  * - JSON: { page, position, biz_number, biz_name, start_date, end_date, no_end }
- * ==============================
- */
+ * ============================================================ */
 export async function saveIndexStoreAd(req, res) {
   try {
     const {
@@ -183,8 +324,6 @@ export async function saveIndexStoreAd(req, res) {
 
     const finalEndDate = noEnd ? null : (endDate || null);
 
-    // store 모드는 일단 메타만 저장
-    // 이미지/링크 자동연결은 나중에 구현해도 됨
     const sql = `
       INSERT INTO admin_ad_slots (
         page, position,
@@ -202,6 +341,7 @@ export async function saveIndexStoreAd(req, res) {
       )
       ON CONFLICT (page, position)
       DO UPDATE SET
+        slot_type     = 'banner',
         slot_mode     = 'store',
         business_no   = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
@@ -232,12 +372,11 @@ export async function saveIndexStoreAd(req, res) {
   }
 }
 
-/**
- * ==============================
+/* ============================================================
  * 🔹 인덱스 광고 슬롯 조회
  * GET /manager/ad/slot?page=index&position=index_main_top
- * ==============================
- */
+ * ✅ A안 반영: store 모드면 서버에서 image/link 보강
+ * ============================================================ */
 export async function getIndexSlot(req, res) {
   try {
     const { page, position } = req.query;
@@ -275,7 +414,10 @@ export async function getIndexSlot(req, res) {
       return res.json({ ok: true, slot: null });
     }
 
-    return res.json({ ok: true, slot: rows[0] });
+    // ✅ A안 핵심
+    const slot = await resolveStoreModeSlot(rows[0]);
+
+    return res.json({ ok: true, slot });
   } catch (err) {
     console.error("GET INDEX SLOT ERROR:", err);
     return res.status(500).json({
@@ -286,12 +428,10 @@ export async function getIndexSlot(req, res) {
   }
 }
 
-/**
- * ==============================
+/* ============================================================
  * 🔹 텍스트 슬롯 조회 (admin_ad_slots 기준 통일)
  * GET /manager/ad/text/get?page=index&position=index_sub_keywords
- * ==============================
- */
+ * ============================================================ */
 export async function getIndexTextSlot(req, res) {
   try {
     const { page, position } = req.query;
@@ -337,13 +477,11 @@ export async function getIndexTextSlot(req, res) {
   }
 }
 
-/**
- * ==============================
+/* ============================================================
  * 🔹 텍스트 슬롯 저장 (admin_ad_slots 기준 통일)
  * POST /manager/ad/text/save
  * - JSON: { page, position, content }
- * ==============================
- */
+ * ============================================================ */
 export async function saveIndexTextSlot(req, res) {
   try {
     const { page, position, content } = req.body || {};
@@ -395,15 +533,14 @@ export async function saveIndexTextSlot(req, res) {
   }
 }
 
-/**
- * ==============================
- * ✅ Best Pick 광고 슬롯 조회 (관리자 슬롯만)
+/* ============================================================
+ * ✅ Best Pick 광고 슬롯 목록 조회 (선택 유지용)
  * GET /manager/ad/best-pick
- * ==============================
- * - food_stores 등 다른 테이블 의존 제거
- * - 1~18번 중 "등록된 슬롯만" 반환
- * - 빈 상태는 프론트가 더미로 처리
- */
+ *
+ * - admin_ad_slots만 기준으로 반환
+ * - 등록된 슬롯만 내려줌
+ * - 프론트가 빈 슬롯은 "준비중" 처리 가능
+ * ============================================================ */
 export async function getBestPickSlots(req, res) {
   try {
     const adSlotsQuery = `
