@@ -465,7 +465,11 @@
 
                 const json = await res.json();
                 
-                // ✅ 응답 구조 수정
+                // ✅ 디버깅: 서버 응답을 전역으로 노출
+                window.__bestPickResponse = json;
+                console.log(`Best Pick ${n} 서버 응답:`, json);
+                
+                // ✅ 응답 구조 분석
                 const image =
                     json?.slot?.image_url ||
                     json?.image_url ||
@@ -481,8 +485,7 @@
                     json?.business_name ||
                     "";
 
-                // ✅ 디버깅 로그 추가
-                console.log(`Best Pick ${n} 응답:`, json);
+                console.log(`Best Pick ${n} 매핑 결과:`, { image, link, businessName });
 
                 return {
                     image: image || "",
@@ -500,13 +503,15 @@
             const track = document.getElementById("bestTrack");
             if (!track) return;
 
-            console.log("베스트 픽 로드 시작...");
+            console.log("🔍 베스트 픽 로드 시작...");
 
             const slots = await Promise.all(
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
 
-            console.log("로드된 베스트 픽 슬롯들:", slots);
+            // ✅ 디버깅: 모든 슬롯 데이터를 전역으로 노출
+            window.__bestPickSlots = slots;
+            console.log("🎯 로드된 베스트 픽 슬롯들:", slots);
 
             const groups = [];
             for (let i = 0; i < slots.length; i += 6) {
@@ -522,17 +527,28 @@
                 items.forEach((slot, idx) => {
                     const n = index * 6 + idx + 1;
 
-                    const hasImage = !!(slot.image && slot.image.trim());
+                    // ✅ 디버깅: 이미지 처리 강화
+                    const rawImage = slot.image || "";
+                    const hasImage = !!(rawImage && rawImage.trim());
+                    const safeImg = hasImage 
+                        ? (rawImage.startsWith("http") ? rawImage : `${location.origin}${rawImage}`)
+                        : "/uploads/no-image.png";
+
                     const hasLink = !!(slot.link && slot.link.trim());
                     const hasName = !!(slot.businessName && slot.businessName.trim());
 
-                    // ✅ 디버깅 로그 추가
-                    console.log(`Best Pick ${n}:`, { hasImage, hasLink, hasName, slot });
+                    console.log(`Best Pick ${n} 렌더링:`, { 
+                        rawImage, 
+                        safeImg, 
+                        hasImage, 
+                        hasLink, 
+                        hasName, 
+                        slot 
+                    });
 
                     const card = document.createElement("a");
                     card.className = "block text-center w-28 sm:w-40";
 
-                    // ✅ 링크 처리 개선
                     if (hasLink) {
                         card.href = slot.link;
                         card.target = "_blank";
@@ -541,13 +557,9 @@
                         card.classList.add("opacity-60", "pointer-events-none", "cursor-not-allowed");
                     }
 
-                    // ✅ 이미지 처리 개선
-                    const safeImg = hasImage ? slot.image : "/uploads/no-image.png";
                     const titleText = hasImage ? `Best Pick ${n}` : `Best Pick ${n}`;
-
                     const bottomTitle = hasName ? slot.businessName : `Best Pick ${n}`;
                     
-                    // ✅ 상태 표시 개선
                     let bottomSub = "";
                     if (hasImage && hasName) {
                         bottomSub = "등록 완료";
@@ -564,7 +576,7 @@
                             <img src="${safeImg}"
                                  alt="${titleText}"
                                  class="w-full h-full object-cover ${hasImage ? "" : "opacity-40"}"
-                                 onerror="this.src='/uploads/no-image.png'">
+                                 onerror="this.src='/uploads/no-image.png'; console.error('Best Pick ${n} 이미지 로드 실패:', '${safeImg}');">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">
                             ${bottomTitle}
