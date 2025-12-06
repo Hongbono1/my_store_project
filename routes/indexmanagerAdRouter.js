@@ -7,6 +7,7 @@ import {
   getIndexSlot,
   getIndexTextSlot,
   saveIndexTextSlot,
+  getBestPickSlots,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
@@ -70,5 +71,8 @@ router.get("/text/get", getIndexTextSlot);
 
 // 텍스트 슬롯 저장
 router.post("/text/save", saveIndexTextSlot);
+
+// ✅ Best Pick 광고 슬롯
+router.get("/best-pick", getBestPickSlots);
 
 export default router;

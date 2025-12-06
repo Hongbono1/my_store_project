@@ -776,55 +776,59 @@
         // Best Pick
         // ============================
         async function loadBestPick() {
-            let allStores = [];
-            try {
-                const res = await fetch("/api/best-pick");
-                if (res.ok) {
-                    allStores = await res.json();
-                }
-            } catch (e) {
-                console.error("Best Pick API 요청 실패", e);
-            }
+  try {
+    // ✅ 인덱스 광고 라우터로 통합된 경로
+    const response = await fetch("/manager/ad/best-pick");
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
-            if (!allStores || allStores.length === 0) {
-                allStores = Array.from({ length: 18 }, (_, i) => ({
-                    id: i + 1,
-                    name: `샘플 ${i + 1}`,
-                    category: "업종",
-                    image: "/uploads/no-image.png"
-                }));
-            }
+    const stores = await response.json();
 
-            const track = document.getElementById("bestTrack");
-            let index = 0;
-            let groups = [];
+    const viewport = document.getElementById("bestViewport");
+    if (!viewport) return;
 
-            function shuffle(array) {
-                return array.sort(() => 0.5 - Math.random());
-            }
+    const track = document.getElementById("bestTrack");
+    track.innerHTML = "";
 
-            function makeGroups() {
-                const shuffled = shuffle([...allStores]);
-                const result = [];
-                for (let i = 0; i < shuffled.length; i += 6) {
-                    result.push(shuffled.slice(i, i + 6));
-                }
-                return result;
-            }
+    // 6개씩 그룹화
+    const groupSize = 6;
+    for (let i = 0; i < stores.length; i += groupSize) {
+      const groupStores = stores.slice(i, i + groupSize);
+      const group = createGroup(groupStores);
+      track.appendChild(group);
+    }
 
-            function createGroup(stores) {
-                const group = document.createElement("div");
-                group.className = "flex justify-center gap-6 basis-full shrink-0";
+    setupCarousel();
+  } catch (err) {
+    console.error("BEST PICK LOAD ERROR:", err);
+  }
+}
 
-                stores.forEach(store => {
-                    const card = document.createElement("a");
-                    
-                    // ✅ 개선된 링크 생성
-                    const safeLink = normalizeStoreLink(store.link, store);
-                    card.href = safeLink;
-                    
-                    card.className = "block text-center w-28 sm:w-40";
-                    card.innerHTML = `
+function createGroup(stores) {
+  const group = document.createElement("div");
+  group.className = "flex justify-center gap-6 basis-full shrink-0";
+
+  stores.forEach(store => {
+    const card = document.createElement("a");
+    
+    // ✅ 링크 정규화
+    const safeLink = store.link
+      ? (store.link.startsWith("http")
+          ? store.link
+          : (store.link.startsWith("/")
+              ? store.link
+              : `/${store.link}`))
+      : null;
+
+    const fallback = `/ndetail.html?id=${store.id}` +
+      (store.type ? `&type=${encodeURIComponent(store.type)}` : "");
+
+    card.href = safeLink || fallback;
+    card.className = "block text-center w-28 sm:w-40";
+    
+    card.innerHTML = `
       <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
         <img src="${store.image || '/uploads/no-image.png'}" 
              alt="${store.name}" 
@@ -833,36 +837,12 @@
       <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
       <p class="text-xs sm:text-sm text-gray-400">${store.category}</p>
     `;
-                    group.appendChild(card);
-                });
+    
+    group.appendChild(card);
+  });
 
-                return group;
-            }
-
-            function renderGroup() {
-                if (index >= groups.length) {
-                    groups = makeGroups();
-                    index = 0;
-                }
-                track.innerHTML = "";
-                track.appendChild(createGroup(groups[index]));
-            }
-
-            function nextSlide() {
-                index++;
-                renderGroup();
-            }
-
-            document.getElementById("bestNext").addEventListener("click", nextSlide);
-            document.getElementById("bestPrev").addEventListener("click", () => {
-                index = index > 0 ? index - 1 : 0;
-                renderGroup();
-            });
-
-            setInterval(nextSlide, 4000);
-            groups = makeGroups();
-            renderGroup();
-        }
+  return group;
+}
 
         // ============================
         // 광고 기간 수집/검증

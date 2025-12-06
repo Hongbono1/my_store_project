@@ -519,3 +519,112 @@ export async function getIndexTextSlot(req, res) {
     });
   }
 }
+
+/**
+ * GET /manager/ad/best-pick
+ * Best Pick 광고 슬롯 조회 (3~18번)
+ * 
+ * 우선순위:
+ * 1. admin_ad_slots의 광고 (best_pick_3~18)
+ * 2. is_best_pick = true인 실제 가게
+ * 3. 더미 데이터
+ */
+export async function getBestPickSlots(req, res) {
+  try {
+    const stores = [];
+
+    // ✅ 1순위: 광고 슬롯
+    const adSlotsQuery = `
+      SELECT 
+        position,
+        image_url,
+        link_url,
+        business_name as name,
+        slot_mode
+      FROM admin_ad_slots
+      WHERE page = 'index' 
+        AND position LIKE 'best_pick_%'
+        AND image_url IS NOT NULL
+      ORDER BY 
+        CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
+    `;
+
+    const { rows: adSlots } = await pool.query(adSlotsQuery);
+
+    adSlots.forEach(slot => {
+      const match = slot.position.match(/best_pick_(\d+)/);
+      const slotNumber = match ? parseInt(match[1]) : 999;
+
+      stores.push({
+        id: `ad_${slot.position}`,
+        name: slot.name || `광고 슬롯 ${slotNumber}`,
+        category: "광고",
+        image: slot.image_url,
+        link: slot.link_url || "#",
+        type: "ad",
+        slotNumber
+      });
+    });
+
+    // ✅ 2순위: 실제 Best Pick 가게
+    if (stores.length < 18) {
+      const remainingCount = 18 - stores.length;
+      
+      const bestPickQuery = `
+        SELECT 
+          id,
+          business_name as name,
+          category,
+          main_image as image,
+          'food' as type
+        FROM food_stores
+        WHERE is_best_pick = true
+        ORDER BY created_at DESC
+        LIMIT $1
+      `;
+
+      const { rows: bestPickStores } = await pool.query(bestPickQuery, [remainingCount]);
+
+      bestPickStores.forEach(store => {
+        stores.push({
+          id: store.id,
+          name: store.name,
+          category: store.category || "기타",
+          image: store.image || "/uploads/no-image.png",
+          link: `/ndetail.html?id=${store.id}&type=${store.type}`,
+          type: store.type,
+          slotNumber: 999
+        });
+      });
+    }
+
+    // ✅ 3순위: 더미 데이터
+    if (stores.length < 18) {
+      const dummyCount = 18 - stores.length;
+      
+      for (let i = 0; i < dummyCount; i++) {
+        stores.push({
+          id: `dummy_${i + 1}`,
+          name: `샘플 가게 ${i + 1}`,
+          category: "샘플",
+          image: "/uploads/no-image.png",
+          link: "#",
+          type: "dummy",
+          slotNumber: 1000 + i
+        });
+      }
+    }
+
+    // 정렬 및 최대 18개 반환
+    stores.sort((a, b) => a.slotNumber - b.slotNumber);
+
+    return res.json(stores.slice(0, 18));
+
+  } catch (err) {
+    console.error("BEST PICK ERROR:", err);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Best Pick 조회 실패" 
+    });
+  }
+}
