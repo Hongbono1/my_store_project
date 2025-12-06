@@ -370,13 +370,12 @@
     <div id="slot_index_d2c_shop" class="hidden js-slot" data-page="index" data-position="index_d2c_shop"
         data-label="D2C 쇼핑 박스"></div>
 
-    <!-- ✅ BEST PICK 관리자 전용 섹션 (중복 제거 후 1개만 유지) -->
+    <!-- ✅ BEST PICK 관리자 전용 섹션 (클릭 → 모달 방식) -->
     <section id="bestPickSection" class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-bold">Best Pick (관리자 광고 슬롯 전용)</h2>
             <div class="flex gap-2">
-                <button id="btnBestPickReload"
-                    class="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800">
+                <button id="btnBestPickReload" class="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800">
                     새로고침
                 </button>
             </div>
@@ -384,11 +383,10 @@
 
         <p class="text-sm text-slate-500 mb-6">
             Best Pick은 1~18번 슬롯을 관리자가 직접 등록한 광고만 노출합니다.
-            비어있는 슬롯은 사용자 화면에서 미노출 또는 '등록 필요'로 처리하세요.
+            아래 슬롯을 클릭하면 동일한 광고 모달이 열립니다.
         </p>
 
-        <div id="bestPickGrid"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div id="bestPickGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             <!-- JS 렌더링 -->
         </div>
     </section>
@@ -1324,7 +1322,7 @@
         }
 
         // =============================
-        // ✅ Best Pick 슬롯 관리 UI
+        // ✅ Best Pick 슬롯 관리 UI (클릭 → 모달 방식)
         // =============================
         const BEST_PICK_MAX = 18;
         const bestPickGrid = document.getElementById("bestPickGrid");
@@ -1334,114 +1332,61 @@
             return `best_pick_${n}`;
         }
 
-        function cardTemplate(slot, n) {
-            const isAd = slot && slot.type === "ad" && (slot.image || slot.image_url);
+        function isSlotShape(item) {
+            return item && typeof item.slotNumber === "number";
+        }
 
-            const imageSrc = slot?.image || slot?.image_url || "";
+        async function fetchBestPickRaw() {
+            const res = await fetch("/manager/ad/best-pick");
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+        }
 
-            const imgHtml = isAd
-                ? `<img src="${imageSrc}" alt="best_pick_${n}"
-                      class="w-full h-40 object-cover rounded-lg border" />`
-                : `<div class="w-full h-40 rounded-lg border border-dashed flex items-center justify-center
-                       text-slate-400 text-sm bg-white">
-                    이미지 미등록
-                   </div>`;
-
-            const nameValue = isAd && (slot.name || slot.businessName) ? (slot.name || slot.businessName) : "";
-            const linkValue = isAd && (slot.link || slot.link_url) && (slot.link || slot.link_url) !== "#"
-                ? (slot.link || slot.link_url)
-                : "";
-            const bizNoValue = isAd && slot.businessNo ? slot.businessNo : "";
-            const storeIdValue = isAd && slot.storeId ? slot.storeId : "";
+        function bestPickTileTemplate(slot, n) {
+            const hasImg = !!(slot && (slot.image || slot.image_url));
+            const imgSrc = slot?.image || slot?.image_url || "";
 
             return `
-              <div class="p-4 rounded-2xl bg-white border shadow-sm">
-                <div class="flex items-center justify-between mb-2">
-                  <div class="text-sm font-semibold text-slate-700">슬롯 ${n}</div>
-                  <span class="text-xs px-2 py-1 rounded-full ${isAd ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}">
-                    ${isAd ? "등록됨" : "비어있음"}
-                  </span>
-                </div>
+      <div
+        id="slot_${slotPosition(n)}"
+        class="neo-card slot-banner js-slot cursor-pointer p-3 rounded-2xl border bg-white"
+        data-page="index"
+        data-position="${slotPosition(n)}"
+        data-label="Best Pick 슬롯 ${n}"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-700">슬롯 ${n}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full ${hasImg ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}">
+            ${hasImg ? "등록됨" : "비어있음"}
+          </span>
+        </div>
 
-                ${imgHtml}
+        ${hasImg
+                    ? `<img class="slot-img w-full h-28 object-cover rounded-lg" src="${imgSrc}" alt="best_pick_${n}">`
+                    : `<div class="slot-default w-full h-28 rounded-lg border border-dashed flex items-center justify-center text-slate-400 text-xs bg-white">
+                 이미지 미등록
+               </div>`
+                }
 
-                <div class="mt-3 space-y-2">
-                  <label class="block text-xs text-slate-500">대표 이미지</label>
-                  <input type="file" accept="image/*"
-                    data-bp-file="${n}"
-                    class="block w-full text-sm file:mr-3 file:px-3 file:py-1.5
-                           file:rounded-lg file:border-0 file:bg-slate-900 file:text-white
-                           hover:file:bg-slate-800" />
-
-                  <label class="block text-xs text-slate-500 mt-2">광고주 상호(노출명)</label>
-                  <input type="text"
-                    data-bp-name="${n}"
-                    value="${nameValue}"
-                    placeholder="예) 아루리식당"
-                    class="w-full px-3 py-2 rounded-lg border text-sm" />
-
-                  <label class="block text-xs text-slate-500">링크 URL</label>
-                  <input type="text"
-                    data-bp-link="${n}"
-                    value="${linkValue}"
-                    placeholder="/ndetail.html?id=2&type=food"
-                    class="w-full px-3 py-2 rounded-lg border text-sm" />
-
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-xs text-slate-500">사업자번호(선택)</label>
-                      <input type="text"
-                        data-bp-bizno="${n}"
-                        value="${bizNoValue}"
-                        placeholder="000-00-00000"
-                        class="w-full px-3 py-2 rounded-lg border text-sm" />
-                    </div>
-                    <div>
-                      <label class="block text-xs text-slate-500">store_id(선택)</label>
-                      <input type="number"
-                        data-bp-storeid="${n}"
-                        value="${storeIdValue}"
-                        placeholder="숫자 ID"
-                        class="w-full px-3 py-2 rounded-lg border text-sm" />
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-xs text-slate-500">시작일(선택)</label>
-                      <input type="date" data-bp-start="${n}"
-                        class="w-full px-3 py-2 rounded-lg border text-sm" />
-                    </div>
-                    <div>
-                      <label class="block text-xs text-slate-500">종료일(선택)</label>
-                      <input type="date" data-bp-end="${n}"
-                        class="w-full px-3 py-2 rounded-lg border text-sm" />
-                    </div>
-                  </div>
-
-                  <button
-                    data-bp-save="${n}"
-                    class="w-full mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-500">
-                    슬롯 ${n} 저장
-                  </button>
-                </div>
-              </div>
-            `;
+        <div class="mt-2 text-[10px] text-slate-500">
+          클릭하여 이미지/링크/기간 설정
+        </div>
+      </div>
+    `;
         }
 
         async function loadBestPickSlots() {
             if (!bestPickGrid) return;
 
             bestPickGrid.innerHTML = `
-              <div class="col-span-full p-6 rounded-xl bg-slate-50 border text-slate-500 text-sm">
-                Best Pick 슬롯 불러오는 중...
-              </div>
-            `;
+      <div class="col-span-full p-6 rounded-xl bg-slate-50 border text-slate-500 text-sm">
+        Best Pick 슬롯 불러오는 중...
+      </div>
+    `;
 
             try {
                 const raw = await fetchBestPickRaw();
-
-                // slot 배열이 아니면 → 관리자 슬롯은 비어있는 것으로 처리
                 const slots = raw.length > 0 && isSlotShape(raw[0]) ? raw : [];
 
                 const map = new Map();
@@ -1453,20 +1398,24 @@
 
                 let html = "";
                 for (let n = 1; n <= BEST_PICK_MAX; n++) {
-                    html += cardTemplate(map.get(n), n);
+                    html += bestPickTileTemplate(map.get(n), n);
                 }
-                bestPickGrid.innerHTML = html;
 
-                bindBestPickSaveHandlers();
+                bestPickGrid.innerHTML = html;
             } catch (err) {
                 console.error(err);
                 bestPickGrid.innerHTML = `
-                <div class="col-span-full p-6 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
-                  Best Pick 슬롯 조회 실패
-                </div>
-              `;
+          <div class="col-span-full p-6 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
+            Best Pick 슬롯 조회 실패
+          </div>
+        `;
             }
         }
+
+        btnBestPickReload?.addEventListener("click", async () => {
+            await loadBestPickSlots();
+            await loadBestPick(); // 캐러셀 미리보기까지 갱신
+        });
 
         function bindBestPickSaveHandlers() {
             for (let n = 1; n <= BEST_PICK_MAX; n++) {
@@ -1630,4 +1579,5 @@
     </script>
 
 </body>
+
 </html>
