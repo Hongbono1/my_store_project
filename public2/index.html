@@ -486,85 +486,95 @@
         }
 
         // ============================================================
-        // 📌 Best Pick 슬라이더 (기존 로직 유지)
+        // 📌 Best Pick 슬라이더 (✅ 관리자 슬롯 기반으로만 동작)
         // ============================================================
-        async function loadBestPick() {
-            let allStores = [];
+        const BEST_PICK_MAX = 18;
+
+        async function fetchBestPickSlot(n) {
+            const position = `best_pick_${n}`;
             try {
-                const res = await fetch("/api/best-pick");
-                if (res.ok) {
-                    allStores = await res.json();
-                }
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent("index")}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return { image: "", link: "", label: `Best Pick ${n}` };
+
+                const json = await res.json();
+                const image =
+                    json?.slot?.image_url ||
+                    json?.slot?.image ||
+                    "";
+
+                const link =
+                    json?.slot?.link_url ||
+                    json?.slot?.link ||
+                    "";
+
+                return {
+                    image: image || "",
+                    link: link || "",
+                    label: `Best Pick ${n}`
+                };
             } catch (e) {
-                console.error("Best Pick API 요청 실패", e);
+                console.error("Best Pick 슬롯 로드 실패:", e);
+                return { image: "", link: "", label: `Best Pick ${n}` };
             }
+        }
 
-            if (!allStores || allStores.length === 0) {
-                allStores = Array.from({ length: 18 }, (_, i) => ({
-                    id: i + 1,
-                    name: `샘플 ${i + 1}`,
-                    category: "업종",
-                    image: "/uploads/no-image.png"
-                }));
-            }
-
+        async function loadBestPick() {
             const track = document.getElementById("bestTrack");
+            if (!track) return;
+
+            // 1) 관리자 슬롯 1~18 로드
+            const slots = await Promise.all(
+                Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
+            );
+
+            // 2) 6개씩 그룹 구성 (순서 고정)
+            const groups = [];
+            for (let i = 0; i < slots.length; i += 6) {
+                groups.push(slots.slice(i, i + 6));
+            }
+
             let index = 0;
-            let groups = [];
 
-            function shuffle(array) {
-                return array.sort(() => 0.5 - Math.random());
-            }
-
-            function makeGroups() {
-                const shuffled = shuffle([...allStores]);
-                const result = [];
-                for (let i = 0; i < shuffled.length; i += 6) {
-                    result.push(shuffled.slice(i, i + 6));
-                }
-                return result;
-            }
-
-            function createGroup(stores) {
+            function createGroup(items) {
                 const group = document.createElement("div");
                 group.className = "flex justify-center gap-6 basis-full shrink-0";
 
-                stores.forEach(store => {
+                items.forEach((slot, idx) => {
+                    const n = index * 6 + idx + 1;
+
+                    const hasImage = !!(slot.image && slot.image.trim());
+                    const hasLink = !!(slot.link && slot.link.trim());
+
                     const card = document.createElement("a");
-                    
-                    // ✅ 빈 슬롯 보호 로직 (index.html에도 동일 적용)
-                    const rawId = store.id;
-                    const idNum = Number.parseInt(String(rawId), 10);
-                    const isValidId = Number.isFinite(idNum) && idNum > 0;
-
-                    const safeImg = store.image && store.image.trim()
-                        ? store.image
-                        : "/uploads/no-image.png";
-
-                    if (!isValidId) {
-                        card.href = "javascript:void(0)";
-                        card.classList.add("opacity-50", "pointer-events-none", "cursor-not-allowed");
-                    } else {
-                        // ✅ 기존 링크 로직 유지
-                        card.href = store.link || `/ndetail.html?id=${store.id}&type=food`;
-                    }
-                    
                     card.className = "block text-center w-28 sm:w-40";
-                    
-                    const displayName = isValidId ? (store.name || '상호명') : '준비중';
-                    const displayCategory = isValidId ? (store.category || '업종') : '';
-                    const textOpacity = isValidId ? '' : 'opacity-60';
+
+                    // ✅ 관리자 링크만 사용 (자동 ndetail 금지)
+                    if (hasLink) {
+                        card.href = slot.link;
+                    } else {
+                        card.href = "javascript:void(0)";
+                        card.classList.add("opacity-60", "pointer-events-none", "cursor-not-allowed");
+                    }
+
+                    const safeImg = hasImage ? slot.image : "/uploads/no-image.png";
+                    const titleText = hasImage ? `Best Pick ${n}` : `Best Pick ${n} (준비중)`;
 
                     card.innerHTML = `
-                      <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                        <img src="${safeImg}" 
-                             alt="${displayName}" 
-                             class="w-full h-full object-cover ${isValidId ? '' : 'opacity-40'}"
-                             onerror="this.src='/uploads/no-image.png'">
-                      </div>
-                      <p class="mt-2 font-bold text-base sm:text-lg ${textOpacity}">${displayName}</p>
-                      <p class="text-xs sm:text-sm text-gray-400 ${textOpacity}">${displayCategory}</p>
-                    `;
+                <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+                    <img src="${safeImg}"
+                         alt="${titleText}"
+                         class="w-full h-full object-cover ${hasImage ? "" : "opacity-40"}"
+                         onerror="this.src='/uploads/no-image.png'">
+                </div>
+                <p class="mt-2 font-bold text-base sm:text-lg text-gray-500">
+                    Best Pick ${n}
+                </p>
+                <p class="text-xs sm:text-sm text-gray-400">
+                    ${hasImage ? "관리자 등록 슬롯" : "준비중"}
+                </p>
+            `;
                     group.appendChild(card);
                 });
 
@@ -572,27 +582,25 @@
             }
 
             function renderGroup() {
-                if (index >= groups.length) {
-                    groups = makeGroups();
-                    index = 0;
-                }
+                if (!groups[index]) index = 0;
                 track.innerHTML = "";
                 track.appendChild(createGroup(groups[index]));
             }
 
             function nextSlide() {
-                index++;
+                index = (index + 1) % groups.length;
                 renderGroup();
             }
 
-            document.getElementById("bestNext").addEventListener("click", nextSlide);
-            document.getElementById("bestPrev").addEventListener("click", () => {
-                index = index > 0 ? index - 1 : 0;
+            document.getElementById("bestNext")?.addEventListener("click", nextSlide);
+            document.getElementById("bestPrev")?.addEventListener("click", () => {
+                index = (index - 1 + groups.length) % groups.length;
                 renderGroup();
             });
 
+            // 자동 슬라이드
             setInterval(nextSlide, 4000);
-            groups = makeGroups();
+
             renderGroup();
         }
 
