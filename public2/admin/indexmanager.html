@@ -1638,8 +1638,70 @@ function createGroup(stores) {
 
 btnBestPickReload?.addEventListener("click", loadBestPickSlots);
 
-// 초기 로드
-loadBestPickSlots();
+        // 초기 로드
+        loadBestPickSlots();
+
+        // ============================
+        // ✅ Best Pick Carousel (ADMIN PREVIEW)
+        // ============================
+        let bestIndex = 0;
+
+        function setupCarousel() {
+            const viewport = document.getElementById("bestViewport");
+            const track = document.getElementById("bestTrack");
+            const prevBtn = document.getElementById("bestPrev");
+            const nextBtn = document.getElementById("bestNext");
+
+            if (!viewport || !track) return;
+
+            const groups = Array.from(track.children);
+            const total = groups.length;
+
+            if (total === 0) {
+                if (prevBtn) prevBtn.classList.add("hidden");
+                if (nextBtn) nextBtn.classList.add("hidden");
+                return;
+            }
+
+            // 버튼 표시/숨김
+            if (prevBtn) prevBtn.classList.toggle("hidden", total <= 1);
+            if (nextBtn) nextBtn.classList.toggle("hidden", total <= 1);
+
+            // 초기 인덱스 보정
+            bestIndex = Math.max(0, Math.min(bestIndex, total - 1));
+
+            const apply = () => {
+                // track은 "flex"이며 각 group이 basis-full shrink-0 이라서
+                // 100% 단위로 슬라이드 이동
+                track.style.transform = `translateX(-${bestIndex * 100}%)`;
+            };
+
+            apply();
+
+            // 기존 리스너 중복 방지용 클론 처리
+            if (prevBtn) {
+                const newPrev = prevBtn.cloneNode(true);
+                prevBtn.parentNode.replaceChild(newPrev, prevBtn);
+
+                newPrev.addEventListener("click", () => {
+                    bestIndex = (bestIndex - 1 + total) % total;
+                    apply();
+                });
+            }
+
+            if (nextBtn) {
+                const newNext = nextBtn.cloneNode(true);
+                nextBtn.parentNode.replaceChild(newNext, nextBtn);
+
+                newNext.addEventListener("click", () => {
+                    bestIndex = (bestIndex + 1) % total;
+                    apply();
+                });
+            }
+
+            // 리사이즈 시에도 위치 유지
+            window.addEventListener("resize", apply);
+        }
     </script>
 
 </body>
