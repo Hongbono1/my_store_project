@@ -8,7 +8,7 @@ import {
   getIndexTextSlot,
   saveIndexTextSlot,
   getBestPickSlots,
-  saveIndexStoreAd, // ✅ 추가
+  saveIndexStoreAd,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
@@ -34,15 +34,12 @@ const upload = multer({
   },
 });
 
+// 기존 라우트들
 router.post("/upload", upload.single("image"), uploadIndexAd);
 router.get("/slot", getIndexSlot);
-
 router.get("/text/get", getIndexTextSlot);
 router.post("/text/save", saveIndexTextSlot);
-
-// ✅ 가게 연결 모드 엔드포인트
 router.post("/store", saveIndexStoreAd);
-
 router.get("/best-pick", getBestPickSlots);
 
 export default router;
