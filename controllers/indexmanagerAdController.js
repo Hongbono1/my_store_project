@@ -520,87 +520,104 @@ export async function getIndexTextSlot(req, res) {
   }
 }
 
-
+/**
+ * GET /manager/ad/best-pick
+ * Best Pick 광고 슬롯 조회 (등록된 항목만 반환)
+ */
 export async function getBestPickSlots(req, res) {
   try {
-    const MAX = 18;
+    const slots = [];
 
-    // ✅ 관리자 광고 슬롯만 조회
+    // ✅ 1순위: 광고 슬롯 (등록된 것만)
     const adSlotsQuery = `
       SELECT 
         position,
         image_url,
         link_url,
         business_name,
-        business_no,
-        store_id,
         slot_mode
       FROM admin_ad_slots
-      WHERE page = 'index'
+      WHERE page = 'index' 
         AND position LIKE 'best_pick_%'
+        AND (
+          image_url IS NOT NULL 
+          OR business_name IS NOT NULL 
+          OR link_url IS NOT NULL
+        )
       ORDER BY 
         CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
     `;
 
     const { rows: adSlots } = await pool.query(adSlotsQuery);
 
-    // position -> 슬롯번호 매핑
-    const slotMap = new Map();
-    adSlots.forEach((slot) => {
-      const match = String(slot.position || "").match(/best_pick_(\d+)/);
-      const num = match ? parseInt(match[1], 10) : null;
-      if (!num) return;
-      if (num < 1 || num > MAX) return;
+    adSlots.forEach(slot => {
+      const match = slot.position.match(/best_pick_(\d+)/);
+      const slotNumber = match ? parseInt(match[1]) : 999;
 
-      slotMap.set(num, slot);
+      slots.push({
+        id: slotNumber, // ✅ 숫자 ID로 변경
+        name: slot.business_name || `광고 슬롯 ${slotNumber}`,
+        category: "광고",
+        image: slot.image_url,
+        link: slot.link_url || "#",
+        type: "ad",
+        slotNumber
+      });
     });
 
-    // ✅ 1~18번 슬롯을 "관리자 슬롯만" 기반으로 구성
-    // - 비어있는 슬롯은 "빈 슬롯"으로만 반환 (가짜 가게/더미 아님)
-    const stores = [];
-    for (let n = 1; n <= MAX; n++) {
-      const slot = slotMap.get(n);
+    // ✅ 2순위: 실제 Best Pick 가게 (빈 슬롯 채우기용)
+    if (slots.length < 18) {
+      const remainingCount = Math.min(18 - slots.length, 12); // 최대 12개까지만
+      
+      const bestPickQuery = `
+        SELECT 
+          id,
+          business_name as name,
+          category,
+          main_image as image,
+          'food' as type
+        FROM food_stores
+        WHERE is_best_pick = true
+          AND id IS NOT NULL
+          AND business_name IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT $1
+      `;
 
-      if (slot && slot.image_url) {
-        stores.push({
-          id: `ad_best_pick_${n}`,
-          name: slot.business_name || `베스트 픽 광고 ${n}`,
-          category: "광고",
-          image: slot.image_url,
-          link: slot.link_url || "#",
-          type: "ad",
-          slotNumber: n,
-          storeId: slot.store_id || null,
-          businessNo: slot.business_no || null,
-          slotMode: slot.slot_mode || "custom",
-        });
-      } else {
-        // ✅ '더미 가게'가 아니라 '빈 광고 슬롯' 표현
-        stores.push({
-          id: `empty_best_pick_${n}`,
-          name: `미등록 슬롯 ${n}`,
-          category: "광고",
-          image: null,
-          link: "#",
-          type: "empty",
-          slotNumber: n,
-          storeId: null,
-          businessNo: null,
-          slotMode: "empty",
-        });
-      }
+      const { rows: bestPickStores } = await pool.query(bestPickQuery, [remainingCount]);
+
+      bestPickStores.forEach(store => {
+        // ✅ 이미 등록된 광고 슬롯과 중복 방지
+        const existingSlotNumbers = slots.map(s => s.slotNumber);
+        let nextSlotNumber = 1;
+        while (existingSlotNumbers.includes(nextSlotNumber) && nextSlotNumber <= 18) {
+          nextSlotNumber++;
+        }
+
+        if (nextSlotNumber <= 18) {
+          slots.push({
+            id: store.id, // ✅ 실제 store ID
+            name: store.name,
+            category: store.category || "기타",
+            image: store.image || "/uploads/no-image.png",
+            link: `/ndetail.html?id=${store.id}&type=${store.type}`,
+            type: store.type,
+            slotNumber: nextSlotNumber
+          });
+        }
+      });
     }
 
-    // 번호 순 정렬 유지
-    stores.sort((a, b) => a.slotNumber - b.slotNumber);
+    // ✅ 정렬 후 반환 (빈 슬롯 더미 데이터 제거)
+    slots.sort((a, b) => a.slotNumber - b.slotNumber);
 
-    // ✅ 성공 시 "배열"로 반환
-    return res.json(stores);
+    return res.json(slots);
+
   } catch (err) {
     console.error("BEST PICK ERROR:", err);
-    return res.status(500).json({
-      success: false,
-      error: "Best Pick 조회 실패",
+    return res.status(500).json({ 
+      success: false, 
+      error: "Best Pick 조회 실패" 
     });
   }
 }

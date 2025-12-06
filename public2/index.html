@@ -528,19 +528,46 @@
             function createGroup(stores) {
                 const group = document.createElement("div");
                 group.className = "flex justify-center gap-6 basis-full shrink-0";
+
                 stores.forEach(store => {
                     const card = document.createElement("a");
-                    card.href = store.link || `/ndetail.html?id=${store.id}&type=food`;
+                    
+                    // ✅ 빈 슬롯 보호 로직 (index.html에도 동일 적용)
+                    const rawId = store.id;
+                    const idNum = Number.parseInt(String(rawId), 10);
+                    const isValidId = Number.isFinite(idNum) && idNum > 0;
+
+                    const safeImg = store.image && store.image.trim()
+                        ? store.image
+                        : "/uploads/no-image.png";
+
+                    if (!isValidId) {
+                        card.href = "javascript:void(0)";
+                        card.classList.add("opacity-50", "pointer-events-none", "cursor-not-allowed");
+                    } else {
+                        // ✅ 기존 링크 로직 유지
+                        card.href = store.link || `/ndetail.html?id=${store.id}&type=food`;
+                    }
+                    
                     card.className = "block text-center w-28 sm:w-40";
+                    
+                    const displayName = isValidId ? (store.name || '상호명') : '준비중';
+                    const displayCategory = isValidId ? (store.category || '업종') : '';
+                    const textOpacity = isValidId ? '' : 'opacity-60';
+
                     card.innerHTML = `
-                        <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                            <img src="${store.image}" alt="${store.name}" class="w-full h-full object-cover">
-                        </div>
-                        <p class="mt-2 font-bold text-base sm:text-lg">${store.name}</p>
-                        <p class="text-xs sm:text-sm text-gray-600">${store.category}</p>
+                      <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+                        <img src="${safeImg}" 
+                             alt="${displayName}" 
+                             class="w-full h-full object-cover ${isValidId ? '' : 'opacity-40'}"
+                             onerror="this.src='/uploads/no-image.png'">
+                      </div>
+                      <p class="mt-2 font-bold text-base sm:text-lg ${textOpacity}">${displayName}</p>
+                      <p class="text-xs sm:text-sm text-gray-400 ${textOpacity}">${displayCategory}</p>
                     `;
                     group.appendChild(card);
                 });
+
                 return group;
             }
 

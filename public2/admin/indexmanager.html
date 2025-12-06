@@ -835,38 +835,63 @@
             stores.forEach(store => {
                 const card = document.createElement("a");
 
-                let finalLink = "";
+                // ✅ 빈 슬롯 보호 로직
+                const rawId = store.id;
+                const idNum = Number.parseInt(String(rawId), 10);
+                const isValidId = Number.isFinite(idNum) && idNum > 0;
 
-                if (store.link) {
-                    if (store.link.includes("/admin/detail") || store.link.includes("admin/detail")) {
-                        const idMatch = store.link.match(/[?&]id=(\d+)/);
-                        const typeMatch = store.link.match(/[?&]type=([^&]+)/);
-                        const id = idMatch ? idMatch[1] : store.id;
-                        const type = typeMatch ? typeMatch[1] : (store.type || "food");
-                        finalLink = `/ndetail.html?id=${id}&type=${type}`;
-                    } else if (store.link.startsWith("http")) {
-                        finalLink = store.link;
-                    } else if (store.link.startsWith("/ndetail")) {
-                        finalLink = store.link;
+                // ✅ 안전한 이미지 처리
+                const safeImg = store.image && store.image.trim()
+                    ? store.image
+                    : "/uploads/no-image.png";
+
+                if (!isValidId) {
+                    // ✅ 빈 슬롯은 클릭 불가 + 시각적으로 약하게
+                    card.href = "javascript:void(0)";
+                    card.classList.add("opacity-50", "pointer-events-none");
+                    card.className += " cursor-not-allowed";
+                } else {
+                    // ✅ 유효한 슬롯만 링크 생성
+                    let finalLink = "";
+
+                    if (store.link) {
+                        if (store.link.includes("/admin/detail") || store.link.includes("admin/detail")) {
+                            const idMatch = store.link.match(/[?&]id=(\d+)/);
+                            const typeMatch = store.link.match(/[?&]type=([^&]+)/);
+                            const id = idMatch ? idMatch[1] : store.id;
+                            const type = typeMatch ? typeMatch[1] : (store.type || "food");
+                            finalLink = `/ndetail.html?id=${id}&type=${type}`;
+                        } else if (store.link.startsWith("http")) {
+                            finalLink = store.link;
+                        } else if (store.link.startsWith("/ndetail")) {
+                            finalLink = store.link;
+                        } else {
+                            finalLink = `/ndetail.html?id=${store.id}&type=${store.type || "food"}`;
+                        }
                     } else {
                         finalLink = `/ndetail.html?id=${store.id}&type=${store.type || "food"}`;
                     }
-                } else {
-                    finalLink = `/ndetail.html?id=${store.id}&type=${store.type || "food"}`;
+
+                    card.href = finalLink;
                 }
 
-                card.href = finalLink;
                 card.className = "block text-center w-28 sm:w-40";
 
+                // ✅ 빈 슬롯 표시 개선
+                const displayName = isValidId ? (store.name || '등록된 광고') : '빈 슬롯';
+                const displayCategory = isValidId ? (store.category || '') : '클릭 불가';
+                const textOpacity = isValidId ? '' : 'opacity-60';
+
                 card.innerHTML = `
-                  <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                    <img src="${store.image || '/uploads/no-image.png'}" 
-                         alt="${store.name || 'best-pick'}" 
-                         class="w-full h-full object-cover">
-                  </div>
-                  <p class="mt-2 font-bold text-base sm:text-lg">${store.name || ''}</p>
-                  <p class="text-xs sm:text-sm text-gray-400">${store.category || ''}</p>
-                `;
+          <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto ${isValidId ? '' : 'bg-gray-100'}">
+            <img src="${safeImg}" 
+                 alt="${displayName}" 
+                 class="w-full h-full object-cover ${isValidId ? '' : 'opacity-40'}"
+                 onerror="this.src='/uploads/no-image.png'">
+          </div>
+          <p class="mt-2 font-bold text-base sm:text-lg ${textOpacity}">${displayName}</p>
+          <p class="text-xs sm:text-sm text-gray-400 ${textOpacity}">${displayCategory}</p>
+        `;
 
                 group.appendChild(card);
             });
