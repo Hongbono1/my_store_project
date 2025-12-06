@@ -86,7 +86,7 @@ function pickStoreImage(storeRow) {
     try {
       const parsed = JSON.parse(images);
       if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return "";
@@ -380,44 +380,62 @@ export async function saveIndexStoreAd(req, res) {
 export async function getIndexSlot(req, res) {
   try {
     const { page, position } = req.query;
-    
+
     console.log(`🔍 슬롯 조회 요청: page=${page}, position=${position}`);
-    
+
     if (!page || !position) {
-      return res.status(400).json({ success: false, error: "page와 position이 필요합니다." });
+      return res.status(400).json({
+        success: false,
+        error: "page와 position이 필요합니다.",
+      });
     }
 
     const result = await pool.query(
-      `SELECT * FROM ad_slots WHERE page = $1 AND position = $2 
-       ORDER BY created_at DESC LIMIT 1`,
+      `SELECT * 
+         FROM admin_ad_slots 
+        WHERE page = $1 AND position = $2
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT 1`,
       [page, position]
     );
 
     console.log(`📊 DB 조회 결과 (${position}):`, result.rows);
 
     if (result.rows.length === 0) {
-      console.log(`❌ 슬롯 없음: ${position}`);
-      return res.json({ success: false, slot: null });
+      console.log(`🟡 슬롯 없음(정상): ${position}`);
+      return res.json({
+        success: true,
+        slot: null,
+        page,
+        position,
+      });
     }
 
     const slot = result.rows[0];
+
     const responseData = {
       success: true,
       slot: {
-        image_url: slot.image_url,
-        link_url: slot.link_url, 
-        business_name: slot.business_name
-      }
+        image_url: slot.image_url || null,
+        link_url: slot.link_url || null,
+        business_name: slot.business_name || null,
+        slot_type: slot.slot_type || null,
+        slot_mode: slot.slot_mode || null,
+      },
     };
 
     console.log(`✅ 슬롯 응답 (${position}):`, responseData);
-    res.json(responseData);
+    return res.json(responseData);
 
   } catch (error) {
     console.error(`❌ 슬롯 조회 오류 (${req.query.position}):`, error);
-    res.status(500).json({ success: false, error: "서버 오류가 발생했습니다." });
+    return res.status(500).json({
+      success: false,
+      error: "서버 오류가 발생했습니다.",
+    });
   }
 }
+
 
 /* ============================================================
  * 🔹 텍스트 슬롯 조회 (admin_ad_slots 기준 통일)
@@ -579,5 +597,5 @@ export async function getBestPickSlots(req, res) {
       error: "Best Pick 조회 실패",
     });
   }
-  
+
 }
