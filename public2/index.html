@@ -317,6 +317,9 @@
     </div>
 
     <script>
+        // ✅ Best Pick 최대 슬롯 수
+        const BEST_PICK_MAX = 18;
+
         // ============================================================
         // 🔥 통합 슬롯 로더 시스템 (1순위: 관리자 → 2순위: 기본값)
         // ============================================================
@@ -334,18 +337,22 @@
 
                 const json = await res.json();
 
-                if (json.ok && json.slot && json.slot.image_url) {
+                // ✅ 서버 응답 키 불일치 해결 (ok/success 둘 다 허용)
+                const isOk = !!(json.ok || json.success);
+                const slot = json.slot || null;
+
+                if (isOk && slot && slot.image_url) {
                     if (img) {
-                        img.src = json.slot.image_url;
+                        img.src = slot.image_url;
                         img.classList.remove("hidden");
                     }
                     if (defaultEl) defaultEl.classList.add("hidden");
 
-                    if (json.slot.link_url) {
+                    if (slot.link_url) {
                         container.style.cursor = "pointer";
                         container.onclick = (e) => {
                             e.preventDefault();
-                            location.href = json.slot.link_url;
+                            location.href = slot.link_url;
                         };
                     }
                 }
@@ -375,7 +382,10 @@
                     json?.slot?.content ||
                     "";
 
-                if (json.ok && content && String(content).trim() !== "") {
+                // ✅ 서버 응답 키 불일치 해결
+                const isOk = !!(json.ok || json.success);
+
+                if (isOk && content && String(content).trim() !== "") {
                     const textEl = container.querySelector(".slot-default-text") || container;
                     textEl.innerHTML = content;
                 } else {
@@ -420,7 +430,10 @@
                         slotJson?.slot?.text_content ||
                         "";
 
-                    if (slotJson.ok && content && String(content).trim() !== "") {
+                    // ✅ 서버 응답 키 불일치 해결
+                    const isOk = !!(slotJson.ok || slotJson.success);
+
+                    if (isOk && content && String(content).trim() !== "") {
                         contentEl.innerHTML = content;
                         return;
                     }
@@ -453,6 +466,42 @@
         // ============================================================
         // 📌 Best Pick 슬라이더 (✅ 관리자 슬롯 기반)
         // ============================================================
+
+        async function fetchBestPickSlot(n) {
+            const position = `best_pick_${n}`;
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent("index")}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
+
+                const json = await res.json();
+                
+                // 디버깅: 서버 응답을 전역으로 노출
+                window.__bestPickResponse = json;
+                console.log(`Best Pick ${n} 서버 응답:`, json);
+                
+                // ✅ 서버 응답 키 불일치 해결
+                const isOk = !!(json.ok || json.success);
+                const slot = json.slot || null;
+
+                const image = slot?.image_url || "";
+                const link = slot?.link_url || "";
+                const businessName = slot?.business_name || "";
+
+                console.log(`Best Pick ${n} 매핑 결과:`, { image, link, businessName, isOk });
+
+                return {
+                    image: image || "",
+                    link: link || "",
+                    businessName: businessName || "",
+                    label: `Best Pick ${n}`
+                };
+            } catch (e) {
+                console.error(`Best Pick ${n} 슬롯 로드 실패:`, e);
+                return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
+            }
+        }
 
         // ✅ 안전한 이미지 로딩 유틸리티
         function safeImageLoader(img, src, fallbackSrc = "/assets/no-image.png") {
@@ -630,8 +679,7 @@
         // 🚀 페이지 로드 시 모든 슬롯 로드
         // ============================================================
         document.addEventListener("DOMContentLoaded", async () => {
-                console.log("INDEX VERSION CHECK 2025-12-06 - FILE");
-
+            console.log("INDEX VERSION CHECK 2025-12-07 - FIXED API KEYS");
 
             fetch("/components/header.html")
                 .then(r => r.text())
