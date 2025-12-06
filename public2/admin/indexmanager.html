@@ -235,16 +235,16 @@
     <!-- ⑦ Best Pick (원래 인덱스 위치/모양 유지) -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-bold">Best Pick</h2>
-            <button id="btnBestPickReload"
-                class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs hover:bg-slate-800">
+            <h2 class="text-2xl sm:text-3xl font-bold">Best Pick 관리</h2>
+            <button id="btnBestPickReload" 
+                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
                 새로고침
             </button>
         </div>
 
         <!-- ✅ 여기 모양은 원래 인덱스 스타일에 맞춰 grid/scroll 중 원하는 걸 유지 -->
         <div id="bestPickGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <!-- JS가 1~18 슬롯 렌더 -->
+            <!-- Best Pick 슬롯들이 여기에 동적으로 생성됩니다 -->
         </div>
     </section>
 
@@ -768,36 +768,42 @@
         }
 
         function renderBestPickGridInline() {
-            const grid = document.getElementById("bestPickGrid");
-            if (!grid) return;
+            const container = document.getElementById("bestPickGrid");
+            if (!container) return;
 
-            let html = "";
-            for (let n = 1; n <= BEST_PICK_MAX; n++) {
-                html += `
-                    <div id="${bestPickSlotId(n)}"
-                        class="neo-card slot-banner js-slot cursor-pointer h-32 sm:h-36 rounded-xl border border-slate-100"
-                        data-page="index"
-                        data-position="${bestPickPosition(n)}"
-                        data-label="Best Pick ${n}번">
-                        
-                        <img class="slot-img hidden w-full h-full object-cover" alt="Best Pick ${n}">
-                        
-                        <div class="slot-default w-full h-full flex flex-col items-center justify-center text-xs text-slate-400 bg-white">
-                            <div class="font-semibold text-slate-700">Best Pick ${n}</div>
-                            <div class="mt-1">클릭하여 등록</div>
+            container.innerHTML = "";
+            
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                
+                const card = document.createElement("div");
+                card.className = "neo-card p-4 cursor-pointer js-slot";
+                card.id = slotId;
+                card.setAttribute("data-page", "index");
+                card.setAttribute("data-position", position);
+                card.setAttribute("data-label", `Best Pick ${i}`);
+                
+                card.innerHTML = `
+                    <div class="text-center">
+                        <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                            <span class="text-xs text-gray-500">${i}</span>
                         </div>
+                        <p class="text-xs font-medium">Best Pick ${i}</p>
+                        <p class="text-xs text-gray-500 mt-1">클릭하여 등록</p>
                     </div>
                 `;
+                
+                container.appendChild(card);
             }
-            grid.innerHTML = html;
         }
 
         async function loadBestPickInlineSlots() {
-            const tasks = [];
-            for (let n = 1; n <= BEST_PICK_MAX; n++) {
-                tasks.push(loadBannerSlotById(bestPickSlotId(n), "index", bestPickPosition(n)));
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                await loadBannerSlotById(slotId, "index", position);
             }
-            await Promise.all(tasks);
         }
 
         // ============================
@@ -1223,22 +1229,38 @@
         // 초기화 (수정됨)
         // ============================
         document.addEventListener("DOMContentLoaded", async () => {
+            // 헤더/푸터 로드
             fetch("/components/header.html")
                 .then(r => r.text())
                 .then(d => {
-                    const el = document.getElementById("header-placeholder");
-                    if (el) el.innerHTML = d;
+                    const hp = document.getElementById("header-placeholder");
+                    if (hp) hp.innerHTML = d;
                 });
 
             fetch("/components/footer.html")
                 .then(r => r.text())
                 .then(d => {
-                    const el = document.getElementById("footer-placeholder");
-                    if (el) el.innerHTML = d;
+                    const fp = document.getElementById("footer-placeholder");
+                    if (fp) fp.innerHTML = d;
                 });
 
-            // ❌ 삭제: renderBestPickAdminGrid();
+            // 모든 슬롯 설정
+            setupSlotClick();
+            setupModalClose();
+            setupTextModalClose();
+            setupModeToggle();
+            setupSave();
+            setupSaveText();
+            setupNoEndToggle();
 
+            // Best Pick 그리드 렌더링 및 로드
+            renderBestPickGridInline();
+            await loadBestPickInlineSlots();
+
+            // 우리동네 한마디 로드
+            await loadOneWord();
+
+            // 기존 슬롯들 로드
             const bannerSlots = [
                 ["slot_index_main_top", "index", "index_main_top"],
                 ["slot_index_main_visual", "index", "index_main_visual"],
@@ -1303,7 +1325,6 @@
             setupModalClose();
             setupTextModalClose();
             setupModeToggle();
-            setupNoEndToggle();
             setupSave();
             setupSaveText();
         });
