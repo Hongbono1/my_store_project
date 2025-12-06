@@ -569,19 +569,19 @@ export async function getBestPickSlots(req, res) {
     // ✅ 2순위: 실제 Best Pick 가게
     if (stores.length < 18) {
       const remainingCount = 18 - stores.length;
-      
+
       const bestPickQuery = `
-        SELECT 
-          id,
-          business_name as name,
-          category,
-          main_image as image,
-          'food' as type
-        FROM food_stores
-        WHERE is_best_pick = true
-        ORDER BY created_at DESC
-        LIMIT $1
-      `;
+    SELECT 
+      id,
+      business_name as name,
+      business_category as category,
+      COALESCE(main_img, main_image, image_url) as image,
+      'food' as type
+    FROM food_stores
+    WHERE is_best_pick = true
+    ORDER BY created_at DESC
+    LIMIT $1
+  `;
 
       const { rows: bestPickStores } = await pool.query(bestPickQuery, [remainingCount]);
 
@@ -598,10 +598,11 @@ export async function getBestPickSlots(req, res) {
       });
     }
 
+
     // ✅ 3순위: 더미 데이터
     if (stores.length < 18) {
       const dummyCount = 18 - stores.length;
-      
+
       for (let i = 0; i < dummyCount; i++) {
         stores.push({
           id: `dummy_${i + 1}`,
@@ -622,9 +623,9 @@ export async function getBestPickSlots(req, res) {
 
   } catch (err) {
     console.error("BEST PICK ERROR:", err);
-    return res.status(500).json({ 
-      success: false, 
-      error: "Best Pick 조회 실패" 
+    return res.status(500).json({
+      success: false,
+      error: "Best Pick 조회 실패"
     });
   }
 }
