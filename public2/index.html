@@ -464,20 +464,25 @@
                 if (!res.ok) return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
 
                 const json = await res.json();
-
+                
+                // ✅ 응답 구조 수정
                 const image =
                     json?.slot?.image_url ||
-                    json?.slot?.image ||
+                    json?.image_url ||
                     "";
 
                 const link =
                     json?.slot?.link_url ||
-                    json?.slot?.link ||
+                    json?.link_url ||
                     "";
 
                 const businessName =
                     json?.slot?.business_name ||
+                    json?.business_name ||
                     "";
+
+                // ✅ 디버깅 로그 추가
+                console.log(`Best Pick ${n} 응답:`, json);
 
                 return {
                     image: image || "",
@@ -486,7 +491,7 @@
                     label: `Best Pick ${n}`
                 };
             } catch (e) {
-                console.error("Best Pick 슬롯 로드 실패:", e);
+                console.error(`Best Pick ${n} 슬롯 로드 실패:`, e);
                 return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
             }
         }
@@ -495,9 +500,13 @@
             const track = document.getElementById("bestTrack");
             if (!track) return;
 
+            console.log("베스트 픽 로드 시작...");
+
             const slots = await Promise.all(
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
+
+            console.log("로드된 베스트 픽 슬롯들:", slots);
 
             const groups = [];
             for (let i = 0; i < slots.length; i += 6) {
@@ -517,24 +526,38 @@
                     const hasLink = !!(slot.link && slot.link.trim());
                     const hasName = !!(slot.businessName && slot.businessName.trim());
 
+                    // ✅ 디버깅 로그 추가
+                    console.log(`Best Pick ${n}:`, { hasImage, hasLink, hasName, slot });
+
                     const card = document.createElement("a");
                     card.className = "block text-center w-28 sm:w-40";
 
-                    // ✅ 링크는 관리자 지정 링크만
+                    // ✅ 링크 처리 개선
                     if (hasLink) {
                         card.href = slot.link;
+                        card.target = "_blank";
                     } else {
                         card.href = "javascript:void(0)";
                         card.classList.add("opacity-60", "pointer-events-none", "cursor-not-allowed");
                     }
 
+                    // ✅ 이미지 처리 개선
                     const safeImg = hasImage ? slot.image : "/uploads/no-image.png";
                     const titleText = hasImage ? `Best Pick ${n}` : `Best Pick ${n}`;
 
                     const bottomTitle = hasName ? slot.businessName : `Best Pick ${n}`;
-                    const bottomSub = hasImage
-                        ? "관리자 등록 슬롯"
-                        : (hasName ? "등록됨 (이미지 없음)" : "준비중");
+                    
+                    // ✅ 상태 표시 개선
+                    let bottomSub = "";
+                    if (hasImage && hasName) {
+                        bottomSub = "등록 완료";
+                    } else if (hasName) {
+                        bottomSub = "이미지 대기중";
+                    } else if (hasImage) {
+                        bottomSub = "정보 입력 필요";
+                    } else {
+                        bottomSub = "준비중";
+                    }
 
                     card.innerHTML = `
                         <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
@@ -543,10 +566,10 @@
                                  class="w-full h-full object-cover ${hasImage ? "" : "opacity-40"}"
                                  onerror="this.src='/uploads/no-image.png'">
                         </div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-500">
+                        <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">
                             ${bottomTitle}
                         </p>
-                        <p class="text-xs sm:text-sm text-gray-400">
+                        <p class="text-xs sm:text-sm ${hasImage || hasName ? 'text-blue-500' : 'text-gray-400'}">
                             ${bottomSub}
                         </p>
                     `;
