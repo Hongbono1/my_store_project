@@ -182,6 +182,10 @@ app.use(express.static(path.join(__dirname, "public")));
 // ✅ /uploads → /data/uploads (A 방식, 영구 저장만 사용)
 app.use("/uploads", express.static(UPLOAD_ROOT));
 
+// 정적 파일 서빙 설정 확인
+app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
+app.use("/assets", express.static(path.join(__dirname, "public2", "assets")));
+
 // ------------------------------------------------------------
 // 3-1. 표준화된 국세청 사업자번호 인증 API
 // ------------------------------------------------------------

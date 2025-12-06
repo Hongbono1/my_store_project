@@ -453,6 +453,44 @@
         // ============================================================
         // 📌 Best Pick 슬라이더 (✅ 관리자 슬롯 기반)
         // ============================================================
+
+        // ✅ 안전한 이미지 로딩 유틸리티
+        function safeImageLoader(img, src, fallbackSrc = "/assets/no-image.svg") {
+            // 이미 에러 핸들러가 실행된 경우 중복 실행 방지
+            if (img.__errorHandled) return;
+            
+            img.onerror = function() {
+                // 무한 루프 방지
+                this.onerror = null;
+                this.__errorHandled = true;
+                
+                console.log(`이미지 로드 실패: ${src} → ${fallbackSrc}`);
+                this.src = fallbackSrc;
+            };
+            
+            img.src = src;
+        }
+
+        // ✅ 이미지 URL 정규화 (상대경로 → 절대경로)
+        function normalizeImageUrl(url) {
+            if (!url || typeof url !== "string") return "/assets/no-image.svg";
+            
+            const trimmed = url.trim();
+            if (!trimmed) return "/assets/no-image.svg";
+            
+            // 이미 절대 URL인 경우
+            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                return trimmed;
+            }
+            
+            // 상대 경로인 경우 절대 경로로 변환
+            if (trimmed.startsWith("/")) {
+                return `${location.origin}${trimmed}`;
+            }
+            
+            return `${location.origin}/${trimmed}`;
+        }
+
         const BEST_PICK_MAX = 18;
 
         async function fetchBestPickSlot(n) {
@@ -465,11 +503,10 @@
 
                 const json = await res.json();
                 
-                // ✅ 디버깅: 서버 응답을 전역으로 노출
+                // 디버깅: 서버 응답을 전역으로 노출
                 window.__bestPickResponse = json;
                 console.log(`Best Pick ${n} 서버 응답:`, json);
                 
-                // ✅ 응답 구조 분석
                 const image =
                     json?.slot?.image_url ||
                     json?.image_url ||
@@ -509,7 +546,7 @@
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
 
-            // ✅ 디버깅: 모든 슬롯 데이터를 전역으로 노출
+            // 디버깅: 모든 슬롯 데이터를 전역으로 노출
             window.__bestPickSlots = slots;
             console.log("🎯 로드된 베스트 픽 슬롯들:", slots);
 
@@ -527,19 +564,18 @@
                 items.forEach((slot, idx) => {
                     const n = index * 6 + idx + 1;
 
-                    // ✅ 디버깅: 이미지 처리 강화
-                    const rawImage = slot.image || "";
-                    const hasImage = !!(rawImage && rawImage.trim());
-                    const safeImg = hasImage 
-                        ? (rawImage.startsWith("http") ? rawImage : `${location.origin}${rawImage}`)
-                        : "/uploads/no-image.png";
-
+                    // ✅ 안전한 이미지 처리
+                    const hasImage = !!(slot.image && slot.image.trim());
                     const hasLink = !!(slot.link && slot.link.trim());
                     const hasName = !!(slot.businessName && slot.businessName.trim());
 
+                    // 이미지 URL 정규화
+                    const normalizedImage = normalizeImageUrl(slot.image);
+                    const fallbackImage = "/assets/no-image.svg";
+
                     console.log(`Best Pick ${n} 렌더링:`, { 
-                        rawImage, 
-                        safeImg, 
+                        originalImage: slot.image,
+                        normalizedImage, 
                         hasImage, 
                         hasLink, 
                         hasName, 
@@ -573,10 +609,10 @@
 
                     card.innerHTML = `
                         <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                            <img src="${safeImg}"
+                            <img class="w-full h-full object-cover ${hasImage ? "" : "opacity-40"}"
                                  alt="${titleText}"
-                                 class="w-full h-full object-cover ${hasImage ? "" : "opacity-40"}"
-                                 onerror="this.src='/uploads/no-image.png'; console.error('Best Pick ${n} 이미지 로드 실패:', '${safeImg}');">
+                                 data-src="${normalizedImage}"
+                                 data-fallback="${fallbackImage}">
                         </div>
                         <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">
                             ${bottomTitle}
@@ -585,6 +621,11 @@
                             ${bottomSub}
                         </p>
                     `;
+
+                    // ✅ 안전한 이미지 로딩 적용
+                    const img = card.querySelector("img");
+                    const srcToLoad = hasImage ? normalizedImage : fallbackImage;
+                    safeImageLoader(img, srcToLoad, fallbackImage);
 
                     group.appendChild(card);
                 });
