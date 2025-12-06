@@ -838,19 +838,36 @@ function createGroup(stores) {
   stores.forEach(store => {
     const card = document.createElement("a");
     
-    // ✅ 링크 정규화
-    const safeLink = store.link
-      ? (store.link.startsWith("http")
-          ? store.link
-          : (store.link.startsWith("/")
-              ? store.link
-              : `/${store.link}`))
-      : null;
+    // ✅ ndetail.html로 통일 - admin/detail 자동 변환
+    let finalLink = "";
+    
+    if (store.link) {
+      // admin/detail 패턴 감지 시 자동 변환
+      if (store.link.includes("/admin/detail") || store.link.includes("admin/detail")) {
+        const idMatch = store.link.match(/[?&]id=(\d+)/);
+        const typeMatch = store.link.match(/[?&]type=([^&]+)/);
+        const id = idMatch ? idMatch[1] : store.id;
+        const type = typeMatch ? typeMatch[1] : (store.type || "food");
+        finalLink = `/ndetail.html?id=${id}&type=${type}`;
+      }
+      // 외부 링크는 그대로 유지
+      else if (store.link.startsWith("http")) {
+        finalLink = store.link;
+      }
+      // 상대 경로 또는 절대 경로
+      else if (store.link.startsWith("/ndetail")) {
+        finalLink = store.link;
+      }
+      // 기타 경로는 ndetail로 변환
+      else {
+        finalLink = `/ndetail.html?id=${store.id}&type=${store.type || "food"}`;
+      }
+    } else {
+      // 링크가 없으면 기본 생성
+      finalLink = `/ndetail.html?id=${store.id}&type=${store.type || "food"}`;
+    }
 
-    const fallback = `/ndetail.html?id=${store.id}` +
-      (store.type ? `&type=${encodeURIComponent(store.type)}` : "");
-
-    card.href = safeLink || fallback;
+    card.href = finalLink;
     card.className = "block text-center w-28 sm:w-40";
     
     card.innerHTML = `
@@ -1598,7 +1615,7 @@ btnBestPickReload?.addEventListener("click", loadBestPickSlots);
 
 // 초기 로드
 loadBestPickSlots();
-</script>
+    </script>
 
 </body>
 </html>
