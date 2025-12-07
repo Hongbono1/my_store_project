@@ -579,6 +579,7 @@ export async function getBestPickSlots(req, res) {
  * ✅ 사업자번호 기반 가게 검색
  * GET /manager/ad/store/search?bizNo=1234567890
  * ============================================================ */
+// ✅ 사업자번호 기반 가게 검색 (수정본)
 export async function searchStoreByBiz(req, res) {
   try {
     const { bizNo } = req.query;
@@ -586,13 +587,17 @@ export async function searchStoreByBiz(req, res) {
       return res.status(400).json({ ok: false, message: "사업자번호를 입력해주세요." });
     }
 
+    // 1) 숫자만 남기기
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
 
-    // 실제 존재 컬럼 자동 탐색
+    // 2) 실제 존재하는 컬럼 자동 탐색 + 숫자만 비교 WHERE 생성
     const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
     const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
 
-    // 존재하는 테이블만 안전하게 UNION 구성
+    // 3) 이제 찍어도 안전
+    console.log("[DEBUG][searchStoreByBiz]", { foodCol, combinedCol, cleanBizNo });
+
+    // 4) 존재하는 테이블만 UNION ALL 로 묶기
     const blocks = [];
     if (foodCol) {
       blocks.push(`
@@ -609,11 +614,12 @@ export async function searchStoreByBiz(req, res) {
       `);
     }
 
-    // 둘 다 사업자번호 컬럼이 없으면 빈 배열 반환
+    // 5) 둘 다 사업자번호 컬럼이 없으면 빈 배열 반환 (08P01 방지)
     if (blocks.length === 0) {
       return res.json({ ok: true, stores: [] });
     }
 
+    // 6) 단일 파라미터로 실행
     const sql = blocks.join(" UNION ALL ") + " LIMIT 5";
     const { rows } = await pool.query(sql, [cleanBizNo]);
 
@@ -627,6 +633,7 @@ export async function searchStoreByBiz(req, res) {
     });
   }
 }
+
 
 /* ============================================================
  * ✅ 가게와 슬롯 연결
