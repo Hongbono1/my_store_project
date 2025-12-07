@@ -9,6 +9,8 @@ import {
   saveIndexTextSlot,
   getBestPickSlots,
   saveIndexStoreAd,
+  // ✅ NEW: 가게 검색 API 컨트롤러
+  searchIndexStoreAd,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
@@ -37,8 +39,15 @@ const upload = multer({
 // 기존 라우트들
 router.post("/upload", upload.single("image"), uploadIndexAd);
 router.get("/slot", getIndexSlot);
+
 router.get("/text/get", getIndexTextSlot);
 router.post("/text/save", saveIndexTextSlot);
+
+// ✅ NEW: 등록된 가게 검색 (사업자번호 기반)
+// app.use("/manager/ad", ...) 이므로 최종 엔드포인트는:
+// GET /manager/ad/store/search?bizNo=xxxxxxxxxx
+router.get("/store/search", searchIndexStoreAd);
+
 router.post("/store", saveIndexStoreAd);
 router.get("/best-pick", getBestPickSlots);
 
