@@ -44,6 +44,32 @@ function pickBody(req) {
   };
 }
 
+// ✅ information_schema로 테이블 내 '사업자번호' 후보 컬럼 탐색
+async function findBizNoColumn(table) {
+  const candidates = [
+    "business_no", "biz_no", "biz_number", "business_number",
+    "registration_no", "reg_no", "brn", "corp_no"
+  ];
+  const { rows } = await pool.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_name = $1
+        AND column_name = ANY($2::text[])
+      LIMIT 1`,
+    [table, candidates]
+  );
+  return rows[0]?.column_name || null;
+}
+
+// ✅ 숫자만 비교하는 WHERE 절 생성 (컬럼 없으면 FALSE)
+async function buildBizNoWhere(table) {
+  const col = await findBizNoColumn(table);
+  if (!col) return { where: "FALSE", col: null };
+  const where = `regexp_replace(COALESCE(${col}::text, ''), '[^0-9]', '', 'g') = $1`;
+  return { where, col };
+}
+
+
 /* ============================================================
  * ✅ A안 핵심 유틸
  * - slot_mode === "store" 이면
@@ -81,7 +107,7 @@ function pickStoreImage(storeRow) {
     try {
       const parsed = JSON.parse(images);
       if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return "";
@@ -176,9 +202,8 @@ async function resolveStoreModeSlot(slot) {
 
   // link_url 보강
   if (!slot.link_url && storeRow?.id) {
-    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${
-      resolvedType === "food" ? "food" : "store"
-    }`;
+    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType === "food" ? "food" : "store"
+      }`;
   }
 
   return slot;
@@ -602,35 +627,39 @@ export async function searchStoreByBiz(req, res) {
 
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
 
+    // ✅ 테이블에 실제 존재하는 사업자번호 컬럼 자동 탐색 후, 숫자만 비교
+    const { where: whereFood, col: foodBizCol } = await buildBizNoWhere("food_stores");
     let storeQuery = `
-      SELECT
-        id,
-        business_name,
-        business_no,
-        'food' as store_type
-      FROM food_stores
-      WHERE business_no = $1
-      LIMIT 5
-    `;
-
+  SELECT
+    id,
+    business_name,
+    ${foodBizCol ? `${foodBizCol}` : "NULL"} AS business_no,
+    'food' as store_type
+  FROM food_stores
+  WHERE ${whereFood}
+  LIMIT 5
+`;
     let { rows } = await pool.query(storeQuery, [cleanBizNo]);
 
     if (rows.length === 0) {
       try {
+        const { where: whereCombined, col: combinedBizCol } =
+          await buildBizNoWhere("combined_store_info");
         const combinedQuery = `
-          SELECT
-            id,
-            business_name,
-            business_no,
-            'store' as store_type
-          FROM combined_store_info
-          WHERE business_no = $1
-          LIMIT 5
-        `;
+      SELECT
+        id,
+        business_name,
+        ${combinedBizCol ? `${combinedBizCol}` : "NULL"} AS business_no,
+        'store' as store_type
+      FROM combined_store_info
+      WHERE ${whereCombined}
+      LIMIT 5
+    `;
         const combinedResult = await pool.query(combinedQuery, [cleanBizNo]);
         rows = combinedResult.rows;
-      } catch {}
+      } catch { }
     }
+
 
     return res.json({ ok: true, stores: rows });
   } catch (err) {
@@ -673,8 +702,9 @@ export async function connectStoreToSlot(req, res) {
 
     let storeId = null;
     try {
+      const { where: whereFoodForConnect } = await buildBizNoWhere("food_stores");
       const storeResult = await pool.query(
-        `SELECT id FROM food_stores WHERE business_no = $1 LIMIT 1`,
+        `SELECT id FROM food_stores WHERE ${whereFoodForConnect} LIMIT 1`,
         [cleanBizNo]
       );
       if (storeResult.rows.length > 0) {
@@ -683,6 +713,7 @@ export async function connectStoreToSlot(req, res) {
     } catch (e) {
       console.warn("가게 ID 매핑 실패:", e.message);
     }
+
 
     const sql = `
       INSERT INTO admin_ad_slots (
