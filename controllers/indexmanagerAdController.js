@@ -607,86 +607,205 @@ export async function getBestPickSlots(req, res) {
  * - HTML의 runBizSearch()가 이 API를 이미 호출하고 있음
  * - 컬럼명이 환경마다 다를 수 있어 "안전 2단 조회" 방식
  * ============================================================ */
-export async function searchIndexStoreByBizNo(req, res) {
+export async function searchStoreByBiz(req, res) {
   try {
-    const bizNoRaw = String(req.query.bizNo || "").trim();
-    const bizNoDigits = bizNoRaw.replace(/\D/g, "");
+    const { bizNo } = req.query;
 
-    if (!bizNoDigits) {
-      return res.json({ ok: true, items: [] });
+    if (!bizNo || String(bizNo).trim() === "") {
+      return res.status(400).json({
+        ok: false,
+        message: "사업자번호를 입력해주세요.",
+      });
     }
 
-    // 1) food_stores에서 먼저 찾기
-    let foodRows = [];
+    const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
 
-    // 컬럼명이 business_no 인 경우
-    try {
-      const r1 = await pool.query(
-        `SELECT id, business_name, business_no, created_at
-           FROM food_stores
-          WHERE REPLACE(COALESCE(business_no, ''), '-', '') = $1
-          ORDER BY created_at DESC NULLS LAST
-          LIMIT 10`,
-        [bizNoDigits]
-      );
-      foodRows = r1.rows || [];
-    } catch (_) {
-      // 컬럼명이 business_number 인 경우
+    // 1) food_stores 우선 조회
+    let storeQuery = `
+      SELECT 
+        id, 
+        business_name,
+        business_no,
+        'food' as store_type
+      FROM food_stores 
+      WHERE business_no = $1 
+      LIMIT 5
+    `;
+
+    let { rows } = await pool.query(storeQuery, [cleanBizNo]);
+
+    // 2) (선택) 통합 테이블도 확인
+    if (rows.length === 0) {
       try {
-        const r2 = await pool.query(
-          `SELECT id, business_name, business_number, created_at
-             FROM food_stores
-            WHERE REPLACE(COALESCE(business_number, ''), '-', '') = $1
-            ORDER BY created_at DESC NULLS LAST
-            LIMIT 10`,
-          [bizNoDigits]
-        );
-        foodRows = r2.rows || [];
-      } catch (_) { }
+        const combinedQuery = `
+          SELECT 
+            id, 
+            business_name,
+            business_no,
+            'store' as store_type
+          FROM combined_store_info 
+          WHERE business_no = $1 
+          LIMIT 5
+        `;
+        const combinedResult = await pool.query(combinedQuery, [cleanBizNo]);
+        rows = combinedResult.rows;
+      } catch (e) {
+        // 통합 테이블이 없어도 괜찮음
+      }
     }
 
-    // 2) 필요하면 통합 테이블 후보도 시도
-    let combinedRows = [];
-    try {
-      const r3 = await pool.query(
-        `SELECT id, business_name, business_no, created_at
-           FROM combined_store_info
-          WHERE REPLACE(COALESCE(business_no, ''), '-', '') = $1
-          ORDER BY created_at DESC NULLS LAST
-          LIMIT 10`,
-        [bizNoDigits]
-      );
-      combinedRows = r3.rows || [];
-    } catch (_) {
-      try {
-        const r4 = await pool.query(
-          `SELECT id, business_name, business_number, created_at
-             FROM combined_store_info
-            WHERE REPLACE(COALESCE(business_number, ''), '-', '') = $1
-            ORDER BY created_at DESC NULLS LAST
-            LIMIT 10`,
-          [bizNoDigits]
-        );
-        combinedRows = r4.rows || [];
-      } catch (_) { }
-    }
-
-    const merged = [...foodRows, ...combinedRows];
-
-    // 표준 응답 형태는 HTML이 items 로 읽도록 맞춤
-    const items = merged.map((r) => ({
-      id: r.id,
-      business_name: r.business_name || null,
-      business_no: r.business_no || r.business_number || null,
-      created_at: r.created_at || null,
-    }));
-
-    return res.json({ ok: true, items });
+    return res.json({
+      ok: true,
+      stores: rows,
+    });
   } catch (err) {
-    console.error("STORE SEARCH ERROR:", err);
+    console.error("SEARCH STORE BY BIZ ERROR:", err);
     return res.status(500).json({
       ok: false,
-      message: "사업자번호 검색 실패",
+      message: "가게 검색 실패",
+      code: "STORE_SEARCH_ERROR",
+    });
+  }
+}
+
+/* ============================================================
+ * ✅ 가게와 슬롯 연결 (사업자번호 + 상호명 기반)
+ * POST /manager/ad/store/connect
+ * - JSON: { page, position, bizNo, bizName, startDate?, endDate?, noEnd? }
+ * 
+ * - saveIndexStoreAd와 유사하지만 더 범용적
+ * ============================================================ */
+export async function connectStoreToSlot(req, res) {
+  try {
+    const {
+      page,
+      position,
+      bizNo,
+      bizName,
+      startDate,
+      endDate,
+      noEnd,
+    } = req.body || {};
+
+    ensurePagePosition(page, position);
+
+    if (!bizNo || !bizName) {
+      return res.status(400).json({
+        ok: false,
+        message: "사업자번호(bizNo)와 상호명(bizName)을 모두 입력해야 합니다.",
+      });
+    }
+
+    const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
+    const finalEndDate = noEnd ? null : (endDate || null);
+
+    // 가게 정보 조회 (store_id 자동 매핑)
+    let storeId = null;
+    try {
+      const storeResult = await pool.query(
+        `SELECT id FROM food_stores WHERE business_no = $1 LIMIT 1`,
+        [cleanBizNo]
+      );
+      if (storeResult.rows.length > 0) {
+        storeId = storeResult.rows[0].id;
+      }
+    } catch (e) {
+      // 가게 매핑 실패해도 슬롯 등록은 진행
+      console.warn("가게 ID 매핑 실패:", e.message);
+    }
+
+    const sql = `
+      INSERT INTO admin_ad_slots (
+        page, position,
+        slot_type, slot_mode,
+        business_no, business_name,
+        store_id,
+        start_date, end_date,
+        updated_at
+      )
+      VALUES (
+        $1, $2,
+        'banner', 'store',
+        $3, $4,
+        $5,
+        $6, $7,
+        NOW()
+      )
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type     = 'banner',
+        slot_mode     = 'store',
+        business_no   = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        store_id      = EXCLUDED.store_id,
+        start_date    = EXCLUDED.start_date,
+        end_date      = EXCLUDED.end_date,
+        updated_at    = NOW()
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(sql, [
+      page,
+      position,
+      cleanBizNo,
+      bizName,
+      storeId,
+      startDate || null,
+      finalEndDate,
+    ]);
+
+    return res.json({ 
+      ok: true, 
+      slot: rows[0],
+      storeConnected: !!storeId
+    });
+  } catch (err) {
+    console.error("CONNECT STORE TO SLOT ERROR:", err);
+    const status = err.statusCode || 500;
+    return res.status(status).json({
+      ok: false,
+      message: err.message || "가게 연결 실패",
+      code: "STORE_CONNECT_ERROR",
+    });
+  }
+}
+
+/* ============================================================
+ * ✅ 슬롯 삭제
+ * DELETE /manager/ad/slot?page=index&position=best_pick_1
+ * ============================================================ */
+export async function deleteSlot(req, res) {
+  try {
+    const { page, position } = req.query;
+
+    ensurePagePosition(page, position);
+
+    const result = await pool.query(
+      `DELETE FROM admin_ad_slots 
+       WHERE page = $1 AND position = $2 
+       RETURNING *`,
+      [page, position]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        message: "삭제할 슬롯을 찾을 수 없습니다.",
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: "슬롯이 삭제되었습니다.",
+      deletedSlot: result.rows[0],
+    });
+  } catch (err) {
+    console.error("DELETE SLOT ERROR:", err);
+    const status = err.statusCode || 500;
+    return res.status(status).json({
+      ok: false,
+      message: err.message || "슬롯 삭제 실패",
+      code: "SLOT_DELETE_ERROR",
     });
   }
 }
