@@ -1,7 +1,8 @@
 // routes/indexmanagerAdRouter.js
-import express from "express";
-import { upload } from "../middlewares/upload.js";
-
+import { Router } from "express";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 import {
   uploadIndexAd,
   saveIndexStoreAd,
@@ -9,32 +10,46 @@ import {
   getIndexTextSlot,
   saveIndexTextSlot,
   getBestPickSlots,
-  searchStoreByBiz,      // ✅ 추가된 함수
-  connectStoreToSlot,    // ✅ 추가된 함수  
-  deleteSlot,            // ✅ 추가된 함수
+  searchStoreByBiz,
+  connectStoreToSlot,
+  deleteSlot,
 } from "../controllers/indexmanagerAdController.js";
 
-const router = express.Router();
+// ✅ 업로드 루트: 반드시 /data/uploads 로 통일
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || "/data/uploads";
+fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
-// 🔸 이미지 업로드
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_ROOT),
+  filename: (req, file, cb) => {
+    const ts = Date.now();
+    const base = (file.originalname || "image").replace(/[^\w.\-]+/g, "_");
+    const ext = path.extname(base) || ".png";
+    cb(null, `${ts}-${Math.random().toString(36).slice(2, 6)}${ext}`);
+  },
+});
+
+const upload = multer({ storage });
+
+const router = Router();
+
+// 🟩 이미지+링크 업로드 저장
 router.post("/upload", upload.single("image"), uploadIndexAd);
 
-// 🔸 가게 연결 (기존)
+// 🟧 등록된 가게로 연결
 router.post("/store", saveIndexStoreAd);
+router.get("/store/search", searchStoreByBiz);
+router.post("/store/connect", connectStoreToSlot);
 
-// 🔸 슬롯 조회
+// 🔎 슬롯/텍스트 로딩
 router.get("/slot", getIndexSlot);
-
-// 🔸 텍스트 슬롯
 router.get("/text/get", getIndexTextSlot);
 router.post("/text/save", saveIndexTextSlot);
 
-// 🔸 Best Pick 목록
+// ⭐ Best Pick 목록
 router.get("/best-pick", getBestPickSlots);
 
-// ✅ 새로 추가된 API들
-router.get("/store/search", searchStoreByBiz);
-router.post("/store/connect", connectStoreToSlot);
+// 🗑️ 슬롯 삭제
 router.delete("/slot", deleteSlot);
 
 export default router;

@@ -81,7 +81,7 @@ function pickStoreImage(storeRow) {
     try {
       const parsed = JSON.parse(images);
       if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-    } catch (_) { }
+    } catch (_) {}
   }
 
   return "";
@@ -176,8 +176,9 @@ async function resolveStoreModeSlot(slot) {
 
   // link_url 보강
   if (!slot.link_url && storeRow?.id) {
-    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType === "food" ? "food" : "store"
-      }`;
+    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${
+      resolvedType === "food" ? "food" : "store"
+    }`;
   }
 
   return slot;
@@ -269,7 +270,15 @@ export async function uploadIndexAd(req, res) {
       position: rows[0]?.position,
     });
 
-    return res.json({ ok: true, slot: rows[0] });
+    // ✅ 보강: slot 응답에 page/position 포함
+    return res.json({
+      ok: true,
+      slot: {
+        ...rows[0],
+        page,
+        position,
+      },
+    });
   } catch (err) {
     console.error("UPLOAD INDEX AD ERROR:", err);
     const status = err.statusCode || 500;
@@ -390,9 +399,12 @@ export async function getIndexSlot(req, res) {
     const rawSlot = result.rows[0];
     const slot = await resolveStoreModeSlot({ ...rawSlot });
 
+    // ✅ 보강: 응답 slot 내부에 page/position 포함
     const responseData = {
       success: true,
       slot: {
+        page,
+        position,
         image_url: slot.image_url || null,
         link_url: slot.link_url || null,
         business_name: slot.business_name || null,
@@ -617,7 +629,7 @@ export async function searchStoreByBiz(req, res) {
         `;
         const combinedResult = await pool.query(combinedQuery, [cleanBizNo]);
         rows = combinedResult.rows;
-      } catch { }
+      } catch {}
     }
 
     return res.json({ ok: true, stores: rows });
