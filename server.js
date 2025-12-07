@@ -1,9 +1,11 @@
-/**  ----------------------------------------------------------
+/**
+ *  ----------------------------------------------------------
  *  MALL HANKOOK SERVER - PERSISTENT UPLOAD VERSION (A 방식)
  *  이미지 경로 /data/uploads 로 영구 저장
- *  public2/uploads와 충돌 제거
+ *  public2/uploads 충돌 제거
  *  기존 라우터 / 기능은 유지
- *  ---------------------------------------------------------- */
+ *  ----------------------------------------------------------
+ */
 
 // .env 를 가장 먼저 로드 (cwd 기준)
 // pm2 start 시 cwd 를 /root/my_store_project_new 로 맞출 것!
@@ -174,20 +176,21 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ------------------------------------------------------------
-// 정적 파일 서빙 설정
+// 4. 정적 파일 서빙 설정
 // ------------------------------------------------------------
-// 기존 public (이미지, js 등)
+
+// ✅ 4-1) 기존 public (기본 정적 리소스)
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ /uploads → /data/uploads (A 방식, 영구 저장만 사용)
+// ✅ 4-2) /uploads → /data/uploads (A 방식 고정)
+//    public2/uploads 와 충돌 제거를 위해 이 라인만 유지
 app.use("/uploads", express.static(UPLOAD_ROOT));
 
-// 정적 파일 서빙 설정 확인
-app.use("/uploads", express.static(path.join(__dirname, "public2", "uploads")));
+// ✅ 4-3) public2 자산 전용 경로
 app.use("/assets", express.static(path.join(__dirname, "public2", "assets")));
 
 // ------------------------------------------------------------
-// 3-1. 표준화된 국세청 사업자번호 인증 API
+// 4-1. 표준화된 국세청 사업자번호 인증 API
 // ------------------------------------------------------------
 app.post("/verify-biz", async (req, res) => {
   try {
@@ -257,13 +260,13 @@ app.post("/verify-biz", async (req, res) => {
 });
 
 // ------------------------------------------------------------
-// 4. 문의 게시판 라우트
+// 5. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
 app.use("/api/inquiry", inquiryBoardRouter);
 
 // ------------------------------------------------------------
-// 5. 주요 API 라우트
+// 6. 주요 API 라우트
 // ------------------------------------------------------------
 app.use("/owner", ownerRouter);
 
@@ -310,14 +313,13 @@ app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
 
 // 🔵 인덱스 레이아웃 관리자 API
-//   실제 엔드포인트 예: POST /manager/ad/upload, /manager/ad/store, /manager/ad/text/save, /manager/ad/best-pick
 app.use("/manager/ad", indexmanagerAdRouter);
 
 // (localRankRouter 는 나중에 연결 가능)
 // app.use("/api/local-rank", localRankRouter);
 
 // ------------------------------------------------------------
-// 6. 정적 파일 (public2) - HTML 캐시 설정
+// 7. 정적 파일 (public2) - HTML 캐시 설정
 // ------------------------------------------------------------
 app.use(
   express.static(path.join(__dirname, "public2"), {
@@ -333,25 +335,9 @@ app.use(
 );
 
 // ------------------------------------------------------------
-// 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
-// ------------------------------------------------------------
-// ❌ 예전 중복 코드들은 이미 제거됨
-// app.use("/uploads", express.static(UPLOAD_ROOT));
-// app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
-// app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
-
-// ------------------------------------------------------------
 // 8. 헬스체크
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
-
-// (선택) ENV 체크 라우트 (필요하면 주석 해제)
-// app.get("/__env-check", (req, res) => {
-//   res.json({
-//     BIZ_API_KEY: !!process.env.BIZ_API_KEY,
-//     DATABASE_URL: !!process.env.DATABASE_URL,
-//   });
-// });
 
 // ------------------------------------------------------------
 // 9. 에러 핸들러
@@ -372,7 +358,7 @@ app.use((err, req, res, next) => {
 // 10. 404 핸들러
 // ------------------------------------------------------------
 app.use((req, res) => {
-  if (/^(\/store|\/combined|\/api)/.test(req.path))
+  if (/^(\/store|\/combined|\/api|\/manager)/.test(req.path))
     return res.status(404).json({ ok: false, error: "not_found" });
 
   res.status(404).send("<h1>Not Found</h1>");
