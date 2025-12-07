@@ -9,7 +9,7 @@
     <style>
         body {
             font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont,
-                'Segue UI', sans-serif;
+                'Segoe UI', sans-serif;
         }
 
         /* ✅ 수정된 neo-card 스타일 - 더 명확한 테두리와 배경 */
@@ -435,7 +435,7 @@
                             class="w-full border border-slate-300 p-2 rounded-lg text-sm" placeholder="예) 123-45-67890">
                     </div>
 
-                    <!-- ✅ NEW: 사업자번호 검색 결과 영역 -->
+                    <!-- ✅ 사업자번호 검색 결과 영역 -->
                     <div id="bizSearchResult" class="hidden border border-slate-200 rounded-lg p-2 bg-white space-y-1">
                         <!-- JS로 채워짐 -->
                     </div>
@@ -609,7 +609,7 @@
         }
 
         function escapeHtml(str = "") {
-            return str
+            return String(str)
                 .replaceAll("&", "&amp;")
                 .replaceAll("<", "&lt;")
                 .replaceAll(">", "&gt;")
@@ -618,7 +618,7 @@
         }
 
         function formatListHTMLFromRaw(raw = "") {
-            const lines = raw
+            const lines = String(raw)
                 .split(/\r?\n/)
                 .map(l => l.trim())
                 .filter(Boolean);
@@ -637,6 +637,17 @@
                 .map(p => (p.innerText || "").trim())
                 .filter(Boolean);
             return lines.join("\n");
+        }
+
+        // ============================
+        // ✅ 검색 결과 박스 간단 제어(초기화용)
+        // ============================
+        function showBizResultBox(html = "") {
+            const box = document.getElementById("bizSearchResult");
+            if (!box) return;
+            box.innerHTML = html;
+            if (html) box.classList.remove("hidden");
+            else box.classList.add("hidden");
         }
 
         // ============================
@@ -661,7 +672,7 @@
                     json?.slot?.image ||
                     "";
 
-                if (json.ok && imageUrl) {
+                if ((json.ok || json.success) && imageUrl) {
                     if (img) {
                         img.src = imageUrl;
                         img.classList.remove("hidden");
@@ -874,120 +885,138 @@
         }
 
         // ============================
-        // ✅ NEW: 사업자번호 검색 UI 로직
+        // ✅ 사업자번호 기반 상호 자동 후보 UI (단일 버전)
         // ============================
-        function normalizeBizNo(v = "") {
-            return String(v).replace(/[^\d-]/g, "").trim();
+
+        function normalizeBizNoDigits(v = "") {
+            return String(v).replace(/[^\d]/g, "").trim(); // 숫자만
         }
 
-        function stripBizNo(v = "") {
-            return String(v).replace(/-/g, "").trim();
-        }
-
-        function showBizResultBox(html) {
-            const box = document.getElementById("bizSearchResult");
-            if (!box) return;
-            box.innerHTML = html || "";
-            if (html) {
-                box.classList.remove("hidden");
-            } else {
-                box.classList.add("hidden");
+        function formatBizNoPretty(digits = "") {
+            const s = String(digits);
+            if (s.length === 10) {
+                return `${s.slice(0, 3)}-${s.slice(3, 5)}-${s.slice(5)}`;
             }
+            return s;
         }
 
-        let __bizSearchTimer = null;
-        let __bizLastQuery = "";
+        function debounce(fn, wait = 250) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), wait);
+            };
+        }
 
-        async function runBizSearch() {
-            const bizInput = document.getElementById("businessNoInput");
+        async function fetchStoresByBizNo(bizNoDigits) {
+            const url = `/manager/ad/store/search?bizNo=${encodeURIComponent(bizNoDigits)}`;
+
+            const res = await fetch(url);
+            if (!res.ok) {
+                return { ok: false, stores: [], status: res.status };
+            }
+
+            const data = await res.json();
+
+            const stores = data?.stores || data?.items || data?.rows || data?.data || [];
+            return { ok: !!(data?.ok || data?.success), stores };
+        }
+
+        function renderBizSearchResult({ bizNoDigits, payload }) {
+            const resultBox = document.getElementById("bizSearchResult");
             const nameInput = document.getElementById("businessNameInput");
-            if (!bizInput || !nameInput) return;
 
-            const raw = normalizeBizNo(bizInput.value || "");
-            bizInput.value = raw; // 입력값 정리
+            if (!resultBox) return;
 
-            const clean = stripBizNo(raw);
+            resultBox.innerHTML = "";
 
-            if (!clean) {
-                __bizLastQuery = "";
-                showBizResultBox("");
+            if (!bizNoDigits || bizNoDigits.length < 5) {
+                resultBox.classList.add("hidden");
                 return;
             }
 
-            // 같은 값이면 재호출 방지
-            if (clean === __bizLastQuery) return;
-            __bizLastQuery = clean;
+            if (payload && payload.ok === false && payload.status === 404) {
+                resultBox.classList.remove("hidden");
+                resultBox.innerHTML = `
+                    <div class="text-xs text-slate-500">
+                        🔎 검색 API가 아직 연결되지 않았습니다.<br>
+                        다음 단계에서 <b>/manager/ad/store/search</b>를 추가하면 자동 완성됩니다.
+                    </div>
+                `;
+                return;
+            }
 
-            showBizResultBox(`
-                <div class="text-xs text-slate-500 px-2 py-1">검색 중...</div>
-            `);
+            const stores = payload?.stores || [];
 
-            try {
-                const res = await fetch(`/manager/ad/store/search?bizNo=${encodeURIComponent(clean)}`);
-                if (!res.ok) {
-                    showBizResultBox(`
-                        <div class="text-xs text-rose-500 px-2 py-1">
-                            검색 API 응답 오류 (${res.status})
-                        </div>
-                    `);
-                    return;
-                }
+            if (!payload?.ok || !Array.isArray(stores) || stores.length === 0) {
+                resultBox.classList.remove("hidden");
+                resultBox.innerHTML = `
+                    <div class="text-xs text-slate-500">
+                        ❌ 일치하는 가게가 없습니다.
+                    </div>
+                `;
+                return;
+            }
 
-                const data = await res.json();
-                const items = Array.isArray(data?.items) ? data.items : [];
+            resultBox.classList.remove("hidden");
 
-                if (!data?.ok || items.length === 0) {
-                    showBizResultBox(`
-                        <div class="text-xs text-slate-500 px-2 py-1">
-                            일치하는 가게가 없습니다.
-                        </div>
-                    `);
-                    return;
-                }
+            stores.forEach((s, idx) => {
+                const biz =
+                    s.business_no ||
+                    s.business_number ||
+                    s.biz_number ||
+                    s.bizNo ||
+                    "";
 
-                const html = items.map((store) => {
-                    const sName = store.business_name || store.biz_name || store.name || "";
-                    const sNo = store.business_number || store.biz_number || store.bizNo || raw;
-                    return `
-                        <button type="button"
-                            class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 border border-slate-100"
-                            data-name="${escapeHtml(String(sName))}">
-                            <div class="text-sm font-semibold text-slate-800">${escapeHtml(String(sName))}</div>
-                            <div class="text-[11px] text-slate-500">${escapeHtml(String(sNo || ""))}</div>
-                        </button>
-                    `;
-                }).join("");
+                const bizDigits = normalizeBizNoDigits(biz);
+                const bizPretty = bizDigits ? formatBizNoPretty(bizDigits) : "사업자번호 미확인";
 
-                showBizResultBox(html);
+                const name =
+                    s.business_name ||
+                    s.store_name ||
+                    s.name ||
+                    `가게 ${idx + 1}`;
 
-                const box = document.getElementById("bizSearchResult");
-                box?.querySelectorAll("button")?.forEach(btn => {
-                    btn.addEventListener("click", () => {
-                        const nm = btn.dataset.name || "";
-                        nameInput.value = nm;
-                        // 선택 직후 결과 박스를 조금 정리해도 됨(원하면 유지 가능)
-                        // showBizResultBox("");
-                    });
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className =
+                    "w-full text-left px-2 py-2 rounded-md border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition text-xs";
+
+                item.innerHTML = `
+                    <div class="font-semibold text-slate-800">${escapeHtml(name)}</div>
+                    <div class="text-[10px] text-slate-500">${escapeHtml(bizPretty)}</div>
+                `;
+
+                item.addEventListener("click", () => {
+                    if (nameInput) nameInput.value = name;
+                    // 필요하면 선택 후 숨김
+                    // resultBox.classList.add("hidden");
                 });
 
-            } catch (err) {
-                console.error("biz search error:", err);
-                showBizResultBox(`
-                    <div class="text-xs text-rose-500 px-2 py-1">
-                        검색 중 오류가 발생했습니다.
-                    </div>
-                `);
-            }
+                resultBox.appendChild(item);
+            });
         }
 
-        function setupBizNoSearch() {
+        function setupBizSearchUI() {
             const bizInput = document.getElementById("businessNoInput");
-            if (!bizInput) return;
+            const resultBox = document.getElementById("bizSearchResult");
 
-            bizInput.addEventListener("input", () => {
-                if (__bizSearchTimer) clearTimeout(__bizSearchTimer);
-                __bizSearchTimer = setTimeout(runBizSearch, 250);
-            });
+            if (!bizInput || !resultBox) return;
+
+            const run = debounce(async () => {
+                const digits = normalizeBizNoDigits(bizInput.value);
+
+                if (!digits || digits.length < 5) {
+                    resultBox.classList.add("hidden");
+                    resultBox.innerHTML = "";
+                    return;
+                }
+
+                const payload = await fetchStoresByBizNo(digits);
+                renderBizSearchResult({ bizNoDigits: digits, payload });
+            }, 250);
+
+            bizInput.addEventListener("input", run);
         }
 
         // ============================
@@ -1044,7 +1073,7 @@
                     document.getElementById("linkInput").value = "";
                     document.getElementById("businessNoInput").value = "";
                     document.getElementById("businessNameInput").value = "";
-                    showBizResultBox(""); // ✅ NEW
+                    showBizResultBox("");
                     resetAdPeriodFields();
 
                     const adModal = document.getElementById("adModal");
@@ -1067,7 +1096,7 @@
                 document.getElementById("linkInput").value = "";
                 document.getElementById("businessNoInput").value = "";
                 document.getElementById("businessNameInput").value = "";
-                showBizResultBox(""); // ✅ NEW
+                showBizResultBox("");
                 resetAdPeriodFields();
             };
 
@@ -1133,7 +1162,6 @@
                     storeFields.classList.add("hidden");
                 }
 
-                // ✅ NEW: 모드 전환 시 검색 결과 박스 초기화
                 showBizResultBox("");
             };
 
@@ -1197,7 +1225,7 @@
                             document.getElementById("adModal").classList.remove("flex");
                             document.getElementById("businessNoInput").value = "";
                             document.getElementById("businessNameInput").value = "";
-                            showBizResultBox(""); // ✅ NEW
+                            showBizResultBox("");
                             resetAdPeriodFields();
 
                             if (String(position).startsWith("best_pick_")) {
@@ -1341,159 +1369,6 @@
         }
 
         // ============================
-        // ✅ 사업자번호 기반 상호 자동 후보 UI
-        // - bizSearchResult 영역을 채움
-        // - 후보 클릭 시 businessNameInput 자동 입력
-        // ============================
-
-        function normalizeBizNo(v = "") {
-            return String(v).replace(/[^\d]/g, "").trim(); // 숫자만
-        }
-
-        function formatBizNoPretty(digits = "") {
-            const s = String(digits);
-            if (s.length === 10) {
-                return `${s.slice(0, 3)}-${s.slice(3, 5)}-${s.slice(5)}`;
-            }
-            return s;
-        }
-
-        function debounce(fn, wait = 250) {
-            let t;
-            return (...args) => {
-                clearTimeout(t);
-                t = setTimeout(() => fn(...args), wait);
-            };
-        }
-
-        /**
-         * ✅ 서버 검색 API 호출
-         * 현재 HTML만 먼저 붙이는 단계이므로
-         * API가 없을 수도 있어 404도 정상 처리.
-         *
-         * 권장 예정 엔드포인트(다음 단계):
-         * GET /manager/ad/store/search?bizNo=1234567890
-         * -> { ok:true, stores:[{ business_name, business_no, id, ...}] }
-         */
-        async function fetchStoresByBizNo(bizNoDigits) {
-            const url = `/manager/ad/store/search?bizNo=${encodeURIComponent(bizNoDigits)}`;
-
-            const res = await fetch(url);
-            if (!res.ok) {
-                // API 아직 없거나 오류일 때
-                return { ok: false, stores: [], status: res.status };
-            }
-
-            const data = await res.json();
-
-            // 방어적 파싱
-            const stores = data?.stores || data?.rows || data?.data || [];
-            return { ok: !!(data?.ok || data?.success), stores };
-        }
-
-        function renderBizSearchResult({ bizNoDigits, payload }) {
-            const resultBox = document.getElementById("bizSearchResult");
-            const nameInput = document.getElementById("businessNameInput");
-
-            if (!resultBox) return;
-
-            resultBox.innerHTML = "";
-
-            // 입력이 너무 짧으면 숨김
-            if (!bizNoDigits || bizNoDigits.length < 5) {
-                resultBox.classList.add("hidden");
-                return;
-            }
-
-            // API 없을 때 안내
-            if (payload && payload.ok === false && payload.status === 404) {
-                resultBox.classList.remove("hidden");
-                resultBox.innerHTML = `
-            <div class="text-xs text-slate-500">
-                🔎 검색 API가 아직 연결되지 않았습니다.<br>
-                다음 단계에서 <b>/manager/ad/store/search</b>를 추가하면 자동 완성됩니다.
-            </div>
-        `;
-                return;
-            }
-
-            const stores = payload?.stores || [];
-
-            // 결과 없음
-            if (!payload?.ok || !Array.isArray(stores) || stores.length === 0) {
-                resultBox.classList.remove("hidden");
-                resultBox.innerHTML = `
-            <div class="text-xs text-slate-500">
-                ❌ 일치하는 가게가 없습니다.
-            </div>
-        `;
-                return;
-            }
-
-            // 결과 표시
-            resultBox.classList.remove("hidden");
-
-            stores.forEach((s, idx) => {
-                const biz = s.business_no || s.biz_number || s.bizNo || "";
-                const bizDigits = normalizeBizNo(biz);
-                const bizPretty = bizDigits ? formatBizNoPretty(bizDigits) : "사업자번호 미확인";
-
-                const name =
-                    s.business_name ||
-                    s.store_name ||
-                    s.name ||
-                    `가게 ${idx + 1}`;
-
-                const item = document.createElement("button");
-                item.type = "button";
-                item.className =
-                    "w-full text-left px-2 py-2 rounded-md border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition text-xs";
-
-                item.innerHTML = `
-            <div class="font-semibold text-slate-800">${name}</div>
-            <div class="text-[10px] text-slate-500">${bizPretty}</div>
-        `;
-
-                item.addEventListener("click", () => {
-                    if (nameInput) nameInput.value = name;
-                    // 선택 후 결과는 남겨도 되고 숨겨도 됨 (원하면 주석 해제)
-                    // resultBox.classList.add("hidden");
-                });
-
-                resultBox.appendChild(item);
-            });
-        }
-
-        function setupBizSearchUI() {
-            const bizInput = document.getElementById("businessNoInput");
-            const resultBox = document.getElementById("bizSearchResult");
-
-            if (!bizInput || !resultBox) return;
-
-            const run = debounce(async () => {
-                const digits = normalizeBizNo(bizInput.value);
-
-                // 입력값이 너무 짧으면 숨김
-                if (!digits || digits.length < 5) {
-                    resultBox.classList.add("hidden");
-                    resultBox.innerHTML = "";
-                    return;
-                }
-
-                // 10자리면 검색 정확도 최고
-                const payload = await fetchStoresByBizNo(digits);
-
-                renderBizSearchResult({ bizNoDigits: digits, payload });
-            }, 250);
-
-            bizInput.addEventListener("input", run);
-            bizInput.addEventListener("blur", () => {
-                // 필요하면 blur 시 숨김 처리 가능
-                // resultBox.classList.add("hidden");
-            });
-        }
-
-        // ============================
         // 네비게이션 버튼
         // ============================
         function goBack() { window.history.back(); }
@@ -1534,17 +1409,14 @@
             setupSaveText();
             setupNoEndToggle();
 
-            // ✅ NEW: 사업자번호 검색 이벤트 연결
-            setupBizNoSearch();
+            // ✅ 사업자번호 검색 이벤트 연결(단일 버전)
+            setupBizSearchUI();
 
             // Best Pick 그리드 렌더링 및 로드
             renderBestPickGridInline();
             await loadBestPickInlineSlots();
 
-            // 우리동네 한마디 로드
-            await loadOneWord();
-
-            // 기존 슬롯들 로드
+            // 기존 배너 슬롯들 로드
             const bannerSlots = [
                 ["slot_index_main_top", "index", "index_main_top"],
                 ["slot_index_main_visual", "index", "index_main_visual"],
@@ -1559,10 +1431,6 @@
                 ["slot_index_store_pride", "index", "index_store_pride"],
                 ["slot_index_traditional", "index", "index_traditional"],
                 ["slot_index_performing", "index", "index_performing"],
-                ["slot_index_event", "index", "index_event"],
-                ["slot_index_localboard", "index", "index_localboard"],
-                ["slot_index_season", "index", "index_season"],
-                ["slot_index_join", "index", "index_join"],
                 ["slot_index_d2c_banner", "index", "index_d2c_banner"],
                 ["slot_index_d2c_shop", "index", "index_d2c_shop"],
                 ["slot_index_support_review", "index", "index_support_review"],
@@ -1574,6 +1442,7 @@
                 bannerSlots.map(([id, page, pos]) => loadBannerSlotById(id, page, pos))
             );
 
+            // 텍스트 슬롯 로드(없으면 더미)
             await loadTextSlotById(
                 "slot_index_sub_keywords",
                 "index",
@@ -1599,10 +1468,8 @@
                 (c) => renderDefaultList(c, DEFAULT_DATA.recommends)
             );
 
+            // 우리동네 한마디 로드
             await loadOneWord();
-
-            renderBestPickGridInline();
-            await loadBestPickInlineSlots();
         });
     </script>
 
