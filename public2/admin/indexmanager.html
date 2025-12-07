@@ -1341,6 +1341,159 @@
         }
 
         // ============================
+        // ✅ 사업자번호 기반 상호 자동 후보 UI
+        // - bizSearchResult 영역을 채움
+        // - 후보 클릭 시 businessNameInput 자동 입력
+        // ============================
+
+        function normalizeBizNo(v = "") {
+            return String(v).replace(/[^\d]/g, "").trim(); // 숫자만
+        }
+
+        function formatBizNoPretty(digits = "") {
+            const s = String(digits);
+            if (s.length === 10) {
+                return `${s.slice(0, 3)}-${s.slice(3, 5)}-${s.slice(5)}`;
+            }
+            return s;
+        }
+
+        function debounce(fn, wait = 250) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), wait);
+            };
+        }
+
+        /**
+         * ✅ 서버 검색 API 호출
+         * 현재 HTML만 먼저 붙이는 단계이므로
+         * API가 없을 수도 있어 404도 정상 처리.
+         *
+         * 권장 예정 엔드포인트(다음 단계):
+         * GET /manager/ad/store/search?bizNo=1234567890
+         * -> { ok:true, stores:[{ business_name, business_no, id, ...}] }
+         */
+        async function fetchStoresByBizNo(bizNoDigits) {
+            const url = `/manager/ad/store/search?bizNo=${encodeURIComponent(bizNoDigits)}`;
+
+            const res = await fetch(url);
+            if (!res.ok) {
+                // API 아직 없거나 오류일 때
+                return { ok: false, stores: [], status: res.status };
+            }
+
+            const data = await res.json();
+
+            // 방어적 파싱
+            const stores = data?.stores || data?.rows || data?.data || [];
+            return { ok: !!(data?.ok || data?.success), stores };
+        }
+
+        function renderBizSearchResult({ bizNoDigits, payload }) {
+            const resultBox = document.getElementById("bizSearchResult");
+            const nameInput = document.getElementById("businessNameInput");
+
+            if (!resultBox) return;
+
+            resultBox.innerHTML = "";
+
+            // 입력이 너무 짧으면 숨김
+            if (!bizNoDigits || bizNoDigits.length < 5) {
+                resultBox.classList.add("hidden");
+                return;
+            }
+
+            // API 없을 때 안내
+            if (payload && payload.ok === false && payload.status === 404) {
+                resultBox.classList.remove("hidden");
+                resultBox.innerHTML = `
+            <div class="text-xs text-slate-500">
+                🔎 검색 API가 아직 연결되지 않았습니다.<br>
+                다음 단계에서 <b>/manager/ad/store/search</b>를 추가하면 자동 완성됩니다.
+            </div>
+        `;
+                return;
+            }
+
+            const stores = payload?.stores || [];
+
+            // 결과 없음
+            if (!payload?.ok || !Array.isArray(stores) || stores.length === 0) {
+                resultBox.classList.remove("hidden");
+                resultBox.innerHTML = `
+            <div class="text-xs text-slate-500">
+                ❌ 일치하는 가게가 없습니다.
+            </div>
+        `;
+                return;
+            }
+
+            // 결과 표시
+            resultBox.classList.remove("hidden");
+
+            stores.forEach((s, idx) => {
+                const biz = s.business_no || s.biz_number || s.bizNo || "";
+                const bizDigits = normalizeBizNo(biz);
+                const bizPretty = bizDigits ? formatBizNoPretty(bizDigits) : "사업자번호 미확인";
+
+                const name =
+                    s.business_name ||
+                    s.store_name ||
+                    s.name ||
+                    `가게 ${idx + 1}`;
+
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className =
+                    "w-full text-left px-2 py-2 rounded-md border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition text-xs";
+
+                item.innerHTML = `
+            <div class="font-semibold text-slate-800">${name}</div>
+            <div class="text-[10px] text-slate-500">${bizPretty}</div>
+        `;
+
+                item.addEventListener("click", () => {
+                    if (nameInput) nameInput.value = name;
+                    // 선택 후 결과는 남겨도 되고 숨겨도 됨 (원하면 주석 해제)
+                    // resultBox.classList.add("hidden");
+                });
+
+                resultBox.appendChild(item);
+            });
+        }
+
+        function setupBizSearchUI() {
+            const bizInput = document.getElementById("businessNoInput");
+            const resultBox = document.getElementById("bizSearchResult");
+
+            if (!bizInput || !resultBox) return;
+
+            const run = debounce(async () => {
+                const digits = normalizeBizNo(bizInput.value);
+
+                // 입력값이 너무 짧으면 숨김
+                if (!digits || digits.length < 5) {
+                    resultBox.classList.add("hidden");
+                    resultBox.innerHTML = "";
+                    return;
+                }
+
+                // 10자리면 검색 정확도 최고
+                const payload = await fetchStoresByBizNo(digits);
+
+                renderBizSearchResult({ bizNoDigits: digits, payload });
+            }, 250);
+
+            bizInput.addEventListener("input", run);
+            bizInput.addEventListener("blur", () => {
+                // 필요하면 blur 시 숨김 처리 가능
+                // resultBox.classList.add("hidden");
+            });
+        }
+
+        // ============================
         // 네비게이션 버튼
         // ============================
         function goBack() { window.history.back(); }
