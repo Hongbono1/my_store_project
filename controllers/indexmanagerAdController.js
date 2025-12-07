@@ -599,3 +599,95 @@ export async function getBestPickSlots(req, res) {
   }
 
 }
+
+/* ============================================================
+ * ✅ 사업자번호 기반 가게 검색 (자동 후보)
+ * GET /manager/ad/store/search?bizNo=1234567890
+ *
+ * - HTML의 runBizSearch()가 이 API를 이미 호출하고 있음
+ * - 컬럼명이 환경마다 다를 수 있어 "안전 2단 조회" 방식
+ * ============================================================ */
+export async function searchIndexStoreByBizNo(req, res) {
+  try {
+    const bizNoRaw = String(req.query.bizNo || "").trim();
+    const bizNoDigits = bizNoRaw.replace(/\D/g, "");
+
+    if (!bizNoDigits) {
+      return res.json({ ok: true, items: [] });
+    }
+
+    // 1) food_stores에서 먼저 찾기
+    let foodRows = [];
+
+    // 컬럼명이 business_no 인 경우
+    try {
+      const r1 = await pool.query(
+        `SELECT id, business_name, business_no, created_at
+           FROM food_stores
+          WHERE REPLACE(COALESCE(business_no, ''), '-', '') = $1
+          ORDER BY created_at DESC NULLS LAST
+          LIMIT 10`,
+        [bizNoDigits]
+      );
+      foodRows = r1.rows || [];
+    } catch (_) {
+      // 컬럼명이 business_number 인 경우
+      try {
+        const r2 = await pool.query(
+          `SELECT id, business_name, business_number, created_at
+             FROM food_stores
+            WHERE REPLACE(COALESCE(business_number, ''), '-', '') = $1
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT 10`,
+          [bizNoDigits]
+        );
+        foodRows = r2.rows || [];
+      } catch (_) { }
+    }
+
+    // 2) 필요하면 통합 테이블 후보도 시도
+    let combinedRows = [];
+    try {
+      const r3 = await pool.query(
+        `SELECT id, business_name, business_no, created_at
+           FROM combined_store_info
+          WHERE REPLACE(COALESCE(business_no, ''), '-', '') = $1
+          ORDER BY created_at DESC NULLS LAST
+          LIMIT 10`,
+        [bizNoDigits]
+      );
+      combinedRows = r3.rows || [];
+    } catch (_) {
+      try {
+        const r4 = await pool.query(
+          `SELECT id, business_name, business_number, created_at
+             FROM combined_store_info
+            WHERE REPLACE(COALESCE(business_number, ''), '-', '') = $1
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT 10`,
+          [bizNoDigits]
+        );
+        combinedRows = r4.rows || [];
+      } catch (_) { }
+    }
+
+    const merged = [...foodRows, ...combinedRows];
+
+    // 표준 응답 형태는 HTML이 items 로 읽도록 맞춤
+    const items = merged.map((r) => ({
+      id: r.id,
+      business_name: r.business_name || null,
+      business_no: r.business_no || r.business_number || null,
+      created_at: r.created_at || null,
+    }));
+
+    return res.json({ ok: true, items });
+  } catch (err) {
+    console.error("STORE SEARCH ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      message: "사업자번호 검색 실패",
+    });
+  }
+}
+
