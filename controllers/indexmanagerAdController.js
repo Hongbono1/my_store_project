@@ -633,10 +633,10 @@ export async function searchStoreByBiz(req, res) {
   SELECT
     id,
     business_name,
-    ${foodBizCol ? `${foodBizCol}` : "NULL"} AS business_no,
+    business_number AS business_no,
     'food' as store_type
   FROM food_stores
-  WHERE ${whereFood}
+  WHERE regexp_replace(COALESCE(business_number::text, ''), '[^0-9]', '', 'g') = $1
   LIMIT 5
 `;
     let { rows } = await pool.query(storeQuery, [cleanBizNo]);
@@ -645,16 +645,18 @@ export async function searchStoreByBiz(req, res) {
       try {
         const { where: whereCombined, col: combinedBizCol } =
           await buildBizNoWhere("combined_store_info");
+        // combined_store_info  ➜ 동일하게 business_number 사용 + AS business_no
         const combinedQuery = `
-      SELECT
-        id,
-        business_name,
-        ${combinedBizCol ? `${combinedBizCol}` : "NULL"} AS business_no,
-        'store' as store_type
-      FROM combined_store_info
-      WHERE ${whereCombined}
-      LIMIT 5
-    `;
+  SELECT
+    id,
+    business_name,
+    business_number AS business_no,
+    'store' as store_type
+  FROM combined_store_info
+  WHERE regexp_replace(COALESCE(business_number::text, ''), '[^0-9]', '', 'g') = $1
+  LIMIT 5
+`;
+
         const combinedResult = await pool.query(combinedQuery, [cleanBizNo]);
         rows = combinedResult.rows;
       } catch { }
