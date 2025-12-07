@@ -69,14 +69,6 @@ async function buildBizNoWhere(table) {
   return { where, col };
 }
 
-
-/* ============================================================
- * ✅ A안 핵심 유틸
- * - slot_mode === "store" 이면
- *   business_name / store_id 기반으로 가게를 찾아
- *   image_url, link_url을 서버에서 보강
- * ============================================================ */
-
 /**
  * 다양한 컬럼/형태를 고려해 대표 이미지 후보를 뽑아주는 방어형 함수
  */
@@ -409,10 +401,7 @@ export async function getIndexSlot(req, res) {
     }
 
     const result = await pool.query(
-      `SELECT *
-         FROM admin_ad_slots
-        WHERE page = $1 AND position = $2
-        LIMIT 1`,
+      `SELECT * FROM admin_ad_slots WHERE page = $1 AND position = $2 LIMIT 1`,
       [page, position]
     );
 
@@ -465,19 +454,9 @@ export async function getIndexTextSlot(req, res) {
     }
 
     const sql = `
-      SELECT
-        id,
-        page,
-        position,
-        slot_type,
-        text_content,
-        start_date,
-        end_date,
-        updated_at
+      SELECT id, page, position, slot_type, text_content, start_date, end_date, updated_at
       FROM admin_ad_slots
-      WHERE page = $1
-        AND position = $2
-        AND slot_type = 'text'
+      WHERE page = $1 AND position = $2 AND slot_type = 'text'
       LIMIT 1
     `;
 
@@ -521,9 +500,7 @@ export async function saveIndexTextSlot(req, res) {
     }
 
     const sql = `
-      INSERT INTO admin_ad_slots (
-        page, position, slot_type, text_content, updated_at
-      )
+      INSERT INTO admin_ad_slots (page, position, slot_type, text_content, updated_at)
       VALUES ($1, $2, 'text', $3, NOW())
       ON CONFLICT (page, position)
       DO UPDATE SET
@@ -533,11 +510,7 @@ export async function saveIndexTextSlot(req, res) {
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(sql, [
-      page,
-      position,
-      String(content).trim(),
-    ]);
+    const { rows } = await pool.query(sql, [page, position, String(content).trim()]);
 
     return res.json({ ok: true, slot: rows[0] });
   } catch (err) {
@@ -553,24 +526,16 @@ export async function saveIndexTextSlot(req, res) {
 /* ============================================================
  * ✅ Best Pick 광고 슬롯 목록 조회
  * GET /manager/ad/best-pick
- * - store 모드면 image/link 보강
  * ============================================================ */
 export async function getBestPickSlots(req, res) {
   try {
     const adSlotsQuery = `
-      SELECT
-        page, position, image_url, link_url, business_name, slot_mode, store_id
+      SELECT page, position, image_url, link_url, business_name, slot_mode, store_id
       FROM admin_ad_slots
       WHERE page = 'index'
         AND position LIKE 'best_pick_%'
-        AND (
-          image_url IS NOT NULL
-          OR business_name IS NOT NULL
-          OR link_url IS NOT NULL
-          OR slot_mode IS NOT NULL
-        )
-      ORDER BY
-        CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
+        AND (image_url IS NOT NULL OR business_name IS NOT NULL OR link_url IS NOT NULL OR slot_mode IS NOT NULL)
+      ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
     `;
 
     const { rows } = await pool.query(adSlotsQuery);
@@ -617,51 +582,40 @@ export async function getBestPickSlots(req, res) {
 export async function searchStoreByBiz(req, res) {
   try {
     const { bizNo } = req.query;
-
     if (!bizNo || String(bizNo).trim() === "") {
-      return res.status(400).json({
-        ok: false,
-        message: "사업자번호를 입력해주세요.",
-      });
+      return res.status(400).json({ ok: false, message: "사업자번호를 입력해주세요." });
     }
 
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
 
-    // ✅ 테이블에 실제 존재하는 사업자번호 컬럼 자동 탐색 후, 숫자만 비교
-    const { where: whereFood, col: foodBizCol } = await buildBizNoWhere("food_stores");
-    let storeQuery = `
-  SELECT
-    id,
-    business_name,
-    business_number AS business_no,
-    'food' as store_type
-  FROM food_stores
-  WHERE regexp_replace(COALESCE(business_number::text, ''), '[^0-9]', '', 'g') = $1
-  LIMIT 5
-`;
-    let { rows } = await pool.query(storeQuery, [cleanBizNo]);
+    // 실제 존재 컬럼 자동 탐색
+    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
+    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
 
-    if (rows.length === 0) {
-      try {
-        const { where: whereCombined, col: combinedBizCol } =
-          await buildBizNoWhere("combined_store_info");
-        // combined_store_info  ➜ 동일하게 business_number 사용 + AS business_no
-        const combinedQuery = `
-  SELECT
-    id,
-    business_name,
-    business_number AS business_no,
-    'store' as store_type
-  FROM combined_store_info
-  WHERE regexp_replace(COALESCE(business_number::text, ''), '[^0-9]', '', 'g') = $1
-  LIMIT 5
-`;
-
-        const combinedResult = await pool.query(combinedQuery, [cleanBizNo]);
-        rows = combinedResult.rows;
-      } catch { }
+    // 존재하는 테이블만 안전하게 UNION 구성
+    const blocks = [];
+    if (foodCol) {
+      blocks.push(`
+        SELECT id, business_name, ${foodCol} AS business_no, 'food' AS store_type
+        FROM food_stores
+        WHERE ${whereFood}
+      `);
+    }
+    if (combinedCol) {
+      blocks.push(`
+        SELECT id, business_name, ${combinedCol} AS business_no, 'store' AS store_type
+        FROM combined_store_info
+        WHERE ${whereCombined}
+      `);
     }
 
+    // 둘 다 사업자번호 컬럼이 없으면 빈 배열 반환
+    if (blocks.length === 0) {
+      return res.json({ ok: true, stores: [] });
+    }
+
+    const sql = blocks.join(" UNION ALL ") + " LIMIT 5";
+    const { rows } = await pool.query(sql, [cleanBizNo]);
 
     return res.json({ ok: true, stores: rows });
   } catch (err) {
@@ -705,56 +659,40 @@ export async function connectStoreToSlot(req, res) {
     let storeId = null;
     try {
       const { where: whereFoodForConnect } = await buildBizNoWhere("food_stores");
-      const storeResult = await pool.query(
-        `SELECT id FROM food_stores WHERE ${whereFoodForConnect} LIMIT 1`,
-        [cleanBizNo]
-      );
-      if (storeResult.rows.length > 0) {
-        storeId = storeResult.rows[0].id;
+      if (whereFoodForConnect && whereFoodForConnect !== "FALSE") {
+        const storeResult = await pool.query(
+          `SELECT id FROM food_stores WHERE ${whereFoodForConnect} LIMIT 1`,
+          [cleanBizNo]
+        );
+        if (storeResult.rows.length > 0) {
+          storeId = storeResult.rows[0].id;
+        }
       }
     } catch (e) {
       console.warn("가게 ID 매핑 실패:", e.message);
     }
 
-
     const sql = `
       INSERT INTO admin_ad_slots (
-        page, position,
-        slot_type, slot_mode,
-        business_no, business_name,
-        store_id,
-        start_date, end_date,
-        updated_at
+        page, position, slot_type, slot_mode, business_no, business_name,
+        store_id, start_date, end_date, updated_at
       )
-      VALUES (
-        $1, $2,
-        'banner', 'store',
-        $3, $4,
-        $5,
-        $6, $7,
-        NOW()
-      )
+      VALUES ($1, $2, 'banner', 'store', $3, $4, $5, $6, $7, NOW())
       ON CONFLICT (page, position)
       DO UPDATE SET
-        slot_type     = 'banner',
-        slot_mode     = 'store',
-        business_no   = EXCLUDED.business_no,
+        slot_type = 'banner',
+        slot_mode = 'store',
+        business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-        store_id      = EXCLUDED.store_id,
-        start_date    = EXCLUDED.start_date,
-        end_date      = EXCLUDED.end_date,
-        updated_at    = NOW()
+        store_id = EXCLUDED.store_id,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        updated_at = NOW()
       RETURNING *;
     `;
 
     const { rows } = await pool.query(sql, [
-      page,
-      position,
-      cleanBizNo,
-      bizName,
-      storeId,
-      startDate || null,
-      finalEndDate,
+      page, position, cleanBizNo, bizName, storeId, startDate || null, finalEndDate,
     ]);
 
     return res.json({
@@ -784,9 +722,7 @@ export async function deleteSlot(req, res) {
     ensurePagePosition(page, position);
 
     const result = await pool.query(
-      `DELETE FROM admin_ad_slots
-       WHERE page = $1 AND position = $2
-       RETURNING *`,
+      `DELETE FROM admin_ad_slots WHERE page = $1 AND position = $2 RETURNING *`,
       [page, position]
     );
 
