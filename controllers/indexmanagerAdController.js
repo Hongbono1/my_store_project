@@ -1,6 +1,51 @@
 // controllers/indexmanagerAdController.js
 import pool from "../db.js";
 
+/**
+ * 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
+ * - 업로드/가게연결/텍스트/기간 공통 대응
+ */
+function pickBody(req) {
+  const b = req?.body || {};
+
+  return {
+    // 필수 키
+    page: b.page,
+    position: b.position,
+
+    // 모드/타입
+    slotType: b.slotType || b.slot_type,
+    slotMode: b.slotMode || b.slot_mode,
+
+    // 링크
+    linkUrl: b.linkUrl || b.link_url || b.link,
+
+    // 텍스트
+    textContent: b.textContent || b.text_content || b.content,
+
+    // 가게 연결용
+    storeId: b.storeId || b.store_id,
+    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo || b.bizNoRaw,
+    businessName: b.businessName || b.business_name || b.biz_name || b.bizName,
+
+    // 기간
+    startDate: b.startDate || b.start_date || null,
+    endDate: b.endDate || b.end_date || null,
+    noEnd: b.noEnd ?? b.no_end ?? false,
+  };
+}
+
+/**
+ * page/position 유효성 검사
+ */
+function ensurePagePosition(page, position) {
+  if (!page || !position) {
+    const error = new Error("page와 position은 필수입니다.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 /* =========================
  * ① 대표 이미지 조회 유틸
  *  - bizNo로 combined_store_info → store_info 순으로 대표 이미지 찾기
