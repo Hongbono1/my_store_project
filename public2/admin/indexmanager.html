@@ -855,12 +855,7 @@
         function applyBannerSlotToDom(slot) {
             if (!slot) return;
 
-            const position = slot.position;
-
-            const imageUrl = pickImageUrl(slot);
-            const businessName = pickBizName(slot);
-            const businessNo = pickBizNo(slot);
-
+            const position = String(slot.position || "");
             const container = getSlotContainerByPosition(position);
             if (!container) return;
 
@@ -869,19 +864,47 @@
             const storeName = container.querySelector("[data-store-name]");
             const storeBiz = container.querySelector("[data-store-biz]");
 
-            // 이미지 처리
+            const imageUrl = toAbs(pickImageUrl(slot));   // ← 절대경로 보정 통일
+            const businessName = pickBizName(slot);
+            const businessNo = pickBizNo(slot);
+
+            // 이벤트 초기화
+            if (img) {
+                img.onload = null;
+                img.onerror = null;
+            }
+
             if (imageUrl) {
                 if (img) {
-                    img.onload = null;
+                    // 1) 로드 전에는 기본 박스 유지
+                    img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+
+                    // 2) 성공적으로 로드되면 기본 박스 숨기고 이미지 표시
+                    img.onload = () => {
+                        img.classList.remove("hidden");
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    };
+
+                    // 3) 로드 실패면 이미지 감추고 기본 박스 다시 노출
                     img.onerror = () => {
                         img.classList.add("hidden");
                         if (defaultEl) defaultEl.classList.remove("hidden");
                     };
-                    img.src = toAbs(imageUrl);
-                    img.classList.remove("hidden");
+
+                    // 같은 src 재지정으로 불필요한 재로딩 방지 (절대/상대 비교 둘 다 커버)
+                    const absCurrent = img.src || "";
+                    const absTarget = imageUrl.startsWith("http") ? imageUrl : (location.origin + imageUrl);
+                    if (absCurrent !== absTarget) {
+                        img.src = imageUrl;
+                    } else {
+                        // 이미 같은 이미지면 곧바로 표시 상태로
+                        img.classList.remove("hidden");
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    }
                 }
-                if (defaultEl) defaultEl.classList.add("hidden");
             } else {
+                // 이미지가 없으면 기본 상태로
                 if (img) {
                     img.src = "";
                     img.classList.add("hidden");
@@ -890,10 +913,13 @@
             }
 
             // ✅ Best Pick이면 하단 텍스트 갱신
-            if (String(position).startsWith("best_pick_")) {
+            if (position.startsWith("best_pick_")) {
                 if (storeName) storeName.textContent = businessName || "상호명 없음";
                 if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
             }
+
+            // (선택) 미리보기용 링크 값 심어두기
+            if (slot.link_url) container.setAttribute("data-link-preview", slot.link_url);
         }
 
         // ============================
