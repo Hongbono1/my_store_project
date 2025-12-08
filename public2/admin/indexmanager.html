@@ -596,6 +596,51 @@
         // ✅ Best Pick 설정 - 한 번만 선언
         const BEST_PICK_MAX = 18;
 
+        function pickFirst(obj, keys = []) {
+            if (!obj) return "";
+            for (const k of keys) {
+                const v = obj?.[k];
+                if (v !== undefined && v !== null && String(v).trim() !== "") {
+                    return v;
+                }
+            }
+            return "";
+        }
+
+        function getSlotImageUrl(slot) {
+            return pickFirst(slot, [
+                "image_url",
+                "image",
+                "img_url",
+                "store_image_url",
+                "main_img",
+                "thumbnail",
+                "thumb",
+            ]);
+        }
+
+        function getSlotBizName(slot) {
+            return pickFirst(slot, [
+                "business_name",
+                "biz_name",
+                "store_name",
+                "name",
+                "businessName",
+                "bizName",
+            ]);
+        }
+
+        function getSlotBizNo(slot) {
+            return pickFirst(slot, [
+                "business_no",
+                "biz_number",
+                "business_number",
+                "biz_no",
+                "businessNo",
+                "bizNo",
+            ]);
+        }
+
         function bestPickSlotId(n) {
             return `slot_best_pick_${n}`;
         }
@@ -757,9 +802,9 @@
 
                 if (json.success && json.slot) {
                     const slot = json.slot;
-                    const imageUrl = slot.image_url || "";
-                    const businessName = slot.business_name || "";
-                    const businessNo = slot.business_no || "";
+                    const imageUrl = getSlotImageUrl(slot);
+                    const businessName = getSlotBizName(slot);
+                    const businessNo = getSlotBizNo(slot);
 
                     // ✅ 이미지 처리
                     if (imageUrl) {
@@ -779,6 +824,7 @@
                     // ✅ 하단 정보 처리
                     if (storeName) storeName.textContent = businessName || "상호명 없음";
                     if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+
 
                 } else {
                     // ✅ 기본 상태
@@ -801,9 +847,9 @@
             if (!slot) return;
 
             const position = slot.position;
-            const imageUrl = slot.image_url || slot.image || "";
-            const businessName = slot.business_name || "";
-            const businessNo = slot.business_no || "";
+            const imageUrl = getSlotImageUrl(slot);
+            const businessName = getSlotBizName(slot);
+            const businessNo = getSlotBizNo(slot);
 
             const container = getSlotContainerByPosition(position);
             if (!container) return;
@@ -852,10 +898,8 @@
                 if (!res.ok) return;
 
                 const json = await res.json();
-                const imageUrl =
-                    json?.slot?.image_url ||
-                    json?.slot?.image ||
-                    "";
+                const slot = json?.slot || {};
+                const imageUrl = getSlotImageUrl(slot);
 
                 if ((json.ok || json.success) && imageUrl) {
                     if (img) {
