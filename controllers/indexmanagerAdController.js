@@ -1,6 +1,62 @@
 // controllers/indexmanagerAdController.js
 import pool from "../db.js";
 
+/* =========================
+ * ① 대표 이미지 조회 유틸
+ *  - bizNo로 combined_store_info → store_info 순으로 대표 이미지 찾기
+ *  - /data/uploads/* → /uploads/* 로 표준화
+ * ========================= */
+function normalizeUploadPath(p) {
+  if (!p) return null;
+  const s = String(p).trim();
+  if (!s) return null;
+  if (s.startsWith("/data/uploads/")) return s.replace("/data/uploads", "/uploads");
+  if (s.startsWith("uploads/")) return "/" + s.replace(/^\/?/, "");
+  return s; // 절대 URL은 그대로
+}
+
+export async function getRepImageByBizNo(bizNoRaw) {
+  if (!bizNoRaw) return null;
+  const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
+  if (!biz) return null;
+
+  // 1) combined_store_info
+  try {
+    const q1 = `
+      SELECT COALESCE(NULLIF(main_img,''), NULLIF(image1,''), NULLIF(image2,''), NULLIF(image3,'')) AS rep
+      FROM combined_store_info
+      WHERE regexp_replace(COALESCE(business_no::text,''), '[^0-9]','','g') = $1
+      ORDER BY updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    `;
+    const r1 = await pool.query(q1, [biz]);
+    if (r1.rows?.length && r1.rows[0].rep) {
+      return normalizeUploadPath(r1.rows[0].rep);
+    }
+  } catch (e) {
+    console.warn("[getRepImageByBizNo] combined_store_info 조회 스킵:", e.message);
+  }
+
+  // 2) store_info
+  try {
+    const q2 = `
+      SELECT COALESCE(NULLIF(main_img,''), NULLIF(image1,''), NULLIF(image2,''), NULLIF(image3,'')) AS rep
+      FROM store_info
+      WHERE regexp_replace(COALESCE(business_no::text,''), '[^0-9]','','g') = $1
+      ORDER BY updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    `;
+    const r2 = await pool.query(q2, [biz]);
+    if (r2.rows?.length && r2.rows[0].rep) {
+      return normalizeUploadPath(r2.rows[0].rep);
+    }
+  } catch (e) {
+    console.warn("[getRepImageByBizNo] store_info 조회 스킵:", e.message);
+  }
+
+  return null;
+}
+
 /**
  * 공통: page / position 검증
  */
@@ -185,6 +241,11 @@ async function resolveStoreModeSlot(slot) {
   if (!slot.link_url && storeRow?.id) {
     slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType === "food" ? "food" : "store"
       }`;
+  }
+
+  if (!slot.image_url && (slot.business_no || slot.businessNo)) {
+    const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
+    if (rep) slot.image_url = rep;
   }
 
   return slot;
@@ -372,6 +433,21 @@ export async function saveIndexStoreAd(req, res) {
       saved.image_url = enriched.image_url || saved.image_url;
       saved.link_url = enriched.link_url || saved.link_url;
       patched = true;
+    }
+
+    // (추가) 여전히 image_url이 없으면 bizNo로 대표 이미지 최종 보강
+    if (!saved.image_url && cleanBizNo) {
+      const rep = await getRepImageByBizNo(cleanBizNo);
+      if (rep) {
+        await pool.query(
+          `UPDATE admin_ad_slots
+             SET image_url = $1, updated_at = NOW()
+           WHERE page = $2 AND position = $3`,
+          [rep, page, position]
+        );
+        saved.image_url = rep;
+        patched = true;
+      }
     }
 
     return res.json({
