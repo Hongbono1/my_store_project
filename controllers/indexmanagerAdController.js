@@ -15,43 +15,112 @@ function normalizeUploadPath(p) {
   return s; // 절대 URL은 그대로
 }
 
+// ✅ image 후보 컬럼 탐색
+async function findImageColumns(table) {
+  const candidates = [
+    "main_img", "main_image", "image1", "image2", "image3",
+    "image_url", "thumbnail_url", "thumb_url",
+    "main_image_url", "banner_image_url",
+    "img1", "photo1", "store_image", "store_main_image",
+    "images" // json/string array 가능성
+  ];
+
+  const { rows } = await pool.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_name = $1
+        AND column_name = ANY($2::text[])`,
+    [table, candidates]
+  );
+
+  return rows.map(r => r.column_name);
+}
+
+// ✅ 안전한 대표 이미지 추출 (bizNo 기준)
+async function pickRepFromTableByBiz(table, biz) {
+  const { where } = await buildBizNoWhere(table);
+  if (!where || where === "FALSE") return null;
+
+  const cols = await findImageColumns(table);
+  if (!cols.length) return null;
+
+  const hasImages = cols.includes("images");
+  const simpleCols = cols.filter(c => c !== "images");
+
+  // 1) 문자열 컬럼 우선
+  if (simpleCols.length) {
+    const expr = simpleCols
+      .map(c => `NULLIF(TRIM(COALESCE(${c}::text,'')), '')`)
+      .join(", ");
+
+    const sql = `
+      SELECT COALESCE(${expr}) AS rep
+           ${hasImages ? ", images" : ""}
+      FROM ${table}
+      WHERE ${where}
+      ORDER BY updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    `;
+
+    const r = await pool.query(sql, [biz]);
+    const row = r.rows?.[0];
+
+    if (row?.rep) return normalizeUploadPath(row.rep);
+
+    // 2) images(json/string) fallback
+    if (hasImages && row?.images) {
+      const raw = row.images;
+      if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
+      if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed[0]) {
+            return normalizeUploadPath(String(parsed[0]));
+          }
+        } catch (_) { }
+      }
+    }
+  } else if (hasImages) {
+    // images만 있는 테이블 케이스
+    const sql = `
+      SELECT images
+      FROM ${table}
+      WHERE ${where}
+      ORDER BY updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    `;
+    const r = await pool.query(sql, [biz]);
+    const row = r.rows?.[0];
+    const raw = row?.images;
+
+    if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed[0]) return normalizeUploadPath(String(parsed[0]));
+      } catch (_) { }
+    }
+  }
+
+  return null;
+}
+
+// ✅ [교체 대상] 대표 이미지 조회 유틸 (완전 방어형)
 export async function getRepImageByBizNo(bizNoRaw) {
   if (!bizNoRaw) return null;
   const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
   if (!biz) return null;
 
-  // 1) combined_store_info
-  try {
-    const q1 = `
-      SELECT COALESCE(NULLIF(main_img,''), NULLIF(image1,''), NULLIF(image2,''), NULLIF(image3,'')) AS rep
-      FROM combined_store_info
-      WHERE regexp_replace(COALESCE(business_no::text,''), '[^0-9]','','g') = $1
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `;
-    const r1 = await pool.query(q1, [biz]);
-    if (r1.rows?.length && r1.rows[0].rep) {
-      return normalizeUploadPath(r1.rows[0].rep);
-    }
-  } catch (e) {
-    console.warn("[getRepImageByBizNo] combined_store_info 조회 스킵:", e.message);
-  }
+  // 우선순위: combined_store_info → store_info → food_stores
+  const tables = ["combined_store_info", "store_info", "food_stores"];
 
-  // 2) store_info
-  try {
-    const q2 = `
-      SELECT COALESCE(NULLIF(main_img,''), NULLIF(image1,''), NULLIF(image2,''), NULLIF(image3,'')) AS rep
-      FROM store_info
-      WHERE regexp_replace(COALESCE(business_no::text,''), '[^0-9]','','g') = $1
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `;
-    const r2 = await pool.query(q2, [biz]);
-    if (r2.rows?.length && r2.rows[0].rep) {
-      return normalizeUploadPath(r2.rows[0].rep);
+  for (const t of tables) {
+    try {
+      const rep = await pickRepFromTableByBiz(t, biz);
+      if (rep) return rep;
+    } catch (e) {
+      console.warn(`[getRepImageByBizNo] ${t} 스킵:`, e.message);
     }
-  } catch (e) {
-    console.warn("[getRepImageByBizNo] store_info 조회 스킵:", e.message);
   }
 
   return null;
