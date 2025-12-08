@@ -941,6 +941,7 @@
         function renderBizSearchResult({ bizNoDigits, payload }) {
             const resultBox = document.getElementById("bizSearchResult");
             const nameInput = document.getElementById("businessNameInput");
+            const bizInput = document.getElementById("businessNoInput");
 
             if (!resultBox) return;
 
@@ -954,23 +955,17 @@
             if (payload && payload.ok === false && payload.status === 404) {
                 resultBox.classList.remove("hidden");
                 resultBox.innerHTML = `
-                    <div class="text-xs text-slate-500">
-                        🔎 검색 API가 아직 연결되지 않았습니다.<br>
-                        다음 단계에서 <b>/manager/ad/store/search</b>를 추가하면 자동 완성됩니다.
-                    </div>
-                `;
+      <div class="text-xs text-slate-500">
+        🔎 검색 API가 아직 연결되지 않았습니다.<br>
+        <b>/manager/ad/store/search</b> 연결 후 자동완성됩니다.
+      </div>`;
                 return;
             }
 
             const stores = payload?.stores || [];
-
             if (!payload?.ok || !Array.isArray(stores) || stores.length === 0) {
                 resultBox.classList.remove("hidden");
-                resultBox.innerHTML = `
-                    <div class="text-xs text-slate-500">
-                        ❌ 일치하는 가게가 없습니다.
-                    </div>
-                `;
+                resultBox.innerHTML = `<div class="text-xs text-slate-500">❌ 일치하는 가게가 없습니다.</div>`;
                 return;
             }
 
@@ -978,33 +973,33 @@
 
             stores.forEach((s, idx) => {
                 const biz =
-                    s.business_no ||
-                    s.business_number ||
-                    s.biz_number ||
-                    s.bizNo ||
-                    "";
-
-                const bizDigits = normalizeBizNoDigits(biz);
-                const bizPretty = bizDigits ? formatBizNoPretty(bizDigits) : "사업자번호 미확인";
+                    s.business_no || s.business_number || s.biz_number || s.bizNo || "";
+                const digits = normalizeBizNoDigits(biz);
+                const pretty = digits ? formatBizNoPretty(digits) : "사업자번호 미확인";
 
                 const name =
-                    s.business_name ||
-                    s.store_name ||
-                    s.name ||
-                    `가게 ${idx + 1}`;
+                    s.business_name || s.store_name || s.name || `가게 ${idx + 1}`;
 
                 const item = document.createElement("button");
                 item.type = "button";
                 item.className =
                     "w-full text-left px-2 py-2 rounded-md border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition text-xs";
-
                 item.innerHTML = `
-                    <div class="font-semibold text-slate-800">${escapeHtml(name)}</div>
-                    <div class="text-[10px] text-slate-500">${escapeHtml(bizPretty)}</div>
-                `;
+      <div class="font-semibold text-slate-800">${escapeHtml(name)}</div>
+      <div class="text-[10px] text-slate-500">${escapeHtml(pretty)}</div>
+    `;
 
+                // ✅ 클릭 시 값 채우고, 결과박스 닫기
                 item.addEventListener("click", () => {
                     if (nameInput) nameInput.value = name;
+                    if (bizInput && digits) bizInput.value = formatBizNoPretty(digits);
+
+                    // 결과 영역 닫기 + 초기화
+                    showBizResultBox("");              // (선택) 이미 정의된 유틸 활용
+                    // resultBox.classList.add("hidden"); // 위 유틸 안 쓰면 이 두 줄로 대체
+                    // resultBox.innerHTML = "";
+
+                    nameInput?.focus();
                 });
 
                 resultBox.appendChild(item);
