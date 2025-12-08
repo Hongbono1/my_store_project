@@ -93,7 +93,7 @@ async function buildSafeOrderClause(table) {
 
 async function findImageColumns(table) {
   const candidates = [
-    // ✅ 대표 이미지 후보 (일반)
+    // 일반 후보
     "main_img", "main_image",
     "image1", "image2", "image3",
     "img1", "img2", "img3",
@@ -104,7 +104,7 @@ async function findImageColumns(table) {
     "represent_img", "rep_img",
     "images",
 
-    // ✅ Neon 현실 대응(임시 대표 이미지 역할)
+    // ✅ Neon 현실 대응: 대표 이미지 없을 때 인증 이미지라도 사용
     "business_cert_path"
   ];
 
@@ -129,7 +129,7 @@ async function findImageColumns(table) {
 
 async function findBizNoColumn(table) {
   const candidates = [
-    // ✅ Neon combined_store_info 실제 컬럼 우선
+    // ✅ combined_store_info 실제 컬럼 우선
     "business_number",
 
     // 일반 후보
@@ -163,7 +163,7 @@ function pickStoreImage(storeRow) {
   if (!storeRow) return "";
 
   const candidates = [
-    // ✅ Neon/임시 대표 우선
+    // ✅ Neon/임시 우선
     "main_image_url",
     "business_cert_path",
 
@@ -186,7 +186,7 @@ function pickStoreImage(storeRow) {
     try {
       const parsed = JSON.parse(images);
       if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-    } catch (_) { }
+    } catch (_) {}
   }
 
   return "";
@@ -232,7 +232,7 @@ async function pickRepFromTableByBiz(table, biz) {
           if (Array.isArray(parsed) && parsed[0]) {
             return normalizeUploadPath(String(parsed[0]));
           }
-        } catch (_) { }
+        } catch (_) {}
       }
     }
   } else if (hasImages) {
@@ -251,21 +251,20 @@ async function pickRepFromTableByBiz(table, biz) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed[0]) return normalizeUploadPath(String(parsed[0]));
-      } catch (_) { }
+      } catch (_) {}
     }
   }
 
   return null;
 }
 
-// ✅ resolveStoreModeSlot이 직접 호출 가능하도록 export 단일본 유지
+// ✅ resolveStoreModeSlot이 참조하는 단일 export
 export async function getRepImageByBizNo(bizNoRaw) {
   if (!bizNoRaw) return null;
 
   const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
   if (!biz) return null;
 
-  // ✅ 우선순위: combined_store_info → food_stores → store_info
   const tables = ["combined_store_info", "food_stores", "store_info"];
 
   for (const t of tables) {
@@ -341,7 +340,7 @@ async function findCombinedStoreByName(name) {
 
 // ✅ bizNo + businessName 정확 매칭
 async function findStoreIdByBizAndName(cleanBizNo, businessName) {
-  // 1) combined_store_info 우선
+  // 1) combined_store_info
   try {
     const { where: whereCombined, col: combinedCol } =
       await buildBizNoWhere("combined_store_info");
@@ -362,7 +361,7 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
     console.warn("combined_store_info 매핑 실패:", e.message);
   }
 
-  // 2) food_stores fallback
+  // 2) food_stores
   try {
     const { where: whereFood, col: foodCol } =
       await buildBizNoWhere("food_stores");
@@ -399,7 +398,7 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
       );
       if (r.rows[0]?.id) return Number(r.rows[0].id);
     }
-  } catch { }
+  } catch {}
 
   try {
     const { where: whereFood, col: foodCol } =
@@ -416,13 +415,13 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
       );
       if (r.rows[0]?.id) return Number(r.rows[0].id);
     }
-  } catch { }
+  } catch {}
 
   return null;
 }
 
 /* =========================================================
- * ✅ 4) store 모드 슬롯 해석기 (강화 단일본)
+ * ✅ 4) store 모드 슬롯 해석기
  * ========================================================= */
 async function resolveStoreModeSlot(slot) {
   if (!slot || slot.slot_mode !== "store") return slot;
@@ -433,7 +432,6 @@ async function resolveStoreModeSlot(slot) {
   // 1) store_id 우선
   if (slot.store_id) {
     storeRow = await findFoodStoreById(slot.store_id);
-
     if (!storeRow) {
       storeRow = await findCombinedStoreById(slot.store_id);
       if (storeRow) resolvedType = "store";
@@ -451,23 +449,19 @@ async function resolveStoreModeSlot(slot) {
     if (storeRow) resolvedType = "food";
   }
 
-  // store_id 보강
   if (storeRow?.id && !slot.store_id) {
     slot.store_id = Number(storeRow.id);
   }
 
-  // image_url 보강
   if (!slot.image_url) {
     const picked = pickStoreImage(storeRow);
     if (picked) slot.image_url = picked;
   }
 
-  // link_url 보강
   if (!slot.link_url && storeRow?.id) {
     slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType}`;
   }
 
-  // 3) 마지막 방어: bizNo 기반 대표 이미지 보강
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
     const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
     if (rep) slot.image_url = rep;
@@ -483,31 +477,16 @@ async function resolveStoreModeSlot(slot) {
 export async function uploadIndexAd(req, res) {
   try {
     const {
-      page,
-      position,
-      slotType,
-      slotMode,
-      linkUrl,
-      textContent,
-      storeId,
-      businessNo,
-      businessName,
-      startDate,
-      endDate,
-      noEnd,
+      page, position,
+      slotType, slotMode,
+      linkUrl, textContent,
+      storeId, businessNo, businessName,
+      startDate, endDate, noEnd,
     } = pickBody(req);
 
     ensurePagePosition(page, position);
 
-    console.log("📤 업로드 파일 정보:", {
-      originalname: req.file?.originalname,
-      filename: req.file?.filename,
-      path: req.file?.path,
-      size: req.file?.size,
-    });
-
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    console.log("🖼️ 이미지 URL 생성:", imageUrl);
 
     const slot_type = slotType === "text" ? "text" : "banner";
     const slot_mode = slotMode || "custom";
@@ -533,14 +512,13 @@ export async function uploadIndexAd(req, res) {
         business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
         start_date = EXCLUDED.start_date,
-        end_date = EXCLUDED.end_date,
+        end_date = EXCLUDED.endDate,
         updated_at = now()
       RETURNING *;
     `;
 
     const params = [
-      page,
-      position,
+      page, position,
       slot_type,
       imageUrl,
       linkUrl || null,
@@ -555,20 +533,9 @@ export async function uploadIndexAd(req, res) {
 
     const { rows } = await pool.query(sql, params);
 
-    console.log("💾 DB 저장 결과:", {
-      id: rows[0]?.id,
-      image_url: rows[0]?.image_url,
-      page: rows[0]?.page,
-      position: rows[0]?.position,
-    });
-
     return res.json({
       ok: true,
-      slot: {
-        ...rows[0],
-        page,
-        position,
-      },
+      slot: { ...rows[0], page, position },
     });
   } catch (err) {
     console.error("UPLOAD INDEX AD ERROR:", err);
@@ -582,7 +549,7 @@ export async function uploadIndexAd(req, res) {
 }
 
 /* ============================================================
- * 🔸 등록된 가게로 슬롯 연결 (Best Pick 등)
+ * 🔸 등록된 가게로 슬롯 연결
  * POST /manager/ad/store
  * ============================================================ */
 export async function saveIndexStoreAd(req, res) {
@@ -604,7 +571,6 @@ export async function saveIndexStoreAd(req, res) {
     const cleanBizNo = String(businessNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    // ✅ bizNo + businessName 기반 정확 매칭
     let storeId = await findStoreIdByBizAndName(cleanBizNo, businessName);
 
     const upsertSql = `
@@ -635,7 +601,6 @@ export async function saveIndexStoreAd(req, res) {
 
     const saved = rows[0];
 
-    // ✅ 저장 직후 이미지/링크 자동 보강
     const enriched = await resolveStoreModeSlot({ ...saved });
     let patched = false;
 
@@ -657,7 +622,6 @@ export async function saveIndexStoreAd(req, res) {
       patched = true;
     }
 
-    // ✅ 그래도 없으면 bizNo 기반 최종 보강
     if (!saved.image_url && cleanBizNo) {
       const rep = await getRepImageByBizNo(cleanBizNo);
       if (rep) {
@@ -696,8 +660,6 @@ export async function getIndexSlot(req, res) {
   try {
     const { page, position } = req.query;
 
-    console.log(`🔍 슬롯 조회 요청: page=${page}, position=${position}`);
-
     if (!page || !position) {
       return res.status(400).json({
         success: false,
@@ -711,14 +673,13 @@ export async function getIndexSlot(req, res) {
     );
 
     if (result.rows.length === 0) {
-      console.log(`🟡 슬롯 없음(정상): ${position}`);
       return res.json({ success: true, slot: null, page, position });
     }
 
     const rawSlot = result.rows[0];
     const slot = await resolveStoreModeSlot({ ...rawSlot });
 
-    const responseData = {
+    return res.json({
       success: true,
       slot: {
         page,
@@ -730,100 +691,12 @@ export async function getIndexSlot(req, res) {
         slot_type: slot.slot_type || null,
         slot_mode: slot.slot_mode || null,
       },
-    };
-
-    console.log(`✅ 슬롯 응답 (${position}):`, responseData);
-    return res.json(responseData);
+    });
   } catch (error) {
     console.error(`❌ 슬롯 조회 오류 (${req.query.position}):`, error);
     return res.status(500).json({
       success: false,
       error: "서버 오류가 발생했습니다.",
-    });
-  }
-}
-
-/* ============================================================
- * 🔹 텍스트 슬롯 조회
- * GET /manager/ad/text/get?page=index&position=xxx
- * ============================================================ */
-export async function getIndexTextSlot(req, res) {
-  try {
-    const { page, position } = req.query;
-
-    if (!page || !position) {
-      return res.status(400).json({
-        ok: false,
-        message: "page, position이 필요합니다.",
-      });
-    }
-
-    const sql = `
-      SELECT id, page, position, slot_type, text_content, start_date, end_date, updated_at
-      FROM admin_ad_slots
-      WHERE page = $1 AND position = $2 AND slot_type = 'text'
-      LIMIT 1
-    `;
-
-    const { rows } = await pool.query(sql, [page, position]);
-
-    if (rows.length === 0) {
-      return res.json({ ok: true, slot: null });
-    }
-
-    return res.json({ ok: true, slot: rows[0] });
-  } catch (err) {
-    console.error("GET INDEX TEXT SLOT ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "텍스트 슬롯 조회 오류",
-      code: "INDEX_TEXT_LOAD_ERROR",
-    });
-  }
-}
-
-/* ============================================================
- * 🔹 텍스트 슬롯 저장
- * POST /manager/ad/text/save
- * ============================================================ */
-export async function saveIndexTextSlot(req, res) {
-  try {
-    const { page, position, content } = req.body || {};
-
-    if (!page || !position) {
-      return res.status(400).json({
-        ok: false,
-        message: "page와 position은 필수입니다.",
-      });
-    }
-
-    if (!content || String(content).trim() === "") {
-      return res.status(400).json({
-        ok: false,
-        message: "텍스트 내용을 입력해주세요.",
-      });
-    }
-
-    const sql = `
-      INSERT INTO admin_ad_slots (page, position, slot_type, text_content, updated_at)
-      VALUES ($1, $2, 'text', $3, NOW())
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        slot_type = 'text',
-        text_content = EXCLUDED.text_content,
-        updated_at = NOW()
-      RETURNING *;
-    `;
-
-    const { rows } = await pool.query(sql, [page, position, String(content).trim()]);
-
-    return res.json({ ok: true, slot: rows[0] });
-  } catch (err) {
-    console.error("SAVE TEXT SLOT ERROR:", err);
-    return res.status(500).json({
-      ok: false,
-      message: "텍스트 저장 실패",
-      error: err.message,
     });
   }
 }
@@ -907,8 +780,6 @@ export async function searchStoreByBiz(req, res) {
     const { where: whereCombined, col: combinedCol } =
       await buildBizNoWhere("combined_store_info");
 
-    console.log("[DEBUG][searchStoreByBiz]", { foodCol, combinedCol, cleanBizNo });
-
     const blocks = [];
 
     if (foodCol) {
@@ -941,120 +812,6 @@ export async function searchStoreByBiz(req, res) {
       ok: false,
       message: "가게 검색 실패",
       code: "STORE_SEARCH_ERROR",
-    });
-  }
-}
-
-/* ============================================================
- * ✅ 가게와 슬롯 연결 (보강 포함)
- * POST /manager/ad/store/connect
- * ============================================================ */
-export async function connectStoreToSlot(req, res) {
-  try {
-    const {
-      page,
-      position,
-      bizNo,
-      bizName,
-      startDate,
-      endDate,
-      noEnd,
-    } = req.body || {};
-
-    ensurePagePosition(page, position);
-
-    if (!bizNo || !bizName) {
-      return res.status(400).json({
-        ok: false,
-        message: "사업자번호(bizNo)와 상호명(bizName)을 모두 입력해야 합니다.",
-      });
-    }
-
-    const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
-    const finalEndDate = noEnd ? null : endDate || null;
-
-    let storeId = await findStoreIdByBizAndName(cleanBizNo, bizName);
-
-    const sql = `
-      INSERT INTO admin_ad_slots (
-        page, position, slot_type, slot_mode, business_no, business_name,
-        store_id, start_date, end_date, updated_at
-      )
-      VALUES ($1, $2, 'banner', 'store', $3, $4, $5, $6, $7, NOW())
-      ON CONFLICT (page, position)
-      DO UPDATE SET
-        slot_type = 'banner',
-        slot_mode = 'store',
-        business_no = EXCLUDED.business_no,
-        business_name = EXCLUDED.business_name,
-        store_id = EXCLUDED.store_id,
-        start_date = EXCLUDED.start_date,
-        end_date = EXCLUDED.end_date,
-        updated_at = NOW()
-      RETURNING *;
-    `;
-
-    const { rows } = await pool.query(sql, [
-      page, position, cleanBizNo, bizName, storeId,
-      startDate || null, finalEndDate,
-    ]);
-
-    const saved = rows[0];
-
-    const enriched = await resolveStoreModeSlot({
-      ...saved,
-      business_no: cleanBizNo,
-      business_name: bizName,
-      slot_mode: "store",
-      store_id: storeId ?? saved.store_id,
-    });
-
-    let patched = false;
-
-    if (
-      (enriched.image_url && enriched.image_url !== saved.image_url) ||
-      (enriched.link_url && enriched.link_url !== saved.link_url)
-    ) {
-      await pool.query(
-        `UPDATE admin_ad_slots
-           SET image_url = COALESCE($1, image_url),
-               link_url  = COALESCE($2, link_url),
-               updated_at = NOW()
-         WHERE page = $3 AND position = $4`,
-        [enriched.image_url || null, enriched.link_url || null, page, position]
-      );
-
-      saved.image_url = enriched.image_url || saved.image_url;
-      saved.link_url = enriched.link_url || saved.link_url;
-      patched = true;
-    }
-
-    if (!saved.image_url && cleanBizNo) {
-      const rep = await getRepImageByBizNo(cleanBizNo);
-      if (rep) {
-        await pool.query(
-          `UPDATE admin_ad_slots
-             SET image_url = $1, updated_at = NOW()
-           WHERE page = $2 AND position = $3`,
-          [rep, page, position]
-        );
-        saved.image_url = rep;
-        patched = true;
-      }
-    }
-
-    return res.json({
-      ok: true,
-      slot: { ...saved, patched },
-      storeConnected: !!storeId,
-    });
-  } catch (err) {
-    console.error("CONNECT STORE TO SLOT ERROR:", err);
-    const status = err.statusCode || 500;
-    return res.status(status).json({
-      ok: false,
-      message: err.message || "가게 연결 실패",
-      code: "STORE_CONNECT_ERROR",
     });
   }
 }
