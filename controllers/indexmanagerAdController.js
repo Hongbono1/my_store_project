@@ -74,36 +74,25 @@ async function buildBizNoWhere(table) {
  */
 function pickStoreImage(storeRow) {
   if (!storeRow) return "";
-
   const candidates = [
-    "image_url",
-    "thumbnail_url",
-    "thumb_url",
-    "main_image_url",
-    "banner_image_url",
-    "main_img",
-    "main_image",
-    "image1",
-    "img1",
+    "image_url", "thumbnail_url", "thumb_url", "main_image_url", "banner_image_url",
+    "main_img", "main_image", "image1", "img1", "photo1", "store_image", "store_main_image"
   ];
-
   for (const key of candidates) {
     const v = storeRow[key];
     if (typeof v === "string" && v.trim()) return v.trim();
   }
-
   const images = storeRow.images;
   if (Array.isArray(images) && images[0]) return String(images[0]);
-
   if (typeof images === "string") {
     try {
       const parsed = JSON.parse(images);
       if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
     } catch (_) { }
   }
-
   return "";
 }
+
 
 async function findFoodStoreById(id) {
   try {
@@ -314,63 +303,82 @@ export async function uploadIndexAd(req, res) {
 export async function saveIndexStoreAd(req, res) {
   try {
     const {
-      page,
-      position,
-      businessNo,
-      businessName,
-      startDate,
-      endDate,
-      noEnd,
+      page, position, businessNo, businessName,
+      startDate, endDate, noEnd,
     } = pickBody(req);
 
     ensurePagePosition(page, position);
-
     if (!businessNo || !businessName) {
-      return res.status(400).json({
-        ok: false,
-        message: "사업자번호와 상호명을 모두 입력해야 합니다.",
-      });
+      return res.status(400).json({ ok: false, message: "사업자번호와 상호명을 모두 입력해야 합니다." });
     }
 
+    const cleanBizNo = String(businessNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    const sql = `
+    // 1) biz 번호로 food_stores에서 id 매핑 (가능하면)
+    let storeId = null;
+    try {
+      const { where: whereFood } = await buildBizNoWhere("food_stores");
+      if (whereFood && whereFood !== "FALSE") {
+        const r = await pool.query(`SELECT id FROM food_stores WHERE ${whereFood} LIMIT 1`, [cleanBizNo]);
+        if (r.rows[0]?.id) storeId = r.rows[0].id;
+      }
+    } catch (e) {
+      console.warn("store_id 매핑 실패:", e.message);
+    }
+
+    // 2) 업서트
+    const upsertSql = `
       INSERT INTO admin_ad_slots (
-        page, position,
-        slot_type,
-        slot_mode,
-        business_no, business_name,
-        start_date, end_date
-      )
-      VALUES (
-        $1, $2,
-        'banner',
-        'store',
-        $3, $4,
-        $5, $6
+        page, position, slot_type, slot_mode,
+        business_no, business_name, store_id,
+        start_date, end_date, updated_at
+      ) VALUES (
+        $1,$2,'banner','store',$3,$4,$5,$6,$7,NOW()
       )
       ON CONFLICT (page, position)
       DO UPDATE SET
-        slot_type     = 'banner',
-        slot_mode     = 'store',
-        business_no   = EXCLUDED.business_no,
+        slot_type   = 'banner',
+        slot_mode   = 'store',
+        business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-        start_date    = EXCLUDED.start_date,
-        end_date      = EXCLUDED.end_date,
-        updated_at    = NOW()
+        store_id    = EXCLUDED.store_id,
+        start_date  = EXCLUDED.start_date,
+        end_date    = EXCLUDED.end_date,
+        updated_at  = NOW()
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(sql, [
-      page,
-      position,
-      businessNo,
-      businessName,
-      startDate || null,
-      finalEndDate,
+    const { rows } = await pool.query(upsertSql, [
+      page, position, cleanBizNo, businessName, storeId,
+      startDate || null, finalEndDate,
     ]);
+    const saved = rows[0];
 
-    return res.json({ ok: true, slot: rows[0] });
+    // 3) 저장 직후 이미지/링크 자동 보강
+    const enriched = await resolveStoreModeSlot({ ...saved });
+    let patched = false;
+
+    if ((enriched.image_url && enriched.image_url !== saved.image_url) ||
+      (enriched.link_url && enriched.link_url !== saved.link_url)) {
+      await pool.query(
+        `UPDATE admin_ad_slots
+           SET image_url = COALESCE($1, image_url),
+               link_url  = COALESCE($2, link_url),
+               updated_at = NOW()
+         WHERE page = $3 AND position = $4`,
+        [enriched.image_url || null, enriched.link_url || null, page, position]
+      );
+      saved.image_url = enriched.image_url || saved.image_url;
+      saved.link_url = enriched.link_url || saved.link_url;
+      patched = true;
+    }
+
+    return res.json({
+      ok: true,
+      slot: { ...saved, page, position, patched },
+      storeConnected: !!storeId,
+    });
   } catch (err) {
     console.error("SAVE INDEX STORE AD ERROR:", err);
     const status = err.statusCode || 500;
@@ -381,6 +389,7 @@ export async function saveIndexStoreAd(req, res) {
     });
   }
 }
+
 
 /* ============================================================
  * 🔹 인덱스 광고 슬롯 조회
