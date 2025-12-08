@@ -15,158 +15,58 @@ function normalizeUploadPath(p) {
   return s; // 절대 URL은 그대로
 }
 
+// ✅ 컬럼 존재 여부 체크
+async function hasColumn(table, col) {
+  const { rows } = await pool.query(
+    `SELECT 1
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+        AND column_name = $2
+      LIMIT 1`,
+    [table, col]
+  );
+  return rows.length > 0;
+}
+
+// ✅ 테이블별 안전한 ORDER BY 생성
+async function buildSafeOrderClause(table) {
+  if (await hasColumn(table, "updated_at")) return "updated_at DESC NULLS LAST, id DESC";
+  if (await hasColumn(table, "created_at")) return "created_at DESC NULLS LAST, id DESC";
+  if (await hasColumn(table, "id")) return "id DESC";
+  return "1"; // 최후 fallback
+}
+
 // ✅ image 후보 컬럼 탐색
 async function findImageColumns(table) {
   const candidates = [
     "main_img", "main_image", "image1", "image2", "image3",
     "image_url", "thumbnail_url", "thumb_url",
     "main_image_url", "banner_image_url",
-    "img1", "photo1", "store_image", "store_main_image",
-    "images" // json/string array 가능성
+    "img1", "img2", "img3",
+    "photo1", "photo2", "photo3",
+    "store_image", "store_main_image",
+    "represent_img", "rep_img",
+    "images"
   ];
 
   const { rows } = await pool.query(
-    `SELECT column_name
+    `SELECT DISTINCT column_name
        FROM information_schema.columns
-      WHERE table_name = $1
-        AND column_name = ANY($2::text[])`,
+      WHERE table_schema = 'public'
+        AND table_name = $1
+        AND (
+          column_name = ANY($2::text[])
+          OR column_name ILIKE '%img%'
+          OR column_name ILIKE '%image%'
+          OR column_name ILIKE '%photo%'
+          OR column_name ILIKE '%thumb%'
+        )
+      ORDER BY column_name`,
     [table, candidates]
   );
 
   return rows.map(r => r.column_name);
-}
-
-// ✅ 안전한 대표 이미지 추출 (bizNo 기준)
-async function pickRepFromTableByBiz(table, biz) {
-  const { where } = await buildBizNoWhere(table);
-  if (!where || where === "FALSE") return null;
-
-  const cols = await findImageColumns(table);
-  if (!cols.length) return null;
-
-  const hasImages = cols.includes("images");
-  const simpleCols = cols.filter(c => c !== "images");
-
-  // 1) 문자열 컬럼 우선
-  if (simpleCols.length) {
-    const expr = simpleCols
-      .map(c => `NULLIF(TRIM(COALESCE(${c}::text,'')), '')`)
-      .join(", ");
-
-    const sql = `
-      SELECT COALESCE(${expr}) AS rep
-           ${hasImages ? ", images" : ""}
-      FROM ${table}
-      WHERE ${where}
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `;
-
-    const r = await pool.query(sql, [biz]);
-    const row = r.rows?.[0];
-
-    if (row?.rep) return normalizeUploadPath(row.rep);
-
-    // 2) images(json/string) fallback
-    if (hasImages && row?.images) {
-      const raw = row.images;
-      if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
-      if (typeof raw === "string") {
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed[0]) {
-            return normalizeUploadPath(String(parsed[0]));
-          }
-        } catch (_) { }
-      }
-    }
-  } else if (hasImages) {
-    // images만 있는 테이블 케이스
-    const sql = `
-      SELECT images
-      FROM ${table}
-      WHERE ${where}
-      ORDER BY updated_at DESC NULLS LAST, id DESC
-      LIMIT 1
-    `;
-    const r = await pool.query(sql, [biz]);
-    const row = r.rows?.[0];
-    const raw = row?.images;
-
-    if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
-    if (typeof raw === "string") {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed[0]) return normalizeUploadPath(String(parsed[0]));
-      } catch (_) { }
-    }
-  }
-
-  return null;
-}
-
-// ✅ [교체 대상] 대표 이미지 조회 유틸 (완전 방어형)
-export async function getRepImageByBizNo(bizNoRaw) {
-  if (!bizNoRaw) return null;
-  const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
-  if (!biz) return null;
-
-  // 우선순위: combined_store_info → store_info → food_stores
-  const tables = ["combined_store_info", "store_info", "food_stores"];
-
-  for (const t of tables) {
-    try {
-      const rep = await pickRepFromTableByBiz(t, biz);
-      if (rep) return rep;
-    } catch (e) {
-      console.warn(`[getRepImageByBizNo] ${t} 스킵:`, e.message);
-    }
-  }
-
-  return null;
-}
-
-/**
- * 공통: page / position 검증
- */
-function ensurePagePosition(page, position) {
-  if (!page || !position) {
-    const err = new Error("page, position 값이 필요합니다.");
-    err.statusCode = 400;
-    throw err;
-  }
-}
-
-/**
- * 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
- */
-function pickBody(req) {
-  const b = req.body || {};
-
-  return {
-    page: b.page,
-    position: b.position,
-
-    // 모드/타입
-    slotType: b.slotType || b.slot_type,
-    slotMode: b.slotMode || b.slot_mode,
-
-    // 링크
-    linkUrl: b.linkUrl || b.link_url || b.link,
-
-    // 텍스트
-    textContent: b.textContent || b.text_content || b.content,
-
-    // 가게 연결용
-    storeId: b.storeId || b.store_id,
-    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo,
-    businessName: b.businessName || b.business_name || b.biz_name,
-
-    // 기간
-    startDate: b.startDate || b.start_date || null,
-    endDate: b.endDate || b.end_date || null,
-    noEnd: b.noEnd || b.no_end || false,
-  };
 }
 
 // ✅ information_schema로 테이블 내 '사업자번호' 후보 컬럼 탐색
@@ -175,14 +75,18 @@ async function findBizNoColumn(table) {
     "business_no", "biz_no", "biz_number", "business_number",
     "registration_no", "reg_no", "brn", "corp_no"
   ];
+
   const { rows } = await pool.query(
     `SELECT column_name
        FROM information_schema.columns
-      WHERE table_name = $1
+      WHERE table_schema = 'public'
+        AND table_name = $1
         AND column_name = ANY($2::text[])
+      ORDER BY array_position($2::text[], column_name)
       LIMIT 1`,
     [table, candidates]
   );
+
   return rows[0]?.column_name || null;
 }
 
