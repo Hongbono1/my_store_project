@@ -477,7 +477,7 @@
                         </div>
                     </div>
 
-                    <!-- ✅ 광고 기간 (이게 빠져서 네가 '아래 내용이 없어'가 된 거야) -->
+                    <!-- ✅ 광고 기간 -->
                     <div class="mt-2 border-t border-slate-100 pt-4">
                         <div class="flex items-center justify-between mb-2">
                             <h3 class="text-sm font-semibold text-slate-700">광고 기간 설정</h3>
@@ -529,7 +529,6 @@
                             class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
                             취소
                         </button>
-                        <!-- ✅ 네가 찾던 저장 버튼은 여기 -->
                         <button type="button" id="saveAdBtn"
                             class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow text-sm hover:bg-blue-700">
                             슬롯 저장
@@ -583,6 +582,39 @@
     </div>
 
     <script>
+        // =========================================================
+        // ✅ 상단(유틸/상수 근처)에 붙이는 가게/이미지 매핑 유틸
+        // =========================================================
+        function pickImageUrl(slot) {
+            return (
+                slot?.image_url ||
+                slot?.image ||
+                slot?.img_url ||
+                slot?.banner_url ||
+                ""
+            );
+        }
+
+        function pickBizName(slot) {
+            return (
+                slot?.business_name ||
+                slot?.biz_name ||
+                slot?.store_name ||
+                slot?.name ||
+                ""
+            );
+        }
+
+        function pickBizNo(slot) {
+            return (
+                slot?.business_no ||
+                slot?.biz_number ||
+                slot?.biz_no ||
+                slot?.business_number ||
+                ""
+            );
+        }
+
         // ============================
         // 기본 텍스트 더미 데이터
         // ============================
@@ -595,51 +627,6 @@
 
         // ✅ Best Pick 설정 - 한 번만 선언
         const BEST_PICK_MAX = 18;
-
-        function pickFirst(obj, keys = []) {
-            if (!obj) return "";
-            for (const k of keys) {
-                const v = obj?.[k];
-                if (v !== undefined && v !== null && String(v).trim() !== "") {
-                    return v;
-                }
-            }
-            return "";
-        }
-
-        function getSlotImageUrl(slot) {
-            return pickFirst(slot, [
-                "image_url",
-                "image",
-                "img_url",
-                "store_image_url",
-                "main_img",
-                "thumbnail",
-                "thumb",
-            ]);
-        }
-
-        function getSlotBizName(slot) {
-            return pickFirst(slot, [
-                "business_name",
-                "biz_name",
-                "store_name",
-                "name",
-                "businessName",
-                "bizName",
-            ]);
-        }
-
-        function getSlotBizNo(slot) {
-            return pickFirst(slot, [
-                "business_no",
-                "biz_number",
-                "business_number",
-                "biz_no",
-                "businessNo",
-                "bizNo",
-            ]);
-        }
 
         function bestPickSlotId(n) {
             return `slot_best_pick_${n}`;
@@ -745,29 +732,29 @@
 
                 // ✅ 위: 이미지 / 아래: 상호+사업자번호
                 card.innerHTML = `
-            <!-- 이미지 영역 -->
-            <div class="relative w-full bg-slate-100 border-b border-slate-200 aspect-[4/3]">
-                <img class="slot-img hidden w-full h-full object-cover" alt="Best Pick ${i}">
-                
-                <!-- 기본 상태 -->
-                <div class="slot-default absolute inset-0 flex flex-col items-center justify-center">
-                    <div class="w-14 h-14 bg-white/80 border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
-                        <span class="text-xs text-slate-500">${i}</span>
+                    <!-- 이미지 영역 -->
+                    <div class="relative w-full bg-slate-100 border-b border-slate-200 aspect-[4/3]">
+                        <img class="slot-img hidden w-full h-full object-cover" alt="Best Pick ${i}">
+                        
+                        <!-- 기본 상태 -->
+                        <div class="slot-default absolute inset-0 flex flex-col items-center justify-center">
+                            <div class="w-14 h-14 bg-white/80 border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
+                                <span class="text-xs text-slate-500">${i}</span>
+                            </div>
+                            <p class="mt-2 text-[11px] text-slate-500">클릭하여 등록</p>
+                        </div>
                     </div>
-                    <p class="mt-2 text-[11px] text-slate-500">클릭하여 등록</p>
-                </div>
-            </div>
 
-            <!-- 정보 영역 -->
-            <div class="p-3 flex flex-col gap-1">
-                <p class="text-[12px] font-semibold text-slate-800 truncate" data-store-name>
-                    등록된 가게 없음
-                </p>
-                <p class="text-[10px] text-slate-500 truncate" data-store-biz>
-                    사업자번호 없음
-                </p>
-            </div>
-        `;
+                    <!-- 정보 영역 -->
+                    <div class="p-3 flex flex-col gap-1">
+                        <p class="text-[12px] font-semibold text-slate-800 truncate" data-store-name>
+                            등록된 가게 없음
+                        </p>
+                        <p class="text-[10px] text-slate-500 truncate" data-store-biz>
+                            사업자번호 없음
+                        </p>
+                    </div>
+                `;
 
                 container.appendChild(card);
             }
@@ -802,9 +789,10 @@
 
                 if (json.success && json.slot) {
                     const slot = json.slot;
-                    const imageUrl = getSlotImageUrl(slot);
-                    const businessName = getSlotBizName(slot);
-                    const businessNo = getSlotBizNo(slot);
+
+                    const imageUrl = pickImageUrl(slot);
+                    const businessName = pickBizName(slot);
+                    const businessNo = pickBizNo(slot);
 
                     // ✅ 이미지 처리
                     if (imageUrl) {
@@ -824,7 +812,6 @@
                     // ✅ 하단 정보 처리
                     if (storeName) storeName.textContent = businessName || "상호명 없음";
                     if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
-
 
                 } else {
                     // ✅ 기본 상태
@@ -847,9 +834,10 @@
             if (!slot) return;
 
             const position = slot.position;
-            const imageUrl = getSlotImageUrl(slot);
-            const businessName = getSlotBizName(slot);
-            const businessNo = getSlotBizNo(slot);
+
+            const imageUrl = pickImageUrl(slot);
+            const businessName = pickBizName(slot);
+            const businessNo = pickBizNo(slot);
 
             const container = getSlotContainerByPosition(position);
             if (!container) return;
@@ -898,8 +886,8 @@
                 if (!res.ok) return;
 
                 const json = await res.json();
-                const slot = json?.slot || {};
-                const imageUrl = getSlotImageUrl(slot);
+                const slot = json?.slot || null;
+                const imageUrl = slot ? pickImageUrl(slot) : "";
 
                 if ((json.ok || json.success) && imageUrl) {
                     if (img) {
@@ -908,7 +896,10 @@
                     }
                     if (defaultEl) defaultEl.classList.add("hidden");
                 } else {
-                    if (img) img.classList.add("hidden");
+                    if (img) {
+                        img.src = "";
+                        img.classList.add("hidden");
+                    }
                     if (defaultEl) defaultEl.classList.remove("hidden");
                 }
             } catch (err) {
@@ -938,6 +929,7 @@
                 const text =
                     data?.slot?.text_content ??
                     data?.slot?.content ??
+                    data?.slot?.text ??
                     data?.text?.content ??
                     "";
 
@@ -1400,7 +1392,6 @@
             });
         }
 
-
         // ============================
         // 광고 기간 관련 함수들
         // ============================
@@ -1428,7 +1419,7 @@
             };
 
             noEndCheckbox.addEventListener("change", applyState);
-            applyState(); // ✅ 모달 열기 전에도 상태 반영
+            applyState();
         }
 
         function resetAdPeriodFields() {
@@ -1483,9 +1474,8 @@
             };
         }
 
-
         // ============================
-        // 사업자번호 검색 UI 설정
+        // ✅ 사업자번호 검색 UI 설정 (문법 수정 완료 버전)
         // ============================
         function setupBizSearchUI() {
             const bizNoInput = document.getElementById("businessNoInput");
@@ -1500,31 +1490,39 @@
 
                 if (searchTimeout) clearTimeout(searchTimeout);
 
-                if (value.length < 3) { showBizResultBox(""); return; } searchTimeout = setTimeout(async () => {
+                if (value.length < 3) {
+                    showBizResultBox("");
+                    return;
+                }
+
+                searchTimeout = setTimeout(async () => {
                     try {
                         const res = await fetch(
                             `/manager/ad/store/search?bizNo=${encodeURIComponent(value)}`
                         );
 
-                        if (!res.ok) return;
+                        if (!res.ok) {
+                            showBizResultBox('<div class="p-2 text-xs text-slate-500">검색 API 응답 오류</div>');
+                            return;
+                        }
 
                         const data = await res.json();
 
                         if (data.ok && data.stores && data.stores.length > 0) {
                             const html = data.stores
                                 .map(store => `
-        <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
-            data-biz-no="${store.business_no || ''}" data-biz-name="${store.business_name || ''}">
-            <div class="font-semibold">${store.business_name || '상호명 없음'}</div>
-            <div class="text-slate-500">${store.business_no || '사업자번호 없음'}</div>
-            <div class="text-slate-400">[${store.store_type}] ID: ${store.id}</div>
-        </div>
-        `)
+                                    <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
+                                        data-biz-no="${store.business_no || store.biz_number || store.biz_no || ''}"
+                                        data-biz-name="${store.business_name || store.biz_name || ''}">
+                                        <div class="font-semibold">${store.business_name || store.biz_name || '상호명 없음'}</div>
+                                        <div class="text-slate-500">${store.business_no || store.biz_number || store.biz_no || '사업자번호 없음'}</div>
+                                        <div class="text-slate-400">[${store.store_type || 'type?'}] ID: ${store.id ?? '-'}</div>
+                                    </div>
+                                `)
                                 .join("");
 
                             showBizResultBox(html);
 
-                            // 클릭 이벤트 추가
                             document.querySelectorAll(".js-biz-item").forEach(item => {
                                 item.addEventListener("click", () => {
                                     const bizNo = item.dataset.bizNo || "";
@@ -1552,7 +1550,7 @@
         }
 
         // ============================
-        // 초기화
+        // ✅ 초기화
         // ============================
         document.addEventListener("DOMContentLoaded", async () => {
             // 헤더/푸터 로드
@@ -1578,13 +1576,7 @@
             setupSave();
             setupSaveText();
 
-            // ✅ 여기 교체
-            if (typeof setupNoEndToggle === "function") {
-                setupNoEndToggle();
-            } else {
-                console.warn("setupNoEndToggle is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
-            }
-
+            // ✅ 안전 호출
             if (typeof setupNoEndToggle === "function") {
                 setupNoEndToggle();
             } else {
@@ -1594,7 +1586,7 @@
             if (typeof setupBizSearchUI === "function") {
                 setupBizSearchUI();
             } else {
-                console.warn("setupBizSearchUI is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
+                console.warn("setupBizSearchUI is not defined.");
             }
 
             // Best Pick 그리드 렌더링 및 로드
