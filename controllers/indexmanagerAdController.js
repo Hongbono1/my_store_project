@@ -243,6 +243,7 @@ async function resolveStoreModeSlot(slot) {
       }`;
   }
 
+  // (추가) 마지막 보강: business_no가 있고 아직 image_url이 없으면 bizNo로 대표 이미지 조회
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
     const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
     if (rep) slot.image_url = rep;
@@ -421,7 +422,7 @@ export async function saveIndexStoreAd(req, res) {
     let patched = false;
 
     if ((enriched.image_url && enriched.image_url !== saved.image_url) ||
-      (enriched.link_url && enriched.link_url !== saved.link_url)) {
+        (enriched.link_url  && enriched.link_url  !== saved.link_url)) {
       await pool.query(
         `UPDATE admin_ad_slots
            SET image_url = COALESCE($1, image_url),

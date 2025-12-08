@@ -585,6 +585,81 @@
         // =========================================================
         // ✅ 상단(유틸/상수 근처)에 붙이는 가게/이미지 매핑 유틸
         // =========================================================
+        
+        // 절대 URL 보정
+        function toAbs(u) {
+            if (!u) return "";
+            if (/^https?:\/\//i.test(u)) return u;
+            return u.startsWith("/") ? u : ("/" + u);
+        }
+        
+        // 미리보기 <img>에 안전 세팅
+        function setPreview(imgEl, url) {
+            if (!imgEl) return;
+            if (url) {
+                imgEl.src = toAbs(url);
+                imgEl.alt = "slot image";
+            } else {
+                imgEl.src = "/assets/img/placeholder.svg";
+                imgEl.alt = "no image";
+            }
+        }
+
+        // 베스트 픽 슬롯 로더 공통 함수
+        async function loadBestPickSlot(slotPos) {
+            try {
+                const r = await fetch(`/manager/ad/slot?page=index&position=${encodeURIComponent(slotPos)}`);
+                const d = await r.json();
+                const img = document.querySelector(`img[data-preview="${slotPos}"]`);
+                const nameEl = document.querySelector(`[data-name="${slotPos}"]`);
+                const linkEl = document.querySelector(`a[data-link="${slotPos}"]`);
+                if (d?.success && d.slot) {
+                    setPreview(img, d.slot.image_url);
+                    if (nameEl) nameEl.textContent = d.slot.business_name || "";
+                    if (linkEl) {
+                        linkEl.href = d.slot.link_url ? toAbs(d.slot.link_url) : "#";
+                        linkEl.target = "_blank";
+                    }
+                } else {
+                    setPreview(img, "");
+                    if (nameEl) nameEl.textContent = "";
+                    if (linkEl) linkEl.removeAttribute("href");
+                }
+            } catch (e) {
+                console.warn("loadBestPickSlot error:", slotPos, e);
+            }
+        }
+
+        // 가게 연결 저장 핸들러
+        async function saveBestPickStore(slotPos) {
+            const bizNo   = (document.querySelector(`input[data-bizno="${slotPos}"]`)?.value || "").trim();
+            const bizName = (document.querySelector(`input[data-bizname="${slotPos}"]`)?.value || "").trim();
+            if (!bizNo || !bizName) {
+                alert("사업자번호와 상호명을 입력하세요.");
+                return;
+            }
+            const body = {
+                page: "index",
+                position: slotPos,
+                biz_number: bizNo,
+                biz_name: bizName,
+                no_end: true
+            };
+            const r = await fetch("/manager/ad/store", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            const d = await r.json();
+            if (!d?.ok) {
+                alert(d?.message || "저장 실패");
+                return;
+            }
+            // 저장 직후 즉시 로드(서버가 자동으로 image_url 채워서 내려줌)
+            await loadBestPickSlot(slotPos);
+            alert("가게가 연결되었습니다!");
+        }
+
         function pickImageUrl(slot) {
             return (
                 slot?.image_url ||
@@ -1650,6 +1725,17 @@
 
             // 우리동네 한마디 로드
             await loadOneWord();
+
+            // Best Pick 슬롯들 일괄 초기 로드
+            const bestPickPositions = [];
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                bestPickPositions.push(`best_pick_${i}`);
+            }
+            
+            // 순차적으로 로드
+            for (const position of bestPickPositions) {
+                await loadBestPickSlot(position);
+            }
         });
     </script>
 
