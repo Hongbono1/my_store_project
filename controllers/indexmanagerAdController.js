@@ -422,7 +422,7 @@ export async function saveIndexStoreAd(req, res) {
     let patched = false;
 
     if ((enriched.image_url && enriched.image_url !== saved.image_url) ||
-        (enriched.link_url  && enriched.link_url  !== saved.link_url)) {
+      (enriched.link_url && enriched.link_url !== saved.link_url)) {
       await pool.query(
         `UPDATE admin_ad_slots
            SET image_url = COALESCE($1, image_url),
@@ -614,14 +614,26 @@ export async function saveIndexTextSlot(req, res) {
  * ✅ Best Pick 광고 슬롯 목록 조회
  * GET /manager/ad/best-pick
  * ============================================================ */
+/* ============================================================
+ * ✅ Best Pick 광고 슬롯 목록 조회
+ * GET /manager/ad/best-pick
+ * ============================================================ */
 export async function getBestPickSlots(req, res) {
   try {
     const adSlotsQuery = `
-      SELECT page, position, image_url, link_url, business_name, slot_mode, store_id
+      SELECT 
+        page, position, image_url, link_url,
+        business_name, business_no, slot_mode, store_id
       FROM admin_ad_slots
       WHERE page = 'index'
         AND position LIKE 'best_pick_%'
-        AND (image_url IS NOT NULL OR business_name IS NOT NULL OR link_url IS NOT NULL OR slot_mode IS NOT NULL)
+        AND (
+          image_url IS NOT NULL
+          OR business_name IS NOT NULL
+          OR link_url IS NOT NULL
+          OR slot_mode IS NOT NULL
+          OR business_no IS NOT NULL
+        )
       ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
     `;
 
@@ -662,6 +674,7 @@ export async function getBestPickSlots(req, res) {
     });
   }
 }
+
 
 /* ============================================================
  * ✅ 사업자번호 기반 가게 검색
