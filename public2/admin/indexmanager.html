@@ -668,18 +668,130 @@
             return document.querySelector(`.js-slot[data-position="${position}"]`);
         }
 
+        // ✅ Best Pick 슬롯 렌더링 개선
+        function renderBestPickGridInline() {
+            const container = document.getElementById("bestPickGrid");
+            if (!container) return;
+
+            container.innerHTML = "";
+
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+
+                const card = document.createElement("div");
+                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
+                card.id = slotId;
+                card.setAttribute("data-page", "index");
+                card.setAttribute("data-position", position);
+                card.setAttribute("data-label", `Best Pick ${i}`);
+
+                card.innerHTML = `
+                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
+                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
+                        <div class="text-center px-2">
+                            <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                                <span class="text-xs text-gray-500">${i}</span>
+                            </div>
+                            <p class="text-[11px] font-medium">Best Pick ${i}</p>
+                            <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
+                        </div>
+                    </div>
+                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
+                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
+                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            }
+        }
+
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
+        async function loadBestPickInlineSlots() {
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
+            }
+        }
+
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
+
+                if (json.success && json.slot) {
+                    const slot = json.slot;
+                    const imageUrl = slot.image_url || "";
+                    const businessName = slot.business_name || "";
+                    const businessNo = slot.business_no || "";
+
+                    // 이미지 처리
+                    if (imageUrl) {
+                        if (img) {
+                            img.src = imageUrl;
+                            img.classList.remove("hidden");
+                        }
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    } else {
+                        if (img) img.classList.add("hidden");
+                        if (defaultEl) defaultEl.classList.remove("hidden");
+                    }
+
+                    // 가게 정보 표시
+                    if (businessName || businessNo) {
+                        if (storeName) storeName.textContent = businessName || "상호명 없음";
+                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                        if (storeInfo) storeInfo.classList.remove("hidden");
+                    } else {
+                        if (storeInfo) storeInfo.classList.add("hidden");
+                    }
+                } else {
+                    // 기본 상태로 리셋
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (storeInfo) storeInfo.classList.add("hidden");
+                }
+            } catch (err) {
+                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
         function applyBannerSlotToDom(slot) {
             if (!slot) return;
 
             const position = slot.position;
             const imageUrl = slot.image_url || slot.image || "";
+            const businessName = slot.business_name || "";
+            const businessNo = slot.business_no || "";
 
             const container = getSlotContainerByPosition(position);
             if (!container) return;
 
             const img = container.querySelector(".slot-img");
             const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
 
+            // 이미지 처리
             if (imageUrl) {
                 if (img) {
                     img.src = imageUrl;
@@ -692,6 +804,13 @@
                     img.classList.add("hidden");
                 }
                 if (defaultEl) defaultEl.classList.remove("hidden");
+            }
+
+            // Best Pick 가게 정보 처리
+            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+                if (storeName) storeName.textContent = businessName || "상호명 없음";
+                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                if (storeInfo) storeInfo.classList.remove("hidden");
             }
         }
 
@@ -832,7 +951,7 @@
             return `best_pick_${n}`;
         }
 
-        // ✅ 핵심 수정: .slot-img / .slot-default 구조 포함
+        // ✅ Best Pick 슬롯 렌더링 개선
         function renderBestPickGridInline() {
             const container = document.getElementById("bestPickGrid");
             if (!container) return;
@@ -844,15 +963,15 @@
                 const position = bestPickPosition(i);
 
                 const card = document.createElement("div");
-                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center";
+                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
                 card.id = slotId;
                 card.setAttribute("data-page", "index");
                 card.setAttribute("data-position", position);
                 card.setAttribute("data-label", `Best Pick ${i}`);
 
                 card.innerHTML = `
-                    <img class="slot-img hidden rounded-xl" alt="Best Pick ${i}">
-                    <div class="slot-default rounded-xl w-full h-full">
+                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
+                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
                         <div class="text-center px-2">
                             <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
                                 <span class="text-xs text-gray-500">${i}</span>
@@ -861,17 +980,969 @@
                             <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
                         </div>
                     </div>
+                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
+                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
+                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
+                    </div>
                 `;
 
                 container.appendChild(card);
             }
         }
 
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
         async function loadBestPickInlineSlots() {
             for (let i = 1; i <= BEST_PICK_MAX; i++) {
                 const slotId = bestPickSlotId(i);
                 const position = bestPickPosition(i);
-                await loadBannerSlotById(slotId, "index", position);
+                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
+            }
+        }
+
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
+
+                if (json.success && json.slot) {
+                    const slot = json.slot;
+                    const imageUrl = slot.image_url || "";
+                    const businessName = slot.business_name || "";
+                    const businessNo = slot.business_no || "";
+
+                    // 이미지 처리
+                    if (imageUrl) {
+                        if (img) {
+                            img.src = imageUrl;
+                            img.classList.remove("hidden");
+                        }
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    } else {
+                        if (img) img.classList.add("hidden");
+                        if (defaultEl) defaultEl.classList.remove("hidden");
+                    }
+
+                    // 가게 정보 표시
+                    if (businessName || businessNo) {
+                        if (storeName) storeName.textContent = businessName || "상호명 없음";
+                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                        if (storeInfo) storeInfo.classList.remove("hidden");
+                    } else {
+                        if (storeInfo) storeInfo.classList.add("hidden");
+                    }
+                } else {
+                    // 기본 상태로 리셋
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (storeInfo) storeInfo.classList.add("hidden");
+                }
+            } catch (err) {
+                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
+        function applyBannerSlotToDom(slot) {
+            if (!slot) return;
+
+            const position = slot.position;
+            const imageUrl = slot.image_url || slot.image || "";
+            const businessName = slot.business_name || "";
+            const businessNo = slot.business_no || "";
+
+            const container = getSlotContainerByPosition(position);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            // 이미지 처리
+            if (imageUrl) {
+                if (img) {
+                    img.src = imageUrl;
+                    img.classList.remove("hidden");
+                }
+                if (defaultEl) defaultEl.classList.add("hidden");
+            } else {
+                if (img) {
+                    img.src = "";
+                    img.classList.add("hidden");
+                }
+                if (defaultEl) defaultEl.classList.remove("hidden");
+            }
+
+            // Best Pick 가게 정보 처리
+            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+                if (storeName) storeName.textContent = businessName || "상호명 없음";
+                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                if (storeInfo) storeInfo.classList.remove("hidden");
+            }
+        }
+
+        // ============================
+        // 슬롯 로드 (이미지 배너)
+        // ============================
+        async function loadBannerSlotById(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                const imageUrl =
+                    json?.slot?.image_url ||
+                    json?.slot?.image ||
+                    "";
+
+                if ((json.ok || json.success) && imageUrl) {
+                    if (img) {
+                        img.src = imageUrl;
+                        img.classList.remove("hidden");
+                    }
+                    if (defaultEl) defaultEl.classList.add("hidden");
+                } else {
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                }
+            } catch (err) {
+                console.error(`슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ============================
+        // ✅ 슬롯 로드 (텍스트)
+        // ============================
+        async function loadTextSlotById(slotId, page, position, fallbackRenderer) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const textBox = container.querySelector(".slot-default-text") || container;
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                    return;
+                }
+
+                const data = await res.json();
+                const text =
+                    data?.slot?.text_content ??
+                    data?.slot?.content ??
+                    data?.text?.content ??
+                    "";
+
+                if (data && data.ok && text) {
+                    if (isListTextPosition(position)) {
+                        textBox.innerHTML = formatListHTMLFromRaw(text);
+                    } else {
+                        textBox.innerHTML = text;
+                    }
+                } else {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                }
+            } catch (err) {
+                console.error("텍스트 슬롯 로드 실패:", err);
+                if (fallbackRenderer) fallbackRenderer(container);
+            }
+        }
+
+        // ============================
+        // 우리동네 한마디
+        // ============================
+        async function loadOneWord() {
+            const contentEl = document.getElementById("oneword-content");
+            if (!contentEl) return;
+
+            try {
+                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
+                if (slotRes.ok) {
+                    const slotJson = await slotRes.json();
+                    const text =
+                        slotJson?.slot?.text_content ??
+                        slotJson?.slot?.content ??
+                        slotJson?.text?.content ??
+                        "";
+
+                    if (slotJson.ok && text) {
+                        contentEl.innerHTML = text;
+                        return;
+                    }
+                }
+
+                const userRegion = localStorage.getItem("userRegion") || "의정부";
+                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
+
+                if (onewordRes.ok) {
+                    const onewordData = await onewordRes.json();
+                    let displayMessage = onewordData.message;
+
+                    if (onewordData.keyword) {
+                        displayMessage = displayMessage.replace(
+                            `'${onewordData.keyword}'`,
+                            `<span class="text-orange-500">'${onewordData.keyword}'</span>`
+                        );
+                    }
+                    contentEl.innerHTML = displayMessage;
+                } else {
+                    contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+                }
+
+            } catch (err) {
+                console.error("우리동네 한마디 로드 실패:", err);
+                contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+            }
+        }
+
+        // ============================
+        // ✅ Best Pick 슬롯 (원래 위치용)
+        // ============================
+        const BEST_PICK_MAX = 18;
+
+        function bestPickSlotId(n) {
+            return `slot_best_pick_${n}`;
+        }
+
+        function bestPickPosition(n) {
+            return `best_pick_${n}`;
+        }
+
+        // ✅ Best Pick 슬롯 렌더링 개선
+        function renderBestPickGridInline() {
+            const container = document.getElementById("bestPickGrid");
+            if (!container) return;
+
+            container.innerHTML = "";
+
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+
+                const card = document.createElement("div");
+                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
+                card.id = slotId;
+                card.setAttribute("data-page", "index");
+                card.setAttribute("data-position", position);
+                card.setAttribute("data-label", `Best Pick ${i}`);
+
+                card.innerHTML = `
+                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
+                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
+                        <div class="text-center px-2">
+                            <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                                <span class="text-xs text-gray-500">${i}</span>
+                            </div>
+                            <p class="text-[11px] font-medium">Best Pick ${i}</p>
+                            <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
+                        </div>
+                    </div>
+                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
+                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
+                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            }
+        }
+
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
+        async function loadBestPickInlineSlots() {
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
+            }
+        }
+
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
+
+                if (json.success && json.slot) {
+                    const slot = json.slot;
+                    const imageUrl = slot.image_url || "";
+                    const businessName = slot.business_name || "";
+                    const businessNo = slot.business_no || "";
+
+                    // 이미지 처리
+                    if (imageUrl) {
+                        if (img) {
+                            img.src = imageUrl;
+                            img.classList.remove("hidden");
+                        }
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    } else {
+                        if (img) img.classList.add("hidden");
+                        if (defaultEl) defaultEl.classList.remove("hidden");
+                    }
+
+                    // 가게 정보 표시
+                    if (businessName || businessNo) {
+                        if (storeName) storeName.textContent = businessName || "상호명 없음";
+                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                        if (storeInfo) storeInfo.classList.remove("hidden");
+                    } else {
+                        if (storeInfo) storeInfo.classList.add("hidden");
+                    }
+                } else {
+                    // 기본 상태로 리셋
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (storeInfo) storeInfo.classList.add("hidden");
+                }
+            } catch (err) {
+                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
+        function applyBannerSlotToDom(slot) {
+            if (!slot) return;
+
+            const position = slot.position;
+            const imageUrl = slot.image_url || slot.image || "";
+            const businessName = slot.business_name || "";
+            const businessNo = slot.business_no || "";
+
+            const container = getSlotContainerByPosition(position);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            // 이미지 처리
+            if (imageUrl) {
+                if (img) {
+                    img.src = imageUrl;
+                    img.classList.remove("hidden");
+                }
+                if (defaultEl) defaultEl.classList.add("hidden");
+            } else {
+                if (img) {
+                    img.src = "";
+                    img.classList.add("hidden");
+                }
+                if (defaultEl) defaultEl.classList.remove("hidden");
+            }
+
+            // Best Pick 가게 정보 처리
+            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+                if (storeName) storeName.textContent = businessName || "상호명 없음";
+                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                if (storeInfo) storeInfo.classList.remove("hidden");
+            }
+        }
+
+        // ============================
+        // 슬롯 로드 (이미지 배너)
+        // ============================
+        async function loadBannerSlotById(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                const imageUrl =
+                    json?.slot?.image_url ||
+                    json?.slot?.image ||
+                    "";
+
+                if ((json.ok || json.success) && imageUrl) {
+                    if (img) {
+                        img.src = imageUrl;
+                        img.classList.remove("hidden");
+                    }
+                    if (defaultEl) defaultEl.classList.add("hidden");
+                } else {
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                }
+            } catch (err) {
+                console.error(`슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ============================
+        // ✅ 슬롯 로드 (텍스트)
+        // ============================
+        async function loadTextSlotById(slotId, page, position, fallbackRenderer) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const textBox = container.querySelector(".slot-default-text") || container;
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                    return;
+                }
+
+                const data = await res.json();
+                const text =
+                    data?.slot?.text_content ??
+                    data?.slot?.content ??
+                    data?.text?.content ??
+                    "";
+
+                if (data && data.ok && text) {
+                    if (isListTextPosition(position)) {
+                        textBox.innerHTML = formatListHTMLFromRaw(text);
+                    } else {
+                        textBox.innerHTML = text;
+                    }
+                } else {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                }
+            } catch (err) {
+                console.error("텍스트 슬롯 로드 실패:", err);
+                if (fallbackRenderer) fallbackRenderer(container);
+            }
+        }
+
+        // ============================
+        // 우리동네 한마디
+        // ============================
+        async function loadOneWord() {
+            const contentEl = document.getElementById("oneword-content");
+            if (!contentEl) return;
+
+            try {
+                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
+                if (slotRes.ok) {
+                    const slotJson = await slotRes.json();
+                    const text =
+                        slotJson?.slot?.text_content ??
+                        slotJson?.slot?.content ??
+                        slotJson?.text?.content ??
+                        "";
+
+                    if (slotJson.ok && text) {
+                        contentEl.innerHTML = text;
+                        return;
+                    }
+                }
+
+                const userRegion = localStorage.getItem("userRegion") || "의정부";
+                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
+
+                if (onewordRes.ok) {
+                    const onewordData = await onewordRes.json();
+                    let displayMessage = onewordData.message;
+
+                    if (onewordData.keyword) {
+                        displayMessage = displayMessage.replace(
+                            `'${onewordData.keyword}'`,
+                            `<span class="text-orange-500">'${onewordData.keyword}'</span>`
+                        );
+                    }
+                    contentEl.innerHTML = displayMessage;
+                } else {
+                    contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+                }
+
+            } catch (err) {
+                console.error("우리동네 한마디 로드 실패:", err);
+                contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+            }
+        }
+
+        // ============================
+        // ✅ Best Pick 슬롯 (원래 위치용)
+        // ============================
+        const BEST_PICK_MAX = 18;
+
+        function bestPickSlotId(n) {
+            return `slot_best_pick_${n}`;
+        }
+
+        function bestPickPosition(n) {
+            return `best_pick_${n}`;
+        }
+
+        // ✅ Best Pick 슬롯 렌더링 개선
+        function renderBestPickGridInline() {
+            const container = document.getElementById("bestPickGrid");
+            if (!container) return;
+
+            container.innerHTML = "";
+
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+
+                const card = document.createElement("div");
+                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
+                card.id = slotId;
+                card.setAttribute("data-page", "index");
+                card.setAttribute("data-position", position);
+                card.setAttribute("data-label", `Best Pick ${i}`);
+
+                card.innerHTML = `
+                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
+                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
+                        <div class="text-center px-2">
+                            <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                                <span class="text-xs text-gray-500">${i}</span>
+                            </div>
+                            <p class="text-[11px] font-medium">Best Pick ${i}</p>
+                            <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
+                        </div>
+                    </div>
+                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
+                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
+                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            }
+        }
+
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
+        async function loadBestPickInlineSlots() {
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
+            }
+        }
+
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
+
+                if (json.success && json.slot) {
+                    const slot = json.slot;
+                    const imageUrl = slot.image_url || "";
+                    const businessName = slot.business_name || "";
+                    const businessNo = slot.business_no || "";
+
+                    // 이미지 처리
+                    if (imageUrl) {
+                        if (img) {
+                            img.src = imageUrl;
+                            img.classList.remove("hidden");
+                        }
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    } else {
+                        if (img) img.classList.add("hidden");
+                        if (defaultEl) defaultEl.classList.remove("hidden");
+                    }
+
+                    // 가게 정보 표시
+                    if (businessName || businessNo) {
+                        if (storeName) storeName.textContent = businessName || "상호명 없음";
+                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                        if (storeInfo) storeInfo.classList.remove("hidden");
+                    } else {
+                        if (storeInfo) storeInfo.classList.add("hidden");
+                    }
+                } else {
+                    // 기본 상태로 리셋
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (storeInfo) storeInfo.classList.add("hidden");
+                }
+            } catch (err) {
+                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
+        function applyBannerSlotToDom(slot) {
+            if (!slot) return;
+
+            const position = slot.position;
+            const imageUrl = slot.image_url || slot.image || "";
+            const businessName = slot.business_name || "";
+            const businessNo = slot.business_no || "";
+
+            const container = getSlotContainerByPosition(position);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            // 이미지 처리
+            if (imageUrl) {
+                if (img) {
+                    img.src = imageUrl;
+                    img.classList.remove("hidden");
+                }
+                if (defaultEl) defaultEl.classList.add("hidden");
+            } else {
+                if (img) {
+                    img.src = "";
+                    img.classList.add("hidden");
+                }
+                if (defaultEl) defaultEl.classList.remove("hidden");
+            }
+
+            // Best Pick 가게 정보 처리
+            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+                if (storeName) storeName.textContent = businessName || "상호명 없음";
+                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                if (storeInfo) storeInfo.classList.remove("hidden");
+            }
+        }
+
+        // ============================
+        // 슬롯 로드 (이미지 배너)
+        // ============================
+        async function loadBannerSlotById(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                const imageUrl =
+                    json?.slot?.image_url ||
+                    json?.slot?.image ||
+                    "";
+
+                if ((json.ok || json.success) && imageUrl) {
+                    if (img) {
+                        img.src = imageUrl;
+                        img.classList.remove("hidden");
+                    }
+                    if (defaultEl) defaultEl.classList.add("hidden");
+                } else {
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                }
+            } catch (err) {
+                console.error(`슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ============================
+        // ✅ 슬롯 로드 (텍스트)
+        // ============================
+        async function loadTextSlotById(slotId, page, position, fallbackRenderer) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const textBox = container.querySelector(".slot-default-text") || container;
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                    return;
+                }
+
+                const data = await res.json();
+                const text =
+                    data?.slot?.text_content ??
+                    data?.slot?.content ??
+                    data?.text?.content ??
+                    "";
+
+                if (data && data.ok && text) {
+                    if (isListTextPosition(position)) {
+                        textBox.innerHTML = formatListHTMLFromRaw(text);
+                    } else {
+                        textBox.innerHTML = text;
+                    }
+                } else {
+                    if (fallbackRenderer) fallbackRenderer(container);
+                }
+            } catch (err) {
+                console.error("텍스트 슬롯 로드 실패:", err);
+                if (fallbackRenderer) fallbackRenderer(container);
+            }
+        }
+
+        // ============================
+        // 우리동네 한마디
+        // ============================
+        async function loadOneWord() {
+            const contentEl = document.getElementById("oneword-content");
+            if (!contentEl) return;
+
+            try {
+                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
+                if (slotRes.ok) {
+                    const slotJson = await slotRes.json();
+                    const text =
+                        slotJson?.slot?.text_content ??
+                        slotJson?.slot?.content ??
+                        slotJson?.text?.content ??
+                        "";
+
+                    if (slotJson.ok && text) {
+                        contentEl.innerHTML = text;
+                        return;
+                    }
+                }
+
+                const userRegion = localStorage.getItem("userRegion") || "의정부";
+                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
+
+                if (onewordRes.ok) {
+                    const onewordData = await onewordRes.json();
+                    let displayMessage = onewordData.message;
+
+                    if (onewordData.keyword) {
+                        displayMessage = displayMessage.replace(
+                            `'${onewordData.keyword}'`,
+                            `<span class="text-orange-500">'${onewordData.keyword}'</span>`
+                        );
+                    }
+                    contentEl.innerHTML = displayMessage;
+                } else {
+                    contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+                }
+
+            } catch (err) {
+                console.error("우리동네 한마디 로드 실패:", err);
+                contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
+            }
+        }
+
+        // ============================
+        // ✅ Best Pick 슬롯 (원래 위치용)
+        // ============================
+        const BEST_PICK_MAX = 18;
+
+        function bestPickSlotId(n) {
+            return `slot_best_pick_${n}`;
+        }
+
+        function bestPickPosition(n) {
+            return `best_pick_${n}`;
+        }
+
+        // ✅ Best Pick 슬롯 렌더링 개선
+        function renderBestPickGridInline() {
+            const container = document.getElementById("bestPickGrid");
+            if (!container) return;
+
+            container.innerHTML = "";
+
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+
+                const card = document.createElement("div");
+                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
+                card.id = slotId;
+                card.setAttribute("data-page", "index");
+                card.setAttribute("data-position", position);
+                card.setAttribute("data-label", `Best Pick ${i}`);
+
+                card.innerHTML = `
+                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
+                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
+                        <div class="text-center px-2">
+                            <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                                <span class="text-xs text-gray-500">${i}</span>
+                            </div>
+                            <p class="text-[11px] font-medium">Best Pick ${i}</p>
+                            <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
+                        </div>
+                    </div>
+                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
+                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
+                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            }
+        }
+
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
+        async function loadBestPickInlineSlots() {
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const slotId = bestPickSlotId(i);
+                const position = bestPickPosition(i);
+                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
+            }
+        }
+
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
+            const container = document.getElementById(slotId);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
+                );
+                if (!res.ok) return;
+
+                const json = await res.json();
+                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
+
+                if (json.success && json.slot) {
+                    const slot = json.slot;
+                    const imageUrl = slot.image_url || "";
+                    const businessName = slot.business_name || "";
+                    const businessNo = slot.business_no || "";
+
+                    // 이미지 처리
+                    if (imageUrl) {
+                        if (img) {
+                            img.src = imageUrl;
+                            img.classList.remove("hidden");
+                        }
+                        if (defaultEl) defaultEl.classList.add("hidden");
+                    } else {
+                        if (img) img.classList.add("hidden");
+                        if (defaultEl) defaultEl.classList.remove("hidden");
+                    }
+
+                    // 가게 정보 표시
+                    if (businessName || businessNo) {
+                        if (storeName) storeName.textContent = businessName || "상호명 없음";
+                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                        if (storeInfo) storeInfo.classList.remove("hidden");
+                    } else {
+                        if (storeInfo) storeInfo.classList.add("hidden");
+                    }
+                } else {
+                    // 기본 상태로 리셋
+                    if (img) img.classList.add("hidden");
+                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (storeInfo) storeInfo.classList.add("hidden");
+                }
+            } catch (err) {
+                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
+            }
+        }
+
+        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
+        function applyBannerSlotToDom(slot) {
+            if (!slot) return;
+
+            const position = slot.position;
+            const imageUrl = slot.image_url || slot.image || "";
+            const businessName = slot.business_name || "";
+            const businessNo = slot.business_no || "";
+
+            const container = getSlotContainerByPosition(position);
+            if (!container) return;
+
+            const img = container.querySelector(".slot-img");
+            const defaultEl = container.querySelector(".slot-default");
+            const storeInfo = container.querySelector(".slot-store-info");
+            const storeName = container.querySelector("[data-store-name]");
+            const storeBiz = container.querySelector("[data-store-biz]");
+
+            // 이미지 처리
+            if (imageUrl) {
+                if (img) {
+                    img.src = imageUrl;
+                    img.classList.remove("hidden");
+                }
+                if (defaultEl) defaultEl.classList.add("hidden");
+            } else {
+                if (img) {
+                    img.src = "";
+                    img.classList.add("hidden");
+                }
+                if (defaultEl) defaultEl.classList.remove("hidden");
+            }
+
+            // Best Pick 가게 정보 처리
+            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+                if (storeName) storeName.textContent = businessName || "상호명 없음";
+                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+                if (storeInfo) storeInfo.classList.remove("hidden");
             }
         }
 
@@ -1262,6 +2333,7 @@
                         });
 
                         const data = await res.json();
+                        console.log("가게 연결 응답:", data);
 
                         if (data.ok) {
                             alert("가게가 이 슬롯에 연결되었습니다.");
@@ -1275,13 +2347,14 @@
                             showBizResultBox("");
                             resetAdPeriodFields();
 
-                            if (data.slot) {
-                                applyBannerSlotToDom(data.slot);
-                            }
-
+                            // ✅ Best Pick 슬롯이면 특별 처리
                             if (String(position).startsWith("best_pick_")) {
-                                await loadBestPickInlineSlots();
+                                const slotId = bestPickSlotId(parseInt(position.replace("best_pick_", "")));
+                                await loadBestPickSlotWithStoreInfo(slotId, page, position);
                             } else {
+                                if (data.slot) {
+                                    applyBannerSlotToDom(data.slot);
+                                }
                                 await loadBannerSlotById(`slot_${position}`, page, position);
                             }
                         } else {
@@ -1448,7 +2521,9 @@
         // ============================
         function setupBestPickReloadBtn() {
             document.getElementById("btnBestPickReload")?.addEventListener("click", async () => {
+                console.log("Best Pick 새로고침 시작...");
                 await loadBestPickInlineSlots();
+                console.log("Best Pick 새로고침 완료");
             });
         }
 
