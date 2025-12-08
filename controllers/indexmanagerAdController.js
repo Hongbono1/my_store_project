@@ -1,6 +1,36 @@
 // controllers/indexmanagerAdController.js
 import pool from "../db.js";
 
+// ✅ 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
+function pickBody(req) {
+  const b = req.body || {};
+
+  return {
+    page: b.page,
+    position: b.position,
+
+    // 모드/타입
+    slotType: b.slotType || b.slot_type,
+    slotMode: b.slotMode || b.slot_mode,
+
+    // 링크
+    linkUrl: b.linkUrl || b.link_url || b.link,
+
+    // 텍스트
+    textContent: b.textContent || b.text_content || b.content,
+
+    // 가게 연결용
+    storeId: b.storeId || b.store_id,
+    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo || b.business_number,
+    businessName: b.businessName || b.business_name || b.biz_name,
+
+    // 기간
+    startDate: b.startDate || b.start_date || null,
+    endDate: b.endDate || b.end_date || null,
+    noEnd: b.noEnd || b.no_end || false,
+  };
+}
+
 /**
  * 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
  * - 업로드/가게연결/텍스트/기간 공통 대응
@@ -51,13 +81,20 @@ function ensurePagePosition(page, position) {
  *  - bizNo로 combined_store_info → store_info 순으로 대표 이미지 찾기
  *  - /data/uploads/* → /uploads/* 로 표준화
  * ========================= */
+/* =========================
+ * ✅ 대표 이미지 조회 유틸 (Neon 구조 기준)
+ * - combined_store_info: business_number + main_image_url
+ * - fallback: business_cert_path
+ * - food_stores 등 다른 테이블도 방어적으로 지원
+ * ========================= */
+
 function normalizeUploadPath(p) {
   if (!p) return null;
   const s = String(p).trim();
   if (!s) return null;
   if (s.startsWith("/data/uploads/")) return s.replace("/data/uploads", "/uploads");
   if (s.startsWith("uploads/")) return "/" + s.replace(/^\/?/, "");
-  return s; // 절대 URL은 그대로
+  return s;
 }
 
 // ✅ 컬럼 존재 여부 체크
@@ -79,19 +116,28 @@ async function buildSafeOrderClause(table) {
   if (await hasColumn(table, "updated_at")) return "updated_at DESC NULLS LAST, id DESC";
   if (await hasColumn(table, "created_at")) return "created_at DESC NULLS LAST, id DESC";
   if (await hasColumn(table, "id")) return "id DESC";
-  return "1"; // 최후 fallback
+  return "1";
 }
 
-// ✅ image 후보 컬럼 탐색
+// ✅ image 후보 컬럼 탐색 (Neon 우선순위 반영)
 async function findImageColumns(table) {
   const candidates = [
-    "main_img", "main_image", "image1", "image2", "image3",
-    "image_url", "thumbnail_url", "thumb_url",
-    "main_image_url", "banner_image_url",
+    // ✅ Neon combined_store_info 신규 컬럼
+    "main_image_url",
+
+    // ✅ 임시/보조
+    "business_cert_path",
+
+    // 일반 후보
+    "main_img", "main_image",
+    "image1", "image2", "image3",
+    "image_url",
+    "thumbnail_url", "thumb_url",
+    "banner_image_url",
     "img1", "img2", "img3",
     "photo1", "photo2", "photo3",
     "store_image", "store_main_image",
-    "represent_img", "rep_img",
+    "rep_img", "represent_img",
     "images"
   ];
 
@@ -107,16 +153,20 @@ async function findImageColumns(table) {
           OR column_name ILIKE '%photo%'
           OR column_name ILIKE '%thumb%'
         )
-      ORDER BY column_name`,
+      ORDER BY array_position($2::text[], column_name) NULLS LAST, column_name`,
     [table, candidates]
   );
 
   return rows.map(r => r.column_name);
 }
 
-// ✅ information_schema로 테이블 내 '사업자번호' 후보 컬럼 탐색
+// ✅ 사업자번호 컬럼 탐색 (Neon 우선)
 async function findBizNoColumn(table) {
   const candidates = [
+    // ✅ Neon combined_store_info 실제 컬럼
+    "business_number",
+
+    // 일반 후보
     "business_no", "biz_no", "biz_number", "business_number",
     "registration_no", "reg_no", "brn", "corp_no"
   ];
@@ -135,7 +185,7 @@ async function findBizNoColumn(table) {
   return rows[0]?.column_name || null;
 }
 
-// ✅ 숫자만 비교하는 WHERE 절 생성 (컬럼 없으면 FALSE)
+// ✅ 숫자만 비교하는 WHERE 절 생성
 async function buildBizNoWhere(table) {
   const col = await findBizNoColumn(table);
   if (!col) return { where: "FALSE", col: null };
@@ -143,13 +193,41 @@ async function buildBizNoWhere(table) {
   return { where, col };
 }
 
-/* =========================
- * ✅ 대표 이미지 조회 유틸(완전 방어형)
- *  - bizNo로 combined_store_info → store_info → food_stores 순서 탐색
- *  - 존재하는 이미지 컬럼만 대상으로 안전하게 조회
- * ========================= */
+// ✅ 다양한 컬럼/형태를 고려해 대표 이미지 후보 추출
+function pickStoreImage(storeRow) {
+  if (!storeRow) return "";
 
-// ✅ 대표 이미지 후보를 테이블에서 안전 추출
+  const candidates = [
+    // ✅ Neon 대표 컬럼 우선
+    "main_image_url",
+    "business_cert_path",
+
+    // 일반 후보
+    "image_url", "thumbnail_url", "thumb_url",
+    "main_image_url", "banner_image_url",
+    "main_img", "main_image",
+    "image1", "img1", "photo1",
+    "store_image", "store_main_image"
+  ];
+
+  for (const key of candidates) {
+    const v = storeRow[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+
+  const images = storeRow.images;
+  if (Array.isArray(images) && images[0]) return String(images[0]);
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
+    } catch (_) { }
+  }
+
+  return "";
+}
+
+// ✅ bizNo 기준 테이블에서 대표이미지 1개 뽑기
 async function pickRepFromTableByBiz(table, biz) {
   const { where } = await buildBizNoWhere(table);
   if (!where || where === "FALSE") return null;
@@ -157,11 +235,12 @@ async function pickRepFromTableByBiz(table, biz) {
   const cols = await findImageColumns(table);
   if (!cols.length) return null;
 
-  const hasImages = cols.includes("images");
-  const simpleCols = cols.filter(c => c !== "images");
   const orderClause = await buildSafeOrderClause(table);
 
-  // 1) 문자열 컬럼 우선
+  // images 제외한 문자열 컬럼 우선
+  const hasImages = cols.includes("images");
+  const simpleCols = cols.filter(c => c !== "images");
+
   if (simpleCols.length) {
     const expr = simpleCols
       .map(c => `NULLIF(TRIM(COALESCE(${c}::text,'')), '')`)
@@ -181,7 +260,6 @@ async function pickRepFromTableByBiz(table, biz) {
 
     if (row?.rep) return normalizeUploadPath(row.rep);
 
-    // 2) images fallback
     if (hasImages && row?.images) {
       const raw = row.images;
       if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
@@ -191,11 +269,10 @@ async function pickRepFromTableByBiz(table, biz) {
           if (Array.isArray(parsed) && parsed[0]) {
             return normalizeUploadPath(String(parsed[0]));
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     }
   } else if (hasImages) {
-    // images만 있는 케이스
     const sql = `
       SELECT images
       FROM ${table}
@@ -204,20 +281,42 @@ async function pickRepFromTableByBiz(table, biz) {
       LIMIT 1
     `;
     const r = await pool.query(sql, [biz]);
-    const row = r.rows?.[0];
-    const raw = row?.images;
+    const raw = r.rows?.[0]?.images;
 
     if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
     if (typeof raw === "string") {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed[0]) return normalizeUploadPath(String(parsed[0]));
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
   return null;
 }
+
+// ✅ [교체 대상] 대표 이미지 조회 유틸 (Neon 최적화)
+export async function getRepImageByBizNo(bizNoRaw) {
+  if (!bizNoRaw) return null;
+
+  const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
+  if (!biz) return null;
+
+  // ✅ 우선순위: combined_store_info → food_stores → store_info
+  const tables = ["combined_store_info", "food_stores", "store_info"];
+
+  for (const t of tables) {
+    try {
+      const rep = await pickRepFromTableByBiz(t, biz);
+      if (rep) return rep;
+    } catch (e) {
+      console.warn(`[getRepImageByBizNo] ${t} 스킵:`, e.message);
+    }
+  }
+
+  return null;
+}
+
 
 // ✅ [필수] resolveStoreModeSlot이 직접 호출하는 함수
 export async function getRepImageByBizNo(bizNoRaw) {
@@ -376,7 +475,7 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
       );
       if (r.rows[0]?.id) return Number(r.rows[0].id);
     }
-  } catch {}
+  } catch { }
 
   try {
     const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
@@ -391,7 +490,7 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
       );
       if (r.rows[0]?.id) return Number(r.rows[0].id);
     }
-  } catch {}
+  } catch { }
 
   return null;
 }
@@ -445,11 +544,12 @@ async function resolveStoreModeSlot(slot) {
     slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType}`;
   }
 
-  // 마지막 보강: bizNo 기반 대표이미지
+  // (추가) 마지막 보강: business_no가 있고 아직 image_url이 없으면 bizNo로 대표 이미지 조회
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
     const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
     if (rep) slot.image_url = rep;
   }
+
 
   return slot;
 }
