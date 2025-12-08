@@ -394,7 +394,6 @@
     <!-- ======================== -->
     <!-- 🎛 광고/이미지/텍스트 등록 모달 -->
     <!-- ======================== -->
-    <!-- AFTER -->
     <div id="adModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
         <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200
               flex flex-col max-h-[85vh] overflow-hidden">
@@ -477,10 +476,39 @@
                         </div>
                     </div>
 
-                    <!-- 광고 기간 -->
+                    <!-- ✅ 광고 기간 (누락분 보강) -->
                     <div class="mt-2 border-t border-slate-100 pt-3">
-                        <!-- (내용 동일) -->
-                        <!-- ... 시작/종료 입력 ... -->
+                        <label class="block font-semibold mb-2 text-sm">광고 기간</label>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <!-- 시작 -->
+                            <div>
+                                <div class="text-xs text-slate-500 mb-1">시작</div>
+                                <div class="flex gap-2">
+                                    <input id="startDateInput" type="date"
+                                        class="w-full border border-slate-300 p-2 rounded-lg" />
+                                    <input id="startTimeInput" type="time"
+                                        class="w-full border border-slate-300 p-2 rounded-lg" />
+                                </div>
+                            </div>
+
+                            <!-- 종료 -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-xs text-slate-500">종료</span>
+                                    <label class="inline-flex items-center gap-2 text-xs">
+                                        <input id="noEndCheckbox" type="checkbox" class="accent-blue-600" />
+                                        <span>종료 없음</span>
+                                    </label>
+                                </div>
+                                <div class="flex gap-2">
+                                    <input id="endDateInput" type="date"
+                                        class="w-full border border-slate-300 p-2 rounded-lg" />
+                                    <input id="endTimeInput" type="time"
+                                        class="w-full border border-slate-300 p-2 rounded-lg" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <input type="hidden" id="selectedPage">
@@ -798,6 +826,7 @@
             return `best_pick_${n}`;
         }
 
+        // ✅ (누락 보강) Best Pick 카드 내부에 프리뷰 구조 추가
         function renderBestPickGridInline() {
             const container = document.getElementById("bestPickGrid");
             if (!container) return;
@@ -809,20 +838,23 @@
                 const position = bestPickPosition(i);
 
                 const card = document.createElement("div");
-                card.className = "neo-card p-4 cursor-pointer js-slot";
+                card.className = "neo-card p-3 cursor-pointer js-slot";
                 card.id = slotId;
                 card.setAttribute("data-page", "index");
                 card.setAttribute("data-position", position);
                 card.setAttribute("data-label", `Best Pick ${i}`);
 
                 card.innerHTML = `
-                    <div class="text-center">
-                        <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
-                            <span class="text-xs text-gray-500">${i}</span>
+                    <div class="slot-banner rounded-lg overflow-hidden">
+                        <img class="slot-img hidden w-full h-24 object-cover" alt="Best Pick ${i}">
+                        <div class="slot-default flex flex-col items-center justify-center h-24 bg-gray-100">
+                            <div class="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow">
+                                <span class="text-xs text-gray-500">${i}</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500 mt-1">클릭하여 등록</p>
                         </div>
-                        <p class="text-xs font-medium">Best Pick ${i}</p>
-                        <p class="text-xs text-gray-500 mt-1">클릭하여 등록</p>
                     </div>
+                    <p class="text-xs font-medium mt-2 text-center">Best Pick ${i}</p>
                 `;
 
                 container.appendChild(card);
@@ -955,10 +987,10 @@
             if (payload && payload.ok === false && payload.status === 404) {
                 resultBox.classList.remove("hidden");
                 resultBox.innerHTML = `
-      <div class="text-xs text-slate-500">
-        🔎 검색 API가 아직 연결되지 않았습니다.<br>
-        <b>/manager/ad/store/search</b> 연결 후 자동완성됩니다.
-      </div>`;
+                    <div class="text-xs text-slate-500">
+                        🔎 검색 API가 아직 연결되지 않았습니다.<br>
+                        <b>/manager/ad/store/search</b> 연결 후 자동완성됩니다.
+                    </div>`;
                 return;
             }
 
@@ -985,20 +1017,16 @@
                 item.className =
                     "w-full text-left px-2 py-2 rounded-md border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition text-xs";
                 item.innerHTML = `
-      <div class="font-semibold text-slate-800">${escapeHtml(name)}</div>
-      <div class="text-[10px] text-slate-500">${escapeHtml(pretty)}</div>
-    `;
+                    <div class="font-semibold text-slate-800">${escapeHtml(name)}</div>
+                    <div class="text-[10px] text-slate-500">${escapeHtml(pretty)}</div>
+                `;
 
                 // ✅ 클릭 시 값 채우고, 결과박스 닫기
                 item.addEventListener("click", () => {
                     if (nameInput) nameInput.value = name;
                     if (bizInput && digits) bizInput.value = formatBizNoPretty(digits);
 
-                    // 결과 영역 닫기 + 초기화
-                    showBizResultBox("");              // (선택) 이미 정의된 유틸 활용
-                    // resultBox.classList.add("hidden"); // 위 유틸 안 쓰면 이 두 줄로 대체
-                    // resultBox.innerHTML = "";
-
+                    showBizResultBox("");
                     nameInput?.focus();
                 });
 
@@ -1244,6 +1272,11 @@
                             showBizResultBox("");
                             resetAdPeriodFields();
 
+                            // ✅ 서버가 돌려준 slot을 즉시 DOM에 반영
+                            if (data.slot) {
+                                applyBannerSlotToDom(data.slot);
+                            }
+
                             if (String(position).startsWith("best_pick_")) {
                                 await loadBestPickInlineSlots();
                             } else {
@@ -1423,6 +1456,7 @@
         // ============================
         document.addEventListener("DOMContentLoaded", async () => {
             // 헤더/푸터 로드
+            // (서버 정적 루트 설정에 따라 URL은 /components 로 유지)
             fetch("/components/header.html")
                 .then(r => r.text())
                 .then(d => {
