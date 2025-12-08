@@ -98,6 +98,102 @@ async function buildBizNoWhere(table) {
   return { where, col };
 }
 
+/* =========================
+ * ✅ 대표 이미지 조회 유틸(완전 방어형)
+ *  - bizNo로 combined_store_info → store_info → food_stores 순서 탐색
+ *  - 존재하는 이미지 컬럼만 대상으로 안전하게 조회
+ * ========================= */
+
+// ✅ 대표 이미지 후보를 테이블에서 안전 추출
+async function pickRepFromTableByBiz(table, biz) {
+  const { where } = await buildBizNoWhere(table);
+  if (!where || where === "FALSE") return null;
+
+  const cols = await findImageColumns(table);
+  if (!cols.length) return null;
+
+  const hasImages = cols.includes("images");
+  const simpleCols = cols.filter(c => c !== "images");
+  const orderClause = await buildSafeOrderClause(table);
+
+  // 1) 문자열 컬럼 우선
+  if (simpleCols.length) {
+    const expr = simpleCols
+      .map(c => `NULLIF(TRIM(COALESCE(${c}::text,'')), '')`)
+      .join(", ");
+
+    const sql = `
+      SELECT COALESCE(${expr}) AS rep
+           ${hasImages ? ", images" : ""}
+      FROM ${table}
+      WHERE ${where}
+      ORDER BY ${orderClause}
+      LIMIT 1
+    `;
+
+    const r = await pool.query(sql, [biz]);
+    const row = r.rows?.[0];
+
+    if (row?.rep) return normalizeUploadPath(row.rep);
+
+    // 2) images fallback
+    if (hasImages && row?.images) {
+      const raw = row.images;
+      if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
+      if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed[0]) {
+            return normalizeUploadPath(String(parsed[0]));
+          }
+        } catch (_) {}
+      }
+    }
+  } else if (hasImages) {
+    // images만 있는 케이스
+    const sql = `
+      SELECT images
+      FROM ${table}
+      WHERE ${where}
+      ORDER BY ${orderClause}
+      LIMIT 1
+    `;
+    const r = await pool.query(sql, [biz]);
+    const row = r.rows?.[0];
+    const raw = row?.images;
+
+    if (Array.isArray(raw) && raw[0]) return normalizeUploadPath(String(raw[0]));
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed[0]) return normalizeUploadPath(String(parsed[0]));
+      } catch (_) {}
+    }
+  }
+
+  return null;
+}
+
+// ✅ [필수] resolveStoreModeSlot이 직접 호출하는 함수
+export async function getRepImageByBizNo(bizNoRaw) {
+  if (!bizNoRaw) return null;
+  const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
+  if (!biz) return null;
+
+  const tables = ["combined_store_info", "store_info", "food_stores"];
+
+  for (const t of tables) {
+    try {
+      const rep = await pickRepFromTableByBiz(t, biz);
+      if (rep) return rep;
+    } catch (e) {
+      console.warn(`[getRepImageByBizNo] ${t} 조회 스킵:`, e.message);
+    }
+  }
+
+  return null;
+}
+
 /**
  * 다양한 컬럼/형태를 고려해 대표 이미지 후보를 뽑아주는 방어형 함수
  */
@@ -218,8 +314,12 @@ async function resolveStoreModeSlot(slot) {
 
   // (추가) 마지막 보강: business_no가 있고 아직 image_url이 없으면 bizNo로 대표 이미지 조회
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
-    const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
-    if (rep) slot.image_url = rep;
+    try {
+      const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
+      if (rep) slot.image_url = rep;
+    } catch (e) {
+      console.warn("[resolveStoreModeSlot] rep 이미지 보강 실패:", e.message);
+    }
   }
 
   return slot;
