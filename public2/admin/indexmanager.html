@@ -930,33 +930,75 @@
             if (!container) return;
 
             const img = container.querySelector(".slot-img");
-            const defaultEl = container.querySelector(".slot-default");
+            const def = container.querySelector(".slot-default");
 
             try {
-                const res = await fetch(
-                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
-                );
-                if (!res.ok) return;
+                const res = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+                if (!res.ok) {
+                    if (img) { img.src = ""; img.classList.add("hidden"); }
+                    if (def) def.classList.remove("hidden");
+                    return;
+                }
 
                 const json = await res.json();
                 const slot = json?.slot || null;
-                const imageUrl = slot ? pickImageUrl(slot) : "";
 
-                if ((json.ok || json.success) && imageUrl) {
+                const url =
+                    slot?.image_url ||
+                    slot?.image ||
+                    slot?.img_url ||
+                    slot?.banner_url ||
+                    slot?.image_path ||
+                    slot?.file_path ||
+                    "";
+
+                // 이벤트 초기화
+                if (img) {
+                    img.onload = null;
+                    img.onerror = null;
+                }
+
+                if (url) {
+                    const abs = /^https?:\/\//i.test(url) ? url : (url.startsWith("/") ? url : "/" + url);
+
                     if (img) {
-                        img.src = toAbs(imageUrl);
-                        img.classList.remove("hidden");
+                        // 로드되면 기본 박스 숨기고 이미지 표시
+                        img.onload = () => {
+                            img.classList.remove("hidden");
+                            if (def) def.classList.add("hidden");
+                        };
+                        // 실패하면 기본 박스 노출
+                        img.onerror = () => {
+                            img.classList.add("hidden");
+                            if (def) def.classList.remove("hidden");
+                        };
+
+                        // 같은 src면 재지정 생략하여 깜빡임 방지
+                        const cur = img.src || "";
+                        const tgt = abs.startsWith("http") ? abs : (location.origin + abs);
+                        if (cur !== tgt) {
+                            img.src = abs;
+                        } else {
+                            // 이미 로드되어 있으면 즉시 표시
+                            img.classList.remove("hidden");
+                            if (def) def.classList.add("hidden");
+                        }
                     }
-                    if (defaultEl) defaultEl.classList.add("hidden");
                 } else {
+                    // 이미지 없음 → 기본 박스
                     if (img) {
                         img.src = "";
                         img.classList.add("hidden");
                     }
-                    if (defaultEl) defaultEl.classList.remove("hidden");
+                    if (def) def.classList.remove("hidden");
                 }
             } catch (err) {
                 console.error(`슬롯 로드 실패 [${position}]:`, err);
+                if (img) {
+                    img.src = "";
+                    img.classList.add("hidden");
+                }
+                if (def) def.classList.remove("hidden");
             }
         }
 
