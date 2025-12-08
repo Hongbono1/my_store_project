@@ -1,40 +1,10 @@
 // controllers/indexmanagerAdController.js
 import pool from "../db.js";
 
-// ✅ 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
-function pickBody(req) {
-  const b = req.body || {};
-
-  return {
-    page: b.page,
-    position: b.position,
-
-    // 모드/타입
-    slotType: b.slotType || b.slot_type,
-    slotMode: b.slotMode || b.slot_mode,
-
-    // 링크
-    linkUrl: b.linkUrl || b.link_url || b.link,
-
-    // 텍스트
-    textContent: b.textContent || b.text_content || b.content,
-
-    // 가게 연결용
-    storeId: b.storeId || b.store_id,
-    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo || b.business_number,
-    businessName: b.businessName || b.business_name || b.biz_name,
-
-    // 기간
-    startDate: b.startDate || b.start_date || null,
-    endDate: b.endDate || b.end_date || null,
-    noEnd: b.noEnd || b.no_end || false,
-  };
-}
-
-/**
- * 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
- * - 업로드/가게연결/텍스트/기간 공통 대응
- */
+/* =========================================================
+ * ✅ 0) Body Picker (단일본)
+ * - 프론트/서버 혼용 키 안전 매핑
+ * ========================================================= */
 function pickBody(req) {
   const b = req?.body || {};
 
@@ -55,8 +25,18 @@ function pickBody(req) {
 
     // 가게 연결용
     storeId: b.storeId || b.store_id,
-    businessNo: b.businessNo || b.business_no || b.biz_number || b.bizNo || b.bizNoRaw,
-    businessName: b.businessName || b.business_name || b.biz_name || b.bizName,
+    businessNo:
+      b.businessNo ||
+      b.business_no ||
+      b.biz_number ||
+      b.bizNo ||
+      b.business_number ||
+      b.bizNoRaw,
+    businessName:
+      b.businessName ||
+      b.business_name ||
+      b.biz_name ||
+      b.bizName,
 
     // 기간
     startDate: b.startDate || b.start_date || null,
@@ -65,9 +45,9 @@ function pickBody(req) {
   };
 }
 
-/**
- * page/position 유효성 검사
- */
+/* =========================================================
+ * ✅ 1) page/position 유효성 검사
+ * ========================================================= */
 function ensurePagePosition(page, position) {
   if (!page || !position) {
     const error = new Error("page와 position은 필수입니다.");
@@ -76,18 +56,12 @@ function ensurePagePosition(page, position) {
   }
 }
 
-/* =========================
- * ① 대표 이미지 조회 유틸
- *  - bizNo로 combined_store_info → store_info 순으로 대표 이미지 찾기
- *  - /data/uploads/* → /uploads/* 로 표준화
- * ========================= */
-/* =========================
- * ✅ 대표 이미지 조회 유틸 (Neon 구조 기준)
- * - combined_store_info: business_number + main_image_url
- * - fallback: business_cert_path
- * - food_stores 등 다른 테이블도 방어적으로 지원
- * ========================= */
-
+/* =========================================================
+ * ✅ 2) 대표 이미지 조회 유틸 (Neon/실제 스키마 방어형)
+ *    - bizNo로 테이블 순회하며 대표 이미지 1개 찾기
+ *    - 컬럼 자동 탐색
+ *    - /data/uploads → /uploads 표준화
+ * ========================================================= */
 function normalizeUploadPath(p) {
   if (!p) return null;
   const s = String(p).trim();
@@ -97,7 +71,6 @@ function normalizeUploadPath(p) {
   return s;
 }
 
-// ✅ 컬럼 존재 여부 체크
 async function hasColumn(table, col) {
   const { rows } = await pool.query(
     `SELECT 1
@@ -111,7 +84,6 @@ async function hasColumn(table, col) {
   return rows.length > 0;
 }
 
-// ✅ 테이블별 안전한 ORDER BY 생성
 async function buildSafeOrderClause(table) {
   if (await hasColumn(table, "updated_at")) return "updated_at DESC NULLS LAST, id DESC";
   if (await hasColumn(table, "created_at")) return "created_at DESC NULLS LAST, id DESC";
@@ -119,26 +91,21 @@ async function buildSafeOrderClause(table) {
   return "1";
 }
 
-// ✅ image 후보 컬럼 탐색 (Neon 우선순위 반영)
 async function findImageColumns(table) {
   const candidates = [
-    // ✅ Neon combined_store_info 신규 컬럼
-    "main_image_url",
-
-    // ✅ 임시/보조
-    "business_cert_path",
-
-    // 일반 후보
+    // ✅ 대표 이미지 후보 (일반)
     "main_img", "main_image",
     "image1", "image2", "image3",
-    "image_url",
-    "thumbnail_url", "thumb_url",
-    "banner_image_url",
     "img1", "img2", "img3",
     "photo1", "photo2", "photo3",
+    "image_url", "thumbnail_url", "thumb_url",
+    "main_image_url", "banner_image_url",
     "store_image", "store_main_image",
-    "rep_img", "represent_img",
-    "images"
+    "represent_img", "rep_img",
+    "images",
+
+    // ✅ Neon 현실 대응(임시 대표 이미지 역할)
+    "business_cert_path"
   ];
 
   const { rows } = await pool.query(
@@ -160,14 +127,13 @@ async function findImageColumns(table) {
   return rows.map(r => r.column_name);
 }
 
-// ✅ 사업자번호 컬럼 탐색 (Neon 우선)
 async function findBizNoColumn(table) {
   const candidates = [
-    // ✅ Neon combined_store_info 실제 컬럼
+    // ✅ Neon combined_store_info 실제 컬럼 우선
     "business_number",
 
     // 일반 후보
-    "business_no", "biz_no", "biz_number", "business_number",
+    "business_no", "biz_no", "biz_number",
     "registration_no", "reg_no", "brn", "corp_no"
   ];
 
@@ -185,7 +151,6 @@ async function findBizNoColumn(table) {
   return rows[0]?.column_name || null;
 }
 
-// ✅ 숫자만 비교하는 WHERE 절 생성
 async function buildBizNoWhere(table) {
   const col = await findBizNoColumn(table);
   if (!col) return { where: "FALSE", col: null };
@@ -193,21 +158,21 @@ async function buildBizNoWhere(table) {
   return { where, col };
 }
 
-// ✅ 다양한 컬럼/형태를 고려해 대표 이미지 후보 추출
+// ✅ storeRow에서 이미지 후보 추출 (단일본)
 function pickStoreImage(storeRow) {
   if (!storeRow) return "";
 
   const candidates = [
-    // ✅ Neon 대표 컬럼 우선
+    // ✅ Neon/임시 대표 우선
     "main_image_url",
     "business_cert_path",
 
     // 일반 후보
     "image_url", "thumbnail_url", "thumb_url",
-    "main_image_url", "banner_image_url",
+    "banner_image_url",
     "main_img", "main_image",
     "image1", "img1", "photo1",
-    "store_image", "store_main_image"
+    "store_image", "store_main_image",
   ];
 
   for (const key of candidates) {
@@ -227,7 +192,6 @@ function pickStoreImage(storeRow) {
   return "";
 }
 
-// ✅ bizNo 기준 테이블에서 대표이미지 1개 뽑기
 async function pickRepFromTableByBiz(table, biz) {
   const { where } = await buildBizNoWhere(table);
   if (!where || where === "FALSE") return null;
@@ -237,7 +201,6 @@ async function pickRepFromTableByBiz(table, biz) {
 
   const orderClause = await buildSafeOrderClause(table);
 
-  // images 제외한 문자열 컬럼 우선
   const hasImages = cols.includes("images");
   const simpleCols = cols.filter(c => c !== "images");
 
@@ -295,7 +258,7 @@ async function pickRepFromTableByBiz(table, biz) {
   return null;
 }
 
-// ✅ [교체 대상] 대표 이미지 조회 유틸 (Neon 최적화)
+// ✅ resolveStoreModeSlot이 직접 호출 가능하도록 export 단일본 유지
 export async function getRepImageByBizNo(bizNoRaw) {
   if (!bizNoRaw) return null;
 
@@ -310,27 +273,6 @@ export async function getRepImageByBizNo(bizNoRaw) {
       const rep = await pickRepFromTableByBiz(t, biz);
       if (rep) return rep;
     } catch (e) {
-      console.warn(`[getRepImageByBizNo] ${t} 스킵:`, e.message);
-    }
-  }
-
-  return null;
-}
-
-
-// ✅ [필수] resolveStoreModeSlot이 직접 호출하는 함수
-export async function getRepImageByBizNo(bizNoRaw) {
-  if (!bizNoRaw) return null;
-  const biz = String(bizNoRaw).replace(/[^0-9]/g, "").trim();
-  if (!biz) return null;
-
-  const tables = ["combined_store_info", "store_info", "food_stores"];
-
-  for (const t of tables) {
-    try {
-      const rep = await pickRepFromTableByBiz(t, biz);
-      if (rep) return rep;
-    } catch (e) {
       console.warn(`[getRepImageByBizNo] ${t} 조회 스킵:`, e.message);
     }
   }
@@ -338,31 +280,9 @@ export async function getRepImageByBizNo(bizNoRaw) {
   return null;
 }
 
-/**
- * 다양한 컬럼/형태를 고려해 대표 이미지 후보를 뽑아주는 방어형 함수
- */
-function pickStoreImage(storeRow) {
-  if (!storeRow) return "";
-  const candidates = [
-    "image_url", "thumbnail_url", "thumb_url", "main_image_url", "banner_image_url",
-    "main_img", "main_image", "image1", "img1", "photo1", "store_image", "store_main_image"
-  ];
-  for (const key of candidates) {
-    const v = storeRow[key];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  const images = storeRow.images;
-  if (Array.isArray(images) && images[0]) return String(images[0]);
-  if (typeof images === "string") {
-    try {
-      const parsed = JSON.parse(images);
-      if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-    } catch (_) { }
-  }
-  return "";
-}
-
-
+/* =========================================================
+ * ✅ 3) 스토어 조회 유틸
+ * ========================================================= */
 async function findFoodStoreById(id) {
   try {
     const { rows } = await pool.query(
@@ -381,7 +301,7 @@ async function findFoodStoreByName(name) {
       `SELECT *
          FROM food_stores
         WHERE business_name = $1
-        ORDER BY created_at DESC NULLS LAST
+        ORDER BY created_at DESC NULLS LAST, id DESC
         LIMIT 1`,
       [name]
     );
@@ -391,7 +311,6 @@ async function findFoodStoreByName(name) {
   }
 }
 
-// ✅ combined_store_info by id
 async function findCombinedStoreById(id) {
   try {
     const { rows } = await pool.query(
@@ -404,7 +323,6 @@ async function findCombinedStoreById(id) {
   }
 }
 
-// ✅ combined_store_info by name
 async function findCombinedStoreByName(name) {
   try {
     const { rows } = await pool.query(
@@ -421,11 +339,13 @@ async function findCombinedStoreByName(name) {
   }
 }
 
-// ✅ bizNo + businessName을 함께 써서 "정확히 그 가게"를 찾는 함수
+// ✅ bizNo + businessName 정확 매칭
 async function findStoreIdByBizAndName(cleanBizNo, businessName) {
   // 1) combined_store_info 우선
   try {
-    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
+    const { where: whereCombined, col: combinedCol } =
+      await buildBizNoWhere("combined_store_info");
+
     if (combinedCol && whereCombined && whereCombined !== "FALSE") {
       const r = await pool.query(
         `SELECT id
@@ -444,7 +364,9 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
 
   // 2) food_stores fallback
   try {
-    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
+    const { where: whereFood, col: foodCol } =
+      await buildBizNoWhere("food_stores");
+
     if (foodCol && whereFood && whereFood !== "FALSE") {
       const r = await pool.query(
         `SELECT id
@@ -461,9 +383,11 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
     console.warn("food_stores 매핑 실패:", e.message);
   }
 
-  // 3) 이름이 정확히 안 맞는 경우를 대비한 bizNo-only fallback
+  // 3) bizNo-only fallback
   try {
-    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
+    const { where: whereCombined, col: combinedCol } =
+      await buildBizNoWhere("combined_store_info");
+
     if (combinedCol && whereCombined && whereCombined !== "FALSE") {
       const r = await pool.query(
         `SELECT id
@@ -478,7 +402,9 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
   } catch { }
 
   try {
-    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
+    const { where: whereFood, col: foodCol } =
+      await buildBizNoWhere("food_stores");
+
     if (foodCol && whereFood && whereFood !== "FALSE") {
       const r = await pool.query(
         `SELECT id
@@ -495,10 +421,9 @@ async function findStoreIdByBizAndName(cleanBizNo, businessName) {
   return null;
 }
 
-/**
- * store 모드 슬롯 해석기 (강화버전)
- * - slot 객체에 image_url/link_url/store_id 보강
- */
+/* =========================================================
+ * ✅ 4) store 모드 슬롯 해석기 (강화 단일본)
+ * ========================================================= */
 async function resolveStoreModeSlot(slot) {
   if (!slot || slot.slot_mode !== "store") return slot;
 
@@ -509,7 +434,6 @@ async function resolveStoreModeSlot(slot) {
   if (slot.store_id) {
     storeRow = await findFoodStoreById(slot.store_id);
 
-    // ✅ food에서 못 찾으면 combined로
     if (!storeRow) {
       storeRow = await findCombinedStoreById(slot.store_id);
       if (storeRow) resolvedType = "store";
@@ -518,7 +442,6 @@ async function resolveStoreModeSlot(slot) {
 
   // 2) business_name 기반
   if (!storeRow && slot.business_name) {
-    // ✅ combined 먼저(헤어/뷰티 등)
     storeRow = await findCombinedStoreByName(slot.business_name);
     if (storeRow) resolvedType = "store";
   }
@@ -544,12 +467,11 @@ async function resolveStoreModeSlot(slot) {
     slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType}`;
   }
 
-  // (추가) 마지막 보강: business_no가 있고 아직 image_url이 없으면 bizNo로 대표 이미지 조회
+  // 3) 마지막 방어: bizNo 기반 대표 이미지 보강
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
     const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
     if (rep) slot.image_url = rep;
   }
-
 
   return slot;
 }
@@ -640,7 +562,6 @@ export async function uploadIndexAd(req, res) {
       position: rows[0]?.position,
     });
 
-    // ✅ 보강: slot 응답에 page/position 포함
     return res.json({
       ok: true,
       slot: {
@@ -661,7 +582,7 @@ export async function uploadIndexAd(req, res) {
 }
 
 /* ============================================================
- * 🔸 등록된 가게로 슬롯 연결 (기존)
+ * 🔸 등록된 가게로 슬롯 연결 (Best Pick 등)
  * POST /manager/ad/store
  * ============================================================ */
 export async function saveIndexStoreAd(req, res) {
@@ -672,17 +593,20 @@ export async function saveIndexStoreAd(req, res) {
     } = pickBody(req);
 
     ensurePagePosition(page, position);
+
     if (!businessNo || !businessName) {
-      return res.status(400).json({ ok: false, message: "사업자번호와 상호명을 모두 입력해야 합니다." });
+      return res.status(400).json({
+        ok: false,
+        message: "사업자번호와 상호명을 모두 입력해야 합니다."
+      });
     }
 
     const cleanBizNo = String(businessNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    // ✅ bizNo + businessName 기반으로 정확 매칭
+    // ✅ bizNo + businessName 기반 정확 매칭
     let storeId = await findStoreIdByBizAndName(cleanBizNo, businessName);
 
-    // 2) 업서트
     const upsertSql = `
       INSERT INTO admin_ad_slots (
         page, position, slot_type, slot_mode,
@@ -693,14 +617,14 @@ export async function saveIndexStoreAd(req, res) {
       )
       ON CONFLICT (page, position)
       DO UPDATE SET
-        slot_type   = 'banner',
-        slot_mode   = 'store',
+        slot_type = 'banner',
+        slot_mode = 'store',
         business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-        store_id    = EXCLUDED.store_id,
-        start_date  = EXCLUDED.start_date,
-        end_date    = EXCLUDED.end_date,
-        updated_at  = NOW()
+        store_id = EXCLUDED.store_id,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        updated_at = NOW()
       RETURNING *;
     `;
 
@@ -708,14 +632,17 @@ export async function saveIndexStoreAd(req, res) {
       page, position, cleanBizNo, businessName, storeId,
       startDate || null, finalEndDate,
     ]);
+
     const saved = rows[0];
 
-    // 3) 저장 직후 이미지/링크 자동 보강
+    // ✅ 저장 직후 이미지/링크 자동 보강
     const enriched = await resolveStoreModeSlot({ ...saved });
     let patched = false;
 
-    if ((enriched.image_url && enriched.image_url !== saved.image_url) ||
-      (enriched.link_url && enriched.link_url !== saved.link_url)) {
+    if (
+      (enriched.image_url && enriched.image_url !== saved.image_url) ||
+      (enriched.link_url && enriched.link_url !== saved.link_url)
+    ) {
       await pool.query(
         `UPDATE admin_ad_slots
            SET image_url = COALESCE($1, image_url),
@@ -724,12 +651,13 @@ export async function saveIndexStoreAd(req, res) {
          WHERE page = $3 AND position = $4`,
         [enriched.image_url || null, enriched.link_url || null, page, position]
       );
+
       saved.image_url = enriched.image_url || saved.image_url;
       saved.link_url = enriched.link_url || saved.link_url;
       patched = true;
     }
 
-    // (추가) 여전히 image_url이 없으면 bizNo로 대표 이미지 최종 보강
+    // ✅ 그래도 없으면 bizNo 기반 최종 보강
     if (!saved.image_url && cleanBizNo) {
       const rep = await getRepImageByBizNo(cleanBizNo);
       if (rep) {
@@ -760,11 +688,9 @@ export async function saveIndexStoreAd(req, res) {
   }
 }
 
-
 /* ============================================================
  * 🔹 인덱스 광고 슬롯 조회
- * GET /manager/ad/slot?page=index&position=index_main_top
- * ✅ store 모드면 서버에서 image/link 보강
+ * GET /manager/ad/slot?page=index&position=best_pick_1
  * ============================================================ */
 export async function getIndexSlot(req, res) {
   try {
@@ -792,7 +718,6 @@ export async function getIndexSlot(req, res) {
     const rawSlot = result.rows[0];
     const slot = await resolveStoreModeSlot({ ...rawSlot });
 
-    // ✅ 보강: 응답 slot 내부에 page/position 포함
     const responseData = {
       success: true,
       slot: {
@@ -820,7 +745,7 @@ export async function getIndexSlot(req, res) {
 
 /* ============================================================
  * 🔹 텍스트 슬롯 조회
- * GET /manager/ad/text/get?page=index&position=index_sub_keywords
+ * GET /manager/ad/text/get?page=index&position=xxx
  * ============================================================ */
 export async function getIndexTextSlot(req, res) {
   try {
@@ -907,28 +832,24 @@ export async function saveIndexTextSlot(req, res) {
  * ✅ Best Pick 광고 슬롯 목록 조회
  * GET /manager/ad/best-pick
  * ============================================================ */
-/* ============================================================
- * ✅ Best Pick 광고 슬롯 목록 조회
- * GET /manager/ad/best-pick
- * ============================================================ */
 export async function getBestPickSlots(req, res) {
   try {
     const adSlotsQuery = `
-  SELECT 
-    page, position, image_url, link_url,
-    business_name, business_no, slot_mode, store_id
-  FROM admin_ad_slots
-  WHERE page = 'index'
-    AND position LIKE 'best_pick_%'
-    AND (
-      NULLIF(TRIM(COALESCE(image_url,'')), '') IS NOT NULL
-      OR NULLIF(TRIM(COALESCE(business_name,'')), '') IS NOT NULL
-      OR NULLIF(TRIM(COALESCE(link_url,'')), '') IS NOT NULL
-      OR NULLIF(TRIM(COALESCE(slot_mode,'')), '') IS NOT NULL
-      OR NULLIF(TRIM(COALESCE(business_no::text,'')), '') IS NOT NULL
-    )
-  ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
-`;
+      SELECT 
+        page, position, image_url, link_url,
+        business_name, business_no, slot_mode, store_id
+      FROM admin_ad_slots
+      WHERE page = 'index'
+        AND position LIKE 'best_pick_%'
+        AND (
+          NULLIF(TRIM(COALESCE(image_url,'')), '') IS NOT NULL
+          OR NULLIF(TRIM(COALESCE(business_name,'')), '') IS NOT NULL
+          OR NULLIF(TRIM(COALESCE(link_url,'')), '') IS NOT NULL
+          OR NULLIF(TRIM(COALESCE(slot_mode,'')), '') IS NOT NULL
+          OR NULLIF(TRIM(COALESCE(business_no::text,'')), '') IS NOT NULL
+        )
+      ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
+    `;
 
     const { rows } = await pool.query(adSlotsQuery);
 
@@ -968,12 +889,10 @@ export async function getBestPickSlots(req, res) {
   }
 }
 
-
 /* ============================================================
  * ✅ 사업자번호 기반 가게 검색
  * GET /manager/ad/store/search?bizNo=1234567890
  * ============================================================ */
-// ✅ 사업자번호 기반 가게 검색 (수정본)
 export async function searchStoreByBiz(req, res) {
   try {
     const { bizNo } = req.query;
@@ -981,18 +900,17 @@ export async function searchStoreByBiz(req, res) {
       return res.status(400).json({ ok: false, message: "사업자번호를 입력해주세요." });
     }
 
-    // 1) 숫자만 남기기
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
 
-    // 2) 실제 존재하는 컬럼 자동 탐색 + 숫자만 비교 WHERE 생성
-    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
-    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
+    const { where: whereFood, col: foodCol } =
+      await buildBizNoWhere("food_stores");
+    const { where: whereCombined, col: combinedCol } =
+      await buildBizNoWhere("combined_store_info");
 
-    // 3) 이제 찍어도 안전
     console.log("[DEBUG][searchStoreByBiz]", { foodCol, combinedCol, cleanBizNo });
 
-    // 4) 존재하는 테이블만 UNION ALL 로 묶기
     const blocks = [];
+
     if (foodCol) {
       blocks.push(`
         SELECT id, business_name, ${foodCol} AS business_no, 'food' AS store_type
@@ -1000,6 +918,7 @@ export async function searchStoreByBiz(req, res) {
         WHERE ${whereFood}
       `);
     }
+
     if (combinedCol) {
       blocks.push(`
         SELECT id, business_name, ${combinedCol} AS business_no, 'store' AS store_type
@@ -1008,13 +927,11 @@ export async function searchStoreByBiz(req, res) {
       `);
     }
 
-    // 5) 둘 다 사업자번호 컬럼이 없으면 빈 배열 반환 (08P01 방지)
     if (blocks.length === 0) {
       return res.json({ ok: true, stores: [] });
     }
 
-    // 6) 단일 파라미터로 실행
-    const sql = blocks.join(" UNION ALL ") + " LIMIT 5";
+    const sql = blocks.join(" UNION ALL ") + " LIMIT 50";
     const { rows } = await pool.query(sql, [cleanBizNo]);
 
     return res.json({ ok: true, stores: rows });
@@ -1029,7 +946,7 @@ export async function searchStoreByBiz(req, res) {
 }
 
 /* ============================================================
- * ✅ 가게와 슬롯 연결 (보강 포함 수정본)
+ * ✅ 가게와 슬롯 연결 (보강 포함)
  * POST /manager/ad/store/connect
  * ============================================================ */
 export async function connectStoreToSlot(req, res) {
@@ -1056,10 +973,8 @@ export async function connectStoreToSlot(req, res) {
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    // ✅ bizNo + bizName 기반으로 정확 매칭
     let storeId = await findStoreIdByBizAndName(cleanBizNo, bizName);
 
-    // 2) 업서트
     const sql = `
       INSERT INTO admin_ad_slots (
         page, position, slot_type, slot_mode, business_no, business_name,
@@ -1080,12 +995,12 @@ export async function connectStoreToSlot(req, res) {
     `;
 
     const { rows } = await pool.query(sql, [
-      page, position, cleanBizNo, bizName, storeId, startDate || null, finalEndDate,
+      page, position, cleanBizNo, bizName, storeId,
+      startDate || null, finalEndDate,
     ]);
 
     const saved = rows[0];
 
-    // 3) ✅ 저장 직후 대표이미지/링크 보강
     const enriched = await resolveStoreModeSlot({
       ...saved,
       business_no: cleanBizNo,
@@ -1114,7 +1029,6 @@ export async function connectStoreToSlot(req, res) {
       patched = true;
     }
 
-    // 4) ✅ 그래도 없으면 bizNo 기반 최종 보강
     if (!saved.image_url && cleanBizNo) {
       const rep = await getRepImageByBizNo(cleanBizNo);
       if (rep) {
