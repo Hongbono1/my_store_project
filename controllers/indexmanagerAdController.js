@@ -508,6 +508,7 @@ export async function getIndexSlot(req, res) {
         image_url: slot.image_url || null,
         link_url: slot.link_url || null,
         business_name: slot.business_name || null,
+        business_no: slot.business_no || null,
         slot_type: slot.slot_type || null,
         slot_mode: slot.slot_mode || null,
       },
@@ -643,6 +644,7 @@ export async function getBestPickSlots(req, res) {
       return {
         id: slotNumber,
         name: slot.business_name || `Best Pick ${slotNumber}`,
+        bizNo: slot.business_no || null,
         category: "광고",
         image: slot.image_url || "",
         link: slot.link_url || "",
