@@ -292,16 +292,27 @@ async function findFoodStoreByName(name) {
   }
 }
 
-/**
- * (있어도 되고 없어도 됨) 통합 테이블 후보
- */
+// ✅ combined_store_info by id
+async function findCombinedStoreById(id) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM combined_store_info WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    return rows[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+// ✅ combined_store_info by name
 async function findCombinedStoreByName(name) {
   try {
     const { rows } = await pool.query(
       `SELECT *
          FROM combined_store_info
         WHERE business_name = $1
-        ORDER BY created_at DESC NULLS LAST
+        ORDER BY created_at DESC NULLS LAST, id DESC
         LIMIT 1`,
       [name]
     );
@@ -311,8 +322,82 @@ async function findCombinedStoreByName(name) {
   }
 }
 
+// ✅ bizNo + businessName을 함께 써서 "정확히 그 가게"를 찾는 함수
+async function findStoreIdByBizAndName(cleanBizNo, businessName) {
+  // 1) combined_store_info 우선
+  try {
+    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
+    if (combinedCol && whereCombined && whereCombined !== "FALSE") {
+      const r = await pool.query(
+        `SELECT id
+           FROM combined_store_info
+          WHERE ${whereCombined}
+            AND business_name = $2
+          ORDER BY created_at DESC NULLS LAST, id DESC
+          LIMIT 1`,
+        [cleanBizNo, businessName]
+      );
+      if (r.rows[0]?.id) return Number(r.rows[0].id);
+    }
+  } catch (e) {
+    console.warn("combined_store_info 매핑 실패:", e.message);
+  }
+
+  // 2) food_stores fallback
+  try {
+    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
+    if (foodCol && whereFood && whereFood !== "FALSE") {
+      const r = await pool.query(
+        `SELECT id
+           FROM food_stores
+          WHERE ${whereFood}
+            AND business_name = $2
+          ORDER BY created_at DESC NULLS LAST, id DESC
+          LIMIT 1`,
+        [cleanBizNo, businessName]
+      );
+      if (r.rows[0]?.id) return Number(r.rows[0].id);
+    }
+  } catch (e) {
+    console.warn("food_stores 매핑 실패:", e.message);
+  }
+
+  // 3) 이름이 정확히 안 맞는 경우를 대비한 bizNo-only fallback
+  try {
+    const { where: whereCombined, col: combinedCol } = await buildBizNoWhere("combined_store_info");
+    if (combinedCol && whereCombined && whereCombined !== "FALSE") {
+      const r = await pool.query(
+        `SELECT id
+           FROM combined_store_info
+          WHERE ${whereCombined}
+          ORDER BY created_at DESC NULLS LAST, id DESC
+          LIMIT 1`,
+        [cleanBizNo]
+      );
+      if (r.rows[0]?.id) return Number(r.rows[0].id);
+    }
+  } catch {}
+
+  try {
+    const { where: whereFood, col: foodCol } = await buildBizNoWhere("food_stores");
+    if (foodCol && whereFood && whereFood !== "FALSE") {
+      const r = await pool.query(
+        `SELECT id
+           FROM food_stores
+          WHERE ${whereFood}
+          ORDER BY created_at DESC NULLS LAST, id DESC
+          LIMIT 1`,
+        [cleanBizNo]
+      );
+      if (r.rows[0]?.id) return Number(r.rows[0].id);
+    }
+  } catch {}
+
+  return null;
+}
+
 /**
- * store 모드 슬롯 해석기
+ * store 모드 슬롯 해석기 (강화버전)
  * - slot 객체에 image_url/link_url/store_id 보강
  */
 async function resolveStoreModeSlot(slot) {
@@ -324,25 +409,29 @@ async function resolveStoreModeSlot(slot) {
   // 1) store_id 우선
   if (slot.store_id) {
     storeRow = await findFoodStoreById(slot.store_id);
+
+    // ✅ food에서 못 찾으면 combined로
+    if (!storeRow) {
+      storeRow = await findCombinedStoreById(slot.store_id);
+      if (storeRow) resolvedType = "store";
+    }
   }
 
-  // 2) business_name 기반 food_stores
+  // 2) business_name 기반
+  if (!storeRow && slot.business_name) {
+    // ✅ combined 먼저(헤어/뷰티 등)
+    storeRow = await findCombinedStoreByName(slot.business_name);
+    if (storeRow) resolvedType = "store";
+  }
+
   if (!storeRow && slot.business_name) {
     storeRow = await findFoodStoreByName(slot.business_name);
-  }
-
-  // 3) (선택) 통합 테이블 후보
-  if (!storeRow && slot.business_name) {
-    const combined = await findCombinedStoreByName(slot.business_name);
-    if (combined) {
-      storeRow = combined;
-      resolvedType = "store";
-    }
+    if (storeRow) resolvedType = "food";
   }
 
   // store_id 보강
   if (storeRow?.id && !slot.store_id) {
-    slot.store_id = storeRow.id;
+    slot.store_id = Number(storeRow.id);
   }
 
   // image_url 보강
@@ -353,18 +442,13 @@ async function resolveStoreModeSlot(slot) {
 
   // link_url 보강
   if (!slot.link_url && storeRow?.id) {
-    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType === "food" ? "food" : "store"
-      }`;
+    slot.link_url = `/ndetail.html?id=${storeRow.id}&type=${resolvedType}`;
   }
 
-  // (추가) 마지막 보강: business_no가 있고 아직 image_url이 없으면 bizNo로 대표 이미지 조회
+  // 마지막 보강: bizNo 기반 대표이미지
   if (!slot.image_url && (slot.business_no || slot.businessNo)) {
-    try {
-      const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
-      if (rep) slot.image_url = rep;
-    } catch (e) {
-      console.warn("[resolveStoreModeSlot] rep 이미지 보강 실패:", e.message);
-    }
+    const rep = await getRepImageByBizNo(slot.business_no || slot.businessNo);
+    if (rep) slot.image_url = rep;
   }
 
   return slot;
@@ -495,17 +579,8 @@ export async function saveIndexStoreAd(req, res) {
     const cleanBizNo = String(businessNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    // 1) biz 번호로 food_stores에서 id 매핑 (가능하면)
-    let storeId = null;
-    try {
-      const { where: whereFood } = await buildBizNoWhere("food_stores");
-      if (whereFood && whereFood !== "FALSE") {
-        const r = await pool.query(`SELECT id FROM food_stores WHERE ${whereFood} LIMIT 1`, [cleanBizNo]);
-        if (r.rows[0]?.id) storeId = r.rows[0].id;
-      }
-    } catch (e) {
-      console.warn("store_id 매핑 실패:", e.message);
-    }
+    // ✅ bizNo + businessName 기반으로 정확 매칭
+    let storeId = await findStoreIdByBizAndName(cleanBizNo, businessName);
 
     // 2) 업서트
     const upsertSql = `
@@ -881,20 +956,8 @@ export async function connectStoreToSlot(req, res) {
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    // 1) store_id 매핑 (food_stores 우선)
-    let storeId = null;
-    try {
-      const { where: whereFoodForConnect } = await buildBizNoWhere("food_stores");
-      if (whereFoodForConnect && whereFoodForConnect !== "FALSE") {
-        const storeResult = await pool.query(
-          `SELECT id FROM food_stores WHERE ${whereFoodForConnect} LIMIT 1`,
-          [cleanBizNo]
-        );
-        if (storeResult.rows[0]?.id) storeId = storeResult.rows[0].id;
-      }
-    } catch (e) {
-      console.warn("가게 ID 매핑 실패:", e.message);
-    }
+    // ✅ bizNo + bizName 기반으로 정확 매칭
+    let storeId = await findStoreIdByBizAndName(cleanBizNo, bizName);
 
     // 2) 업서트
     const sql = `
