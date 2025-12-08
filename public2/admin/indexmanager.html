@@ -1346,8 +1346,9 @@
             });
         }
 
+
         // ============================
-        // 광고 기간 관련 함수들 추가
+        // 광고 기간 관련 함수들
         // ============================
         function setupNoEndToggle() {
             const noEndCheckbox = document.getElementById("noEndCheckbox");
@@ -1356,7 +1357,7 @@
 
             if (!noEndCheckbox || !endDateInput || !endTimeInput) return;
 
-            noEndCheckbox.addEventListener("change", () => {
+            const applyState = () => {
                 if (noEndCheckbox.checked) {
                     endDateInput.disabled = true;
                     endTimeInput.disabled = true;
@@ -1370,17 +1371,15 @@
                     endDateInput.style.opacity = "1";
                     endTimeInput.style.opacity = "1";
                 }
-            });
+            };
+
+            noEndCheckbox.addEventListener("change", applyState);
+            applyState(); // ✅ 모달 열기 전에도 상태 반영
         }
 
         function resetAdPeriodFields() {
-            const inputs = [
-                "startDateInput",
-                "startTimeInput", 
-                "endDateInput",
-                "endTimeInput"
-            ];
-            
+            const inputs = ["startDateInput", "startTimeInput", "endDateInput", "endTimeInput"];
+
             inputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -1391,9 +1390,7 @@
             });
 
             const noEndCheckbox = document.getElementById("noEndCheckbox");
-            if (noEndCheckbox) {
-                noEndCheckbox.checked = false;
-            }
+            if (noEndCheckbox) noEndCheckbox.checked = false;
         }
 
         function collectAdPeriod() {
@@ -1403,7 +1400,6 @@
             const endTime = document.getElementById("endTimeInput")?.value || "";
             const noEnd = document.getElementById("noEndCheckbox")?.checked || false;
 
-            // 시작 날짜와 시간 검증
             if (startDate && !startTime) {
                 alert("시작 날짜를 입력했으면 시작 시간도 함께 입력해주세요.");
                 return null;
@@ -1413,7 +1409,6 @@
                 return null;
             }
 
-            // 종료 날짜와 시간 검증 (종료 없음이 아닌 경우)
             if (!noEnd) {
                 if (endDate && !endTime) {
                     alert("종료 날짜를 입력했으면 종료 시간도 함께 입력해주세요.");
@@ -1434,6 +1429,7 @@
             };
         }
 
+
         // ============================
         // 사업자번호 검색 UI 설정
         // ============================
@@ -1447,45 +1443,39 @@
 
             bizNoInput.addEventListener("input", () => {
                 const value = (bizNoInput.value || "").trim();
-                
+
                 if (searchTimeout) clearTimeout(searchTimeout);
 
-                if (value.length < 3) {
-                    showBizResultBox("");
-                    return;
-                }
-
-                searchTimeout = setTimeout(async () => {
+                if (value.length < 3) { showBizResultBox(""); return; } searchTimeout = setTimeout(async () => {
                     try {
                         const res = await fetch(
                             `/manager/ad/store/search?bizNo=${encodeURIComponent(value)}`
                         );
-                        
+
                         if (!res.ok) return;
-                        
+
                         const data = await res.json();
-                        
+
                         if (data.ok && data.stores && data.stores.length > 0) {
                             const html = data.stores
                                 .map(store => `
-                                    <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
-                                         data-biz-no="${store.business_no || ''}"
-                                         data-biz-name="${store.business_name || ''}">
-                                        <div class="font-semibold">${store.business_name || '상호명 없음'}</div>
-                                        <div class="text-slate-500">${store.business_no || '사업자번호 없음'}</div>
-                                        <div class="text-slate-400">[${store.store_type}] ID: ${store.id}</div>
-                                    </div>
-                                `)
+        <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
+            data-biz-no="${store.business_no || ''}" data-biz-name="${store.business_name || ''}">
+            <div class="font-semibold">${store.business_name || '상호명 없음'}</div>
+            <div class="text-slate-500">${store.business_no || '사업자번호 없음'}</div>
+            <div class="text-slate-400">[${store.store_type}] ID: ${store.id}</div>
+        </div>
+        `)
                                 .join("");
-                            
+
                             showBizResultBox(html);
-                            
+
                             // 클릭 이벤트 추가
                             document.querySelectorAll(".js-biz-item").forEach(item => {
                                 item.addEventListener("click", () => {
                                     const bizNo = item.dataset.bizNo || "";
                                     const bizName = item.dataset.bizName || "";
-                                    
+
                                     bizNoInput.value = bizNo;
                                     bizNameInput.value = bizName;
                                     showBizResultBox("");
@@ -1533,8 +1523,20 @@
             setupModeToggle();
             setupSave();
             setupSaveText();
-            setupNoEndToggle(); // ✅ 이제 정의됨
-            setupBizSearchUI(); // ✅ 이제 정의됨
+
+            // ✅ 여기 교체
+            if (typeof setupNoEndToggle === "function") {
+                setupNoEndToggle();
+            } else {
+                console.warn("setupNoEndToggle is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
+            }
+
+            if (typeof setupBizSearchUI === "function") {
+                setupBizSearchUI();
+            } else {
+                console.warn("setupBizSearchUI is not defined.");
+            }
+
 
             // Best Pick 그리드 렌더링 및 로드
             renderBestPickGridInline();
