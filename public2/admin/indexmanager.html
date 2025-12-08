@@ -691,28 +691,38 @@
                 const position = bestPickPosition(i);
 
                 const card = document.createElement("div");
-                card.className = "neo-card slot-banner p-3 cursor-pointer js-slot flex items-center justify-center relative";
+                card.className =
+                    "neo-card overflow-hidden cursor-pointer js-slot flex flex-col";
                 card.id = slotId;
                 card.setAttribute("data-page", "index");
                 card.setAttribute("data-position", position);
                 card.setAttribute("data-label", `Best Pick ${i}`);
 
+                // ✅ 위: 이미지 / 아래: 상호+사업자번호
                 card.innerHTML = `
-                    <img class="slot-img hidden rounded-xl w-full h-full object-cover absolute inset-0" alt="Best Pick ${i}">
-                    <div class="slot-default rounded-xl w-full h-full flex items-center justify-center relative">
-                        <div class="text-center px-2">
-                            <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
-                                <span class="text-xs text-gray-500">${i}</span>
-                            </div>
-                            <p class="text-[11px] font-medium">Best Pick ${i}</p>
-                            <p class="text-[10px] text-gray-500 mt-1">클릭하여 등록</p>
-                        </div>
+            <!-- 이미지 영역 -->
+            <div class="relative w-full bg-slate-100 border-b border-slate-200 aspect-[4/3]">
+                <img class="slot-img hidden w-full h-full object-cover" alt="Best Pick ${i}">
+                
+                <!-- 기본 상태 -->
+                <div class="slot-default absolute inset-0 flex flex-col items-center justify-center">
+                    <div class="w-14 h-14 bg-white/80 border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
+                        <span class="text-xs text-slate-500">${i}</span>
                     </div>
-                    <div class="slot-store-info hidden absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b-xl">
-                        <p class="text-[10px] font-semibold truncate" data-store-name></p>
-                        <p class="text-[9px] opacity-80 truncate" data-store-biz></p>
-                    </div>
-                `;
+                    <p class="mt-2 text-[11px] text-slate-500">클릭하여 등록</p>
+                </div>
+            </div>
+
+            <!-- 정보 영역 -->
+            <div class="p-3 flex flex-col gap-1">
+                <p class="text-[12px] font-semibold text-slate-800 truncate" data-store-name>
+                    등록된 가게 없음
+                </p>
+                <p class="text-[10px] text-slate-500 truncate" data-store-biz>
+                    사업자번호 없음
+                </p>
+            </div>
+        `;
 
                 container.appendChild(card);
             }
@@ -734,7 +744,6 @@
 
             const img = container.querySelector(".slot-img");
             const defaultEl = container.querySelector(".slot-default");
-            const storeInfo = container.querySelector(".slot-store-info");
             const storeName = container.querySelector("[data-store-name]");
             const storeBiz = container.querySelector("[data-store-biz]");
 
@@ -745,7 +754,6 @@
                 if (!res.ok) return;
 
                 const json = await res.json();
-                console.log(`Best Pick ${position} 슬롯 데이터:`, json);
 
                 if (json.success && json.slot) {
                     const slot = json.slot;
@@ -753,7 +761,7 @@
                     const businessName = slot.business_name || "";
                     const businessNo = slot.business_no || "";
 
-                    // 이미지 처리
+                    // ✅ 이미지 처리
                     if (imageUrl) {
                         if (img) {
                             img.src = imageUrl;
@@ -761,23 +769,27 @@
                         }
                         if (defaultEl) defaultEl.classList.add("hidden");
                     } else {
-                        if (img) img.classList.add("hidden");
+                        if (img) {
+                            img.src = "";
+                            img.classList.add("hidden");
+                        }
                         if (defaultEl) defaultEl.classList.remove("hidden");
                     }
 
-                    // 가게 정보 표시
-                    if (businessName || businessNo) {
-                        if (storeName) storeName.textContent = businessName || "상호명 없음";
-                        if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
-                        if (storeInfo) storeInfo.classList.remove("hidden");
-                    } else {
-                        if (storeInfo) storeInfo.classList.add("hidden");
-                    }
+                    // ✅ 하단 정보 처리
+                    if (storeName) storeName.textContent = businessName || "상호명 없음";
+                    if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
+
                 } else {
-                    // 기본 상태로 리셋
-                    if (img) img.classList.add("hidden");
+                    // ✅ 기본 상태
+                    if (img) {
+                        img.src = "";
+                        img.classList.add("hidden");
+                    }
                     if (defaultEl) defaultEl.classList.remove("hidden");
-                    if (storeInfo) storeInfo.classList.add("hidden");
+
+                    if (storeName) storeName.textContent = "등록된 가게 없음";
+                    if (storeBiz) storeBiz.textContent = "사업자번호 없음";
                 }
             } catch (err) {
                 console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
@@ -798,7 +810,6 @@
 
             const img = container.querySelector(".slot-img");
             const defaultEl = container.querySelector(".slot-default");
-            const storeInfo = container.querySelector(".slot-store-info");
             const storeName = container.querySelector("[data-store-name]");
             const storeBiz = container.querySelector("[data-store-biz]");
 
@@ -817,11 +828,10 @@
                 if (defaultEl) defaultEl.classList.remove("hidden");
             }
 
-            // Best Pick 가게 정보 처리
-            if (String(position).startsWith("best_pick_") && (businessName || businessNo)) {
+            // ✅ Best Pick이면 하단 텍스트 갱신
+            if (String(position).startsWith("best_pick_")) {
                 if (storeName) storeName.textContent = businessName || "상호명 없음";
                 if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
-                if (storeInfo) storeInfo.classList.remove("hidden");
             }
         }
 
@@ -1531,12 +1541,17 @@
                 console.warn("setupNoEndToggle is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
             }
 
+            if (typeof setupNoEndToggle === "function") {
+                setupNoEndToggle();
+            } else {
+                console.warn("setupNoEndToggle is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
+            }
+
             if (typeof setupBizSearchUI === "function") {
                 setupBizSearchUI();
             } else {
-                console.warn("setupBizSearchUI is not defined.");
+                console.warn("setupBizSearchUI is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
             }
-
 
             // Best Pick 그리드 렌더링 및 로드
             renderBestPickGridInline();
