@@ -621,21 +621,21 @@ export async function saveIndexTextSlot(req, res) {
 export async function getBestPickSlots(req, res) {
   try {
     const adSlotsQuery = `
-      SELECT 
-        page, position, image_url, link_url,
-        business_name, business_no, slot_mode, store_id
-      FROM admin_ad_slots
-      WHERE page = 'index'
-        AND position LIKE 'best_pick_%'
-        AND (
-          image_url IS NOT NULL
-          OR business_name IS NOT NULL
-          OR link_url IS NOT NULL
-          OR slot_mode IS NOT NULL
-          OR business_no IS NOT NULL
-        )
-      ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
-    `;
+  SELECT 
+    page, position, image_url, link_url,
+    business_name, business_no, slot_mode, store_id
+  FROM admin_ad_slots
+  WHERE page = 'index'
+    AND position LIKE 'best_pick_%'
+    AND (
+      NULLIF(TRIM(COALESCE(image_url,'')), '') IS NOT NULL
+      OR NULLIF(TRIM(COALESCE(business_name,'')), '') IS NOT NULL
+      OR NULLIF(TRIM(COALESCE(link_url,'')), '') IS NOT NULL
+      OR NULLIF(TRIM(COALESCE(slot_mode,'')), '') IS NOT NULL
+      OR NULLIF(TRIM(COALESCE(business_no::text,'')), '') IS NOT NULL
+    )
+  ORDER BY CAST(SUBSTRING(position FROM 'best_pick_([0-9]+)') AS INTEGER) ASC
+`;
 
     const { rows } = await pool.query(adSlotsQuery);
 
@@ -735,9 +735,8 @@ export async function searchStoreByBiz(req, res) {
   }
 }
 
-
 /* ============================================================
- * ✅ 가게와 슬롯 연결
+ * ✅ 가게와 슬롯 연결 (보강 포함 수정본)
  * POST /manager/ad/store/connect
  * ============================================================ */
 export async function connectStoreToSlot(req, res) {
@@ -764,6 +763,7 @@ export async function connectStoreToSlot(req, res) {
     const cleanBizNo = String(bizNo).replace(/-/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
+    // 1) store_id 매핑 (food_stores 우선)
     let storeId = null;
     try {
       const { where: whereFoodForConnect } = await buildBizNoWhere("food_stores");
@@ -772,14 +772,13 @@ export async function connectStoreToSlot(req, res) {
           `SELECT id FROM food_stores WHERE ${whereFoodForConnect} LIMIT 1`,
           [cleanBizNo]
         );
-        if (storeResult.rows.length > 0) {
-          storeId = storeResult.rows[0].id;
-        }
+        if (storeResult.rows[0]?.id) storeId = storeResult.rows[0].id;
       }
     } catch (e) {
       console.warn("가게 ID 매핑 실패:", e.message);
     }
 
+    // 2) 업서트
     const sql = `
       INSERT INTO admin_ad_slots (
         page, position, slot_type, slot_mode, business_no, business_name,
@@ -803,9 +802,55 @@ export async function connectStoreToSlot(req, res) {
       page, position, cleanBizNo, bizName, storeId, startDate || null, finalEndDate,
     ]);
 
+    const saved = rows[0];
+
+    // 3) ✅ 저장 직후 대표이미지/링크 보강
+    const enriched = await resolveStoreModeSlot({
+      ...saved,
+      business_no: cleanBizNo,
+      business_name: bizName,
+      slot_mode: "store",
+      store_id: storeId ?? saved.store_id,
+    });
+
+    let patched = false;
+
+    if (
+      (enriched.image_url && enriched.image_url !== saved.image_url) ||
+      (enriched.link_url && enriched.link_url !== saved.link_url)
+    ) {
+      await pool.query(
+        `UPDATE admin_ad_slots
+           SET image_url = COALESCE($1, image_url),
+               link_url  = COALESCE($2, link_url),
+               updated_at = NOW()
+         WHERE page = $3 AND position = $4`,
+        [enriched.image_url || null, enriched.link_url || null, page, position]
+      );
+
+      saved.image_url = enriched.image_url || saved.image_url;
+      saved.link_url = enriched.link_url || saved.link_url;
+      patched = true;
+    }
+
+    // 4) ✅ 그래도 없으면 bizNo 기반 최종 보강
+    if (!saved.image_url && cleanBizNo) {
+      const rep = await getRepImageByBizNo(cleanBizNo);
+      if (rep) {
+        await pool.query(
+          `UPDATE admin_ad_slots
+             SET image_url = $1, updated_at = NOW()
+           WHERE page = $2 AND position = $3`,
+          [rep, page, position]
+        );
+        saved.image_url = rep;
+        patched = true;
+      }
+    }
+
     return res.json({
       ok: true,
-      slot: rows[0],
+      slot: { ...saved, patched },
       storeConnected: !!storeId,
     });
   } catch (err) {
