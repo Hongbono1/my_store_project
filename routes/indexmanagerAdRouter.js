@@ -1,61 +1,90 @@
 // routes/indexmanagerAdRouter.js
 import express from "express";
 import multer from "multer";
-import path from "path";
 import fs from "fs";
+import path from "path";
 
 import {
   uploadIndexAd,
   saveIndexStoreAd,
   getIndexSlot,
+  getIndexTextSlot,
+  saveIndexTextSlot,
   getBestPickSlots,
   searchStoreByBiz,
+  connectStoreToSlot,
   deleteSlot,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
 
-/* =========================
- * ✅ 업로드 설정
- * - 기존 프로젝트 규칙에 맞춰 /data/uploads 우선 사용
- * ========================= */
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "/data/uploads";
+/**
+ * ✅ 관리자 광고 업로드용 multer
+ * - /data/uploads 우선, 없으면 public/uploads
+ * - 파일명 충돌 방지
+ */
+function resolveUploadDir() {
+  const preferred = "/data/uploads";
+  const fallback = path.join(process.cwd(), "public", "uploads");
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  if (fs.existsSync(preferred)) return preferred;
+  if (!fs.existsSync(fallback)) fs.mkdirSync(fallback, { recursive: true });
+  return fallback;
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  destination: (req, file, cb) => {
+    const dir = resolveUploadDir();
+    cb(null, dir);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname || "");
-    const safeExt = ext && ext.length <= 10 ? ext : "";
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`);
+    const safe = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+    cb(null, safe);
   },
 });
 
 const upload = multer({ storage });
 
 /* =========================
- * ✅ 라우팅
+ * ✅ 슬롯 업로드
  * ========================= */
-
-// 1) 배너/이미지 업로드 슬롯 저장
 router.post("/upload", upload.single("image"), uploadIndexAd);
 
-// 2) 가게 연결 저장 (best_pick_x 포함)
-router.post("/store", saveIndexStoreAd);
-
-// 3) 단일 슬롯 조회
+/* =========================
+ * ✅ 슬롯 조회
+ * ========================= */
 router.get("/slot", getIndexSlot);
 
-// 4) Best Pick 목록
+/* =========================
+ * ✅ Best Pick 목록
+ * ========================= */
 router.get("/best-pick", getBestPickSlots);
 
-// 5) 사업자번호로 가게 검색
+/* =========================
+ * ✅ 텍스트 슬롯
+ * ========================= */
+router.get("/text/get", getIndexTextSlot);
+router.post("/text/save", saveIndexTextSlot);
+
+/* =========================
+ * ✅ 사업자번호 기반 가게 검색
+ * ========================= */
 router.get("/store/search", searchStoreByBiz);
 
-// 6) 슬롯 삭제
+/* =========================
+ * ✅ 기존 방식 가게 연결
+ * ========================= */
+router.post("/store", saveIndexStoreAd);
+
+/* =========================
+ * ✅ 신규 엔드포인트 가게 연결
+ * ========================= */
+router.post("/store/connect", connectStoreToSlot);
+
+/* =========================
+ * ✅ 슬롯 삭제
+ * ========================= */
 router.delete("/slot", deleteSlot);
 
 export default router;
