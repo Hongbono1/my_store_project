@@ -579,8 +579,26 @@
 
     <script>
         // =========================================================
-        // ✅ 상단(유틸/상수 근처)에 붙이는 가게/이미지 매핑 유틸
+        // ✅ 안전한 이미지 로딩 유틸리티 함수들
         // =========================================================
+        
+        function normalizeImg(src) {
+            if (!src) return "/assets/no-image.png";
+
+            // 예전 placeholder가 섞여 들어오는 경우 차단
+            if (src.includes("no-image.png") || src.includes("sample-banner-product.png")) {
+                return "/assets/no-image.png";
+            }
+            return src;
+        }
+
+        function applySafeImage(imgEl, src) {
+            imgEl.src = normalizeImg(src);
+            imgEl.onerror = () => {
+                imgEl.onerror = null;
+                imgEl.src = "/assets/no-image.png";
+            };
+        }
 
         // 절대 URL 보정
         function toAbs(u) {
@@ -609,10 +627,10 @@
         function setPreview(imgEl, url) {
             if (!imgEl) return;
             if (url) {
-                imgEl.src = toAbs(url);
+                applySafeImage(imgEl, toAbs(url));
                 imgEl.alt = "slot image";
             } else {
-                imgEl.src = "/assets/img/placeholder.svg";
+                applySafeImage(imgEl, "/assets/no-image.png");
                 imgEl.alt = "no image";
             }
         }
@@ -794,7 +812,7 @@
             }
         }
 
-        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함)
+        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함) - 안전한 이미지 로딩 적용
         async function loadBestPickInlineSlots() {
             for (let i = 1; i <= BEST_PICK_MAX; i++) {
                 const slotId = bestPickSlotId(i);
@@ -803,7 +821,7 @@
             }
         }
 
-        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드
+        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드 - 안전한 이미지 로딩 적용
         async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
             const container = document.getElementById(slotId);
             if (!container) return;
@@ -828,15 +846,13 @@
                     const businessName = pickBizName(slot);
                     const businessNo = pickBizNo(slot);
 
-                    // ✅ 이미지 처리
-                    if (imageUrl) {
-                        if (img) {
-                            img.src = toAbs(imageUrl);  // 절대 경로 보정
-                            img.classList.remove("hidden");
-                        }
+                    // ✅ 이미지 처리 - 안전한 이미지 로딩 적용
+                    if (imageUrl && img) {
+                        applySafeImage(img, toAbs(imageUrl));
+                        img.classList.remove("hidden");
                         if (defaultEl) defaultEl.classList.add("hidden");
                         
-                        // ✅ (B) 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
+                        // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
                         if (container) hideDefaultWhenImageReady(container);
                     } else {
                         if (img) {
@@ -866,7 +882,7 @@
             }
         }
 
-        // ✅ 기존 applyBannerSlotToDom 함수도 Best Pick용으로 개선
+        // ✅ 기존 applyBannerSlotToDom 함수도 안전한 이미지 로딩 적용
         function applyBannerSlotToDom(slot) {
             if (!slot) return;
 
@@ -879,7 +895,7 @@
             const storeName = container.querySelector("[data-store-name]");
             const storeBiz = container.querySelector("[data-store-biz]");
 
-            const imageUrl = toAbs(pickImageUrl(slot));   // ← 절대경로 보정 통일
+            const imageUrl = pickImageUrl(slot);
             const businessName = pickBizName(slot);
             const businessNo = pickBizNo(slot);
 
@@ -889,37 +905,27 @@
                 img.onerror = null;
             }
 
-            if (imageUrl) {
-                if (img) {
-                    // 1) 로드 전에는 기본 박스 유지
+            if (imageUrl && img) {
+                // 1) 로드 전에는 기본 박스 유지
+                img.classList.add("hidden");
+                if (defaultEl) defaultEl.classList.remove("hidden");
+
+                // 2) 안전한 이미지 로딩 적용
+                applySafeImage(img, toAbs(imageUrl));
+
+                // 3) 성공적으로 로드되면 기본 박스 숨기고 이미지 표시
+                img.onload = () => {
+                    img.classList.remove("hidden");
+                    if (defaultEl) defaultEl.classList.add("hidden");
+                };
+
+                // 4) 로드 실패면 이미지 감추고 기본 박스 다시 노출
+                img.onerror = () => {
                     img.classList.add("hidden");
                     if (defaultEl) defaultEl.classList.remove("hidden");
+                };
 
-                    // 2) 성공적으로 로드되면 기본 박스 숨기고 이미지 표시
-                    img.onload = () => {
-                        img.classList.remove("hidden");
-                        if (defaultEl) defaultEl.classList.add("hidden");
-                    };
-
-                    // 3) 로드 실패면 이미지 감추고 기본 박스 다시 노출
-                    img.onerror = () => {
-                        img.classList.add("hidden");
-                        if (defaultEl) defaultEl.classList.remove("hidden");
-                    };
-
-                    // 같은 src 재지정으로 불필요한 재로딩 방지 (절대/상대 비교 둘 다 커버)
-                    const absCurrent = img.src || "";
-                    const absTarget = imageUrl.startsWith("http") ? imageUrl : (location.origin + imageUrl);
-                    if (absCurrent !== absTarget) {
-                        img.src = imageUrl;
-                    } else {
-                        // 이미 같은 이미지면 곧바로 표시 상태로
-                        img.classList.remove("hidden");
-                        if (defaultEl) defaultEl.classList.add("hidden");
-                    }
-                }
-                
-                // ✅ (B) imageUrl가 있는 경우 분기 내부 마지막 쯤에 추가
+                // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
                 if (container) hideDefaultWhenImageReady(container);
             } else {
                 // 이미지가 없으면 기본 상태로
@@ -941,7 +947,7 @@
         }
 
         // ============================
-        // 슬롯 로드 (이미지 배너)
+        // 슬롯 로드 (이미지 배너) - 안전한 이미지 로딩 적용
         // ============================
         async function loadBannerSlotById(slotId, page, position) {
             const container = document.getElementById(slotId);
@@ -961,14 +967,7 @@
                 const json = await res.json();
                 const slot = json?.slot || null;
 
-                const imageUrl =
-                    slot?.image_url ||
-                    slot?.image ||
-                    slot?.img_url ||
-                    slot?.banner_url ||
-                    slot?.image_path ||
-                    slot?.file_path ||
-                    "";
+                const imageUrl = pickImageUrl(slot);
 
                 // 이벤트 초기화
                 if (img) {
@@ -976,33 +975,21 @@
                     img.onerror = null;
                 }
 
-                // ✅ (C) loadBannerSlotById 성공 분기 보강
-                if ((json.ok || json.success) && imageUrl) {
-                    const abs = /^https?:\/\//i.test(imageUrl) ? imageUrl : (imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl);
+                // ✅ 성공 분기 - 안전한 이미지 로딩 적용
+                if ((json.ok || json.success) && imageUrl && img) {
+                    // 안전한 이미지 로딩 적용
+                    applySafeImage(img, toAbs(imageUrl));
 
-                    if (img) {
-                        // 로드되면 기본 박스 숨기고 이미지 표시
-                        img.onload = () => {
-                            img.classList.remove("hidden");
-                            if (def) def.classList.add("hidden");
-                        };
-                        // 실패하면 기본 박스 노출
-                        img.onerror = () => {
-                            img.classList.add("hidden");
-                            if (def) def.classList.remove("hidden");
-                        };
-
-                        // 같은 src면 재지정 생략하여 깜빡임 방지
-                        const cur = img.src || "";
-                        const tgt = abs.startsWith("http") ? abs : (location.origin + abs);
-                        if (cur !== tgt) {
-                            img.src = abs;
-                        } else {
-                            // 이미 로드되어 있으면 즉시 표시
-                            img.classList.remove("hidden");
-                            if (def) def.classList.add("hidden");
-                        }
-                    }
+                    // 로드되면 기본 박스 숨기고 이미지 표시
+                    img.onload = () => {
+                        img.classList.remove("hidden");
+                        if (def) def.classList.add("hidden");
+                    };
+                    // 실패하면 기본 박스 노출
+                    img.onerror = () => {
+                        img.classList.add("hidden");
+                        if (def) def.classList.remove("hidden");
+                    };
 
                     // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
                     hideDefaultWhenImageReady(container);
@@ -1628,6 +1615,7 @@
                         if (data.ok && data.stores && data.stores.length > 0) {
                             const html = data.stores
                                 .map(store => `
+
                                     <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
                                         data-biz-no="${store.business_no || store.biz_number || store.biz_no || ''}"
                                         data-biz-name="${store.business_name || store.biz_name || ''}">
@@ -1695,6 +1683,20 @@
         // ✅ 초기화
         // ============================
         document.addEventListener("DOMContentLoaded", async () => {
+            console.log("🔍 DOMContentLoaded 시작");
+            
+            // 기본 슬롯들이 DOM에 있는지 확인
+            const testSlots = [
+                'slot_index_main_visual',
+                'slot_index_promo_1', 
+                'bestPickGrid'
+            ];
+            
+            testSlots.forEach(id => {
+                const el = document.getElementById(id);
+                console.log(`슬롯 ${id}:`, el ? '✅ 존재' : '❌ 없음');
+            });
+
             // ✅ 슬롯 레이아웃 강제 보정 (실수 방지용)
             enforceSlotLayout([
                 'slot_index_main_visual',
@@ -1709,39 +1711,38 @@
                 .then(d => {
                     const hp = document.getElementById("header-placeholder");
                     if (hp) hp.innerHTML = d;
-                });
+                })
+                .catch(err => console.log("헤더 로드 실패:", err));
 
             fetch("/components/footer.html")
                 .then(r => r.text())
                 .then(d => {
                     const fp = document.getElementById("footer-placeholder");
                     if (fp) fp.innerHTML = d;
-                });
+                })
+                .catch(err => console.log("푸터 로드 실패:", err));
 
             // 모든 슬롯 설정
-            setupSlotClick();
-            setupModalClose();
-            setupTextModalClose();
-            setupModeToggle();
-            setupSave();
-            setupSaveText();
-
-            // ✅ 안전 호출
-            if (typeof setupNoEndToggle === "function") {
+            try {
+                setupSlotClick();
+                setupModalClose();
+                setupTextModalClose();
+                setupModeToggle();
+                setupSave();
+                setupSaveText();
                 setupNoEndToggle();
-            } else {
-                console.warn("setupNoEndToggle is not defined. 위쪽 스크립트 문법 오류/캐시/파일 불일치 확인");
-            }
-
-            if (typeof setupBizSearchUI === "function") {
                 setupBizSearchUI();
-            } else {
-                console.warn("setupBizSearchUI is not defined.");
+            } catch (err) {
+                console.error("슬롯 설정 중 오류:", err);
             }
 
             // Best Pick 그리드 렌더링 및 로드
-            renderBestPickGridInline();
-            await loadBestPickInlineSlots();
+            try {
+                renderBestPickGridInline();
+                await loadBestPickInlineSlots();
+            } catch (err) {
+                console.error("Best Pick 로드 실패:", err);
+            }
 
             // Best Pick 리로드 버튼
             setupBestPickReloadBtn();
@@ -1768,39 +1769,48 @@
                 ["slot_index_support_inquiry", "index", "index_support_inquiry"],
             ];
 
-            await Promise.all(
-                bannerSlots.map(([id, page, pos]) => loadBannerSlotById(id, page, pos))
-            );
+            try {
+                await Promise.all(
+                    bannerSlots.map(([id, page, pos]) => loadBannerSlotById(id, page, pos))
+                );
+            } catch (err) {
+                console.error("배너 슬롯 로드 실패:", err);
+            }
 
             // 텍스트 슬롯 로드(없으면 더미)
-            await loadTextSlotById(
-                "slot_index_sub_keywords",
-                "index",
-                "index_sub_keywords",
-                (c) => renderDefaultList(c, DEFAULT_DATA.keywords)
-            );
-            await loadTextSlotById(
-                "slot_index_sub_news",
-                "index",
-                "index_sub_news",
-                (c) => renderDefaultList(c, DEFAULT_DATA.news)
-            );
-            await loadTextSlotById(
-                "slot_index_sub_events",
-                "index",
-                "index_sub_events",
-                (c) => renderDefaultList(c, DEFAULT_DATA.events)
-            );
-            await loadTextSlotById(
-                "slot_index_sub_recommends",
-                "index",
-                "index_sub_recommends",
-                (c) => renderDefaultList(c, DEFAULT_DATA.recommends)
-            );
+            try {
+                await loadTextSlotById(
+                    "slot_index_sub_keywords",
+                    "index",
+                    "index_sub_keywords",
+                    (c) => renderDefaultList(c, DEFAULT_DATA.keywords)
+                );
+                await loadTextSlotById(
+                    "slot_index_sub_news",
+                    "index",
+                    "index_sub_news",
+                    (c) => renderDefaultList(c, DEFAULT_DATA.news)
+                );
+                await loadTextSlotById(
+                    "slot_index_sub_events",
+                    "index",
+                    "index_sub_events",
+                    (c) => renderDefaultList(c, DEFAULT_DATA.events)
+                );
+                await loadTextSlotById(
+                    "slot_index_sub_recommends",
+                    "index",
+                    "index_sub_recommends",
+                    (c) => renderDefaultList(c, DEFAULT_DATA.recommends)
+                );
 
-            // 우리동네 한마디 로드
-            await loadOneWord();
+                // 우리동네 한마디 로드
+                await loadOneWord();
+            } catch (err) {
+                console.error("텍스트 슬롯 로드 실패:", err);
+            }
 
+            console.log("🔍 DOMContentLoaded 완료");
         });
     </script>
 
