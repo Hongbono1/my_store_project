@@ -17,15 +17,16 @@ if (!fs.existsSync(uploadDir)) {
 // 🔧 Multer 설정 (이미지 최대 3개, 5MB)
 // ✅ inquiryregister.html 에서는 <input name="images" ...> 로 3개까지 보냄
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const timestamp = Date.now();
-        const random = Math.round(Math.random() * 1e9);
-        const ext = path.extname(file.originalname);
-        cb(null, `${timestamp}-${random}${ext}`);
-    },
+  destination: function (req, file, cb) {
+    cb(null, "/data/uploads/inquiryBoard"); // ✅ A 방식 통일
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
 });
 
 export const uploadInquiryBoard = multer({
@@ -305,4 +306,47 @@ export const getInquiryBoardDetail = async (req, res) => {
             error: "서버 오류가 발생했습니다.",
         });
     }
+};
+
+export const createInquiry = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { title, content, category, is_private, password } = req.body;
+
+    // ✅ A 방식: /uploads/inquiryBoard/...
+    const image_url = req.file ? `/uploads/inquiryBoard/${req.file.filename}` : null;
+
+    const query = `
+      INSERT INTO inquiry_board (title, content, category, is_private, password, image_url)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `;
+
+    const result = await client.query(query, [
+      title,
+      content,
+      category || "일반",
+      is_private === "true" || is_private === true,
+      password || null,
+      image_url,
+    ]);
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("❌ 문의 등록 오류:", error);
+    res.status(500).json({
+      success: false,
+      error: "문의 등록 실패",
+    });
+  } finally {
+    client.release();
+  }
 };

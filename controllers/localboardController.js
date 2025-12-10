@@ -30,38 +30,46 @@ export const checkNickname = async (req, res) => {
 /* -----------------------------
    1) 글 생성 (+ 이미지 업로드)
 --------------------------------*/
-export const createPost = async (req, res) => {
-    try {
-        const { region, category, title, content, writer } = req.body;
+export async function createPost(req, res) {
+  try {
+    const { title, content, location, category } = req.body;
 
-        const sql =
-            "INSERT INTO local_board_posts(region, category, title, content, writer, is_notice, is_blocked) VALUES($1,$2,$3,$4,$5, false, false) RETURNING id";
-
-        const result = await pool.query(sql, [
-            region,
-            category,
-            title,
-            content,
-            writer,
-        ]);
-
-        const postId = result.rows[0].id;
-
-        if (req.files && req.files.length > 0) {
-            for (let file of req.files) {
-                await pool.query(
-                    "INSERT INTO local_board_images(post_id, image_url) VALUES($1, $2)",
-                    [postId, `/uploads/${file.filename}`]
-                );
-            }
-        }
-
-        res.json({ success: true, id: postId });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false });
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        error: "제목과 내용은 필수입니다.",
+      });
     }
-};
+
+    // ✅ A 방식: /uploads/localboard/...
+    const image_url = req.file ? `/uploads/localboard/${req.file.filename}` : null;
+
+    const query = `
+      INSERT INTO local_board (title, content, location, category, image_url)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [
+      title,
+      content,
+      location || null,
+      category || "일반",
+      image_url,
+    ]);
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("❌ 지역게시판 등록 오류:", error);
+    res.status(500).json({
+      success: false,
+      error: "게시글 등록 실패",
+    });
+  }
+}
 
 /* -----------------------------
    2) 목록 + 공지 상단 고정

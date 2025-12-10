@@ -132,3 +132,46 @@ export async function getHotBlog(req, res) {
         res.status(500).json({ success: false, error: err.message });
     }
 }
+
+/** 블로그 등록 (구버전) */
+export async function registerBlog(req, res) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { title, content, category, tags } = req.body;
+
+    // ✅ A 방식: /uploads/hotblog/...
+    const thumbnail = req.file ? `/uploads/hotblog/${req.file.filename}` : null;
+
+    const query = `
+      INSERT INTO hot_blogs (title, content, category, thumbnail, tags)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const result = await client.query(query, [
+      title,
+      content,
+      category || "일반",
+      thumbnail,
+      tags || null,
+    ]);
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("❌ 핫블로그 등록 오류:", error);
+    res.status(500).json({
+      success: false,
+      error: "블로그 등록 실패",
+    });
+  } finally {
+    client.release();
+  }
+}

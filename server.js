@@ -31,7 +31,8 @@ import suggestRouter from "./routes/suggestRouter.js";
 import openregisterRouter from "./routes/openregisterRouter.js";
 import openRouter from "./routes/openRouter.js";
 import opendetailRouter from "./routes/opendetailRouter.js";
-import uploadRouter from "./routes/upload.js";
+// ❌ 존재하지 않는 파일 제거
+// import uploadRouter from "./routes/upload.js";
 import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
 import storeprideRouter from "./routes/storeprideRouter.js";
 import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterRouter.js";
@@ -325,7 +326,8 @@ app.use("/open", openRouter);
 app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
 
-app.use("/upload", uploadRouter);
+// ❌ 존재하지 않는 라우터 제거
+// app.use("/upload", uploadRouter);
 
 // 가게 등록 / 통합 등록
 app.use("/store", foodregisterRouter);
