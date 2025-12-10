@@ -132,11 +132,36 @@ initPerformingArtsTables();
 // ------------------------------------------------------------
 const UPLOAD_ROOT = "/data/uploads"; // ★★★ 영구 저장 A 방식 ★★★
 
+// ✅ 우리가 합의한 서브디렉토리까지 모두 준비
 const uploadDirs = [
   UPLOAD_ROOT,
+
+  // 문의 (일반)
   path.join(UPLOAD_ROOT, "inquiry"),
+
+  // 문의 게시판 모듈
+  path.join(UPLOAD_ROOT, "inquiryBoard"),
+
+  // 전통시장
   path.join(UPLOAD_ROOT, "traditionalmarket"),
+
+  // 공연예술
   path.join(UPLOAD_ROOT, "performingart"),
+
+  // 지역게시판
+  path.join(UPLOAD_ROOT, "localboard"),
+
+  // 이벤트
+  path.join(UPLOAD_ROOT, "events"),
+
+  // 오픈예정
+  path.join(UPLOAD_ROOT, "open"),
+
+  // 핫블로그
+  path.join(UPLOAD_ROOT, "hotblog"),
+
+  // 인덱스 광고
+  path.join(UPLOAD_ROOT, "indexads"),
 ];
 
 uploadDirs.forEach((dir) => {
