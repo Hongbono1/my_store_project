@@ -2,11 +2,28 @@
 import pool from "../db.js";
 
 /**
+ * ✅ Boolean 정규화 유틸
+ * - "true"/"false", 1/0, on/off 등 혼용 대응
+ */
+function toBool(v) {
+  if (v === true) return true;
+  if (v === false) return false;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    return s === "true" || s === "1" || s === "on" || s === "yes";
+  }
+  return false;
+}
+
+/**
  * ✅ 바디 키를 프론트/서버 혼용 케이스까지 안전 매핑
  * - 업로드/가게연결/텍스트/기간 공통 대응
  */
 function pickBody(req) {
   const b = req?.body || {};
+
+  const noEndRaw = b.noEnd ?? b.no_end ?? false;
 
   return {
     // 필수
@@ -34,7 +51,7 @@ function pickBody(req) {
     // 기간
     startDate: b.startDate || b.start_date || null,
     endDate: b.endDate || b.end_date || null,
-    noEnd: b.noEnd ?? b.no_end ?? false,
+    noEnd: toBool(noEndRaw),
   };
 }
 
@@ -542,9 +559,11 @@ export async function uploadIndexAd(req, res) {
       ON CONFLICT (page, position)
       DO UPDATE SET
         slot_type = EXCLUDED.slot_type,
-        image_url = EXCLUDED.image_url,
-        link_url = EXCLUDED.link_url,
-        text_content = EXCLUDED.text_content,
+        -- ✅ 파일 없으면 기존 이미지 유지
+        image_url = COALESCE(EXCLUDED.image_url, admin_ad_slots.image_url),
+        -- ✅ 링크/텍스트도 빈값 덮어쓰기 방지(안전형)
+        link_url = COALESCE(EXCLUDED.link_url, admin_ad_slots.link_url),
+        text_content = COALESCE(EXCLUDED.text_content, admin_ad_slots.text_content),
         slot_mode = EXCLUDED.slot_mode,
         store_id = EXCLUDED.store_id,
         business_no = EXCLUDED.business_no,
@@ -710,29 +729,30 @@ export async function saveIndexStoreAd(req, res) {
  * ============================================================ */
 export async function connectStoreToSlot(req, res) {
   try {
+    // ✅ pickBody로 통일 (프론트 키 혼용 방어)
     const {
       page,
       position,
-      bizNo,
-      bizName,
+      businessNo,
+      businessName,
       startDate,
       endDate,
       noEnd,
-    } = req.body || {};
+    } = pickBody(req);
 
     ensurePagePosition(page, position);
 
-    if (!bizNo || !bizName) {
+    if (!businessNo || !businessName) {
       return res.status(400).json({
         ok: false,
-        message: "사업자번호(bizNo)와 상호명(bizName)을 모두 입력해야 합니다.",
+        message: "사업자번호와 상호명을 모두 입력해야 합니다.",
       });
     }
 
-    const cleanBizNo = String(bizNo).replace(/[^0-9]/g, "").trim();
+    const cleanBizNo = String(businessNo).replace(/[^0-9]/g, "").trim();
     const finalEndDate = noEnd ? null : endDate || null;
 
-    const storeId = await findStoreIdByBizAndName(cleanBizNo, bizName);
+    const storeId = await findStoreIdByBizAndName(cleanBizNo, businessName);
 
     const sql = `
       INSERT INTO admin_ad_slots (
@@ -757,7 +777,7 @@ export async function connectStoreToSlot(req, res) {
       page,
       position,
       cleanBizNo,
-      bizName,
+      businessName,
       storeId,
       startDate || null,
       finalEndDate,
@@ -768,7 +788,7 @@ export async function connectStoreToSlot(req, res) {
     const enriched = await resolveStoreModeSlot({
       ...saved,
       business_no: cleanBizNo,
-      business_name: bizName,
+      business_name: businessName,
       slot_mode: "store",
       store_id: storeId ?? saved.store_id,
     });

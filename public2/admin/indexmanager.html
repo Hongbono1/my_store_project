@@ -333,7 +333,7 @@
     </section>
 
     <!-- 🔥 이벤트 / 지역게시판 / 계절테마 / 신규회원혜택 (모두 동일 크기) -->
-    <section <section class="max-w-7xl mx-auto px-4 sm:px-6 py-6 
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-6 
            grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 
            gap-4 text-center">
 
@@ -514,6 +514,12 @@
                                 class="w-full border border-slate-300 p-2 rounded-lg text-sm" placeholder="예) 홍길동식당">
                         </div>
 
+                        <!-- ✅ (A) 현재 연결 표기 -->
+                        <p id="currentStoreInfo" class="mt-1 text-xs text-slate-500 hidden">
+                            현재 연결: <span id="currentBizName">-</span>
+                            (<span id="currentBizNo">-</span>)
+                        </p>
+
                         <p class="text-[11px] text-slate-400">
                             ✅ 사업자번호 입력 시, 일치 가게가 있으면 상호 후보가 표시되고 클릭하면 자동 입력됩니다.
                         </p>
@@ -525,6 +531,14 @@
                             <label class="block font-semibold mb-1 text-sm">이미지 파일 (선택)</label>
                             <input id="imageInput" type="file"
                                 class="w-full border border-slate-300 p-2 rounded-lg text-sm" accept="image/*">
+
+                            <!-- ✅ (A) 파일 입력 아래 현재 이미지 표기 + 기존 이미지 URL hidden -->
+                            <div id="currentImageInfo" class="mt-1 text-xs text-slate-500 hidden">
+                                현재 저장된 파일:
+                                <a id="currentImageLink" href="#" target="_blank" class="underline"></a>
+                            </div>
+                            <input type="hidden" id="existingImageUrl" />
+
                             <p class="text-[11px] text-slate-400 mt-1">배너/카드에 들어갈 이미지를 선택하세요.</p>
                         </div>
 
@@ -735,6 +749,94 @@
                 slot?.business_number ||
                 ""
             );
+        }
+
+        // =========================================================
+        // ✅ (B) 모달 프리필 유틸 + 프리필 함수
+        // =========================================================
+        function filenameFromUrl(u) {
+            try {
+                return decodeURIComponent(String(u).split("/").pop());
+            } catch {
+                return u || "";
+            }
+        }
+        function setIf(id, v) {
+            const el = document.getElementById(id);
+            if (el && v != null && v !== "") el.value = v;
+        }
+
+        async function prefillAdModal(page, position) {
+            try {
+                const r = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+                if (!r.ok) return;
+                const j = await r.json();
+                const slot = j?.slot;
+                if (!slot) return;
+
+                // 입력 모드 라디오
+                const modeStore = document.getElementById("modeStore");
+                const modeCustom = document.getElementById("modeCustom");
+                if (slot.slot_mode === "store") {
+                    if (modeStore) modeStore.checked = true;
+                } else {
+                    if (modeCustom) modeCustom.checked = true;
+                }
+                // 모드별 영역 토글 갱신
+                document.getElementById("modeStore")?.dispatchEvent(new Event("change"));
+
+                // 링크/기간
+                setIf("linkInput", slot.link_url);
+                setIf("startDateInput", slot.start_date);
+                setIf("startTimeInput", slot.start_time);
+                setIf("endDateInput", slot.end_date);
+                setIf("endTimeInput", slot.end_time);
+
+                const noEnd = !!slot.no_end;
+                const noEndEl = document.getElementById("noEndCheckbox");
+                if (noEndEl) noEndEl.checked = noEnd;
+                if (typeof setupNoEndToggle === "function") setupNoEndToggle();
+
+                // 이미지 표기
+                const url = toAbs(pickImageUrl(slot));
+                const infoBox = document.getElementById("currentImageInfo");
+                const linkA = document.getElementById("currentImageLink");
+                const hidden = document.getElementById("existingImageUrl");
+
+                if (url) {
+                    if (linkA) {
+                        linkA.textContent = filenameFromUrl(url);
+                        linkA.href = url;
+                    }
+                    infoBox?.classList.remove("hidden");
+                    if (hidden) hidden.value = url; // 나중 저장 시 '기존 이미지 유지'에 사용
+                } else {
+                    infoBox?.classList.add("hidden");
+                    if (linkA) {
+                        linkA.textContent = "";
+                        linkA.href = "#";
+                    }
+                    if (hidden) hidden.value = "";
+                }
+
+                // 사업자 표기/입력 프리필
+                const bizNo = pickBizNo(slot) || "";
+                const bizName = pickBizName(slot) || "";
+                setIf("businessNoInput", bizNo);
+                setIf("businessNameInput", bizName);
+
+                const sBox = document.getElementById("currentStoreInfo");
+                const bizNoEl = document.getElementById("currentBizNo");
+                const bizNameEl = document.getElementById("currentBizName");
+                if (bizNoEl) bizNoEl.textContent = bizNo || "-";
+                if (bizNameEl) bizNameEl.textContent = bizName || "-";
+
+                if (bizNo || bizName) sBox?.classList.remove("hidden");
+                else sBox?.classList.add("hidden");
+
+            } catch (e) {
+                console.error("prefillAdModal error:", e);
+            }
         }
 
         // ============================
@@ -1173,7 +1275,7 @@
         // 슬롯 클릭 → 모달 열기
         // ============================
         function setupSlotClick() {
-            document.addEventListener("click", (e) => {
+            document.addEventListener("click", async (e) => {
                 const slotEl = e.target.closest(".js-slot, .js-text-slot");
                 if (!slotEl) return;
 
@@ -1219,12 +1321,31 @@
                     document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
                     document.getElementById("slotInfo").textContent = `${page} / ${position}`;
 
+                    // ✅ 초기화(빈값) 먼저
                     document.getElementById("imageInput").value = "";
                     document.getElementById("linkInput").value = "";
                     document.getElementById("businessNoInput").value = "";
                     document.getElementById("businessNameInput").value = "";
                     showBizResultBox("");
                     resetAdPeriodFields();
+
+                    // ✅ 현재 값 표기 초기화
+                    const infoBox = document.getElementById("currentImageInfo");
+                    const linkA = document.getElementById("currentImageLink");
+                    const hidden = document.getElementById("existingImageUrl");
+                    if (infoBox) infoBox.classList.add("hidden");
+                    if (linkA) { linkA.textContent = ""; linkA.href = "#"; }
+                    if (hidden) hidden.value = "";
+
+                    const sBox = document.getElementById("currentStoreInfo");
+                    const cbn = document.getElementById("currentBizName");
+                    const cbno = document.getElementById("currentBizNo");
+                    if (sBox) sBox.classList.add("hidden");
+                    if (cbn) cbn.textContent = "-";
+                    if (cbno) cbno.textContent = "-";
+
+                    // 🔹 저장돼있는 값으로 프리필
+                    await prefillAdModal(page, position);
 
                     const adModal = document.getElementById("adModal");
                     adModal.classList.remove("hidden");
@@ -1248,6 +1369,21 @@
                 document.getElementById("businessNameInput").value = "";
                 showBizResultBox("");
                 resetAdPeriodFields();
+
+                // ✅ 현재 값 표기 리셋
+                const infoBox = document.getElementById("currentImageInfo");
+                const linkA = document.getElementById("currentImageLink");
+                const hidden = document.getElementById("existingImageUrl");
+                if (infoBox) infoBox.classList.add("hidden");
+                if (linkA) { linkA.textContent = ""; linkA.href = "#"; }
+                if (hidden) hidden.value = "";
+
+                const sBox = document.getElementById("currentStoreInfo");
+                const cbn = document.getElementById("currentBizName");
+                const cbno = document.getElementById("currentBizNo");
+                if (sBox) sBox.classList.add("hidden");
+                if (cbn) cbn.textContent = "-";
+                if (cbno) cbno.textContent = "-";
             };
 
             closeBtn.addEventListener("click", () => {
@@ -1423,6 +1559,10 @@
                 formData.append("page", page);
                 formData.append("position", position);
                 formData.append("link_url", link);
+
+                // ✅ (D) 이미지 새로 안 고르면 기존 이미지 유지용 URL 전송
+                const existing = document.getElementById("existingImageUrl")?.value || "";
+                if (!imageFile && existing) formData.append("existing_image_url", existing);
 
                 if (period.startDate) formData.append("start_date", period.startDate);
                 if (period.startTime) formData.append("start_time", period.startTime);
