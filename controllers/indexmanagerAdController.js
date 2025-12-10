@@ -10,8 +10,10 @@ import path from "path";
  * - Express에서 /uploads 정적서빙을 이미 쓰고 있다는 전제에 가장 안전한 경로
  */
 const UPLOAD_SUBDIR = "indexads";
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", UPLOAD_SUBDIR);
+const UPLOAD_ROOT = "/data/uploads";
+const UPLOAD_DIR = path.join(UPLOAD_ROOT, UPLOAD_SUBDIR);
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
 
 /**
  * ✅ multer 설정
