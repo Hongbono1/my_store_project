@@ -881,6 +881,9 @@ export async function getIndexSlot(req, res) {
         business_no: slot.business_no || null,
         slot_type: slot.slot_type || null,
         slot_mode: slot.slot_mode || null,
+        start_date: slot.start_date || null,
+        end_date: slot.end_date || null,
+        updated_at: slot.updated_at || null,
       },
     });
   } catch (error) {
