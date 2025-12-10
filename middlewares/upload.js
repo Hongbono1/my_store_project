@@ -1,22 +1,38 @@
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+// routes/upload.js
+import express from "express";
+import { upload } from "../middlewares/upload.js";
 
-const uploadDir = path.join(process.cwd(), "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext  = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext)
-                 .replace(/\s+/g, "_")
-                 .replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9-_]/g, "");
-    cb(null, `${Date.now()}-${base}${ext}`);
-  },
+/**
+ * ✅ 범용 업로드 테스트 라우터
+ * - server.js에서 app.use("/upload", uploadRouter) 같은 형태로
+ *   연결되어 있을 때 안전하게 동작
+ *
+ * - 폼 필드명이 무엇이든 업로드 테스트 가능
+ */
+router.post("/", upload.any(), (req, res) => {
+  const files = (req.files || []).map((f) => ({
+    fieldname: f.fieldname,
+    originalname: f.originalname,
+    filename: f.filename,
+    size: f.size,
+    mimetype: f.mimetype,
+    url: `/uploads/${f.filename}`, // ✅ public/uploads 기준
+  }));
+
+  return res.json({
+    ok: true,
+    count: files.length,
+    files,
+  });
 });
 
-export const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+/**
+ * ✅ 헬스 체크
+ */
+router.get("/health", (_req, res) => {
+  res.json({ ok: true, route: "upload" });
 });
+
+export default router;
