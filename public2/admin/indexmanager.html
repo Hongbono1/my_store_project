@@ -2,2028 +2,1401 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MALL HANKOOK 메인 레이아웃 관리자 | indexmanager</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MALL HANKOOK | Index Layout Manager (indexmanager)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
         body {
-            font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont,
-                'Segoe UI', sans-serif;
+            font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        /* ✅ 수정된 neo-card 스타일 - 더 명확한 테두리와 배경 */
+        /* =========================
+           ✅ 카드/슬롯 기본 스타일
+        ========================== */
         .neo-card {
             background: rgba(255, 255, 255, 0.95);
-            border: 2px solid rgba(59, 130, 246, 0.2);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(59, 130, 246, 0.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border-radius: 1rem;
             box-shadow:
-                4px 4px 12px rgba(0, 0, 0, 0.1),
-                -2px -2px 8px rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease;
-            min-height: 120px;
+                6px 6px 12px rgba(0, 0, 0, 0.08),
+                -6px -6px 12px rgba(255, 255, 255, 0.85);
+            transition: all 0.22s ease;
         }
 
         .neo-card:hover {
             transform: translateY(-2px);
             box-shadow:
-                6px 6px 16px rgba(0, 0, 0, 0.15),
-                -3px -3px 10px rgba(255, 255, 255, 0.9);
-            border: 2px solid rgba(59, 130, 246, 0.4);
-            background: rgba(255, 255, 255, 0.98);
+                10px 10px 18px rgba(0, 0, 0, 0.12),
+                -6px -6px 10px rgba(255, 255, 255, 0.95);
         }
 
-        /* 디버깅용 - 박스가 안보일 때 활성화 */
-        .debug-neo-card {
-            outline: 2px dashed #ef4444 !important;
-            background: rgba(255, 0, 0, 0.05) !important;
-        }
-
-        /* 슬롯 기본 스타일 강화 */
         .slot-banner {
             position: relative;
             overflow: hidden;
-            min-height: 100px;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
+            cursor: pointer;
+            isolation: isolate;
         }
 
-        .slot-banner img {
+        /* ✅ 슬롯 이미지 안전 규격 */
+        .slot-banner .slot-img {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
             display: block;
+            object-fit: cover;
+            z-index: 1;
         }
 
         .slot-banner .slot-default {
-            align-items: center;
-            justify-content: center;
+            position: relative;
+            z-index: 0;
             width: 100%;
             height: 100%;
-            background: #f1f5f9;
-            border: 2px dashed #cbd5e1;
-        }
-
-        /* 텍스트 슬롯 기본 스타일 */
-        .js-text-slot .slot-default-text {
-            min-height: 80px;
-            padding: 1rem;
             display: flex;
-            flex-direction: column;
-            justify-content: center;
             align-items: center;
-            text-align: center;
+            justify-content: center;
+            color: rgba(107, 114, 128, 0.9);
+            font-size: 0.85rem;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
         }
 
-        /* 관리자 모달 공통 */
-        .modal-bg {
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+        /* =========================
+           ✅ 관리자 오버레이 배지
+        ========================== */
+        .slot-badge {
+            position: absolute;
+            z-index: 3;
+            font-size: 10px;
+            line-height: 1;
+            padding: 6px 8px;
+            border-radius: 9999px;
+            background: rgba(15, 23, 42, 0.85);
+            color: white;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            letter-spacing: 0.2px;
         }
 
-        .badge-ad {
-            background: rgba(59, 130, 246, 0.12);
-            color: #1d4ed8;
+        .slot-badge.size {
+            bottom: 10px;
+            right: 10px;
+            background: rgba(37, 99, 235, 0.9);
         }
 
-        .badge-img {
-            background: rgba(34, 197, 94, 0.12);
-            color: #15803d;
+        .slot-badge.store {
+            bottom: 10px;
+            left: 10px;
+            background: rgba(16, 185, 129, 0.9);
         }
 
-        .badge-info {
-            background: rgba(148, 163, 184, 0.16);
-            color: #475569;
+        /* =========================
+           ✅ 커서 따라오는 툴팁
+        ========================== */
+        #hoverTip {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            transform: translate(12px, 12px);
+            padding: 6px 10px;
+            font-size: 11px;
+            border-radius: 8px;
+            background: rgba(2, 6, 23, 0.9);
+            color: white;
+            opacity: 0;
+            transition: opacity 0.08s ease;
+            white-space: nowrap;
+        }
+
+        #hoverTip.show {
+            opacity: 1;
+        }
+
+        /* =========================
+           ✅ 모달 기본
+        ========================== */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 9998;
+        }
+
+        .modal-panel {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 9999;
+        }
+
+        .modal-card {
+            width: min(920px, 96vw);
+            max-height: 92vh;
+            overflow: auto;
+            border-radius: 20px;
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .field {
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+        }
+
+        .field:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.25);
+        }
+
+        .divider {
+            height: 1px;
+            background: #eef2f7;
+        }
+
+        /* Best Pick 원형 슬롯 */
+        .best-circle {
+            position: relative;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .best-circle .slot-img {
+            object-fit: cover;
         }
     </style>
 </head>
 
 <body class="bg-white text-gray-800">
 
-    <!-- 상단 관리자 안내 띠 -->
-    <header class="w-full border-b border-slate-200/70 bg-slate-50/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between text-xs">
+    <!-- 상단 타이틀 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    Index 레이아웃 관리자 (indexmanager)
+                </h1>
+                <p class="text-sm text-gray-500 mt-1">
+                    각 박스를 클릭해 이미지 광고 또는 가게 연결 광고를 설정하세요.
+                </p>
+            </div>
             <div class="flex items-center gap-2">
-                <span
-                    class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold">ADM</span>
-                <div>
-                    <p class="font-semibold text-slate-700">MALL HANKOOK · 메인 레이아웃 관리자</p>
-                    <p class="text-[11px] text-slate-500">index.html 화면의 광고/이미지/텍스트 슬롯을 설정합니다. (클릭하면
-                        모달 열림)</p>
-                </div>
-            </div>
-            <div class="hidden sm:flex flex-col items-end gap-0.5 text-[10px] text-slate-500">
-                <span>page = <span class="font-mono font-semibold text-slate-800">"index"</span></span>
-                <span>router: <span class="font-mono">/manager/ad/*</span></span>
-            </div>
-        </div>
-    </header>
-
-    <!-- 헤더 -->
-    <div id="header-placeholder"></div>
-
-    <!-- ① 상단 띠배너 -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
-        <div id="slot_index_main_top"
-            class="neo-card h-28 flex flex-col items-center justify-center text-center cursor-pointer slot-banner js-slot"
-            data-page="index" data-position="index_main_top" data-label="상단 띠배너">
-            <img class="slot-img hidden rounded-lg" alt="광고">
-            <div class="slot-default">
-                <div>
-                    <p class="text-lg sm:text-xl md:text-2xl font-bold">네이버에 새집마련</p>
-                    <p class="text-gray-600 text-sm sm:text-base">내 취향을 기록할 새로운 공간</p>
-                </div>
+                <span class="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                    page = index
+                </span>
+                <span class="text-xs px-2 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-100">
+                    /manager/ad/slot 연동
+                </span>
             </div>
         </div>
     </div>
 
-    <!-- ② 메인 비주얼 + ③④⑤ 프로모 1/2/3 -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <!-- =========================
+         ① 상단 띠배너
+    ========================== -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-10">
+        <div id="slot_index_main_top"
+            class="neo-card h-28 flex flex-col items-center justify-center text-center slot-banner"
+            data-position="index_main_top" data-label="상단 띠배너" data-size="가로형 (권장 비율 6:1)">
+            <img class="slot-img hidden" alt="상단 띠배너">
+            <div class="slot-default">
+                <div>
+                    <p class="text-lg sm:text-xl font-bold">상단 띠배너</p>
+                    <p class="text-gray-500 text-xs sm:text-sm">클릭하여 광고 설정</p>
+                </div>
+            </div>
+            <span class="slot-badge size">6:1</span>
+            <span class="slot-badge store hidden"></span>
+        </div>
+    </div>
 
+    <!-- =========================
+         ② 메인 비주얼 + ③④⑤ 프로모
+    ========================== -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-stretch">
 
-            <!-- 메인 배너 -->
+            <!-- 메인 비주얼 -->
             <div class="lg:col-span-3">
                 <div id="slot_index_main_visual"
-                    class="slot-banner js-slot rounded-2xl overflow-hidden bg-gray-100 shadow-lg aspect-[21/9] w-full cursor-pointer relative min-h-[240px]"
-                    data-page="index" data-position="index_main_visual" data-label="메인 비주얼 배너">
-
-                    <img class="slot-img hidden absolute inset-0 w-full h-full object-cover z-10" alt="메인 배너">
-
-                    <div
-                        class="slot-default absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 z-0">
-                        <img src="/uploads/main-banner.png" alt="기본 메인 배너" class="w-full h-full object-contain">
+                    class="slot-banner rounded-2xl overflow-hidden bg-gray-100 shadow-lg aspect-[21/9] w-full h-full"
+                    data-position="index_main_visual" data-label="메인 비주얼" data-size="권장 비율 21:9">
+                    <img class="slot-img hidden w-full h-full" alt="메인 비주얼">
+                    <div class="slot-default w-full h-full">
+                        <div class="text-center">
+                            <p class="text-lg sm:text-xl font-bold">메인 비주얼</p>
+                            <p class="text-gray-500 text-xs sm:text-sm mt-1">클릭하여 광고 설정</p>
+                        </div>
                     </div>
+                    <span class="slot-badge size">21:9</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
             </div>
 
-            <!-- 오른쪽 프로모 3개 -->
+            <!-- 프로모 1/2/3 컬럼 -->
             <div class="lg:col-span-1 flex flex-col gap-4 h-full">
 
                 <div id="slot_index_promo_1"
-                    class="slot-banner js-slot rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] cursor-pointer relative"
-                    data-page="index" data-position="index_promo_1" data-label="프로모션 1번">
-                    <img class="slot-img hidden absolute inset-0 w-full h-full object-cover z-10" alt="프로모 1">
-                    <div
-                        class="slot-default absolute inset-0 w-full h-full flex items-center justify-center text-xs text-gray-500 bg-gray-100 z-0">
-                        Promo 1
+                    class="slot-banner rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] aspect-[4/3]"
+                    data-position="index_promo_1" data-label="프로모 1" data-size="권장 비율 4:3">
+                    <img class="slot-img hidden" alt="프로모 1">
+                    <div class="slot-default">
+                        <span>Promo 1</span>
                     </div>
+                    <span class="slot-badge size">4:3</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
 
                 <div id="slot_index_promo_2"
-                    class="slot-banner js-slot rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] cursor-pointer relative"
-                    data-page="index" data-position="index_promo_2" data-label="프로모션 2번">
-                    <img class="slot-img hidden absolute inset-0 w-full h-full object-cover z-10" alt="프로모 2">
-                    <div
-                        class="slot-default absolute inset-0 w-full h-full flex items-center justify-center text-xs text-gray-500 bg-gray-100 z-0">
-                        Promo 2
+                    class="slot-banner rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] aspect-[4/3]"
+                    data-position="index_promo_2" data-label="프로모 2" data-size="권장 비율 4:3">
+                    <img class="slot-img hidden" alt="프로모 2">
+                    <div class="slot-default">
+                        <span>Promo 2</span>
                     </div>
+                    <span class="slot-badge size">4:3</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
 
                 <div id="slot_index_promo_3"
-                    class="slot-banner js-slot rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] cursor-pointer relative"
-                    data-page="index" data-position="index_promo_3" data-label="프로모션 3번">
-                    <img class="slot-img hidden absolute inset-0 w-full h-full object-cover z-10" alt="프로모 3">
-                    <div
-                        class="slot-default absolute inset-0 w-full h-full flex items-center justify-center text-xs text-gray-500 bg-gray-100 z-0">
-                        Promo 3
+                    class="slot-banner rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex-1 min-h-[90px] aspect-[4/3]"
+                    data-position="index_promo_3" data-label="프로모 3" data-size="권장 비율 4:3">
+                    <img class="slot-img hidden" alt="프로모 3">
+                    <div class="slot-default">
+                        <span>Promo 3</span>
                     </div>
+                    <span class="slot-badge size">4:3</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
 
             </div>
         </div>
     </section>
 
-    <!-- ⑥ 상단 서브 박스 -->
-    <section
-        class="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">검색어</h3>
-            <a href="search.html">
-                <div id="slot_index_sub_keywords" class="neo-card min-h-28 p-4 cursor-pointer js-text-slot"
-                    data-page="index" data-position="index_sub_keywords" data-slot-type="text" data-label="검색어 박스">
-                    <div class="slot-default-text"></div>
+    <!-- =========================
+         ⑥ 상단 서브 박스 (텍스트 영역이지만 일단 동일 UI로 관리 가능)
+    ========================== -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+
+            <div>
+                <h3 class="font-bold text-xl sm:text-2xl mb-2">검색어</h3>
+                <div id="slot_index_sub_keywords" class="neo-card min-h-28 p-4 slot-banner"
+                    data-position="index_sub_keywords" data-label="검색어 박스" data-size="텍스트 영역">
+                    <img class="slot-img hidden" alt="검색어">
+                    <div class="slot-default">
+                        <span class="text-xs text-gray-500">텍스트/이미지 모두 가능</span>
+                    </div>
+                    <span class="slot-badge size">Text</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
-            </a>
-        </div>
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">최신 소식</h3>
-            <a href="news.html">
-                <div id="slot_index_sub_news" class="neo-card min-h-28 p-4 cursor-pointer js-text-slot"
-                    data-page="index" data-position="index_sub_news" data-slot-type="text" data-label="최신 소식 박스">
-                    <div class="slot-default-text"></div>
-                </div>
-            </a>
-        </div>
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">이벤트 정보</h3>
-            <div id="slot_index_sub_events" class="neo-card min-h-28 p-4 cursor-pointer js-text-slot" data-page="index"
-                data-position="index_sub_events" data-slot-type="text" data-label="이벤트 정보 박스">
-                <div class="slot-default-text"></div>
             </div>
-        </div>
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">추천 제품</h3>
-            <a href="recommend.html">
-                <div id="slot_index_sub_recommends" class="neo-card min-h-28 p-4 cursor-pointer js-text-slot"
-                    data-page="index" data-position="index_sub_recommends" data-slot-type="text" data-label="추천 제품 박스">
-                    <div class="slot-default-text"></div>
+
+            <div>
+                <h3 class="font-bold text-xl sm:text-2xl mb-2">최신 소식</h3>
+                <div id="slot_index_sub_news" class="neo-card min-h-28 p-4 slot-banner" data-position="index_sub_news"
+                    data-label="최신 소식 박스" data-size="텍스트 영역">
+                    <img class="slot-img hidden" alt="최신 소식">
+                    <div class="slot-default">
+                        <span class="text-xs text-gray-500">텍스트/이미지 모두 가능</span>
+                    </div>
+                    <span class="slot-badge size">Text</span>
+                    <span class="slot-badge store hidden"></span>
                 </div>
-            </a>
+            </div>
+
+            <div>
+                <h3 class="font-bold text-xl sm:text-2xl mb-2">이벤트 정보</h3>
+                <div id="slot_index_sub_events" class="neo-card min-h-28 p-4 slot-banner"
+                    data-position="index_sub_events" data-label="이벤트 정보 박스" data-size="텍스트 영역">
+                    <img class="slot-img hidden" alt="이벤트 정보">
+                    <div class="slot-default">
+                        <span class="text-xs text-gray-500">텍스트/이미지 모두 가능</span>
+                    </div>
+                    <span class="slot-badge size">Text</span>
+                    <span class="slot-badge store hidden"></span>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="font-bold text-xl sm:text-2xl mb-2">추천 제품</h3>
+                <div id="slot_index_sub_recommends" class="neo-card min-h-28 p-4 slot-banner"
+                    data-position="index_sub_recommends" data-label="추천 제품 박스" data-size="텍스트 영역">
+                    <img class="slot-img hidden" alt="추천 제품">
+                    <div class="slot-default">
+                        <span class="text-xs text-gray-500">텍스트/이미지 모두 가능</span>
+                    </div>
+                    <span class="slot-badge size">Text</span>
+                    <span class="slot-badge store hidden"></span>
+                </div>
+            </div>
+
         </div>
     </section>
 
-    <!-- ⑦ Best Pick (원래 인덱스 위치/모양 유지) -->
+    <!-- =========================
+         ⑦ Best Pick (관리자 버전)
+    ========================== -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl sm:text-3xl font-bold">Best Pick 관리</h2>
-            <button id="btnBestPickReload"
-                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                새로고침
-            </button>
+            <h2 class="text-2xl sm:text-3xl font-bold">Best Pick</h2>
+            <span class="text-xs text-gray-500">최대 18개 슬롯</span>
         </div>
 
-        <div id="bestPickGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <!-- Best Pick 슬롯들이 여기에 동적으로 생성됩니다 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <!-- 1 ~ 18 생성 -->
+            <div id="best_pick_grid"></div>
         </div>
     </section>
 
-    <!-- ⑧ 우리동네 한마디 -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div class="w-[73%] mx-auto">
-            <div id="slot_index_oneword"
-                class="neo-card h-28 sm:h-32 rounded-2xl flex flex-col items-center justify-center p-5 shadow-xl border-2 border-blue-400 cursor-pointer js-text-slot"
-                data-page="index" data-position="index_oneword" data-slot-type="text" data-label="우리동네 한마디">
-                <div class="text-2xl sm:text-3xl font-semibold mb-3 text-blue-600">📍 우리동네 한마디</div>
-                <p id="oneword-content"
-                    class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 text-center leading-tight">
-                    정보를 불러오는 중...</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- ⑨ 기능 진입 카드들 -->
+    <!-- =========================
+         ⑨ 기능 진입 카드들
+    ========================== -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         <div class="grid grid-rows-2 gap-4">
-            <a href="foodcategory.html" id="slot_index_food_delivery"
-                class="slot-banner rounded-lg overflow-hidden js-slot" data-page="index"
-                data-position="index_food_delivery" data-label="홍보의 배달 진입 카드">
+            <div id="slot_index_food_delivery"
+                class="slot-banner rounded-lg overflow-hidden min-h-28 sm:min-h-40 bg-gray-100"
+                data-position="index_food_delivery" data-label="홍보의 배달" data-size="자유 / 권장 16:9">
                 <img class="slot-img hidden" alt="홍보의 배달">
-                <div class="slot-default bg-gray-200 h-32 sm:h-full hover:bg-gray-300 flex items-center justify-center">
-                    <span class="text-lg font-bold text-gray-700">홍보의 배달</span>
-                </div>
-            </a>
-            <a href="ncategory2.html" id="slot_index_all_stores" class="slot-banner rounded-lg overflow-hidden js-slot"
-                data-page="index" data-position="index_all_stores" data-label="우리동네 모든가게 진입 카드">
+                <div class="slot-default">홍보의 배달</div>
+                <span class="slot-badge size">16:9</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_all_stores"
+                class="slot-banner rounded-lg overflow-hidden min-h-28 sm:min-h-40 bg-gray-100"
+                data-position="index_all_stores" data-label="우리동네 모든가게" data-size="자유 / 권장 16:9">
                 <img class="slot-img hidden" alt="우리동네 모든가게">
-                <div class="slot-default bg-gray-200 h-32 sm:h-full hover:bg-gray-300 flex items-center justify-center">
-                    <span class="text-lg font-bold text-gray-700">우리동네 모든가게</span>
-                </div>
-            </a>
+                <div class="slot-default">우리동네 모든가게</div>
+                <span class="slot-badge size">16:9</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
         </div>
+
         <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a href="hot.html" id="slot_index_hot_place" class="slot-banner rounded-lg overflow-hidden js-slot"
-                data-page="index" data-position="index_hot_place" data-label="가장 HOT한 우리동네">
+            <div id="slot_index_hot_place" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_hot_place" data-label="가장 HOT한 우리동네" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="가장 HOT한 우리동네">
-                <div class="slot-default bg-gray-200 aspect-[4/3] flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">가장 HOT한 우리동네</span>
-                </div>
-            </a>
-            <a href="suggest.html" id="slot_index_suggest" class="slot-banner rounded-lg overflow-hidden js-slot"
-                data-page="index" data-position="index_suggest" data-label="홍보의 추천">
+                <div class="slot-default">가장 HOT한 우리동네</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_suggest" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_suggest" data-label="홍보의 추천" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="홍보의 추천">
-                <div class="slot-default bg-gray-200 aspect-[4/3] flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">홍보의 추천</span>
-                </div>
-            </a>
-            <a href="open.html" id="slot_index_open" class="slot-banner rounded-lg overflow-hidden js-slot"
-                data-page="index" data-position="index_open" data-label="오픈 예정">
+                <div class="slot-default">홍보의 추천</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_open" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_open" data-label="오픈 예정" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="오픈 예정">
-                <div class="slot-default bg-gray-200 aspect-[4/3] flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">오픈 예정</span>
-                </div>
-            </a>
-            <a href="storepride.html" id="slot_index_store_pride" class="slot-banner rounded-lg overflow-hidden js-slot"
-                data-page="index" data-position="index_store_pride" data-label="가게자랑">
+                <div class="slot-default">오픈 예정</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_store_pride" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_store_pride" data-label="가게자랑" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="가게자랑">
-                <div class="slot-default bg-gray-200 aspect-[4/3] flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">가게자랑</span>
-                </div>
-            </a>
-            <a href="traditionalmarket.html" id="slot_index_traditional"
-                class="slot-banner rounded-lg overflow-hidden js-slot" data-page="index"
-                data-position="index_traditional" data-label="전통시장">
+                <div class="slot-default">가게자랑</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_traditional" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_traditional" data-label="전통시장" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="전통시장">
-                <div class="slot-default bg-gray-200 aspect-[4/3] flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">전통시장</span>
-                </div>
-            </a>
-            <a href="performingart.html" id="slot_index_performing"
-                class="slot-banner rounded-lg overflow-hidden js-slot" data-page="index"
-                data-position="index_performing" data-label="공연/예술, 축제">
+                <div class="slot-default">전통시장</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
+
+            <div id="slot_index_performing" class="slot-banner rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]"
+                data-position="index_performing" data-label="공연/예술, 축제" data-size="권장 4:3">
                 <img class="slot-img hidden" alt="공연/예술, 축제">
-                <div
-                    class="slot-default bg-gray-200 aspect-[4/3] font-bold flex items-center justify-center hover:bg-gray-300">
-                    <span class="text-lg font-bold text-gray-700">공연/예술, 축제</span>
-                </div>
-            </a>
+                <div class="slot-default font-bold">공연/예술, 축제</div>
+                <span class="slot-badge size">4:3</span>
+                <span class="slot-badge store hidden"></span>
+            </div>
         </div>
     </section>
 
-    <!-- 🔥 이벤트 / 지역게시판 / 계절테마 / 신규회원혜택 (모두 동일 크기) -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-6 
-           grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 
-           gap-4 text-center">
-
-        <!-- 이벤트 -->
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">이벤트</h3>
-            <div id="slot_index_event" class="neo-card min-h-28 p-4 cursor-pointer js-slot" data-page="index"
-                data-position="index_event" data-label="이벤트 박스">
-
-                <!-- 기본 이미지/텍스트 구조 -->
-                <img class="slot-img hidden w-full h-full object-cover" alt="event">
-                <div class="slot-default flex flex-col items-center justify-center h-full text-gray-500 text-sm">
-                    이미지 또는 링크를 등록하세요.
-                </div>
+    <!-- =========================
+         ⑩⑪ 이벤트 / 지역 게시판
+    ========================== -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div id="slot_index_event" class="slot-banner rounded-lg overflow-hidden bg-yellow-50 min-h-36 sm:min-h-52"
+            data-position="index_event" data-label="이벤트" data-size="권장 16:9">
+            <img class="slot-img hidden" alt="이벤트">
+            <div class="slot-default">
+                <span class="text-lg font-bold">이벤트</span>
             </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
         </div>
 
-        <!-- 지역 게시판 -->
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">지역 게시판</h3>
-            <div id="slot_index_board" class="neo-card min-h-28 p-4 cursor-pointer js-slot" data-page="index"
-                data-position="index_board" data-label="지역 게시판 박스">
-
-                <img class="slot-img hidden w-full h-full object-cover" alt="board">
-                <div class="slot-default flex flex-col items-center justify-center h-full text-gray-500 text-sm">
-                    이미지 또는 링크를 등록하세요.
-                </div>
+        <div id="slot_index_localboard" class="slot-banner rounded-lg overflow-hidden bg-blue-50 min-h-36 sm:min-h-52"
+            data-position="index_localboard" data-label="지역 게시판" data-size="권장 16:9">
+            <img class="slot-img hidden" alt="지역 게시판">
+            <div class="slot-default">
+                <span class="text-lg font-bold">지역 게시판</span>
             </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
         </div>
-
-        <!-- 계절 테마 -->
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">계절 테마</h3>
-            <div id="slot_index_season" class="neo-card min-h-28 p-4 cursor-pointer js-slot" data-page="index"
-                data-position="index_season" data-label="계절 테마 박스">
-
-                <img class="slot-img hidden w-full h-full object-cover" alt="season">
-                <div class="slot-default flex flex-col items-center justify-center h-full text-gray-500 text-sm">
-                    이미지 또는 링크를 등록하세요.
-                </div>
-            </div>
-        </div>
-
-        <!-- 신규회원 혜택 -->
-        <div>
-            <h3 class="font-bold text-xl sm:text-2xl mb-2">신규회원 혜택</h3>
-            <div id="slot_index_new_member" class="neo-card min-h-28 p-4 cursor-pointer js-slot" data-page="index"
-                data-position="index_new_member" data-label="신규회원 혜택 박스">
-
-                <img class="slot-img hidden w-full h-full object-cover" alt="new member">
-                <div class="slot-default flex flex-col items-center justify-center h-full text-gray-500 text-sm">
-                    이미지 또는 링크를 등록하세요.
-                </div>
-            </div>
-        </div>
-
     </section>
 
-    <!-- ⑮ 고객지원 박스 -->
-    <section
-        class="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-center">
-        <a href="review.html" id="slot_index_support_review" class="slot-banner rounded-lg overflow-hidden js-slot"
-            data-page="index" data-position="index_support_review" data-label="리뷰/후기 박스">
+    <!-- =========================
+         ⑫⑬ 계절 테마 / 신규 회원 혜택
+    ========================== -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div id="slot_index_season" class="slot-banner rounded-lg overflow-hidden bg-gray-100 min-h-36 sm:min-h-52"
+            data-position="index_season" data-label="계절테마" data-size="권장 16:9">
+            <img class="slot-img hidden" alt="계절테마">
+            <div class="slot-default">
+                <span class="text-lg font-bold">계절테마</span>
+            </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
+        </div>
+
+        <div id="slot_index_join" class="slot-banner rounded-lg overflow-hidden bg-gray-100 min-h-36 sm:min-h-52"
+            data-position="index_join" data-label="신규 회원 혜택" data-size="권장 16:9">
+            <img class="slot-img hidden" alt="신규 회원 혜택">
+            <div class="slot-default flex-col">
+                <span class="text-lg font-bold">신규 회원 혜택</span>
+                <span class="text-xs text-gray-500 mt-1">클릭하여 설정</span>
+            </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
+        </div>
+    </section>
+
+    <!-- =========================
+         ⑮ 고객지원 3칸
+    ========================== -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="slot_index_support_review"
+            class="slot-banner rounded-lg overflow-hidden bg-gray-100 min-h-28 sm:min-h-40"
+            data-position="index_support_review" data-label="리뷰/후기" data-size="권장 16:9">
             <img class="slot-img hidden" alt="리뷰/후기">
-            <div
-                class="slot-default bg-gray-200 min-h-28 sm:min-h-40 flex items-center justify-center hover:bg-gray-300">
-                <span class="text-lg font-bold text-gray-700">리뷰/후기</span>
+            <div class="slot-default">
+                <span class="text-lg font-bold">리뷰/후기</span>
             </div>
-        </a>
-        <div id="slot_index_support_empty" class="slot-banner rounded-lg overflow-hidden js-slot cursor-pointer"
-            data-page="index" data-position="index_support_empty" data-label="중앙 박스">
-            <img class="slot-img hidden" alt="중앙 박스">
-            <div
-                class="slot-default bg-gray-200 min-h-28 sm:min-h-40 flex items-center justify-center hover:bg-gray-300">
-                <span class="text-sm text-gray-500">클릭하여 설정</span>
-            </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
         </div>
-        <a href="inquiryBoard.html" id="slot_index_support_inquiry"
-            class="slot-banner rounded-lg overflow-hidden js-slot" data-page="index"
-            data-position="index_support_inquiry" data-label="문의게시판 박스">
-            <img class="slot-img hidden" alt="문의게시판">
-            <div
-                class="slot-default bg-gray-200 min-h-28 sm:min-h-40 hover:bg-gray-300 flex flex-col items-center justify-center p-3">
-                <h4 class="font-bold text-base text-gray-700">문의게시판 (Q&A)</h4>
-                <p class="text-xs text-gray-600 mt-1 text-center">궁금한 점을 남겨주세요</p>
+
+        <div id="slot_index_support_empty"
+            class="slot-banner rounded-lg overflow-hidden bg-gray-100 min-h-28 sm:min-h-40"
+            data-position="index_support_empty" data-label="고객지원 중앙" data-size="자유">
+            <img class="slot-img hidden" alt="중앙 박스">
+            <div class="slot-default">
+                <span class="text-sm text-gray-500">중앙 지원 박스</span>
             </div>
-        </a>
+            <span class="slot-badge size">FREE</span>
+            <span class="slot-badge store hidden"></span>
+        </div>
+
+        <div id="slot_index_support_inquiry"
+            class="slot-banner rounded-lg overflow-hidden bg-gray-100 min-h-28 sm:min-h-40"
+            data-position="index_support_inquiry" data-label="문의게시판" data-size="권장 16:9">
+            <img class="slot-img hidden" alt="문의게시판">
+            <div class="slot-default flex-col">
+                <span class="text-lg font-bold">문의게시판</span>
+                <span class="text-xs text-gray-500 mt-1">클릭하여 설정</span>
+            </div>
+            <span class="slot-badge size">16:9</span>
+            <span class="slot-badge store hidden"></span>
+        </div>
     </section>
 
-    <!-- D2C 영역 -->
-    <div id="slot_index_d2c_banner" class="hidden js-slot" data-page="index" data-position="index_d2c_banner"
-        data-label="D2C 상단 배너"></div>
-    <div id="slot_index_d2c_shop" class="hidden js-slot" data-page="index" data-position="index_d2c_shop"
-        data-label="D2C 쇼핑 박스"></div>
+    <!-- =========================
+         툴팁
+    ========================== -->
+    <div id="hoverTip"></div>
 
-    <!-- 푸터 -->
-    <div id="footer-placeholder"></div>
-
-    <!-- 오른쪽 하단 네비 -->
-    <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
-        <div class="flex flex-col items-center">
-            <button onclick="goBack()"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow">←</button>
-            <span class="text-xs mt-1">이전</span>
-        </div>
-        <div class="flex flex-col items-center">
-            <button onclick="goNext()"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow">→</button>
-            <span class="text-xs mt-1">다음</span>
-        </div>
-        <div class="flex flex-col items-center">
-            <a href="/index.html"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow">🏠</a>
-            <span class="text-xs mt-1">홈</span>
-        </div>
-    </div>
-
-    <!-- ======================== -->
-    <!-- 🎛 광고/이미지/텍스트 등록 모달 -->
-    <!-- ======================== -->
-    <div id="adModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200
-              flex flex-col max-h-[85vh] overflow-hidden">
-
-            <!-- 헤더 -->
-            <h2 id="modalTitle" class="text-lg font-bold shrink-0 px-6 md:px-7 pt-6 md:pt-7 pb-4">
-                슬롯 설정
-            </h2>
-
-            <!-- 폼 전체 -->
-            <form id="adForm" class="flex-1 flex flex-col min-h-0">
-
-                <!-- ✅ 스크롤 영역 -->
-                <div class="grow min-h-0 overflow-y-auto px-6 md:px-7 space-y-4 pb-24">
-
-                    <div class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3"
-                        id="slotInfo">
-                        선택된 슬롯 정보가 여기에 표시됩니다.
-                    </div>
-
-                    <!-- 입력 방식 선택 -->
-                    <div>
-                        <label class="block font-semibold mb-1 text-sm">입력 방식 선택</label>
-                        <div class="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-4">
-                            <label class="inline-flex items-center gap-1">
-                                <input type="radio" name="adMode" id="modeCustom" value="custom" class="text-blue-600"
-                                    checked>
-                                <span>이미지 + 링크 직접 입력</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1">
-                                <input type="radio" name="adMode" id="modeStore" value="store" class="text-blue-600">
-                                <span>등록된 가게로 연결 (사업자번호 + 상호)</span>
-                            </label>
-                        </div>
-                        <p class="text-[11px] text-slate-400 mt-1">
-                            메인 인덱스의 배너는 <span class="font-semibold">'이미지 + 링크'</span>,
-                            가게 광고 슬롯은 <span class="font-semibold">'등록된 가게'</span>를 선택하세요.
-                        </p>
-                    </div>
-
-                    <!-- ✅ 등록된 가게로 연결 -->
-                    <div id="storeModeFields" class="space-y-2 hidden">
+    <!-- =========================
+         공통 모달
+    ========================== -->
+    <div id="modalRoot" class="hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-card">
+                <!-- 헤더 -->
+                <div class="p-6 sticky top-0 bg-white/90 backdrop-blur border-b border-slate-100 z-10">
+                    <div class="flex items-start justify-between gap-4">
                         <div>
-                            <label for="businessNoInput" class="block font-semibold mb-1 text-sm">사업자 등록번호</label>
-                            <input id="businessNoInput" type="text"
-                                class="w-full border border-slate-300 p-2 rounded-lg text-sm"
-                                placeholder="예) 123-45-67890">
+                            <h3 id="modalTitle" class="text-xl sm:text-2xl font-extrabold">슬롯 수정</h3>
+                            <p class="text-xs text-gray-500 mt-1">
+                                page: <b>index</b> /
+                                position: <span id="modalPositionText" class="font-semibold"></span>
+                            </p>
                         </div>
 
-                        <!-- ✅ 결과 리스트 -->
-                        <div id="bizSearchResult"
-                            class="hidden border border-slate-200 rounded-lg p-2 bg-white space-y-1 max-h-48 overflow-y-auto">
-                        </div>
-
-                        <div>
-                            <label for="businessNameInput" class="block font-semibold mb-1 text-sm">상호명</label>
-                            <input id="businessNameInput" type="text"
-                                class="w-full border border-slate-300 p-2 rounded-lg text-sm" placeholder="예) 홍길동식당">
-                        </div>
-
-                        <!-- ✅ (A) 현재 연결 표기 -->
-                        <p id="currentStoreInfo" class="mt-1 text-xs text-slate-500 hidden">
-                            현재 연결: <span id="currentBizName">-</span>
-                            (<span id="currentBizNo">-</span>)
-                        </p>
-
-                        <p class="text-[11px] text-slate-400">
-                            ✅ 사업자번호 입력 시, 일치 가게가 있으면 상호 후보가 표시되고 클릭하면 자동 입력됩니다.
-                        </p>
+                        <button id="btnCloseModal"
+                            class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
+                            닫기
+                        </button>
                     </div>
-
-                    <!-- 이미지 + 링크 직접 입력 -->
-                    <div id="customModeFields" class="space-y-3">
-                        <div>
-                            <label class="block font-semibold mb-1 text-sm">이미지 파일 (선택)</label>
-                            <input id="imageInput" type="file"
-                                class="w-full border border-slate-300 p-2 rounded-lg text-sm" accept="image/*">
-
-                            <!-- ✅ (A) 파일 입력 아래 현재 이미지 표기 + 기존 이미지 URL hidden -->
-                            <div id="currentImageInfo" class="mt-1 text-xs text-slate-500 hidden">
-                                현재 저장된 파일:
-                                <a id="currentImageLink" href="#" target="_blank" class="underline"></a>
-                            </div>
-                            <input type="hidden" id="existingImageUrl" />
-
-                            <p class="text-[11px] text-slate-400 mt-1">배너/카드에 들어갈 이미지를 선택하세요.</p>
-                        </div>
-
-                        <div>
-                            <label class="block font-semibold mb-1 text-sm">클릭 시 이동 링크 (선택)</label>
-                            <input id="linkInput" type="text"
-                                placeholder="https://www.hongbono1.com/ndetail.html?id=1&type=food"
-                                class="w-full border border-slate-300 p-2 rounded-lg text-sm">
-                            <p class="text-[11px] text-slate-400 mt-1">비워두면 링크 없이 이미지/배너만 표시됩니다.</p>
-                        </div>
-                    </div>
-
-                    <!-- ✅ 광고 기간 -->
-                    <div class="mt-2 border-t border-slate-100 pt-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-sm font-semibold text-slate-700">광고 기간 설정</h3>
-                            <span class="text-[11px] text-slate-400">선택 입력</span>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">시작 날짜</label>
-                                <input type="date" id="startDateInput"
-                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">시작 시간</label>
-                                <input type="time" id="startTimeInput"
-                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">종료 날짜</label>
-                                <input type="date" id="endDateInput"
-                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">종료 시간</label>
-                                <input type="time" id="endTimeInput"
-                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                            </div>
-                        </div>
-
-                        <label class="inline-flex items-center gap-2 mt-3 text-xs text-slate-600">
-                            <input type="checkbox" id="noEndCheckbox" class="accent-blue-600">
-                            종료 없음
-                        </label>
-
-                        <p class="text-[11px] text-slate-400 mt-1">
-                            ✅ 시작은 <b>날짜+시간</b>을 함께 입력해야 합니다. 종료 없음 선택 시 종료 입력은 비활성화됩니다.
-                        </p>
-                    </div>
-
-                    <input type="hidden" id="selectedPage">
-                    <input type="hidden" id="selectedPosition">
                 </div>
 
-                <!-- ✅ 하단 버튼 바 -->
-                <div class="shrink-0 sticky bottom-0 left-0 right-0
-                  px-6 md:px-7 pt-3 pb-3 bg-white/95 backdrop-blur border-t">
-                    <div class="flex justify-end gap-3">
-                        <button type="button" id="closeModal"
-                            class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
-                            취소
+                <!-- 본문 -->
+                <div class="p-6 space-y-6">
+
+                    <!-- 모드 선택 -->
+                    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold mb-3">광고 방식 선택</p>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="slotMode" value="image" class="accent-blue-600">
+                                <span>이미지 입력</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="slotMode" value="store" class="accent-emerald-600">
+                                <span>가게 연결</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 공통 링크 -->
+                    <div>
+                        <label class="text-sm font-semibold">링크 URL (선택)</label>
+                        <input id="fieldLinkUrl" class="field mt-2"
+                            placeholder="/ndetail.html?id=123&type=store or https://..." />
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- 이미지 블록 -->
+                    <div id="imageBlock" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-sm font-semibold">이미지 파일</label>
+                                <input id="fieldImageFile" type="file" accept="image/*" class="field mt-2 bg-white" />
+                                <p class="text-xs text-gray-500 mt-1">
+                                    슬롯 비율에 맞게 자동 크롭됩니다.
+                                </p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold">현재 이미지 미리보기</label>
+                                <div
+                                    class="mt-2 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden aspect-[16/9] flex items-center justify-center">
+                                    <img id="currentPreviewImg" src="" alt="preview"
+                                        class="w-full h-full object-cover hidden" />
+                                    <span id="currentPreviewEmpty" class="text-xs text-gray-400">이미지 없음</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 가게 연결 블록 -->
+                    <div id="storeBlock" class="space-y-4 hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-sm font-semibold">사업자번호</label>
+                                <input id="fieldBizNo" class="field mt-2" placeholder="예) 2910802895" />
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold">상호명</label>
+                                <input id="fieldBizName" class="field mt-2" placeholder="예) 미례헤어" />
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button id="btnSearchStore"
+                                class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
+                                가게 검색
+                            </button>
+                            <span id="storeSearchHint" class="text-xs text-gray-500"></span>
+                        </div>
+
+                        <div id="storeResults" class="border border-slate-100 rounded-xl overflow-hidden">
+                            <div class="px-4 py-3 bg-slate-50 text-sm font-semibold">
+                                검색 결과
+                            </div>
+                            <div id="storeResultsBody" class="p-4 text-sm text-gray-500">
+                                검색어를 입력하고 “가게 검색”을 눌러주세요.
+                            </div>
+                        </div>
+
+                        <!-- 선택된 가게 hidden -->
+                        <input id="fieldStoreId" type="hidden" />
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- 기간 -->
+                    <div class="rounded-xl border border-slate-100 p-4">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-semibold">광고 기간 설정</p>
+                            <label class="flex items-center gap-2 text-xs">
+                                <input id="fieldNoEnd" type="checkbox" class="accent-blue-600">
+                                <span class="text-gray-700">계속 유지 (종료 없음)</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-600">시작 일시</label>
+                                <input id="fieldStartAt" type="datetime-local" class="field mt-2" />
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-600">종료 일시</label>
+                                <input id="fieldEndAt" type="datetime-local" class="field mt-2" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 요약 표시 -->
+                    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold mb-2">현재 선택 정보</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">선택 이미지:</span>
+                                <span id="textSelectedImage" class="font-semibold text-slate-800">없음</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">연결 가게:</span>
+                                <span id="textSelectedStore" class="font-semibold text-slate-800">없음</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 저장 버튼 -->
+                    <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                        <button id="btnResetModal"
+                            class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
+                            입력 초기화
                         </button>
-                        <button type="button" id="saveAdBtn"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow text-sm hover:bg-blue-700">
+                        <button id="btnSaveSlot"
+                            class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
                             슬롯 저장
                         </button>
                     </div>
+
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ======================== -->
-    <!-- 🟢 텍스트 입력 전용 모달 -->
-    <!-- ======================== -->
-    <div id="textModal" class="fixed inset-0 bg-black/40 modal-bg hidden justify-center items-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-7 max-w-lg w-full border border-slate-200">
-            <h2 id="textModalTitle" class="text-lg font-bold mb-3">
-                텍스트 설정
-            </h2>
-
-            <form id="textForm" class="space-y-3">
-                <div class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3"
-                    id="textSlotInfo">
-                    인덱스 페이지의 <span class="font-semibold">텍스트 슬롯</span> 내용을 설정합니다.
-                </div>
-
-                <div>
-                    <label class="block font-semibold mb-1 text-sm">표시할 텍스트</label>
-                    <textarea id="textContentInput"
-                        class="w-full border border-slate-300 rounded-lg p-2 text-sm min-h-[120px]"
-                        placeholder="한 줄에 하나씩 입력하면 자동으로 리스트로 표시됩니다."></textarea>
-                    <p class="text-[11px] text-slate-400 mt-1">
-                        ✅ 검색어/최신소식/이벤트/추천제품 박스는 <b>한 줄 = 한 항목</b> 방식으로 입력하세요.
-                    </p>
-                </div>
-
-                <input type="hidden" id="textSelectedPage">
-                <input type="hidden" id="textSelectedPosition">
-
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" id="closeTextModal"
-                        class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
-                        취소
-                    </button>
-                    <button type="button" id="saveTextBtn"
-                        class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow text-sm hover:bg-emerald-700">
-                        저장
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
     <script>
-        // =========================================================
-        // ✅ 안전한 이미지 로딩 유틸리티 함수들
-        // =========================================================
+        /* ============================================================
+           ✅ 기본 상수/유틸
+        ============================================================ */
+        const PAGE = "index";
+        const BEST_PICK_MAX = 18;
 
-        function normalizeImg(src) {
-            if (!src) return "/assets/no-image.png";
+        function qs(sel, root = document) { return root.querySelector(sel); }
+        function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
 
-            // 예전 placeholder가 섞여 들어오는 경우 차단
-            if (src.includes("no-image.png") || src.includes("sample-banner-product.png")) {
-                return "/assets/no-image.png";
-            }
-            return src;
-        }
-
-        function applySafeImage(imgEl, src) {
-            imgEl.src = normalizeImg(src);
-            imgEl.onerror = () => {
-                imgEl.onerror = null;
-                imgEl.src = "/assets/no-image.png";
-            };
-        }
-
-        // 절대 URL 보정
         function toAbs(u) {
             if (!u) return "";
             if (/^https?:\/\//i.test(u)) return u;
-
-            // ⭐ /uploads/가 앞에 없다면 자동으로 붙여준다
-            if (!u.startsWith("/uploads/")) {
-                return "/uploads/" + u.replace(/^\//, "");
-            }
-
-            return u;
+            return u.startsWith("/") ? u : ("/" + u);
+        }
+        function withBust(u) {
+            if (!u) return "";
+            const sep = u.includes("?") ? "&" : "?";
+            return `${u}${sep}v=${Date.now()}`;
         }
 
-        // ✅ (A) 공통 유틸 추가 - 이미지 로드 상태에 따른 기본 박스 제어
-        function hideDefaultWhenImageReady(container) {
-            const img = container?.querySelector('.slot-img');
-            const def = container?.querySelector('.slot-default');
-            if (!img || !def) return;
-
-            // 이미지가 이미 로딩되어 있으면 즉시 숨김
-            if (img.complete && img.naturalWidth > 0) {
-                def.classList.add('hidden');
-                return;
-            }
-            // 로드 시 숨김, 에러 시 표시
-            img.addEventListener('load', () => def.classList.add('hidden'), { once: true });
-            img.addEventListener('error', () => def.classList.remove('hidden'), { once: true });
-        }
-
-        // 미리보기 <img>에 안전 세팅
-        function setPreview(imgEl, url) {
+        function safeSetImage(imgEl, rawUrl, defEl) {
             if (!imgEl) return;
-            if (url) {
-                applySafeImage(imgEl, toAbs(url));
-                imgEl.alt = "slot image";
-            } else {
-                applySafeImage(imgEl, "/assets/no-image.png");
-                imgEl.alt = "no image";
+            const url = rawUrl ? withBust(toAbs(rawUrl)) : "";
+
+            // 초기화
+            imgEl.classList.add("hidden");
+            imgEl.removeAttribute("src");
+            if (defEl) defEl.classList.remove("hidden");
+
+            if (!url) return;
+
+            imgEl.onload = () => {
+                imgEl.classList.remove("hidden");
+                if (defEl) defEl.classList.add("hidden");
+            };
+            imgEl.onerror = () => {
+                imgEl.classList.add("hidden");
+                if (defEl) defEl.classList.remove("hidden");
+            };
+            imgEl.src = url;
+        }
+
+        function pickOk(json) {
+            return !!(json?.ok || json?.success);
+        }
+
+        function pickSlot(json) {
+            return json?.slot || json?.data || json?.ad || null;
+        }
+
+        function normalizeDateTimeForInput(value) {
+            if (!value) return "";
+            try {
+                // 이미 datetime-local 형태면 그대로
+                if (typeof value === "string" && value.includes("T") && value.length >= 16) {
+                    return value.slice(0, 16);
+                }
+                const d = new Date(value);
+                if (isNaN(d.getTime())) return "";
+                const off = d.getTimezoneOffset();
+                const local = new Date(d.getTime() - off * 60000);
+                return local.toISOString().slice(0, 16);
+            } catch {
+                return "";
             }
         }
 
-        function pickImageUrl(slot) {
-            return (
+        /* ============================================================
+           ✅ Best Pick 관리자 슬롯 생성
+        ============================================================ */
+        (function buildBestPickGrid() {
+            const host = document.getElementById("best_pick_grid");
+            if (!host) return;
+
+            // grid wrapper 역할로 host가 1개 div라서 내부를 실제 아이템으로 채움
+            const frag = document.createDocumentFragment();
+
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                const wrap = document.createElement("div");
+                wrap.className = "w-full";
+
+                wrap.innerHTML = `
+                    <div id="slot_best_pick_${i}"
+                        class="neo-card slot-banner best-circle aspect-square w-full flex items-center justify-center"
+                        data-position="best_pick_${i}"
+                        data-label="Best Pick ${i}"
+                        data-size="권장 1:1">
+                        <img class="slot-img hidden" alt="Best Pick ${i}">
+                        <div class="slot-default flex-col">
+                            <span class="font-bold text-sm">Best Pick ${i}</span>
+                            <span class="text-[10px] text-gray-500 mt-1">클릭하여 설정</span>
+                        </div>
+                        <span class="slot-badge size">1:1</span>
+                        <span class="slot-badge store hidden"></span>
+                    </div>
+                `;
+                frag.appendChild(wrap);
+            }
+            host.replaceWith(...frag.childNodes);
+        })();
+
+        /* ============================================================
+           ✅ 슬롯 목록 수집
+        ============================================================ */
+        function getAllSlotElements() {
+            const baseIds = [
+                "slot_index_main_top",
+                "slot_index_main_visual",
+                "slot_index_promo_1",
+                "slot_index_promo_2",
+                "slot_index_promo_3",
+                "slot_index_sub_keywords",
+                "slot_index_sub_news",
+                "slot_index_sub_events",
+                "slot_index_sub_recommends",
+                "slot_index_food_delivery",
+                "slot_index_all_stores",
+                "slot_index_hot_place",
+                "slot_index_suggest",
+                "slot_index_open",
+                "slot_index_store_pride",
+                "slot_index_traditional",
+                "slot_index_performing",
+                "slot_index_event",
+                "slot_index_localboard",
+                "slot_index_season",
+                "slot_index_join",
+                "slot_index_support_review",
+                "slot_index_support_empty",
+                "slot_index_support_inquiry",
+            ];
+
+            const bestIds = [];
+            for (let i = 1; i <= BEST_PICK_MAX; i++) {
+                bestIds.push(`slot_best_pick_${i}`);
+            }
+
+            return [...baseIds, ...bestIds]
+                .map(id => document.getElementById(id))
+                .filter(Boolean);
+        }
+
+        /* ============================================================
+           ✅ 서버 슬롯 로드 (미리보기)
+        ============================================================ */
+        async function fetchSlot(position) {
+            const url = `/manager/ad/slot?page=${encodeURIComponent(PAGE)}&position=${encodeURIComponent(position)}`;
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (!pickOk(json)) return null;
+            return pickSlot(json);
+        }
+
+        function applySlotToBox(box, slot) {
+            const img = qs(".slot-img", box);
+            const def = qs(".slot-default", box);
+            const storeBadge = qs(".slot-badge.store", box);
+
+            const imageUrl =
                 slot?.image_url ||
                 slot?.image ||
                 slot?.img_url ||
                 slot?.banner_url ||
                 slot?.image_path ||
-                slot?.file_path ||
-                ""
-            );
-        }
+                "";
 
-        function pickBizName(slot) {
-            return (
-                slot?.business_name ||
-                slot?.biz_name ||
-                slot?.store_name ||
-                slot?.name ||
-                ""
-            );
-        }
+            const mode = slot?.slot_mode || slot?.slotMode || "";
+            const businessName = slot?.business_name || slot?.businessName || "";
+            const businessNo = slot?.business_no || slot?.businessNo || "";
 
-        function pickBizNo(slot) {
-            return (
-                slot?.business_no ||
-                slot?.biz_number ||
-                slot?.biz_no ||
-                slot?.business_number ||
-                ""
-            );
-        }
+            safeSetImage(img, imageUrl, def);
 
-        // =========================================================
-        // ✅ (B) 모달 프리필 유틸 + 프리필 함수
-        // =========================================================
-        function filenameFromUrl(u) {
-            try {
-                return decodeURIComponent(String(u).split("/").pop());
-            } catch {
-                return u || "";
-            }
-        }
-        function setIf(id, v) {
-            const el = document.getElementById(id);
-            if (el && v != null && v !== "") el.value = v;
-        }
-
-        async function prefillAdModal(page, position) {
-            try {
-                const r = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
-                if (!r.ok) return;
-                const j = await r.json();
-                const slot = j?.slot;
-                if (!slot) return;
-
-                // 입력 모드 라디오
-                const modeStore = document.getElementById("modeStore");
-                const modeCustom = document.getElementById("modeCustom");
-                if (slot.slot_mode === "store") {
-                    if (modeStore) modeStore.checked = true;
+            if (storeBadge) {
+                if (mode === "store" && (businessName || businessNo)) {
+                    storeBadge.textContent = businessName ? businessName : businessNo;
+                    storeBadge.classList.remove("hidden");
                 } else {
-                    if (modeCustom) modeCustom.checked = true;
+                    storeBadge.classList.add("hidden");
+                    storeBadge.textContent = "";
                 }
-                // 모드별 영역 토글 갱신
-                document.getElementById("modeStore")?.dispatchEvent(new Event("change"));
-
-                // 링크/기간
-                setIf("linkInput", slot.link_url);
-                setIf("startDateInput", slot.start_date);
-                setIf("startTimeInput", slot.start_time);
-                setIf("endDateInput", slot.end_date);
-                setIf("endTimeInput", slot.end_time);
-
-                const noEnd = !!slot.no_end;
-                const noEndEl = document.getElementById("noEndCheckbox");
-                if (noEndEl) noEndEl.checked = noEnd;
-                if (typeof setupNoEndToggle === "function") setupNoEndToggle();
-
-                // 이미지 표기
-                const url = toAbs(pickImageUrl(slot));
-                const infoBox = document.getElementById("currentImageInfo");
-                const linkA = document.getElementById("currentImageLink");
-                const hidden = document.getElementById("existingImageUrl");
-
-                if (url) {
-                    if (linkA) {
-                        linkA.textContent = filenameFromUrl(url);
-                        linkA.href = url;
-                    }
-                    infoBox?.classList.remove("hidden");
-                    if (hidden) hidden.value = url; // 나중 저장 시 '기존 이미지 유지'에 사용
-                } else {
-                    infoBox?.classList.add("hidden");
-                    if (linkA) {
-                        linkA.textContent = "";
-                        linkA.href = "#";
-                    }
-                    if (hidden) hidden.value = "";
-                }
-
-                // 사업자 표기/입력 프리필
-                const bizNo = pickBizNo(slot) || "";
-                const bizName = pickBizName(slot) || "";
-                setIf("businessNoInput", bizNo);
-                setIf("businessNameInput", bizName);
-
-                const sBox = document.getElementById("currentStoreInfo");
-                const bizNoEl = document.getElementById("currentBizNo");
-                const bizNameEl = document.getElementById("currentBizName");
-                if (bizNoEl) bizNoEl.textContent = bizNo || "-";
-                if (bizNameEl) bizNameEl.textContent = bizName || "-";
-
-                if (bizNo || bizName) sBox?.classList.remove("hidden");
-                else sBox?.classList.add("hidden");
-
-            } catch (e) {
-                console.error("prefillAdModal error:", e);
             }
         }
 
-        // ============================
-        // 기본 텍스트 더미 데이터
-        // ============================
-        const DEFAULT_DATA = {
-            keywords: ["검색어1", "검색어2", "검색어3", "검색어4", "검색어5"],
-            news: ["신제품 출시", "업데이트 소식", "공지사항", "점검 안내", "서비스 개선"],
-            events: ["봄맞이 세일", "회원 전용 쿠폰", "포인트 2배 적립", "신규 가입 이벤트", "리뷰 작성 이벤트"],
-            recommends: ["추천 상품 A", "추천 상품 B", "추천 상품 C", "추천 상품 D", "추천 상품 E"]
-        };
-
-        // ✅ Best Pick 설정 - 한 번만 선언
-        const BEST_PICK_MAX = 18;
-
-        function bestPickSlotId(n) {
-            return `slot_best_pick_${n}`;
+        async function loadAllSlotsPreview() {
+            const boxes = getAllSlotElements();
+            await Promise.all(boxes.map(async (box) => {
+                const position = box.dataset.position;
+                if (!position) return;
+                try {
+                    const slot = await fetchSlot(position);
+                    if (slot) applySlotToBox(box, slot);
+                } catch (e) {
+                    console.warn("slot preview fail:", position, e);
+                }
+            }));
         }
 
-        function bestPickPosition(n) {
-            return `best_pick_${n}`;
+        /* ============================================================
+           ✅ 커서 툴팁
+        ============================================================ */
+        const hoverTip = document.getElementById("hoverTip");
+
+        function bindHoverTooltip(box) {
+            const label = box.dataset.label || box.dataset.position || "슬롯";
+
+            box.addEventListener("mouseenter", () => {
+                if (!hoverTip) return;
+                hoverTip.textContent = label;
+                hoverTip.classList.add("show");
+            });
+            box.addEventListener("mousemove", (e) => {
+                if (!hoverTip) return;
+                hoverTip.style.left = e.clientX + "px";
+                hoverTip.style.top = e.clientY + "px";
+            });
+            box.addEventListener("mouseleave", () => {
+                if (!hoverTip) return;
+                hoverTip.classList.remove("show");
+            });
         }
 
-        function renderDefaultList(container, items) {
-            const textEl = container.querySelector(".slot-default-text") || container;
-            textEl.innerHTML = items
-                .map(t => `<p class="text-xl leading-relaxed tracking-wide">${t}</p>`)
-                .join("");
+        /* ============================================================
+           ✅ 모달 상태
+        ============================================================ */
+        const modalRoot = document.getElementById("modalRoot");
+
+        const modalTitle = document.getElementById("modalTitle");
+        const modalPositionText = document.getElementById("modalPositionText");
+        const btnCloseModal = document.getElementById("btnCloseModal");
+        const btnSaveSlot = document.getElementById("btnSaveSlot");
+        const btnResetModal = document.getElementById("btnResetModal");
+
+        const radioModes = () => qsa('input[name="slotMode"]');
+        const imageBlock = document.getElementById("imageBlock");
+        const storeBlock = document.getElementById("storeBlock");
+
+        const fieldLinkUrl = document.getElementById("fieldLinkUrl");
+        const fieldImageFile = document.getElementById("fieldImageFile");
+        const currentPreviewImg = document.getElementById("currentPreviewImg");
+        const currentPreviewEmpty = document.getElementById("currentPreviewEmpty");
+
+        const fieldBizNo = document.getElementById("fieldBizNo");
+        const fieldBizName = document.getElementById("fieldBizName");
+        const fieldStoreId = document.getElementById("fieldStoreId");
+        const btnSearchStore = document.getElementById("btnSearchStore");
+        const storeResultsBody = document.getElementById("storeResultsBody");
+        const storeSearchHint = document.getElementById("storeSearchHint");
+
+        const fieldNoEnd = document.getElementById("fieldNoEnd");
+        const fieldStartAt = document.getElementById("fieldStartAt");
+        const fieldEndAt = document.getElementById("fieldEndAt");
+
+        const textSelectedImage = document.getElementById("textSelectedImage");
+        const textSelectedStore = document.getElementById("textSelectedStore");
+
+        let activeBox = null;
+        let activePosition = "";
+        let activeLabel = "";
+        let lastLoadedSlot = null;
+
+        function openModal() {
+            modalRoot.classList.remove("hidden");
+        }
+        function closeModal() {
+            modalRoot.classList.add("hidden");
+            activeBox = null;
+            activePosition = "";
+            activeLabel = "";
+            lastLoadedSlot = null;
         }
 
-        // ============================
-        // ✅ 리스트형 텍스트 슬롯 정의
-        // ============================
-        const LIST_TEXT_POSITIONS = new Set([
-            "index_sub_keywords",
-            "index_sub_news",
-            "index_sub_events",
-            "index_sub_recommends",
-        ]);
-
-        function isListTextPosition(position) {
-            return LIST_TEXT_POSITIONS.has(position);
+        function setModeUI(mode) {
+            if (mode === "store") {
+                storeBlock.classList.remove("hidden");
+                imageBlock.classList.add("hidden");
+            } else {
+                imageBlock.classList.remove("hidden");
+                storeBlock.classList.add("hidden");
+            }
         }
 
-        function escapeHtml(str = "") {
-            return String(str)
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#39;");
+        function getSelectedMode() {
+            const r = radioModes().find(x => x.checked);
+            return r ? r.value : "image";
         }
 
-        function formatListHTMLFromRaw(raw = "") {
-            const lines = String(raw)
-                .split(/\r?\n/)
-                .map(l => l.trim())
-                .filter(Boolean);
-
-            if (lines.length === 0) return "";
-            return lines
-                .map(t => `<p class="text-xl leading-relaxed tracking-wide">${escapeHtml(t)}</p>`)
-                .join("");
+        function setSelectedMode(mode) {
+            radioModes().forEach(r => r.checked = (r.value === mode));
+            setModeUI(mode);
         }
 
-        function extractListTextFromSlot(slotEl) {
-            if (!slotEl) return "";
-            const textRoot = slotEl.querySelector(".slot-default-text") || slotEl;
-            const ps = textRoot.querySelectorAll("p");
-            const lines = Array.from(ps)
-                .map(p => (p.innerText || "").trim())
-                .filter(Boolean);
-            return lines.join("\n");
+        function updateSelectedSummary() {
+            // 이미지 이름
+            const file = fieldImageFile?.files?.[0];
+            textSelectedImage.textContent = file ? file.name : (lastLoadedSlot?.image_url ? "기존 이미지 사용" : "없음");
+
+            // 가게
+            const bn = fieldBizName.value?.trim();
+            const bno = fieldBizNo.value?.trim();
+            if (bn) textSelectedStore.textContent = bn;
+            else if (bno) textSelectedStore.textContent = bno;
+            else textSelectedStore.textContent = lastLoadedSlot?.business_name || "없음";
         }
 
-        // ============================
-        // ✅ 검색 결과 박스 간단 제어
-        // ============================
-        function showBizResultBox(html = "") {
-            const box = document.getElementById("bizSearchResult");
-            if (!box) return;
-            box.innerHTML = html;
-            if (html) box.classList.remove("hidden");
-            else box.classList.add("hidden");
+        function resetModalFields(keepMode = true) {
+            if (!keepMode) setSelectedMode("image");
+
+            fieldLinkUrl.value = "";
+
+            fieldImageFile.value = "";
+            if (currentPreviewImg) {
+                currentPreviewImg.classList.add("hidden");
+                currentPreviewImg.removeAttribute("src");
+            }
+            if (currentPreviewEmpty) currentPreviewEmpty.classList.remove("hidden");
+
+            fieldBizNo.value = "";
+            fieldBizName.value = "";
+            fieldStoreId.value = "";
+            storeResultsBody.innerHTML = `<div class="text-sm text-gray-500">검색어를 입력하고 “가게 검색”을 눌러주세요.</div>`;
+            storeSearchHint.textContent = "";
+
+            fieldStartAt.value = "";
+            fieldEndAt.value = "";
+            fieldNoEnd.checked = false;
+            fieldEndAt.disabled = false;
+
+            textSelectedImage.textContent = "없음";
+            textSelectedStore.textContent = "없음";
         }
 
-        // ============================
-        // ✅ 업로드/저장 직후 DOM 즉시 반영 유틸
-        // ============================
-        function getSlotContainerByPosition(position) {
-            if (!position) return null;
-
-            const byId = document.getElementById(`slot_${position}`);
-            if (byId) return byId;
-
-            return document.querySelector(`.js-slot[data-position="${position}"]`);
+        function applyNoEndState() {
+            const checked = fieldNoEnd.checked;
+            fieldEndAt.disabled = checked;
+            if (checked) fieldEndAt.value = "";
         }
 
-        // ✅ Best Pick 슬롯 렌더링 개선
-        function renderBestPickGridInline() {
-            const container = document.getElementById("bestPickGrid");
-            if (!container) return;
+        /* ============================================================
+           ✅ 기존 슬롯 데이터 → 모달 프리필
+        ============================================================ */
+        function fillModalFromSlot(slot) {
+            lastLoadedSlot = slot;
 
-            container.innerHTML = "";
+            const mode = slot?.slot_mode || slot?.slotMode || "image";
+            setSelectedMode(mode === "store" ? "store" : "image");
 
-            for (let i = 1; i <= BEST_PICK_MAX; i++) {
-                const slotId = bestPickSlotId(i);
-                const position = bestPickPosition(i);
+            const link =
+                slot?.link_url || slot?.linkUrl || slot?.link || slot?.href || "";
+            fieldLinkUrl.value = link || "";
 
-                const card = document.createElement("div");
-                card.className =
-                    "neo-card overflow-hidden cursor-pointer js-slot flex flex-col";
-                card.id = slotId;
-                card.setAttribute("data-page", "index");
-                card.setAttribute("data-position", position);
-                card.setAttribute("data-label", `Best Pick ${i}`);
+            const businessName = slot?.business_name || slot?.businessName || "";
+            const businessNo = slot?.business_no || slot?.businessNo || "";
+            const storeId = slot?.store_id || slot?.storeId || "";
 
-                // ✅ 위: 이미지 / 아래: 상호+사업자번호
-                card.innerHTML = `
-                    <!-- 이미지 영역 -->
-                    <div class="relative w-full bg-slate-100 border-b border-slate-200 aspect-[4/3]">
-                        <img class="slot-img hidden w-full h-full object-cover" alt="Best Pick ${i}">
-                        
-                        <!-- 기본 상태 -->
-                        <div class="slot-default absolute inset-0 flex flex-col items-center justify-center">
-                            <div class="w-14 h-14 bg-white/80 border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
-                                <span class="text-xs text-slate-500">${i}</span>
-                            </div>
-                            <p class="mt-2 text-[11px] text-slate-500">클릭하여 등록</p>
+            fieldBizName.value = businessName || "";
+            fieldBizNo.value = businessNo || "";
+            fieldStoreId.value = storeId || "";
+
+            // 기간 키 혼용 대비
+            const start =
+                slot?.start_at || slot?.startAt || slot?.start_date || slot?.startDate || "";
+            const end =
+                slot?.end_at || slot?.endAt || slot?.end_date || slot?.endDate || "";
+
+            fieldStartAt.value = normalizeDateTimeForInput(start);
+            fieldEndAt.value = normalizeDateTimeForInput(end);
+
+            // "계속 유지" 추정 로직: 종료 값이 없으면 on
+            fieldNoEnd.checked = !fieldEndAt.value;
+            applyNoEndState();
+
+            // 이미지 프리뷰
+            const imageUrl =
+                slot?.image_url ||
+                slot?.image ||
+                slot?.img_url ||
+                slot?.banner_url ||
+                slot?.image_path ||
+                "";
+
+            if (imageUrl && currentPreviewImg) {
+                currentPreviewImg.src = withBust(toAbs(imageUrl));
+                currentPreviewImg.classList.remove("hidden");
+                if (currentPreviewEmpty) currentPreviewEmpty.classList.add("hidden");
+            } else {
+                currentPreviewImg?.classList.add("hidden");
+                currentPreviewEmpty?.classList.remove("hidden");
+            }
+
+            updateSelectedSummary();
+        }
+
+        /* ============================================================
+           ✅ 가게 검색
+        ============================================================ */
+        async function searchStores() {
+            const bizNo = fieldBizNo.value.trim();
+            const name = fieldBizName.value.trim();
+
+            if (!bizNo && !name) {
+                storeSearchHint.textContent = "사업자번호 또는 상호명을 입력해주세요.";
+                storeSearchHint.className = "text-xs text-red-500";
+                return;
+            }
+
+            storeSearchHint.textContent = "검색 중...";
+            storeSearchHint.className = "text-xs text-gray-500";
+
+            // 다양한 백엔드 구현을 고려한 쿼리 구성
+            const params = new URLSearchParams();
+            if (bizNo) params.set("bizNo", bizNo);
+            if (name) params.set("name", name);
+            if (name) params.set("businessName", name); // 혹시 이 키를 쓰는 경우 대비
+
+            try {
+                const res = await fetch(`/manager/ad/store/search?${params.toString()}`, { cache: "no-store" });
+                const json = await res.json().catch(() => ({}));
+
+                const stores =
+                    json?.stores ||
+                    json?.data ||
+                    json?.results ||
+                    [];
+
+                if (!res.ok || !Array.isArray(stores) || stores.length === 0) {
+                    storeResultsBody.innerHTML = `
+                        <div class="text-sm text-gray-500">
+                            검색 결과가 없습니다.
                         </div>
-                    </div>
+                    `;
+                    storeSearchHint.textContent = "검색 결과 없음";
+                    storeSearchHint.className = "text-xs text-gray-500";
+                    return;
+                }
 
-                    <!-- 정보 영역 -->
-                    <div class="p-3 flex flex-col gap-1">
-                        <p class="text-[12px] font-semibold text-slate-800 truncate" data-store-name>
-                            등록된 가게 없음
-                        </p>
-                        <p class="text-[10px] text-slate-500 truncate" data-store-biz>
-                            사업자번호 없음
-                        </p>
+                storeSearchHint.textContent = `${stores.length}건 검색됨`;
+                storeSearchHint.className = "text-xs text-emerald-600";
+
+                storeResultsBody.innerHTML = `
+                    <div class="space-y-2">
+                        ${stores.map((s, idx) => {
+                    const id = s.id ?? s.store_id ?? "";
+                    const bn = s.business_name ?? s.name ?? s.store_name ?? "";
+                    const bno = s.business_no ?? s.biz_no ?? s.bizNo ?? "";
+                    const cat = s.business_category ?? s.category ?? s.store_category ?? "";
+                    return `
+                                <button
+                                    class="w-full text-left px-3 py-3 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition"
+                                    data-store-idx="${idx}">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="font-semibold text-slate-800">${bn || "(상호명 없음)"}</div>
+                                        <div class="text-[10px] text-slate-500">ID: ${id || "-"}</div>
+                                    </div>
+                                    <div class="mt-1 text-xs text-slate-500">
+                                        <span class="mr-2">사업자번호: <b>${bno || "-"}</b></span>
+                                        <span>업종: ${cat || "-"}</span>
+                                    </div>
+                                </button>
+                            `;
+                }).join("")}
                     </div>
                 `;
 
-                container.appendChild(card);
-            }
-        }
+                // 클릭 바인딩
+                qsa("button[data-store-idx]", storeResultsBody).forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        const idx = Number(btn.dataset.storeIdx);
+                        const s = stores[idx];
+                        if (!s) return;
 
-        // ✅ Best Pick 슬롯 로드 개선 (가게 정보 포함) - 안전한 이미지 로딩 적용
-        async function loadBestPickInlineSlots() {
-            for (let i = 1; i <= BEST_PICK_MAX; i++) {
-                const slotId = bestPickSlotId(i);
-                const position = bestPickPosition(i);
-                await loadBestPickSlotWithStoreInfo(slotId, "index", position);
-            }
-        }
+                        const id = s.id ?? s.store_id ?? "";
+                        const bn = s.business_name ?? s.name ?? s.store_name ?? "";
+                        const bno = s.business_no ?? s.biz_no ?? s.bizNo ?? "";
 
-        // ✅ 새로운 함수: Best Pick 슬롯 + 가게 정보 로드 - 안전한 이미지 로딩 적용
-        async function loadBestPickSlotWithStoreInfo(slotId, page, position) {
-            const container = document.getElementById(slotId);
-            if (!container) return;
+                        fieldStoreId.value = id ? String(id) : "";
+                        fieldBizName.value = bn || "";
+                        fieldBizNo.value = bno || "";
 
-            const img = container.querySelector(".slot-img");
-            const defaultEl = container.querySelector(".slot-default");
-            const storeName = container.querySelector("[data-store-name]");
-            const storeBiz = container.querySelector("[data-store-biz]");
-
-            try {
-                const res = await fetch(
-                    `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
-                );
-                if (!res.ok) return;
-
-                const json = await res.json();
-
-                if (json.success && json.slot) {
-                    const slot = json.slot;
-
-                    const imageUrl = pickImageUrl(slot);
-                    const businessName = pickBizName(slot);
-                    const businessNo = pickBizNo(slot);
-
-                    // ✅ 이미지 처리 - 안전한 이미지 로딩 적용
-                    if (imageUrl && img) {
-                        applySafeImage(img, toAbs(imageUrl));
-                        img.classList.remove("hidden");
-                        if (defaultEl) defaultEl.classList.add("hidden");
-
-                        // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
-                        if (container) hideDefaultWhenImageReady(container);
-                    } else {
-                        if (img) {
-                            img.src = "";
-                            img.classList.add("hidden");
+                        // 링크 자동 제안(기존 값이 비어있을 때만)
+                        if (!fieldLinkUrl.value.trim() && id) {
+                            fieldLinkUrl.value = `/ndetail.html?id=${id}&type=store`;
                         }
-                        if (defaultEl) defaultEl.classList.remove("hidden");
-                    }
 
-                    // ✅ 하단 정보 처리
-                    if (storeName) storeName.textContent = businessName || "상호명 없음";
-                    if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
-
-                } else {
-                    // ✅ 기본 상태
-                    if (img) {
-                        img.src = "";
-                        img.classList.add("hidden");
-                    }
-                    if (defaultEl) defaultEl.classList.remove("hidden");
-
-                    if (storeName) storeName.textContent = "등록된 가게 없음";
-                    if (storeBiz) storeBiz.textContent = "사업자번호 없음";
-                }
-            } catch (err) {
-                console.error(`Best Pick 슬롯 로드 실패 [${position}]:`, err);
-            }
-        }
-
-        // ✅ 기존 applyBannerSlotToDom 함수도 안전한 이미지 로딩 적용
-        function applyBannerSlotToDom(slot) {
-            if (!slot) return;
-
-            const position = String(slot.position || "");
-            const container = getSlotContainerByPosition(position);
-            if (!container) return;
-
-            const img = container.querySelector(".slot-img");
-            const defaultEl = container.querySelector(".slot-default");
-            const storeName = container.querySelector("[data-store-name]");
-            const storeBiz = container.querySelector("[data-store-biz]");
-
-            const imageUrl = pickImageUrl(slot);
-            const businessName = pickBizName(slot);
-            const businessNo = pickBizNo(slot);
-
-            // 이벤트 초기화
-            if (img) {
-                img.onload = null;
-                img.onerror = null;
-            }
-
-            if (imageUrl && img) {
-                // 1) 로드 전에는 기본 박스 유지
-                img.classList.add("hidden");
-                if (defaultEl) defaultEl.classList.remove("hidden");
-
-                // 2) 안전한 이미지 로딩 적용
-                applySafeImage(img, toAbs(imageUrl));
-
-                // 3) 성공적으로 로드되면 기본 박스 숨기고 이미지 표시
-                img.onload = () => {
-                    img.classList.remove("hidden");
-                    if (defaultEl) defaultEl.classList.add("hidden");
-                };
-
-                // 4) 로드 실패면 이미지 감추고 기본 박스 다시 노출
-                img.onerror = () => {
-                    img.classList.add("hidden");
-                    if (defaultEl) defaultEl.classList.remove("hidden");
-                };
-
-                // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
-                if (container) hideDefaultWhenImageReady(container);
-            } else {
-                // 이미지가 없으면 기본 상태로
-                if (img) {
-                    img.src = "";
-                    img.classList.add("hidden");
-                }
-                if (defaultEl) defaultEl.classList.remove("hidden");
-            }
-
-            // ✅ Best Pick이면 하단 텍스트 갱신
-            if (position.startsWith("best_pick_")) {
-                if (storeName) storeName.textContent = businessName || "상호명 없음";
-                if (storeBiz) storeBiz.textContent = businessNo || "사업자번호 없음";
-            }
-
-            // (선택) 미리보기용 링크 값 심어두기
-            if (slot.link_url) container.setAttribute("data-link-preview", slot.link_url);
-        }
-
-        // ============================
-        // 슬롯 로드 (이미지 배너) - 안전한 이미지 로딩 적용
-        // ============================
-        async function loadBannerSlotById(slotId, page, position) {
-            const container = document.getElementById(slotId);
-            if (!container) return;
-
-            const img = container.querySelector(".slot-img");
-            const def = container.querySelector(".slot-default");
-
-            try {
-                const res = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
-                if (!res.ok) {
-                    if (img) { img.src = ""; img.classList.add("hidden"); }
-                    if (def) def.classList.remove("hidden");
-                    return;
-                }
-
-                const json = await res.json();
-                const slot = json?.slot || null;
-
-                const imageUrl = pickImageUrl(slot);
-
-                // 이벤트 초기화
-                if (img) {
-                    img.onload = null;
-                    img.onerror = null;
-                }
-
-                // ✅ 성공 분기 - 안전한 이미지 로딩 적용
-                if ((json.ok || json.success) && imageUrl && img) {
-                    // 안전한 이미지 로딩 적용
-                    applySafeImage(img, toAbs(imageUrl));
-
-                    // 로드되면 기본 박스 숨기고 이미지 표시
-                    img.onload = () => {
-                        img.classList.remove("hidden");
-                        if (def) def.classList.add("hidden");
-                    };
-                    // 실패하면 기본 박스 노출
-                    img.onerror = () => {
-                        img.classList.add("hidden");
-                        if (def) def.classList.remove("hidden");
-                    };
-
-                    // ✅ 즉시/캐시 로드 시 기본 박스가 남아있는 경우 커버
-                    hideDefaultWhenImageReady(container);
-                } else {
-                    // 실패/없음 분기 그대로 유지
-                    if (img) {
-                        img.src = "";
-                        img.classList.add("hidden");
-                    }
-                    if (def) def.classList.remove("hidden");
-                }
-            } catch (err) {
-                console.error(`슬롯 로드 실패 [${position}]:`, err);
-                if (img) {
-                    img.src = "";
-                    img.classList.add("hidden");
-                }
-                if (def) def.classList.remove("hidden");
-            }
-        }
-
-        // ============================
-        // ✅ 슬롯 로드 (텍스트)
-        // ============================
-        async function loadTextSlotById(slotId, page, position, fallbackRenderer) {
-            const container = document.getElementById(slotId);
-            if (!container) return;
-
-            const textBox = container.querySelector(".slot-default-text") || container;
-
-            try {
-                const res = await fetch(
-                    `/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`
-                );
-                if (!res.ok) {
-                    if (fallbackRenderer) fallbackRenderer(container);
-                    return;
-                }
-
-                const data = await res.json();
-                const text =
-                    data?.slot?.text_content ??
-                    data?.slot?.content ??
-                    data?.slot?.text ??
-                    data?.text?.content ??
-                    "";
-
-                if (data && data.ok && text) {
-                    if (isListTextPosition(position)) {
-                        textBox.innerHTML = formatListHTMLFromRaw(text);
-                    } else {
-                        textBox.innerHTML = text;
-                    }
-                } else {
-                    if (fallbackRenderer) fallbackRenderer(container);
-                }
-            } catch (err) {
-                console.error("텍스트 슬롯 로드 실패:", err);
-                if (fallbackRenderer) fallbackRenderer(container);
-            }
-        }
-
-        // ============================
-        // 우리동네 한마디
-        // ============================
-        async function loadOneWord() {
-            const contentEl = document.getElementById("oneword-content");
-            if (!contentEl) return;
-
-            try {
-                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
-                if (slotRes.ok) {
-                    const slotJson = await slotRes.json();
-                    const text =
-                        slotJson?.slot?.text_content ??
-                        slotJson?.slot?.content ??
-                        slotJson?.text?.content ??
-                        "";
-
-                    if (slotJson.ok && text) {
-                        contentEl.innerHTML = text;
-                        return;
-                    }
-                }
-
-                const userRegion = localStorage.getItem("userRegion") || "의정부";
-                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
-
-                if (onewordRes.ok) {
-                    const onewordData = await onewordRes.json();
-                    let displayMessage = onewordData.message;
-
-                    if (onewordData.keyword) {
-                        displayMessage = displayMessage.replace(
-                            `'${onewordData.keyword}'`,
-                            `<span class="text-orange-500">'${onewordData.keyword}'</span>`
-                        );
-                    }
-                    contentEl.innerHTML = displayMessage;
-                } else {
-                    contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
-                }
-
-            } catch (err) {
-                console.error("우리동네 한마디 로드 실패:", err);
-                contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
-            }
-        }
-
-        // ============================
-        // 슬롯 클릭 → 모달 열기
-        // ============================
-        function setupSlotClick() {
-            document.addEventListener("click", async (e) => {
-                const slotEl = e.target.closest(".js-slot, .js-text-slot");
-                if (!slotEl) return;
-
-                const linkParent = slotEl.closest("a[href]");
-                if (linkParent) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-
-                const page = slotEl.dataset.page || "index";
-                const position = slotEl.dataset.position || "";
-                const label = slotEl.dataset.label || position || "선택된 슬롯";
-                const slotType =
-                    slotEl.dataset.slotType ||
-                    (slotEl.classList.contains("js-text-slot") ? "text" : "banner");
-
-                if (slotType === "text") {
-                    document.getElementById("textSelectedPage").value = page;
-                    document.getElementById("textSelectedPosition").value = position;
-                    document.getElementById("textModalTitle").textContent = `텍스트 설정: ${label}`;
-                    document.getElementById("textSlotInfo").innerHTML =
-                        `index 페이지의 <span class="font-semibold">${position}</span> 슬롯에 표시될 텍스트를 입력합니다.`;
-
-                    let currentText = "";
-
-                    if (position === "index_oneword") {
-                        currentText = (document.getElementById("oneword-content")?.innerText || "").trim();
-                    } else if (isListTextPosition(position)) {
-                        currentText = extractListTextFromSlot(slotEl);
-                    } else {
-                        const currentTextEl = slotEl.querySelector(".slot-default-text") || slotEl;
-                        currentText = (currentTextEl.innerText || "").trim();
-                    }
-
-                    document.getElementById("textContentInput").value = currentText;
-
-                    const textModal = document.getElementById("textModal");
-                    textModal.classList.remove("hidden");
-                    textModal.classList.add("flex");
-                } else {
-                    document.getElementById("selectedPage").value = page;
-                    document.getElementById("selectedPosition").value = position;
-                    document.getElementById("modalTitle").textContent = `슬롯 설정: ${label}`;
-                    document.getElementById("slotInfo").textContent = `${page} / ${position}`;
-
-                    // ✅ 초기화(빈값) 먼저
-                    document.getElementById("imageInput").value = "";
-                    document.getElementById("linkInput").value = "";
-                    document.getElementById("businessNoInput").value = "";
-                    document.getElementById("businessNameInput").value = "";
-                    showBizResultBox("");
-                    resetAdPeriodFields();
-
-                    // ✅ 현재 값 표기 초기화
-                    const infoBox = document.getElementById("currentImageInfo");
-                    const linkA = document.getElementById("currentImageLink");
-                    const hidden = document.getElementById("existingImageUrl");
-                    if (infoBox) infoBox.classList.add("hidden");
-                    if (linkA) { linkA.textContent = ""; linkA.href = "#"; }
-                    if (hidden) hidden.value = "";
-
-                    const sBox = document.getElementById("currentStoreInfo");
-                    const cbn = document.getElementById("currentBizName");
-                    const cbno = document.getElementById("currentBizNo");
-                    if (sBox) sBox.classList.add("hidden");
-                    if (cbn) cbn.textContent = "-";
-                    if (cbno) cbno.textContent = "-";
-
-                    // 🔹 저장돼있는 값으로 프리필
-                    await prefillAdModal(page, position);
-
-                    const adModal = document.getElementById("adModal");
-                    adModal.classList.remove("hidden");
-                    adModal.classList.add("flex");
-                }
-            });
-        }
-
-        // ============================
-        // 모달 닫기
-        // ============================
-        function setupModalClose() {
-            const adModal = document.getElementById("adModal");
-            const closeBtn = document.getElementById("closeModal");
-            if (!adModal || !closeBtn) return;
-
-            const resetAll = () => {
-                document.getElementById("imageInput").value = "";
-                document.getElementById("linkInput").value = "";
-                document.getElementById("businessNoInput").value = "";
-                document.getElementById("businessNameInput").value = "";
-                showBizResultBox("");
-                resetAdPeriodFields();
-
-                // ✅ 현재 값 표기 리셋
-                const infoBox = document.getElementById("currentImageInfo");
-                const linkA = document.getElementById("currentImageLink");
-                const hidden = document.getElementById("existingImageUrl");
-                if (infoBox) infoBox.classList.add("hidden");
-                if (linkA) { linkA.textContent = ""; linkA.href = "#"; }
-                if (hidden) hidden.value = "";
-
-                const sBox = document.getElementById("currentStoreInfo");
-                const cbn = document.getElementById("currentBizName");
-                const cbno = document.getElementById("currentBizNo");
-                if (sBox) sBox.classList.add("hidden");
-                if (cbn) cbn.textContent = "-";
-                if (cbno) cbno.textContent = "-";
-            };
-
-            closeBtn.addEventListener("click", () => {
-                adModal.classList.add("hidden");
-                adModal.classList.remove("flex");
-                resetAll();
-            });
-
-            adModal.addEventListener("click", (e) => {
-                if (e.target === e.currentTarget) {
-                    adModal.classList.add("hidden");
-                    adModal.classList.remove("flex");
-                    resetAll();
-                }
-            });
-        }
-
-        // ============================
-        // 텍스트 모달 닫기
-        // ============================
-        function setupTextModalClose() {
-            const textModal = document.getElementById("textModal");
-            const closeBtn = document.getElementById("closeTextModal");
-            if (!textModal || !closeBtn) return;
-
-            const resetText = () => {
-                document.getElementById("textContentInput").value = "";
-            };
-
-            closeBtn.addEventListener("click", () => {
-                textModal.classList.add("hidden");
-                textModal.classList.remove("flex");
-                resetText();
-            });
-
-            textModal.addEventListener("click", (e) => {
-                if (e.target === e.currentTarget) {
-                    textModal.classList.add("hidden");
-                    textModal.classList.remove("flex");
-                    resetText();
-                }
-            });
-        }
-
-        // ============================
-        // 입력 모드 토글
-        // ============================
-        function setupModeToggle() {
-            const customFields = document.getElementById("customModeFields");
-            const storeFields = document.getElementById("storeModeFields");
-            const modeCustom = document.getElementById("modeCustom");
-            const modeStore = document.getElementById("modeStore");
-
-            if (!customFields || !storeFields || !modeCustom || !modeStore) return;
-
-            const updateVisibility = () => {
-                if (modeStore.checked) {
-                    storeFields.classList.remove("hidden");
-                    customFields.classList.add("hidden");
-                } else {
-                    customFields.classList.remove("hidden");
-                    storeFields.classList.add("hidden");
-                }
-                showBizResultBox("");
-            };
-
-            modeCustom.addEventListener("change", updateVisibility);
-            modeStore.addEventListener("change", updateVisibility);
-            updateVisibility();
-        }
-
-        // ============================
-        // 광고 저장
-        // ============================
-        function setupSave() {
-            const btn = document.getElementById("saveAdBtn");
-            if (!btn) return;
-
-            btn.addEventListener("click", async () => {
-                const page = document.getElementById("selectedPage").value;
-                const position = document.getElementById("selectedPosition").value;
-                const modeInput = document.querySelector('input[name="adMode"]:checked');
-                const mode = modeInput ? modeInput.value : "custom";
-
-                if (!page || !position) {
-                    alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
-                    return;
-                }
-
-                const period = collectAdPeriod();
-                if (!period) return;
-
-                // ----------------
-                // 가게 연결 모드
-                // ----------------
-                if (mode === "store") {
-                    const businessNo = (document.getElementById("businessNoInput").value || "").trim();
-                    const businessName = (document.getElementById("businessNameInput").value || "").trim();
-
-                    if (!businessNo || !businessName) {
-                        alert("사업자번호와 상호를 모두 입력해주세요.");
-                        return;
-                    }
-
-                    const body = {
-                        page,
-                        position,
-                        biz_number: businessNo,
-                        biz_name: businessName,
-                        start_date: period.startDate || null,
-                        start_time: period.startTime || null,
-                        end_date: period.noEnd ? null : (period.endDate || null),
-                        end_time: period.noEnd ? null : (period.endTime || null),
-                        no_end: period.noEnd
-                    };
-
-                    try {
-                        const res = await fetch("/manager/ad/store", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(body),
-                        });
-
-                        const data = await res.json();
-                        console.log("가게 연결 응답:", data);
-
-                        if (data.ok) {
-                            alert("가게가 이 슬롯에 연결되었습니다.");
-
-                            const adModal = document.getElementById("adModal");
-                            adModal.classList.add("hidden");
-                            adModal.classList.remove("flex");
-
-                            document.getElementById("businessNoInput").value = "";
-                            document.getElementById("businessNameInput").value = "";
-                            showBizResultBox("");
-                            resetAdPeriodFields();
-
-                            // ✅ Best Pick 슬롯이면 특별 처리
-                            if (String(position).startsWith("best_pick_")) {
-                                const slotId = bestPickSlotId(parseInt(position.replace("best_pick_", "")));
-                                await loadBestPickSlotWithStoreInfo(slotId, page, position);
-                            } else {
-                                if (data.slot) {
-                                    applyBannerSlotToDom(data.slot);
-                                }
-                                await loadBannerSlotById(`slot_${position}`, page, position);
-                            }
-                        } else {
-                            alert("오류: " + (data.message || "가게 연결에 실패했습니다."));
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert("가게 연결 중 오류가 발생했습니다.");
-                    }
-                    return;
-                }
-
-                // ----------------
-                // 이미지+링크 모드
-                // ----------------
-                const imageFile = document.getElementById("imageInput").files[0];
-                const link = (document.getElementById("linkInput").value || "").trim();
-
-                if (!imageFile && !link && !period.startDate && !period.endDate && !period.noEnd) {
-                    const ok = confirm(
-                        "이미지, 링크, 기간 정보가 모두 비어 있습니다.\n그래도 이 슬롯 정보만 저장하시겠습니까?"
-                    );
-                    if (!ok) return;
-                }
-
-                const formData = new FormData();
-                formData.append("page", page);
-                formData.append("position", position);
-                formData.append("link_url", link);
-
-                // ✅ (D) 이미지 새로 안 고르면 기존 이미지 유지용 URL 전송
-                const existing = document.getElementById("existingImageUrl")?.value || "";
-                if (!imageFile && existing) formData.append("existing_image_url", existing);
-
-                if (period.startDate) formData.append("start_date", period.startDate);
-                if (period.startTime) formData.append("start_time", period.startTime);
-
-                if (period.noEnd) {
-                    formData.append("no_end", "true");
-                } else {
-                    if (period.endDate) formData.append("end_date", period.endDate);
-                    if (period.endTime) formData.append("end_time", period.endTime);
-                }
-
-                if (imageFile) {
-                    formData.append("image", imageFile);
-                }
-
-                try {
-                    const res = await fetch("/manager/ad/upload", {
-                        method: "POST",
-                        body: formData
+                        updateSelectedSummary();
                     });
+                });
 
-                    const data = await res.json();
-
-                    if (data.ok) {
-                        if (data.slot) {
-                            applyBannerSlotToDom(data.slot);
-                        } else {
-                            await loadBannerSlotById(`slot_${position}`, page, position);
-                        }
-
-                        alert("저장 완료되었습니다.");
-
-                        const adModal = document.getElementById("adModal");
-                        adModal.classList.add("hidden");
-                        adModal.classList.remove("flex");
-
-                        document.getElementById("imageInput").value = "";
-                        document.getElementById("linkInput").value = "";
-                        resetAdPeriodFields();
-
-                        if (String(position).startsWith("best_pick_")) {
-                            await loadBestPickInlineSlots();
-                        }
-                    } else {
-                        alert("오류: " + (data.message || "저장에 실패했습니다."));
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert("저장 중 오류가 발생했습니다.");
-                }
-            });
+            } catch (e) {
+                storeResultsBody.innerHTML = `
+                    <div class="text-sm text-red-500">
+                        검색 중 오류가 발생했습니다.
+                    </div>
+                `;
+                storeSearchHint.textContent = "검색 실패";
+                storeSearchHint.className = "text-xs text-red-500";
+            }
         }
 
-        // ============================
-        // ✅ 텍스트 저장
-        // ============================
-        function setupSaveText() {
-            const btn = document.getElementById("saveTextBtn");
-            if (!btn) return;
+        /* ============================================================
+           ✅ 저장 요청
+        ============================================================ */
+        async function saveSlot() {
+            if (!activePosition) return;
 
-            btn.addEventListener("click", async () => {
-                const page = document.getElementById("textSelectedPage").value || "index";
-                const position = document.getElementById("textSelectedPosition").value;
-                const content = document.getElementById("textContentInput").value.trim();
+            const mode = getSelectedMode();
 
-                if (!page || !position) {
-                    alert("슬롯 정보가 없습니다. 다시 선택해주세요.");
+            const linkUrl = fieldLinkUrl.value.trim();
+            const storeId = fieldStoreId.value.trim();
+            const businessNo = fieldBizNo.value.trim();
+            const businessName = fieldBizName.value.trim();
+
+            const startAt = fieldStartAt.value;
+            const endAt = fieldNoEnd.checked ? "" : fieldEndAt.value;
+
+            const fd = new FormData();
+
+            // ✅ 서버/프론트 키 혼용 대비
+            fd.append("page", PAGE);
+            fd.append("position", activePosition);
+
+            fd.append("slotType", "banner");
+            fd.append("slot_type", "banner");
+
+            fd.append("slotMode", mode);
+            fd.append("slot_mode", mode);
+
+            if (linkUrl) {
+                fd.append("linkUrl", linkUrl);
+                fd.append("link_url", linkUrl);
+                fd.append("link", linkUrl);
+            }
+
+            if (mode === "store") {
+                if (storeId) {
+                    fd.append("storeId", storeId);
+                    fd.append("store_id", storeId);
+                }
+                if (businessNo) {
+                    fd.append("businessNo", businessNo);
+                    fd.append("business_no", businessNo);
+                    fd.append("bizNo", businessNo);
+                }
+                if (businessName) {
+                    fd.append("businessName", businessName);
+                    fd.append("business_name", businessName);
+                }
+            }
+
+            if (startAt) {
+                fd.append("startAt", startAt);
+                fd.append("start_at", startAt);
+                fd.append("startDate", startAt);
+                fd.append("start_date", startAt);
+            }
+
+            if (endAt) {
+                fd.append("endAt", endAt);
+                fd.append("end_at", endAt);
+                fd.append("endDate", endAt);
+                fd.append("end_date", endAt);
+            }
+
+            fd.append("noEnd", fieldNoEnd.checked ? "1" : "0");
+            fd.append("no_end", fieldNoEnd.checked ? "1" : "0");
+
+            // ✅ 이미지 등록 모드일 때 파일 첨부
+            const file = fieldImageFile?.files?.[0];
+            if (mode === "image" && file) {
+                // multer field name 다양성 대비(같은 파일을 2개 키로)
+                fd.append("image", file);
+                fd.append("slotImage", file);
+            }
+
+            btnSaveSlot.disabled = true;
+            btnSaveSlot.textContent = "저장 중...";
+
+            try {
+                const res = await fetch("/manager/ad/slot", {
+                    method: "POST",
+                    body: fd
+                });
+
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok || !pickOk(json)) {
+                    alert("저장 실패: 서버 응답을 확인해주세요.");
+                    console.error("save fail:", json);
                     return;
                 }
-                if (!content) {
-                    alert("표시할 텍스트를 입력해주세요.");
-                    return;
+
+                // 저장 후 최신 슬롯 다시 읽어서 UI 동기화
+                const slot = await fetchSlot(activePosition);
+                if (slot && activeBox) {
+                    applySlotToBox(activeBox, slot);
                 }
 
-                const body = { page, position, content };
+                closeModal();
 
-                try {
-                    const res = await fetch("/manager/ad/text/save", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(body),
-                    });
-
-                    if (!res.ok) {
-                        alert("텍스트 저장 API를 찾지 못했습니다. 서버 라우터를 확인해주세요.");
-                        return;
-                    }
-
-                    const data = await res.json();
-
-                    if (data.ok) {
-                        alert("텍스트가 저장되었습니다.");
-
-                        const textModal = document.getElementById("textModal");
-                        textModal.classList.add("hidden");
-                        textModal.classList.remove("flex");
-
-                        if (position === "index_oneword") {
-                            const ow = document.getElementById("oneword-content");
-                            if (ow) ow.innerHTML = content;
-                            return;
-                        }
-
-                        const slotEl = document.querySelector(
-                            `.js-text-slot[data-page="${page}"][data-position="${position}"]`
-                        );
-
-                        if (slotEl) {
-                            const target = slotEl.querySelector(".slot-default-text") || slotEl;
-
-                            if (isListTextPosition(position)) {
-                                target.innerHTML = formatListHTMLFromRaw(content);
-                            } else {
-                                target.innerHTML = content;
-                            }
-                        }
-                    } else {
-                        alert("오류: " + (data.message || "저장에 실패했습니다."));
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert("저장 중 오류가 발생했습니다.");
-                }
-            });
+            } catch (e) {
+                console.error("save error:", e);
+                alert("저장 중 오류가 발생했습니다.");
+            } finally {
+                btnSaveSlot.disabled = false;
+                btnSaveSlot.textContent = "슬롯 저장";
+            }
         }
 
-        // ============================
-        // 네비게이션 버튼
-        // ============================
-        function goBack() { window.history.back(); }
-        function goNext() { window.history.forward(); }
+        /* ============================================================
+           ✅ 박스 클릭 → 모달 오픈
+        ============================================================ */
+        async function handleBoxClick(box) {
+            activeBox = box;
+            activePosition = box.dataset.position || "";
+            activeLabel = box.dataset.label || activePosition;
 
-        // ============================
-        // Best Pick 관리자 새로고침 버튼
-        // ============================
-        function setupBestPickReloadBtn() {
-            document.getElementById("btnBestPickReload")?.addEventListener("click", async () => {
-                console.log("Best Pick 새로고침 시작...");
-                await loadBestPickInlineSlots();
-                console.log("Best Pick 새로고침 완료");
-            });
-        }
+            if (!activePosition) return;
 
-        // ============================
-        // 광고 기간 관련 함수들
-        // ============================
-        function setupNoEndToggle() {
-            const noEndCheckbox = document.getElementById("noEndCheckbox");
-            const endDateInput = document.getElementById("endDateInput");
-            const endTimeInput = document.getElementById("endTimeInput");
+            modalTitle.textContent = activeLabel || "슬롯 수정";
+            modalPositionText.textContent = activePosition;
 
-            if (!noEndCheckbox || !endDateInput || !endTimeInput) return;
+            resetModalFields(true);
 
-            const applyState = () => {
-                if (noEndCheckbox.checked) {
-                    endDateInput.disabled = true;
-                    endTimeInput.disabled = true;
-                    endDateInput.value = "";
-                    endTimeInput.value = "";
-                    endDateInput.style.opacity = "0.5";
-                    endTimeInput.style.opacity = "0.5";
+            // 기본 모드
+            setSelectedMode("image");
+
+            // 기존 슬롯 로드
+            try {
+                const slot = await fetchSlot(activePosition);
+                if (slot) {
+                    fillModalFromSlot(slot);
                 } else {
-                    endDateInput.disabled = false;
-                    endTimeInput.disabled = false;
-                    endDateInput.style.opacity = "1";
-                    endTimeInput.style.opacity = "1";
+                    // 빈 슬롯이더라도 라벨/요약 갱신
+                    updateSelectedSummary();
                 }
-            };
-
-            noEndCheckbox.addEventListener("change", applyState);
-            applyState();
-        }
-
-        function resetAdPeriodFields() {
-            const inputs = ["startDateInput", "startTimeInput", "endDateInput", "endTimeInput"];
-
-            inputs.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.value = "";
-                    el.disabled = false;
-                    el.style.opacity = "1";
-                }
-            });
-
-            const noEndCheckbox = document.getElementById("noEndCheckbox");
-            if (noEndCheckbox) noEndCheckbox.checked = false;
-        }
-
-        function collectAdPeriod() {
-            const startDate = document.getElementById("startDateInput")?.value || "";
-            const startTime = document.getElementById("startTimeInput")?.value || "";
-            const endDate = document.getElementById("endDateInput")?.value || "";
-            const endTime = document.getElementById("endTimeInput")?.value || "";
-            const noEnd = document.getElementById("noEndCheckbox")?.checked || false;
-
-            if (startDate && !startTime) {
-                alert("시작 날짜를 입력했으면 시작 시간도 함께 입력해주세요.");
-                return null;
-            }
-            if (startTime && !startDate) {
-                alert("시작 시간을 입력했으면 시작 날짜도 함께 입력해주세요.");
-                return null;
+            } catch (e) {
+                console.warn("modal preload fail:", activePosition, e);
             }
 
-            if (!noEnd) {
-                if (endDate && !endTime) {
-                    alert("종료 날짜를 입력했으면 종료 시간도 함께 입력해주세요.");
-                    return null;
-                }
-                if (endTime && !endDate) {
-                    alert("종료 시간을 입력했으면 종료 날짜도 함께 입력해주세요.");
-                    return null;
-                }
+            openModal();
+        }
+
+        /* ============================================================
+           ✅ 이벤트 바인딩
+        ============================================================ */
+        function bindAllBoxes() {
+            const boxes = getAllSlotElements();
+            boxes.forEach(box => {
+                bindHoverTooltip(box);
+                box.addEventListener("click", () => handleBoxClick(box));
+            });
+        }
+
+        // 모달 라디오 변경
+        radioModes().forEach(r => {
+            r.addEventListener("change", () => {
+                setModeUI(getSelectedMode());
+                updateSelectedSummary();
+            });
+        });
+
+        // 이미지 선택 시 파일명 반영
+        fieldImageFile?.addEventListener("change", () => {
+            const file = fieldImageFile.files?.[0];
+            textSelectedImage.textContent = file ? file.name : "없음";
+        });
+
+        // 가게 필드 입력 변화
+        [fieldBizNo, fieldBizName].forEach(el => {
+            el?.addEventListener("input", updateSelectedSummary);
+        });
+
+        // No-End 토글
+        fieldNoEnd?.addEventListener("change", () => {
+            applyNoEndState();
+        });
+
+        btnSearchStore?.addEventListener("click", searchStores);
+
+        btnCloseModal?.addEventListener("click", closeModal);
+        qs(".modal-backdrop", modalRoot)?.addEventListener("click", closeModal);
+
+        btnResetModal?.addEventListener("click", () => resetModalFields(true));
+        btnSaveSlot?.addEventListener("click", saveSlot);
+
+        // ESC 닫기
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !modalRoot.classList.contains("hidden")) {
+                closeModal();
             }
+        });
 
-            return {
-                startDate,
-                startTime,
-                endDate: noEnd ? null : endDate,
-                endTime: noEnd ? null : endTime,
-                noEnd
-            };
-        }
-
-        // ============================
-        // ✅ 사업자번호 검색 UI 설정 (문법 수정 완료 버전)
-        // ============================
-        function setupBizSearchUI() {
-            const bizNoInput = document.getElementById("businessNoInput");
-            const bizNameInput = document.getElementById("businessNameInput");
-
-            if (!bizNoInput || !bizNameInput) return;
-
-            let searchTimeout = null;
-
-            bizNoInput.addEventListener("input", () => {
-                const value = (bizNoInput.value || "").trim();
-
-                if (searchTimeout) clearTimeout(searchTimeout);
-
-                if (value.length < 3) {
-                    showBizResultBox("");
-                    return;
-                }
-
-                searchTimeout = setTimeout(async () => {
-                    try {
-                        const res = await fetch(
-                            `/manager/ad/store/search?bizNo=${encodeURIComponent(value)}`
-                        );
-
-                        if (!res.ok) {
-                            showBizResultBox('<div class="p-2 text-xs text-slate-500">검색 API 응답 오류</div>');
-                            return;
-                        }
-
-                        const data = await res.json();
-
-                        if (data.ok && data.stores && data.stores.length > 0) {
-                            const html = data.stores
-                                .map(store => `
-
-                                    <div class="p-2 border border-slate-200 rounded cursor-pointer hover:bg-blue-50 text-xs js-biz-item"
-                                        data-biz-no="${store.business_no || store.biz_number || store.biz_no || ''}"
-                                        data-biz-name="${store.business_name || store.biz_name || ''}">
-                                        <div class="font-semibold">${store.business_name || store.biz_name || '상호명 없음'}</div>
-                                        <div class="text-slate-500">${store.business_no || store.biz_number || store.biz_no || '사업자번호 없음'}</div>
-                                        <div class="text-slate-400">[${store.store_type || 'type?'}] ID: ${store.id ?? '-'}</div>
-                                    </div>
-                                `)
-                                .join("");
-
-                            showBizResultBox(html);
-
-                            document.querySelectorAll(".js-biz-item").forEach(item => {
-                                item.addEventListener("click", () => {
-                                    const bizNo = item.dataset.bizNo || "";
-                                    const bizName = item.dataset.bizName || "";
-
-                                    bizNoInput.value = bizNo;
-                                    bizNameInput.value = bizName;
-                                    showBizResultBox("");
-                                });
-                            });
-                        } else {
-                            showBizResultBox('<div class="p-2 text-xs text-slate-500">일치하는 가게가 없습니다.</div>');
-                        }
-                    } catch (err) {
-                        console.error("사업자번호 검색 오류:", err);
-                        showBizResultBox('<div class="p-2 text-xs text-red-500">검색 중 오류가 발생했습니다.</div>');
-                    }
-                }, 500);
-            });
-
-            // 사업자번호 입력란이 비워지면 결과 숨기기
-            bizNoInput.addEventListener("blur", () => {
-                setTimeout(() => showBizResultBox(""), 200);
-            });
-        }
-
-        // ============================
-        // ✅ 슬롯 레이아웃 강제 보정 함수 (안전장치)
-        // ============================
-        function enforceSlotLayout(ids) {
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-
-                // 컨테이너에 relative 추가
-                el.classList.add('relative');
-
-                // 이미지에 absolute 레이아웃 적용
-                const img = el.querySelector('.slot-img');
-                if (img) {
-                    img.classList.add('absolute', 'inset-0', 'w-full', 'h-full', 'object-contain', 'p-2', 'z-10');
-                }
-
-                // 기본 박스에 absolute 레이아웃 적용
-                const defaultBox = el.querySelector('.slot-default');
-                if (defaultBox) {
-                    defaultBox.classList.add('absolute', 'inset-0', 'z-0');
-                }
-            });
-        }
-
-        // ============================
-        // ✅ 초기화
-        // ============================
+        /* ============================================================
+           ✅ 초기 로드
+        ============================================================ */
         document.addEventListener("DOMContentLoaded", async () => {
-            console.log("🔍 DOMContentLoaded 시작");
-
-            // 기본 슬롯들이 DOM에 있는지 확인
-            const testSlots = [
-                'slot_index_main_visual',
-                'slot_index_promo_1',
-                'bestPickGrid'
-            ];
-
-            testSlots.forEach(id => {
-                const el = document.getElementById(id);
-                console.log(`슬롯 ${id}:`, el ? '✅ 존재' : '❌ 없음');
-            });
-
-            // ✅ 슬롯 레이아웃 강제 보정 (실수 방지용)
-            enforceSlotLayout([
-                'slot_index_main_visual',
-                'slot_index_promo_1',
-                'slot_index_promo_2',
-                'slot_index_promo_3'
-            ]);
-
-            // 헤더/푸터 로드
-            fetch("/components/header.html")
-                .then(r => r.text())
-                .then(d => {
-                    const hp = document.getElementById("header-placeholder");
-                    if (hp) hp.innerHTML = d;
-                })
-                .catch(err => console.log("헤더 로드 실패:", err));
-
-            fetch("/components/footer.html")
-                .then(r => r.text())
-                .then(d => {
-                    const fp = document.getElementById("footer-placeholder");
-                    if (fp) fp.innerHTML = d;
-                })
-                .catch(err => console.log("푸터 로드 실패:", err));
-
-            // 모든 슬롯 설정
-            try {
-                setupSlotClick();
-                setupModalClose();
-                setupTextModalClose();
-                setupModeToggle();
-                setupSave();
-                setupSaveText();
-                setupNoEndToggle();
-                setupBizSearchUI();
-            } catch (err) {
-                console.error("슬롯 설정 중 오류:", err);
-            }
-
-            // Best Pick 그리드 렌더링 및 로드
-            try {
-                renderBestPickGridInline();
-                await loadBestPickInlineSlots();
-            } catch (err) {
-                console.error("Best Pick 로드 실패:", err);
-            }
-
-            // Best Pick 리로드 버튼
-            setupBestPickReloadBtn();
-
-            // 기존 배너 슬롯들 로드
-            const bannerSlots = [
-                ["slot_index_main_top", "index", "index_main_top"],
-                ["slot_index_main_visual", "index", "index_main_visual"],
-                ["slot_index_promo_1", "index", "index_promo_1"],
-                ["slot_index_promo_2", "index", "index_promo_2"],
-                ["slot_index_promo_3", "index", "index_promo_3"],
-                ["slot_index_food_delivery", "index", "index_food_delivery"],
-                ["slot_index_all_stores", "index", "index_all_stores"],
-                ["slot_index_hot_place", "index", "index_hot_place"],
-                ["slot_index_suggest", "index", "index_suggest"],
-                ["slot_index_open", "index", "index_open"],
-                ["slot_index_store_pride", "index", "index_store_pride"],
-                ["slot_index_traditional", "index", "index_traditional"],
-                ["slot_index_performing", "index", "index_performing"],
-                ["slot_index_d2c_banner", "index", "index_d2c_banner"],
-                ["slot_index_d2c_shop", "index", "index_d2c_shop"],
-                ["slot_index_support_review", "index", "index_support_review"],
-                ["slot_index_support_empty", "index", "index_support_empty"],
-                ["slot_index_support_inquiry", "index", "index_support_inquiry"],
-            ];
-
-            try {
-                await Promise.all(
-                    bannerSlots.map(([id, page, pos]) => loadBannerSlotById(id, page, pos))
-                );
-            } catch (err) {
-                console.error("배너 슬롯 로드 실패:", err);
-            }
-
-            // 텍스트 슬롯 로드(없으면 더미)
-            try {
-                await loadTextSlotById(
-                    "slot_index_sub_keywords",
-                    "index",
-                    "index_sub_keywords",
-                    (c) => renderDefaultList(c, DEFAULT_DATA.keywords)
-                );
-                await loadTextSlotById(
-                    "slot_index_sub_news",
-                    "index",
-                    "index_sub_news",
-                    (c) => renderDefaultList(c, DEFAULT_DATA.news)
-                );
-                await loadTextSlotById(
-                    "slot_index_sub_events",
-                    "index",
-                    "index_sub_events",
-                    (c) => renderDefaultList(c, DEFAULT_DATA.events)
-                );
-                await loadTextSlotById(
-                    "slot_index_sub_recommends",
-                    "index",
-                    "index_sub_recommends",
-                    (c) => renderDefaultList(c, DEFAULT_DATA.recommends)
-                );
-
-                // 우리동네 한마디 로드
-                await loadOneWord();
-            } catch (err) {
-                console.error("텍스트 슬롯 로드 실패:", err);
-            }
-
-            console.log("🔍 DOMContentLoaded 완료");
+            bindAllBoxes();
+            await loadAllSlotsPreview();
         });
     </script>
-
 </body>
 
 </html>
