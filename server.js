@@ -24,8 +24,13 @@ import multer from "multer";      // (다른 라우터에서 사용 가능하도
 import ownerRouter from "./routes/owner.js";
 import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
+
+// ✅ 이름 매칭용 래퍼 라우터 파일이 반드시 존재해야 함
+// - routes/subcategoryRouter.js -> routes/subcategory.js를 export
+// - routes/hotblogRouter.js     -> routes/hotblogregister.js를 export
 import subcategoryRouter from "./routes/subcategoryRouter.js";
 import hotblogRouter from "./routes/hotblogRouter.js";
+
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import onewordRouter from "./routes/onewordRouter.js";
@@ -40,7 +45,7 @@ import localboardRouter from "./routes/localboardRouter.js";
 import openRouter from "./routes/openRouter.js";
 import openregisterRouter from "./routes/openregisterRouter.js";
 import opendetailRouter from "./routes/opendetailRouter.js";
-// ❌ 제거: import uploadRouter from "./routes/upload.js";
+
 import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
@@ -310,18 +315,13 @@ app.use("/api/oneword", onewordRouter);
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
 
-// ❌ Best Pick 기존 전용 API 제거
-// app.use("/api/best-pick", bestpickRouter);
-
+// 오픈예정
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
 app.use("/api/open", opendetailRouter);
 app.use("/open", openRouter);
 app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
-
-// ❌ 존재하지 않는 라우터 제거
-// app.use("/upload", uploadRouter);
 
 // 가게 등록 / 통합 등록
 app.use("/store", foodregisterRouter);
@@ -335,9 +335,6 @@ app.use("/api/hot", hotRouter);
 
 // 🔵 인덱스 레이아웃 관리자 API
 app.use("/manager/ad", indexmanagerAdRouter);
-
-// (localRankRouter 는 나중에 연결 가능)
-// app.use("/api/local-rank", localRankRouter);
 
 // ------------------------------------------------------------
 // 7. 정적 파일 (public2) - HTML 캐시 설정

@@ -1,4 +1,3 @@
-// routes/subcategory.js
 import { Router } from "express";
 import * as ctrl from "../controllers/subcategoryController.js";
 
@@ -16,7 +15,6 @@ router.get("/food/best", ctrl.getBestFoodStores);
 // 음식점 New registration
 // 👉 GET /api/subcategory/food/new
 router.get("/food/new", ctrl.getNewFoodStores);
-
 
 /* ================== 통합/뷰티 ================== */
 // 뷰티/통합 서브카테고리 조회

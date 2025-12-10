@@ -1,36 +1,34 @@
-import express from "express";
-import multer from "multer";
-import path from "path";
+import { Router } from "express";
 import {
+  registerHotBlog,
+  getHotBlog,
   registerBlog,
-  getAllBlogs,
-  getBlogById,
   updateBlog,
   deleteBlog,
 } from "../controllers/hotblogregisterController.js";
+import { upload } from "../middlewares/upload.js";
 
-const router = express.Router();
+const router = Router();
 
-// ✅ A 방식: /data/uploads/hotblog
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "/data/uploads/hotblog");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
+/**
+ * ✅ 신규 홍보 블로그(테마/랜덤/셀프 Q&A)
+ * - coverImage + 각 질문 이미지 등 다중 필드 업로드 대응
+ */
+router.post("/register", upload.any(), registerHotBlog);
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
+/**
+ * ✅ 신규 홍보 블로그 단일 조회
+ */
+router.get("/:id", getHotBlog);
 
-// 부팅 시 export 확인(로그에 registerHotBlog/getHotBlog가 보여야 정상)
-console.log("[hotblog routes] exports:", Object.keys(ctrl));
-
-router.post("/register", upload.any(), ctrl.registerHotBlog);
-router.get("/:id", ctrl.getHotBlog);
+/**
+ * ✅ (구버전) hot_blogs 기반 CRUD
+ * - 기존 흐름을 유지하는 기본 매핑
+ * - 파일 업로드가 필요한 구버전 썸네일 흐름이 있다면
+ *   별도 multer 구성이 붙어있던 방식으로 확장하면 됨
+ */
+router.post("/legacy", registerBlog);
+router.put("/legacy/:id", updateBlog);
+router.delete("/legacy/:id", deleteBlog);
 
 export default router;
