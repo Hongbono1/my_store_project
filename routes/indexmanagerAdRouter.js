@@ -31,10 +31,12 @@ const router = express.Router();
  * - 파일 필드명은 프론트에서 보내는 이름에 맞춰야 함
  *   (일반적으로 "image" 또는 "file")
  * ============================================================ */
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
+const UPLOAD_DIR = "/data/uploads";
+
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
