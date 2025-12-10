@@ -1,16 +1,26 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import pool from "../db.js";
 
 const router = express.Router();
 
-// ✅ multer 설정
+// ✅ A 방식 표준 경로
+const SUBDIR = "open";
+const UPLOAD_DIR = `/data/uploads/${SUBDIR}`;
+
+// 폴더 보장
+if (!fs.existsSync(UPLOAD_DIR)) {
+   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+// ✅ multer 설정 (저장 경로 통일)
 const storage = multer.diskStorage({
-   destination: (req, file, cb) => cb(null, "public/uploads"),
+   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const fileName = `${Date.now()}${ext}`;
+      const ext = path.extname(file.originalname || "");
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
       cb(null, fileName);
    },
 });
@@ -42,12 +52,12 @@ router.post("/", upload.single("img"), async (req, res) => {
          return res.json({ success: false, error: "필수 항목 누락 (상호명, 오픈일, 전화번호)" });
       }
 
-      // 이미지 경로 설정
-      const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
-      
+      // ✅ 이미지 경로 설정 (DB에는 /uploads/open/<filename>만 저장)
+      const imagePath = req.file ? `/uploads/${SUBDIR}/${req.file.filename}` : null;
+
       console.log("💾 DB 저장 준비:", {
          store_name,
-         open_date, 
+         open_date,
          category,
          phone,
          finalDescription: finalDescription ? finalDescription.substring(0, 100) + "..." : null,
