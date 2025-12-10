@@ -21,38 +21,32 @@ import fetch from "node-fetch";   // 국세청 API 사용
 import multer from "multer";      // (다른 라우터에서 사용 가능하도록 남겨둠)
 
 // Routers
-import foodregisterRouter from "./routes/foodregister.js";
-import ncombinedregister from "./routes/ncombinedregister.js";
-import subcategoryRouter from "./routes/subcategory.js";
-import hotblogRouter from "./routes/hotblogregister.js";
 import ownerRouter from "./routes/owner.js";
 import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
-import openregisterRouter from "./routes/openregisterRouter.js";
-import openRouter from "./routes/openRouter.js";
-import opendetailRouter from "./routes/opendetailRouter.js";
-// ❌ 존재하지 않는 파일 제거
-// import uploadRouter from "./routes/upload.js";
-import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
+import subcategoryRouter from "./routes/subcategoryRouter.js";
+import hotblogRouter from "./routes/hotblogRouter.js";
+import hotplaceRouter from "./routes/hotplaceRouter.js";
+import hotRouter from "./routes/hotRouter.js";
+import onewordRouter from "./routes/onewordRouter.js";
 import storeprideRouter from "./routes/storeprideRouter.js";
 import traditionalmarketregisterRouter from "./routes/traditionalmarketregisterRouter.js";
 import traditionalmarketdetailRouter from "./routes/traditionalmarketdetailRouter.js";
-// ❌ Best Pick 기존 전용 라우터는 제거(인덱스 관리자에 흡수)
-// import bestpickRouter from "./routes/bestpickRouter.js";
 import performingartRouter from "./routes/performingartRouter.js";
 import performingartregisterRouter from "./routes/performingartregisterRouter.js";
 import performingartdetailRouter from "./routes/performingartdetailRouter.js";
 import eventregisterRouter from "./routes/eventregisterRouter.js";
 import localboardRouter from "./routes/localboardRouter.js";
-import onewordRouter from "./routes/onewordRouter.js";
+import openRouter from "./routes/openRouter.js";
+import openregisterRouter from "./routes/openregisterRouter.js";
+import opendetailRouter from "./routes/opendetailRouter.js";
+// ❌ 제거: import uploadRouter from "./routes/upload.js";
+import { makeStorePrideRegisterRouter } from "./routes/storePrideRegisterRouter.js";
 import shoppingRegisterRouter from "./routes/shoppingRegisterRouter.js";
 import shoppingDetailRouter from "./routes/shoppingDetailRouter.js";
+import foodregisterRouter from "./routes/foodregister.js";
+import ncombinedregister from "./routes/ncombinedregister.js";
 import inquiryBoardRouter from "./routes/inquiryBoardRouter.js";
-import localRankRouter from "./routes/localRankRouter.js"; // 나중에 사용할 여지
-import hotplaceRouter from "./routes/hotplaceRouter.js";
-import hotRouter from "./routes/hotRouter.js";
-
-// 🔵 인덱스 레이아웃 관리자 라우터
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
 import pool from "./db.js";

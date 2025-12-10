@@ -175,3 +175,94 @@ export async function registerBlog(req, res) {
     client.release();
   }
 }
+
+export async function updateBlog(req, res) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const id = parseInt(req.params.id, 10);
+    const { title, content, category, tags } = req.body;
+
+    const thumbnail = req.file ? `/uploads/hotblog/${req.file.filename}` : null;
+
+    let query;
+    let values;
+
+    if (thumbnail) {
+      query = `
+        UPDATE hot_blogs 
+        SET title = $1, content = $2, category = $3, thumbnail = $4, tags = $5, updated_at = NOW()
+        WHERE id = $6
+        RETURNING *
+      `;
+      values = [title, content, category || "일반", thumbnail, tags || null, id];
+    } else {
+      query = `
+        UPDATE hot_blogs 
+        SET title = $1, content = $2, category = $3, tags = $4, updated_at = NOW()
+        WHERE id = $5
+        RETURNING *
+      `;
+      values = [title, content, category || "일반", tags || null, id];
+    }
+
+    const result = await client.query(query, values);
+
+    if (result.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        success: false,
+        error: "블로그를 찾을 수 없습니다.",
+      });
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("❌ 핫블로그 수정 오류:", error);
+    res.status(500).json({
+      success: false,
+      error: "블로그 수정 실패",
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteBlog(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    const query = `
+      DELETE FROM hot_blogs 
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "블로그를 찾을 수 없습니다.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "블로그가 삭제되었습니다.",
+    });
+  } catch (error) {
+    console.error("❌ 핫블로그 삭제 오류:", error);
+    res.status(500).json({
+      success: false,
+      error: "블로그 삭제 실패",
+    });
+  }
+}
