@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🌦️ 오늘의 테마 추천 | MALL HANKOOK</title>
+  <title>핫 서브카테고리 | MALL HANKOOK</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
@@ -73,8 +73,8 @@
 
   <!-- Hero -->
   <section class="text-center py-10 fade-in">
-    <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-gradient">🌦️ 오늘의 테마 추천</h1>
-    <p class="text-gray-500 text-sm">food / cafe만 랜덤으로 보여주고, 12개씩 페이지로 나눕니다.</p>
+    <h1 id="heroTitle" class="text-3xl sm:text-4xl font-bold mb-2 text-gradient">🔥 핫 서브카테고리</h1>
+    <p id="heroDesc" class="text-gray-500 text-sm">food / cafe만 랜덤으로 노출됩니다.</p>
   </section>
 
   <!-- Grid -->
@@ -89,27 +89,32 @@
   <div id="footer"></div>
 
   <script>
-    const cardGrid = document.getElementById("cardGrid");
-    const pagination = document.getElementById("pagination");
+    const $ = (sel) => document.querySelector(sel);
 
-    // ✅ food/cafe만 남김 (그 외 전부 제거)
+    const cardGrid = $("#cardGrid");
+    const pagination = $("#pagination");
+    const heroTitle = $("#heroTitle");
+    const heroDesc = $("#heroDesc");
+
+    // ✅ food/cafe만 허용 (그 외 전부 삭제/제외)
     const ALLOWED = ["food", "cafe"];
     const CATEGORY_LABEL = {
-      food: "한식",
-      cafe: "카페",
+      food: "오늘의 한식 맛집",
+      cafe: "감성 카페 리스트"
     };
 
-    let allItems = [];
+    let allItems = [];       // 필터(허용)된 전체 목록
+    let viewItems = [];      // 현재 화면에 적용된 목록(카테고리 쿼리 적용 후)
     let currentPage = 1;
     const perPage = 12;
 
-    // ✅ 헤더/푸터
+    // ✅ 헤더/푸터 로드
     Promise.all([
       fetch("/components/header.html").then(r => r.text()).catch(() => ""),
       fetch("/components/footer.html").then(r => r.text()).catch(() => ""),
     ]).then(([h, f]) => {
-      document.getElementById("header").innerHTML = h;
-      document.getElementById("footer").innerHTML = f;
+      $("#header").innerHTML = h;
+      $("#footer").innerHTML = f;
     });
 
     function escapeHtml(s) {
@@ -118,7 +123,7 @@
       );
     }
 
-    // ✅ 배열 랜덤 섞기 (페이지 이동해도 순서 유지: 로드 시 1회만)
+    // ✅ 랜덤 섞기(로드 시 1회)
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -127,48 +132,51 @@
       return arr;
     }
 
+    function getQueryCategory() {
+      const params = new URLSearchParams(location.search);
+      const cat = (params.get("category") || "").toLowerCase().trim();
+      return ALLOWED.includes(cat) ? cat : "";
+    }
+
     async function loadList() {
       try {
         const res = await fetch("/api/hotsubcategory");
         const json = await res.json();
-        console.log("🌦️ /api/hotsubcategory:", json);
+        console.log("🔥 /api/hotsubcategory:", json);
 
+        // 서버가 ok/data 형태로 내려준다는 전제 (네가 올린 코드 스타일 그대로)
         if (!json.ok || !Array.isArray(json.data)) {
-          throw new Error("데이터 형식 오류");
+          throw new Error("데이터 형식 오류 (ok/data)");
         }
 
-        // ✅ 정규화 + food/cafe만 필터
-        allItems = json.data.map(row => {
-          const key = String(row.category ?? row.cat ?? "").toLowerCase(); // 기대: food/cafe/...
+        // ✅ 정규화: 카드에 필요한 필드만 뽑고 category를 food/cafe만 남김
+        // - categoryKey: row.category (food/cafe/...)
+        // - cover: 대표 이미지 (thumbnail_url/cover_image/image_url)
+        // - storeName: 상호( store_name > business_name > title )
+        // - bizType: 업종(있으면 사용, 없으면 food/cafe 라벨로 대체)
+        const normalized = json.data.map(row => {
+          const categoryKey = String(row.category ?? "").toLowerCase().trim();
           const cover = row.thumbnail_url || row.cover_image || row.image_url || "/uploads/default.jpg";
-
-          // 상호: 서버에 따라 달라서 최대한 안전 매핑
           const storeName = row.store_name || row.business_name || row.title || "";
-
-          // 업종(하단 표시): 서버 컬럼 우선, 없으면 food/cafe 라벨
           const bizType =
             row.business_category ||
             row.store_category ||
             row.business_subcategory ||
-            CATEGORY_LABEL[key] ||
-            key ||
-            "업종";
+            (CATEGORY_LABEL[categoryKey] ? CATEGORY_LABEL[categoryKey] : "업종");
 
           return {
             id: row.id,
-            categoryKey: key,
+            categoryKey,
             cover,
             storeName,
-            bizType,
+            bizType
           };
         }).filter(x => ALLOWED.includes(x.categoryKey)); // ✅ 여기서 food/cafe만 남김
 
-        // ✅ 랜덤 섞기
-        shuffle(allItems);
+        // ✅ 랜덤 섞기 (전체 리스트 기준)
+        allItems = shuffle([...normalized]);
 
-        // ✅ 첫 페이지 렌더
-        currentPage = 1;
-        render();
+        applyCategoryFromQuery();
       } catch (e) {
         console.error("❌ loadList:", e);
         cardGrid.innerHTML = `
@@ -180,14 +188,31 @@
       }
     }
 
+    function applyCategoryFromQuery() {
+      const cat = getQueryCategory(); // "" or "food" or "cafe"
+
+      if (cat) {
+        heroTitle.textContent = CATEGORY_LABEL[cat] || "핫 서브카테고리";
+        heroDesc.textContent = "해당 카테고리만 랜덤으로 노출됩니다.";
+        // 카테고리별로도 랜덤이 되게: 필터 후 다시 섞기
+        viewItems = shuffle(allItems.filter(x => x.categoryKey === cat));
+      } else {
+        heroTitle.textContent = "🔥 핫 서브카테고리";
+        heroDesc.textContent = "food / cafe만 랜덤으로 노출됩니다.";
+        viewItems = [...allItems];
+      }
+
+      currentPage = 1;
+      render();
+    }
+
     function render() {
       renderCards();
       renderPagination();
     }
 
     function renderCards() {
-      const total = allItems.length;
-      if (!total) {
+      if (!viewItems.length) {
         cardGrid.innerHTML = `
           <div class="col-span-full text-center text-gray-500 py-12">
             표시할 데이터가 없습니다. (food/cafe만 남겼습니다)
@@ -198,7 +223,7 @@
 
       const start = (currentPage - 1) * perPage;
       const end = start + perPage;
-      const pageItems = allItems.slice(start, end);
+      const pageItems = viewItems.slice(start, end);
 
       cardGrid.innerHTML = pageItems.map(item => `
         <article class="neo-card overflow-hidden cursor-pointer fade-in"
@@ -209,7 +234,7 @@
               class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
             <div class="absolute top-3 left-3">
               <span class="text-xs px-2 py-1 rounded-full bg-white/90 border border-gray-200 shadow">
-                ${escapeHtml(CATEGORY_LABEL[item.categoryKey] || item.categoryKey)}
+                ${escapeHtml(item.categoryKey)}
               </span>
             </div>
           </div>
@@ -224,41 +249,43 @@
     }
 
     function renderPagination() {
-      const totalPages = Math.ceil(allItems.length / perPage);
+      const totalPages = Math.ceil(viewItems.length / perPage);
+
       if (totalPages <= 1) {
         pagination.innerHTML = "";
         return;
       }
 
-      // 너무 많아도 자동 생성은 되는데, UI는 현재/앞뒤 몇개만 보이게 (가독성)
       const windowSize = 7;
       const half = Math.floor(windowSize / 2);
+
       let start = Math.max(1, currentPage - half);
       let end = Math.min(totalPages, start + windowSize - 1);
       start = Math.max(1, end - windowSize + 1);
 
       let html = "";
 
-      // Prev
+      // 이전
       html += `<button class="page-btn" ${currentPage === 1 ? "disabled style='opacity:.5;cursor:not-allowed'" : ""} data-page="${currentPage - 1}">이전</button>`;
 
-      // First + ellipsis
+      // 1 ... 
       if (start > 1) {
         html += `<button class="page-btn" data-page="1">1</button>`;
         if (start > 2) html += `<span class="px-2 text-gray-400">…</span>`;
       }
 
+      // 중간 페이지들
       for (let p = start; p <= end; p++) {
         html += `<button class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`;
       }
 
-      // Last + ellipsis
+      // ... 마지막
       if (end < totalPages) {
         if (end < totalPages - 1) html += `<span class="px-2 text-gray-400">…</span>`;
         html += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
       }
 
-      // Next
+      // 다음
       html += `<button class="page-btn" ${currentPage === totalPages ? "disabled style='opacity:.5;cursor:not-allowed'" : ""} data-page="${currentPage + 1}">다음</button>`;
 
       pagination.innerHTML = html;
@@ -266,9 +293,8 @@
       pagination.querySelectorAll("button[data-page]").forEach(btn => {
         btn.addEventListener("click", () => {
           const p = Number(btn.dataset.page);
-          const totalPagesNow = Math.ceil(allItems.length / perPage);
           if (!Number.isFinite(p)) return;
-          if (p < 1 || p > totalPagesNow) return;
+          if (p < 1 || p > totalPages) return;
           currentPage = p;
           renderCards();
           renderPagination();
