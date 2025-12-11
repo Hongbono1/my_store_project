@@ -75,7 +75,7 @@
             color: #000;
         }
 
-        /* ✅ Cross-browser Gradient Text */
+        /* ✅ Gradient Text */
         .text-gradient {
             background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
             background-size: 200%;
@@ -96,34 +96,6 @@
             }
         }
 
-        /* ✅ Apple-style Filter Bar */
-        .sticky-filter {
-            position: sticky;
-            top: 0;
-            z-index: 40;
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.8);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .filter-btn {
-            font-size: 0.875rem;
-            padding: 0.375rem 1rem;
-            border-radius: 9999px;
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            transition: all .2s ease;
-        }
-
-        .filter-btn:hover {
-            background: #f3f4f6;
-        }
-
-        .filter-btn.active {
-            background: #111827;
-            color: #fff;
-        }
-
         .fade-in {
             animation: fadeIn 0.6s ease both;
         }
@@ -139,6 +111,24 @@
                 transform: translateY(0);
             }
         }
+
+        /* ✅ 카드 안에서 사용하는 카테고리 태그 */
+        .category-chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .category-chip:hover {
+            background: #dbeafe;
+        }
     </style>
 </head>
 
@@ -149,38 +139,26 @@
     <!-- Hero -->
     <section class="text-center py-12 fade-in">
         <h1 class="text-4xl font-bold mb-2 text-gradient">🔥 핫 서브카테고리</h1>
-        <p class="text-gray-500 text-sm">네오+글래스 하이브리드 감성으로 한눈에 모아보기</p>
+        <p class="text-gray-500 text-sm">핫블로그 카드들을 한눈에 모아보고, 필요할 때만 분류로 찾아보기</p>
     </section>
 
-    <!-- ✅ Filter Bar -->
-    <div class="sticky-filter">
-        <div class="max-w-7xl mx-auto px-6 py-3 flex flex-wrap justify-between items-center gap-3">
-            <!-- 카테고리 버튼 -->
-            <div class="flex flex-wrap gap-2">
-                <button class="filter-btn active" data-cat="all">전체</button>
-                <button class="filter-btn" data-cat="food">맛집</button>
-                <button class="filter-btn" data-cat="beauty">뷰티</button>
-                <button class="filter-btn" data-cat="life">생활</button>
-                <button class="filter-btn" data-cat="event">이벤트</button>
-            </div>
-
-            <!-- 검색창 & 정렬 -->
-            <div class="flex gap-2 items-center">
-                <input type="search" id="searchInput" placeholder="검색..."
-                    class="border border-gray-200 rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:ring-gray-300 bg-white" />
-                <select id="sortSelect"
-                    class="border border-gray-200 rounded-full px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-gray-300">
-                    <option value="trending">인기순</option>
-                    <option value="latest">최신순</option>
-                    <option value="rating">평점순</option>
-                </select>
-            </div>
+    <!-- 🔍 상단 검색/정렬 바 (카테고리 탭 제거) -->
+    <section class="max-w-7xl mx-auto px-6 mb-4">
+        <div class="flex flex-wrap justify-end items-center gap-2">
+            <input type="search" id="searchInput" placeholder="제목/내용 검색..."
+                class="border border-gray-200 rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:ring-gray-300 bg-white" />
+            <select id="sortSelect"
+                class="border border-gray-200 rounded-full px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-gray-300">
+                <option value="trending">인기순</option>
+                <option value="latest">최신순</option>
+                <option value="rating">평점순</option>
+            </select>
         </div>
-    </div>
+    </section>
 
     <!-- ✅ Grid Section -->
     <main
-        class="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 fade-in"
+        class="max-w-7xl mx-auto px-6 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 fade-in"
         id="grid"></main>
 
     <!-- Footer -->
@@ -188,11 +166,15 @@
 
     <script>
         const grid = document.getElementById("grid");
-        const filterBtns = document.querySelectorAll(".filter-btn");
+        const searchInput = document.getElementById("searchInput");
+        const sortSelect = document.getElementById("sortSelect");
 
-        let allData = [];     // 서버 전체 데이터
-        let currentPage = 1;  // 현재 페이지
-        const perPage = 12;   // 한 페이지당 카드 수
+        let allData = [];        // 서버에서 받은 전체 데이터
+        let filteredData = [];   // 현재 필터/검색이 적용된 데이터
+        let currentPage = 1;
+        const perPage = 12;
+        let currentCategory = null; // 선택된 카테고리 (없으면 null)
+        let currentSearch = "";     // 검색어
 
         /* ✅ 서버 데이터 불러오기 */
         async function loadHotSubData() {
@@ -201,108 +183,201 @@
                 const json = await res.json();
                 console.log("🔥 서버 응답:", json);
 
-                if (!json.ok || !Array.isArray(json.data)) throw new Error("데이터 오류");
+                if (!json.ok || !Array.isArray(json.data)) {
+                    throw new Error("데이터 형식 오류");
+                }
 
-                // ✅ 실제 서버 데이터 저장
                 allData = json.data;
 
-                // ✅ 렌더링
-                currentPage = 1;
-                renderGrid();
-                renderPagination();
+                // URL 쿼리에서 category=... 가 있으면 해당 분류로 시작
+                const params = new URLSearchParams(window.location.search);
+                const catParam = params.get("category");
+                currentCategory = catParam && catParam !== "all" ? catParam : null;
+
+                applyFilters();
             } catch (err) {
                 console.error("❌ [loadHotSubData 오류]:", err);
                 grid.innerHTML = `
-      <p class="text-gray-500 text-center col-span-full py-10">
-        서버에서 데이터를 불러오지 못했습니다.
-      </p>`;
+          <p class="text-gray-500 text-center col-span-full py-10">
+            서버에서 데이터를 불러오지 못했습니다.
+          </p>`;
             }
         }
 
-        /* ✅ 카드 렌더링 함수 */
+        /* ✅ 현재 상태(카테고리/검색/정렬)에 맞게 filteredData 구성 */
+        function applyFilters() {
+            filteredData = Array.isArray(allData) ? [...allData] : [];
+
+            // 1) 카테고리 필터 (제목 아래 태그/디테일 페이지에서 선택)
+            if (currentCategory) {
+                filteredData = filteredData.filter(
+                    item => item.category === currentCategory
+                );
+            }
+
+            // 2) 검색어 필터 (제목/설명)
+            if (currentSearch.trim() !== "") {
+                const q = currentSearch.trim().toLowerCase();
+                filteredData = filteredData.filter(item =>
+                    (item.title || "").toLowerCase().includes(q) ||
+                    (item.description || "").toLowerCase().includes(q)
+                );
+            }
+
+            // 3) 정렬 (간단한 버전)
+            const sort = sortSelect?.value || "trending";
+            if (sort === "rating") {
+                filteredData.sort((a, b) =>
+                    (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0)
+                );
+            } else if (sort === "latest") {
+                filteredData.sort((a, b) => {
+                    const ad = new Date(a.created_at || a.createdAt || 0).getTime();
+                    const bd = new Date(b.created_at || b.createdAt || 0).getTime();
+                    return bd - ad;
+                });
+            }
+            // trending 은 일단 서버에서 내려오는 순서를 존중
+
+            currentPage = 1;
+            renderGrid();
+            renderPagination();
+        }
+
+        /* ✅ 카드 렌더링 */
         function renderGrid() {
+            if (!filteredData.length) {
+                grid.innerHTML = `
+        <p class="text-gray-500 text-center col-span-full py-10">
+          표시할 핫블로그가 없습니다.
+        </p>`;
+                const existing = document.getElementById("pagination");
+                if (existing) existing.remove();
+                return;
+            }
+
             const start = (currentPage - 1) * perPage;
             const end = start + perPage;
-            const pageData = allData.slice(start, end);
+            const pageData = filteredData.slice(start, end);
 
-            grid.innerHTML = pageData.map(item => `
-    <article class="neo-card overflow-hidden fade-in">
-      <div class="relative aspect-[4/3] overflow-hidden">
-        <img src="${item.thumbnail_url || '/uploads/default.jpg'}" alt="${item.title}" 
-             class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
-        <div class="absolute bottom-3 left-3 text-white">
-          <h3 class="font-semibold">${item.title}</h3>
-          <p class="text-xs opacity-90">${item.description || ''}</p>
-        </div>
-      </div>
+            grid.innerHTML = pageData.map(item => {
+                const category = item.category || "";
+                const categoryLabelMap = {
+                    food: "맛집",
+                    beauty: "뷰티",
+                    life: "생활",
+                    event: "이벤트"
+                };
+                const categoryLabel = categoryLabelMap[category] || category || "기타";
 
-      <div class="p-4">
-        <p class="text-sm text-gray-600 line-clamp-2 mb-2">${item.description || ''}</p>
+                return `
+        <article class="neo-card overflow-hidden fade-in">
+          <div class="relative aspect-[4/3] overflow-hidden">
+            <img src="${item.thumbnail_url || '/uploads/default.jpg'}" 
+                 alt="${item.title || ''}" 
+                 class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent"></div>
+            <div class="absolute bottom-3 left-3 text-white">
+              <h3 class="font-semibold">${item.title || ''}</h3>
+              <div class="mt-1">
+                ${category
+                        ? `<button class="category-chip" data-cat="${category}"># ${categoryLabel}</button>`
+                        : ""}
+              </div>
+            </div>
+          </div>
 
-        <div class="flex justify-between items-center text-xs text-gray-500">
-          <span>${item.category || '일반'}</span>
-          <span>⭐ ${item.rating || '4.0'}</span>
-        </div>
+          <div class="p-4">
+            <p class="text-sm text-gray-600 line-clamp-2 mb-2">
+              ${item.description || ''}
+            </p>
 
-        <div class="mt-4 flex gap-2">
-          <a href="/hotblogdetail.html?id=${item.id}" class="neo-btn flex-1 text-center">자세히 보기</a>
-          <button class="glass-btn flex-1">관련 목록</button>
-        </div>
-      </div>
-    </article>
-  `).join('');
+            <div class="flex justify-between items-center text-xs text-gray-500">
+              <span>${categoryLabel}</span>
+              <span>⭐ ${item.rating || '4.0'}</span>
+            </div>
+
+            <div class="mt-4 flex gap-2">
+              <a href="/hotblogdetail.html?id=${item.id}" class="neo-btn flex-1 text-center">
+                자세히 보기
+              </a>
+              <button class="glass-btn flex-1" data-id="${item.id}">
+                관련 목록
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+            }).join('');
+
+            attachCategoryChipEvents();
         }
 
         /* ✅ 페이지네이션 렌더링 */
         function renderPagination() {
-            const totalPages = Math.ceil(allData.length / perPage);
-            const existing = document.querySelector("#pagination");
+            const totalPages = Math.ceil(filteredData.length / perPage);
+            const existing = document.getElementById("pagination");
             if (existing) existing.remove();
+
+            if (totalPages <= 1) return;
 
             const paginationContainer = document.createElement("div");
             paginationContainer.id = "pagination";
             paginationContainer.className = "flex justify-center gap-2 mt-10";
 
             paginationContainer.innerHTML = Array.from({ length: totalPages }, (_, i) => `
-    <button 
-      class="px-3 py-1.5 rounded-lg border text-sm font-medium
-             ${i + 1 === currentPage
+        <button
+          class="px-3 py-1.5 rounded-lg border text-sm font-medium
+                 ${i + 1 === currentPage
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}"
-      onclick="goToPage(${i + 1})">${i + 1}
-    </button>
-  `).join("");
+          data-page="${i + 1}">
+          ${i + 1}
+        </button>
+      `).join("");
 
             grid.insertAdjacentElement("afterend", paginationContainer);
-        }
 
-        /* ✅ 페이지 이동 */
-        function goToPage(page) {
-            currentPage = page;
-            renderGrid();
-            renderPagination();
-            window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-
-        /* ✅ 카테고리 필터 */
-        filterBtns.forEach(btn => {
-            btn.addEventListener("click", () => {
-                document.querySelector(".filter-btn.active")?.classList.remove("active");
-                btn.classList.add("active");
-
-                const cat = btn.dataset.cat;
-                if (cat === "all") {
-                    loadHotSubData();
-                } else {
-                    const filtered = allData.filter(v => v.category === cat);
-                    currentPage = 1;
-                    allData = filtered;
-                    renderGrid();
-                    renderPagination();
-                }
+            paginationContainer.querySelectorAll("button[data-page]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const p = Number(btn.dataset.page);
+                    if (!Number.isNaN(p)) {
+                        currentPage = p;
+                        renderGrid();
+                        renderPagination();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                });
             });
-        });
+        }
+
+        /* ✅ 카드 안의 카테고리 태그 클릭 → 해당 분류만 보기 */
+        function attachCategoryChipEvents() {
+            document.querySelectorAll(".category-chip").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const cat = btn.dataset.cat;
+                    currentCategory = cat || null;
+                    currentSearch = "";
+                    if (searchInput) searchInput.value = "";
+                    applyFilters();
+                });
+            });
+        }
+
+        /* 🔍 검색 이벤트 */
+        if (searchInput) {
+            searchInput.addEventListener("input", (e) => {
+                currentSearch = e.target.value;
+                applyFilters();
+            });
+        }
+
+        /* 🔁 정렬 이벤트 */
+        if (sortSelect) {
+            sortSelect.addEventListener("change", () => {
+                applyFilters();
+            });
+        }
 
         /* ✅ Header/Footer 불러오기 */
         Promise.all([
