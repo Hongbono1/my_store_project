@@ -254,19 +254,17 @@
             <button id="closeModal"
                 class="absolute -top-4 -right-4 bg-white text-black rounded-full text-3xl w-10 h-10 flex items-center justify-center z-60 hover:bg-gray-200">×</button>
         </div>
-
     </div>
 
     <script type="module">
-
-        // === 헤더/푸터 동적 포함 (최상단 추가) ===
+        // === 헤더/푸터 동적 포함 ===
         async function loadPartial(targetId, url) {
             const el = document.getElementById(targetId);
             if (!el) return;
             try {
                 const res = await fetch(url + `?v=${Date.now()}`, { cache: "no-cache" });
                 el.innerHTML = await res.text();
-                // (옵션) partial 안 <script> 실행
+                // partial 안 <script> 실행
                 el.querySelectorAll("script").forEach(old => {
                     const s = document.createElement("script");
                     [...old.attributes].forEach(a => s.setAttribute(a.name, a.value));
@@ -282,8 +280,8 @@
         await loadPartial("header-placeholder", "/components/header.html");
         await loadPartial("footer-placeholder", "/components/footer.html");
 
-        document.getElementById('header-placeholder')?.style.setProperty('display', 'contents');
-        document.getElementById('footer-placeholder')?.style.setProperty('display', 'contents');
+        document.getElementById("header-placeholder")?.style.setProperty("display", "contents");
+        document.getElementById("footer-placeholder")?.style.setProperty("display", "contents");
 
         requestAnimationFrame(syncRightColHeight);
         setTimeout(syncRightColHeight, 300);
@@ -298,9 +296,13 @@
         }
 
         function escapeHtml(s = "") {
-            s = String(s ?? "");   // null, boolean 등을 안전하게 문자열 변환
+            s = String(s ?? "");
             return s.replace(/[&<>\"']/g, (m) => ({
-                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
             }[m]));
         }
 
@@ -464,7 +466,6 @@
                 modal.classList.add("hidden");
             }
 
-            // 버튼이 나중에 동적으로 생겨도 동작하도록 '이벤트 위임' 사용
             document.addEventListener("click", (e) => {
                 const btn = e.target.closest(".openTextModal");
                 if (!btn) return;
@@ -472,15 +473,18 @@
             });
 
             closeBtn.addEventListener("click", closeTextModal);
-            modal.addEventListener("click", (e) => { if (e.target === modal) closeTextModal(); });
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeTextModal();
+            });
         })();
 
+        // 레이아웃 높이 동기화
         function syncRightColHeight() {
-            const mq = window.matchMedia('(min-width: 1024px)'); // lg 이상에서만 동기화
+            const mq = window.matchMedia("(min-width: 1024px)"); // lg 이상에서만 동기화
             const right = $("rightCol");
             if (!right) return;
 
-            if (!mq.matches) {                 // 모바일/태블릿: 자동 흐름
+            if (!mq.matches) {
                 right.style.height = "";
                 return;
             }
@@ -488,15 +492,14 @@
             const leftH = $("leftCol")?.offsetHeight || 0;
             const midH = $("middleCol")?.offsetHeight || 0;
 
-            // ★ middle 기준으로 정렬 (연락처 하단선과 장바구니 하단선 일치)
-            const base = midH || leftH;        // midH가 0이면(초기) 왼쪽으로 임시 대체
+            const base = midH || leftH;
             right.style.height = base + "px";
         }
 
         window.addEventListener("resize", syncRightColHeight);
         window.addEventListener("load", syncRightColHeight);
 
-        // ========== Kakao 지도 ==========
+        // ========== Kakao 지도 버튼(카카오맵 열기/길찾기) ==========
         function renderMapActions(lat, lng, name, address) {
             const parent = $("map").parentElement;
             let box = document.getElementById("mapActions");
@@ -536,19 +539,45 @@
             box.append(openBtn, dirBtn);
         }
 
-        // initMap
-        // ========== Kakao 지도 ==========
+        // 카카오 지도용 주소 정제
+        function refineAddress(address, name = "") {
+            if (!address) return "";
+
+            let a = String(address);
+
+            // "상호: 하늘식당" 이런 부분 제거
+            a = a.replace(/상호\s*:.*/g, "");
+
+            // 괄호로 된 참고정보 제거
+            a = a.replace(/\(.*?\)/g, "");
+
+            // "지하 160" -> "160"  (숫자는 살린다)
+            a = a.replace(/지하\s*(\d+)/g, "$1");
+
+            // "지하 1층", "B1층", "3층" 같은 층 정보 제거
+            a = a.replace(/지하\s*\d+층/g, "");
+            a = a.replace(/\bB\d+층\b/gi, "");
+            a = a.replace(/\b\d+층\b/g, "");
+
+            // 공백 정리
+            a = a.replace(/\s+/g, " ").trim();
+
+            return a;
+        }
+
+        // ✅ 최종 Kakao 지도 initMap (한 번만 선언!)
         async function initMap(address, name = "") {
             return new Promise(async (resolve) => {
                 if (!address) {
                     $("addressText").textContent = "📍 주소 정보 없음";
-                    $("map").innerHTML = "<div class='flex items-center justify-center h-full text-gray-500'>주소 없음</div>";
+                    $("map").innerHTML =
+                        "<div class='flex items-center justify-center h-full text-gray-500'>주소 없음</div>";
                     renderMapActions(null, null, name, address);
                     resolve();
                     return;
                 }
 
-                // 📌 화면에는 상세주소 그대로 표시
+                // 화면에는 상세주소 그대로 표시
                 $("addressText").textContent = `📍 ${address}`;
                 console.log("지도 주소 검색 시작 (원본):", address, "상호:", name);
 
@@ -562,20 +591,10 @@
                 await new Promise((r) => kakao.maps.load(r));
                 const geocoder = new kakao.maps.services.Geocoder();
 
-                // 📌 상세주소 제거 후 검색 (도로명까지만)
-                const cleaned = address.replace(/\s\d{1,4}(-\d{1,4})?$/, "").trim();
+                const cleaned = refineAddress(address, name);
                 console.log("정제 후 주소:", cleaned);
 
-                geocoder.addressSearch(cleaned, (result, status) => {
-                    console.log("주소검색 결과:", result, "status:", status);
-
-                    if (status !== kakao.maps.services.Status.OK || !result?.length) {
-                        $("map").innerHTML = "<div class='flex items-center justify-center h-full text-gray-500'>지도 로딩 실패</div>";
-                        renderMapActions(null, null, name, address);
-                        resolve();
-                        return;
-                    }
-
+                function onSuccess(result) {
                     const lat = Number(result[0].y);
                     const lng = Number(result[0].x);
                     const coords = new kakao.maps.LatLng(lat, lng);
@@ -583,19 +602,45 @@
                     const map = new kakao.maps.Map($("map"), { center: coords, level: 3 });
                     const marker = new kakao.maps.Marker({ map, position: coords });
 
-                    // 📌 마커 툴팁에 상세주소 그대로
                     const infowindow = new kakao.maps.InfoWindow({
-                        content: `<div style="padding:5px;font-size:13px;">${name}<br>${address}</div>`
+                        content: `<div style="padding:5px;font-size:13px;">${escapeHtml(name)}<br>${escapeHtml(
+                            address
+                        )}</div>`,
                     });
                     infowindow.open(map, marker);
 
                     renderMapActions(lat, lng, name, address);
                     resolve();
+                }
+
+                // 1차: 정제 주소로 검색
+                geocoder.addressSearch(cleaned, (result, status) => {
+                    console.log("주소검색 결과(정제):", result, "status:", status);
+
+                    if (status === kakao.maps.services.Status.OK && result && result.length) {
+                        onSuccess(result);
+                        return;
+                    }
+
+                    // 2차: 정제 실패하면 원본 주소로 재시도
+                    console.warn("정제 주소 검색 실패, 원본 주소로 재시도:", address);
+                    geocoder.addressSearch(address, (result2, status2) => {
+                        console.log("주소검색 결과(원본):", result2, "status:", status2);
+
+                        if (status2 === kakao.maps.services.Status.OK && result2 && result2.length) {
+                            onSuccess(result2);
+                        } else {
+                            $("map").innerHTML =
+                                "<div class='flex items-center justify-center h-full text-gray-500'>지도 로딩 실패</div>";
+                            renderMapActions(null, null, name, address);
+                            resolve();
+                        }
+                    });
                 });
             });
         }
 
-        // 2) 데이터 표준화 (이 블록으로 교체)
+        // ========== 데이터 표준화 + 상세 렌더링 ==========
         (async () => {
             try {
                 const q = new URLSearchParams(location.search);
@@ -612,7 +657,10 @@
                 if (!res.ok) {
                     const alt = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
                     const tryAlt = await fetch(alt);
-                    if (tryAlt.ok) { res = tryAlt; apiUrl = alt; }
+                    if (tryAlt.ok) {
+                        res = tryAlt;
+                        apiUrl = alt;
+                    }
                 }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -624,64 +672,87 @@
                 // images: 다양한 포맷 허용
                 const rawImagesCand = json.images ?? store.images ?? json.data?.images ?? [];
                 const rawImages = Array.isArray(rawImagesCand)
-                    ? rawImagesCand.map(i => {
-                        if (!i && i !== 0) return "";
-                        if (typeof i === "string") return i;
-                        if (typeof i === "object") return i.url || i.image_url || i.path || i.filename || i.src || "";
-                        return "";
-                    }).filter(Boolean)
+                    ? rawImagesCand
+                        .map((i) => {
+                            if (!i && i !== 0) return "";
+                            if (typeof i === "string") return i;
+                            if (typeof i === "object")
+                                return i.url || i.image_url || i.path || i.filename || i.src || "";
+                            return "";
+                        })
+                        .filter(Boolean)
                     : [];
                 const imagesFixed = rawImages.map(normalizeSrc).filter(Boolean);
                 slider.init(imagesFixed);
 
-                // (DEBUG는 아래에서 menus/events 정의 후 출력하도록 이동)
-                
                 // menus: 항상 정의 (다양한 스키마 허용)
-                const rawMenusCandidate = json.menus ?? json.storeMenus ?? json.menuList ?? json.menu ?? json.data?.menus ?? [];
+                const rawMenusCandidate =
+                    json.menus ?? json.storeMenus ?? json.menuList ?? json.menu ?? json.data?.menus ?? [];
                 let rawList = [];
                 if (Array.isArray(rawMenusCandidate)) rawList = rawMenusCandidate;
                 else if (rawMenusCandidate && typeof rawMenusCandidate === "object") {
-                    rawList = Object.values(rawMenusCandidate).flatMap(v => Array.isArray(v) ? v : (Array.isArray(v?.items) ? v.items : []));
+                    rawList = Object.values(rawMenusCandidate).flatMap((v) =>
+                        Array.isArray(v) ? v : Array.isArray(v?.items) ? v.items : []
+                    );
                 }
-                const toNumber = v => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
-                const menus = rawList.map(m => ({
+                const toNumber = (v) => Number(String(v ?? 0).replace(/[^\d.-]/g, "")) || 0;
+                const menus = rawList.map((m) => ({
                     category: m?.category ?? m?.category_name ?? m?.cat ?? "기타",
                     name: m?.name ?? m?.menu_name ?? m?.title ?? "",
                     price: toNumber(m?.price ?? m?.menu_price ?? m?.cost),
                     image_url: m?.image_url ?? m?.imageUrl ?? m?.image ?? "",
-                    description: m?.description ?? m?.desc ?? ""
+                    description: m?.description ?? m?.desc ?? "",
                 }));
 
                 // 기본 정보 렌더
                 $("businessNameHeader").textContent = store.business_name ?? store.name ?? "상호명 없음";
                 $("businessType").textContent = onlyValue(store.business_type);
-                $("businessCategory").textContent = onlyValue(store.business_category ?? store.category);
+                $("businessCategory").textContent = onlyValue(
+                    store.business_category ?? store.category
+                );
                 $("deliveryOption").textContent = onlyValue(store.delivery_option);
                 $("businessHours").textContent = onlyValue(store.business_hours);
 
-                $("serviceDetails").innerHTML = store.service_details ? nl2br(store.service_details) : "-";
-                $("additionalDesc").innerHTML = store.additional_desc ? nl2br(store.additional_desc) : "-";
+                $("serviceDetails").innerHTML = store.service_details
+                    ? nl2br(store.service_details)
+                    : "-";
+                $("additionalDesc").innerHTML = store.additional_desc
+                    ? nl2br(store.additional_desc)
+                    : "-";
 
-                // events: 방어적(간단·안전) 파싱 — 오류를 절대 던지지 않음
-                const rawEvents = json.events ?? store.events ?? json.eventList ?? json.eventsList ?? json.data?.events ?? [];
+                // events: 방어적 파싱
+                const rawEvents =
+                    json.events ??
+                    store.events ??
+                    json.eventList ??
+                    json.eventsList ??
+                    json.data?.events ??
+                    [];
                 const eventsArr = [];
                 if (Array.isArray(rawEvents)) {
                     for (const ev of rawEvents) {
                         if (ev === null || ev === undefined) continue;
                         if (typeof ev === "string") eventsArr.push(ev);
-                        else if (typeof ev === "object") eventsArr.push(ev.content ?? ev.text ?? ev.body ?? ev.name ?? "");
+                        else if (typeof ev === "object")
+                            eventsArr.push(ev.content ?? ev.text ?? ev.body ?? ev.name ?? "");
                         else eventsArr.push(String(ev));
                     }
                 }
                 const events = eventsArr.filter(Boolean).map(escapeHtml);
-                $("eventsList").innerHTML = events.length ? events.map(e => `<li>${e}</li>`).join("") : `<li>-</li>`;
+                $("eventsList").innerHTML = events.length
+                    ? events.map((e) => `<li>${e}</li>`).join("")
+                    : `<li>-</li>`;
 
-                // DEBUG: API 파싱 결과 확인 (안전한 위치)
                 console.log("[DEBUG] images:", imagesFixed, "menus:", menus, "events:", events);
-                
+
                 $("infoEtcList").innerHTML = `
       <li>장애인 편의시설: ${escapeHtml(store.facilities ?? "-")}</li>
-      <li>반려동물 출입: ${store.pets_allowed === true ? "가능" : store.pets_allowed === false ? "불가" : "-"}</li>
+      <li>반려동물 출입: ${store.pets_allowed === true
+                        ? "가능"
+                        : store.pets_allowed === false
+                            ? "불가"
+                            : "-"
+                    }</li>
       <li>주차 정보: ${escapeHtml(store.parking ?? "-")}</li>
     `;
 
@@ -690,24 +761,44 @@
                 const contactLinks = [];
                 if (phoneNum) {
                     const tel = `tel:${phoneNum.replace(/[^0-9]/g, "")}`;
-                    contactLinks.push(`<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(phoneNum)}</a>`);
+                    contactLinks.push(
+                        `<a href="${tel}" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(
+                            phoneNum
+                        )}</a>`
+                    );
                 }
-                const linkOrNull = (url, label) => url ? `<a href="${/^https?:\/\//i.test(url) ? url : "http://" + url}" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(label ?? url)}</a>` : null;
-                [ [store.homepage, "홈페이지"], [store.instagram, "인스타그램"], [store.facebook, "페이스북"] ].forEach(([u, l]) => { const h = linkOrNull(u, l); if (h) contactLinks.push(h); });
+                const linkOrNull = (url, label) =>
+                    url
+                        ? `<a href="${/^https?:\/\//i.test(url) ? url : "http://" + url
+                        }" target="_blank" rel="noopener" class="block w-full text-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">${escapeHtml(
+                            label ?? url
+                        )}</a>`
+                        : null;
+                [
+                    [store.homepage, "홈페이지"],
+                    [store.instagram, "인스타그램"],
+                    [store.facebook, "페이스북"],
+                ].forEach(([u, l]) => {
+                    const h = linkOrNull(u, l);
+                    if (h) contactLinks.push(h);
+                });
                 const grid = $("contactGrid");
-                if (!contactLinks.length) grid.innerHTML = `<div class="col-span-2 text-gray-500 text-center">-</div>`;
-                else if (contactLinks.length === 1) grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
-                else grid.innerHTML = contactLinks.map(x => `<div>${x}</div>`).join("");
-
+                if (!contactLinks.length)
+                    grid.innerHTML =
+                        `<div class="col-span-2 text-gray-500 text-center">-</div>`;
+                else if (contactLinks.length === 1)
+                    grid.innerHTML = `<div class="col-span-2">${contactLinks[0]}</div>`;
+                else grid.innerHTML = contactLinks.map((x) => `<div>${x}</div>`).join("");
 
                 // 메뉴 렌더
                 const menuList = $("menuList");
                 menuList.innerHTML = "";
                 if (!menus.length) {
-                    menuList.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
+                    menuList.innerHTML =
+                        `<div class="text-center text-gray-500 py-4">메뉴가 없습니다.</div>`;
                 } else {
                     const byCat = new Map();
-                    menus.forEach(it => {
+                    menus.forEach((it) => {
                         const cat = (it.category || "").toString().trim() || "기타";
                         if (!byCat.has(cat)) byCat.set(cat, []);
                         byCat.get(cat).push(it);
@@ -718,19 +809,29 @@
                         title.textContent = "🍱 " + cat;
                         title.className = "text-xl font-bold mt-6 mb-2 text-gray-800";
                         group.appendChild(title);
-                        groupItems.forEach(it => {
+                        groupItems.forEach((it) => {
                             const box = document.createElement("div");
-                            box.className = "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
+                            box.className =
+                                "flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border";
                             const imgSrc = normalizeSrc(it.image_url || "");
                             box.innerHTML = `
           <img src="${imgSrc}" class="w-24 h-24 object-cover rounded-md" />
           <div class="flex-1 min-w-0">
-            <div class="text-lg font-bold mb-1 truncate">${escapeHtml(it.name || "-")}</div>
-            <div class="text-base font-medium text-gray-700">${Number(it.price || 0).toLocaleString()}원</div>
-            ${it.description ? `<div class="text-sm text-gray-500 mt-1">${escapeHtml(it.description)}</div>` : ""}
+            <div class="text-lg font-bold mb-1 truncate">${escapeHtml(
+                                it.name || "-"
+                            )}</div>
+            <div class="text-base font-medium text-gray-700">${Number(
+                                it.price || 0
+                            ).toLocaleString()}원</div>
+            ${it.description
+                                    ? `<div class="text-sm text-gray-500 mt-1">${escapeHtml(
+                                        it.description
+                                    )}</div>`
+                                    : ""
+                                }
           </div>
           <div class="flex flex-col items-center gap-1 shrink-0">
-            <div class="flex items-center gap-1">
+            <div class="flex items_center gap-1">
               <button class="decrease px-2 py-1 bg-gray-200 rounded">－</button>
               <span class="quantity w-6 text-center">1</span>
               <button class="increase px-2 py-1 bg-gray-200 rounded">＋</button>
@@ -739,9 +840,18 @@
           </div>`;
                             let qty = 1;
                             const qtySpan = box.querySelector(".quantity");
-                            box.querySelector(".decrease").onclick = () => { if (qty > 1) qtySpan.textContent = --qty; };
-                            box.querySelector(".increase").onclick = () => { qtySpan.textContent = ++qty; };
-                            box.querySelector(".addBtn").onclick = () => addToCart({ name: it.name, price: it.price, quantity: qty });
+                            box.querySelector(".decrease").onclick = () => {
+                                if (qty > 1) qtySpan.textContent = --qty;
+                            };
+                            box.querySelector(".increase").onclick = () => {
+                                qtySpan.textContent = ++qty;
+                            };
+                            box.querySelector(".addBtn").onclick = () =>
+                                addToCart({
+                                    name: it.name,
+                                    price: it.price,
+                                    quantity: qty,
+                                });
                             group.appendChild(box);
                         });
                         menuList.appendChild(group);
@@ -749,23 +859,27 @@
                 }
 
                 // 지도, 예약, 레이아웃
-                initMap(store.address ?? "", store.business_name ?? store.name ?? "").catch(() => {});
-                $("reserveBtn")?.addEventListener("click", () => alert("예약 신청 기능은 곧 제공됩니다!"));
+                initMap(
+                    store.address ?? "",
+                    store.business_name ?? store.name ?? ""
+                ).catch(() => { });
+                $("reserveBtn")?.addEventListener("click", () =>
+                    alert("예약 신청 기능은 곧 제공됩니다!")
+                );
                 syncRightColHeight();
                 setTimeout(syncRightColHeight, 300);
-
             } catch (err) {
                 console.error("상세 로딩 실패:", err);
-                $("businessNameHeader").textContent = "상세 정보를 불러오지 못했습니다.";
+                $("businessNameHeader").textContent =
+                    "상세 정보를 불러오지 못했습니다.";
             }
         })();
 
         const params = new URLSearchParams(window.location.search);
         const storeId = params.get("id");
-
         console.log("가져온 storeId:", storeId);
-
     </script>
+
     <script>
         function goBack() {
             if (document.referrer && document.referrer !== location.href) {
