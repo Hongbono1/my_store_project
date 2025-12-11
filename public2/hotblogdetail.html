@@ -16,7 +16,10 @@
   <div class="max-w-2xl mx-auto p-4 bg-white shadow rounded mt-8">
     <!-- 제목 / 날짜 -->
     <h1 id="title" class="text-2xl font-bold mb-2 text-center"></h1>
-    <p id="meta" class="text-gray-500 text-sm text-center mb-6"></p>
+    <p id="meta" class="text-gray-500 text-sm text-center mb-3"></p>
+
+    <!-- ✅ 제목 아래 카테고리 선택 영역 -->
+    <div id="categoryArea" class="flex flex-wrap justify-center gap-2 mb-6"></div>
 
     <!-- 대표 이미지 -->
     <div id="coverWrap" class="mb-8">
@@ -79,7 +82,7 @@
     }
 
     loadHeaderFooter();
-    
+
     const $ = (sel) => document.querySelector(sel);
 
     function escapeHtml(s) {
@@ -137,6 +140,39 @@
       }).join("");
     }
 
+    // ✅ 제목 아래 카테고리 버튼 렌더링
+    function renderCategoryPills(activeCategory) {
+      const container = $("#categoryArea");
+      if (!container) return;
+
+      const categories = [
+        { key: "food", label: "맛집" },
+        { key: "beauty", label: "뷰티" },
+        { key: "life", label: "생활" },
+        { key: "event", label: "이벤트" },
+      ];
+
+      container.innerHTML = categories.map(cat => `
+        <button
+          class="px-3 py-1 rounded-full border text-xs sm:text-sm
+                 ${cat.key === activeCategory
+          ? 'bg-gray-900 text-white border-gray-900'
+          : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'}"
+          data-cat="${cat.key}">
+          # ${cat.label}
+        </button>
+      `).join("");
+
+      container.querySelectorAll("button[data-cat]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const cat = btn.dataset.cat;
+          if (!cat) return;
+          // ✅ 해당 분류 목록으로 이동
+          location.href = `/hotsubcategory.html?category=${encodeURIComponent(cat)}`;
+        });
+      });
+    }
+
     async function loadBlog() {
       const params = new URLSearchParams(location.search);
       const id = params.get("id");
@@ -147,37 +183,42 @@
         const q = new URLSearchParams(location.search);
         const storeId = q.get('store_id') ?? q.get('id');
         if (!storeId) {
-            console.error("store id missing for hotblog fetch");
+          console.error("store id missing for hotblog fetch");
         } else {
-            const res = await fetch(`/api/hotblog/${encodeURIComponent(storeId)}`);
-            const data = await res.json();
-            if (!data.success) { renderEmptyQa(); return; }
+          const res = await fetch(`/api/hotblog/${encodeURIComponent(storeId)}`);
+          const data = await res.json();
+          if (!data.success) { renderEmptyQa(); return; }
 
-            const blog = data.blog;
+          const blog = data.blog;
 
-            // 제목 / 날짜
-            $("#title").textContent = blog.title || "";
-            $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
+          // 제목 / 날짜
+          $("#title").textContent = blog.title || "";
+          $("#meta").textContent = blog.created_at ? new Date(blog.created_at).toLocaleString("ko-KR") : "";
 
-            // 대표 이미지
-            if (blog.cover_image) {
-              $("#coverImage").src = blog.cover_image;
-              $("#coverImage").alt = escapeHtml(blog.title || "cover");
-            } else {
-              $("#coverWrap").style.display = "none";
-            }
+          // ✅ 제목 아래 카테고리 버튼 렌더링
+          renderCategoryPills(blog.category || "");
 
-            // 가게 기본 정보
-            const info = [];
-            if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
-            if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
-            if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
-            $("#info").innerHTML = info.join("") || "";
+          // 대표 이미지
+          if (blog.cover_image) {
+            $("#coverImage").src = blog.cover_image;
+            $("#coverImage").alt = escapeHtml(blog.title || "cover");
+          } else {
+            $("#coverWrap").style.display = "none";
+          }
 
-            // 질문/답변
-            const qaList = Array.isArray(blog.qa) ? blog.qa : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
-            if (!qaList.length) { renderEmptyQa(); return; }
-            renderQa(qaList);
+          // 가게 기본 정보
+          const info = [];
+          if (blog.store_name) info.push(`<div class="text-lg font-semibold">${escapeHtml(blog.store_name)}</div>`);
+          if (blog.phone) info.push(`<div class="text-gray-600">☎ <a href="tel:${escapeHtml(blog.phone)}" class="hover:underline">${escapeHtml(blog.phone)}</a></div>`);
+          if (blog.url) info.push(`<div><a href="${escapeHtml(blog.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">홈페이지 바로가기</a></div>`);
+          $("#info").innerHTML = info.join("") || "";
+
+          // 질문/답변
+          const qaList = Array.isArray(blog.qa)
+            ? blog.qa
+            : (typeof blog.qa === "string" ? JSON.parse(blog.qa || "[]") : []);
+          if (!qaList.length) { renderEmptyQa(); return; }
+          renderQa(qaList);
         }
 
       } catch (err) {
@@ -187,12 +228,11 @@
     }
 
     // ✅ 전역에서 실행될 ID/버튼 함수
-    // 현재 ID 가져오기
     const params = new URLSearchParams(location.search);
-    const currentId = parseInt(params.get("id") || "1");
+    const currentId = parseInt(params.get("id") || "1", 10);
 
-    // 이전 페이지 이동
-    function goPrev() {
+    // 이전 페이지 이동 (HTML에서 쓰는 이름과 맞춰줌)
+    function goBack() {
       if (currentId > 1) {
         location.href = `hotblogdetail.html?id=${currentId - 1}`;
       } else {
@@ -206,8 +246,6 @@
     }
 
     loadBlog();
-
-
   </script>
 </body>
 
