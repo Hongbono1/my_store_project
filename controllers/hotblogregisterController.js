@@ -52,7 +52,9 @@ export async function registerHotBlog(req, res) {
         // 파일 맵 (필드명 → 업로드 URL)
         const filesByField = {};
         (req.files || []).forEach(f => {
-            filesByField[f.fieldname] = `/uploads/${f.filename}`;
+            // 🔹 라우터에서 /data/uploads/hotblog 에 저장하므로
+            //     URL 은 /uploads/hotblog/파일명 형태로 고정
+            filesByField[f.fieldname] = `/uploads/hotblog/${f.filename}`;
         });
 
         const coverImage = filesByField["coverImage"] || null;
