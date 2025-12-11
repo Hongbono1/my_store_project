@@ -426,42 +426,105 @@
                     `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`,
                     { cache: "no-store" }
                 );
-                if (!res.ok) return;
+                if (!res.ok) {
+                    console.warn(`[${position}] API 응답 실패: ${res.status}`);
+                    return;
+                }
 
                 const json = await res.json();
-                const ok = !!(json.ok || json.success);
-                const slot = json.slot || null;
+                console.log(`[${position}] 서버 응답:`, json);
 
-                // 다양한 키 이름 대응
-                const rawImg =
-                    slot?.image_url || slot?.image || slot?.img_url || slot?.banner_url || slot?.image_path || "";
-                const link = slot?.link_url || slot?.link || slot?.href || "";
+                const slot = json.slot || json.data || null;
+                if (!slot) {
+                    console.warn(`[${position}] slot 데이터 없음`);
+                    return;
+                }
 
-                if (!ok || !rawImg || !img) return;
+                // ✅ 다양한 키 패턴 대응
+                const rawImg = 
+                    slot.image_url || 
+                    slot.imageUrl || 
+                    slot.image || 
+                    slot.banner_url || 
+                    slot.img_url || 
+                    slot.image_path || 
+                    "";
 
-                const finalSrc = withBust(toAbs(rawImg)); // 캐시 무효화
+                const link = 
+                    slot.link_url || 
+                    slot.linkUrl || 
+                    slot.link || 
+                    slot.href || 
+                    "";
 
+                if (!rawImg || !img) {
+                    console.warn(`[${position}] 이미지 URL 없음: ${rawImg}`);
+                    return;
+                }
+
+                // ✅ 순서 수정: 절대경로 변환 → 캐시 무효화
+                const absUrl = toAbs(rawImg);
+                const finalSrc = withBust(absUrl);
+
+                console.log(`[${position}] 이미지 로드 시도: ${finalSrc}`);
+
+                // ✅ 이벤트 핸들러를 src 설정 **전에** 등록
                 img.onload = () => {
+                    console.log(`[${position}] 이미지 로드 성공`);
                     img.classList.remove("hidden");
                     if (def) def.classList.add("hidden");
                 };
-                img.onerror = () => {
+
+                img.onerror = (e) => {
+                    console.error(`[${position}] 이미지 로드 실패:`, finalSrc, e);
                     img.classList.add("hidden");
                     if (def) def.classList.remove("hidden");
                 };
 
+                // ✅ 마지막에 src 설정
                 img.src = finalSrc;
 
-                container.style.cursor = link ? "pointer" : "default";
-                container.onclick = link
-                    ? (e) => {
+                // 링크 설정
+                if (link) {
+                    container.style.cursor = "pointer";
+                    container.onclick = (e) => {
                         e.preventDefault();
-                        location.href = link;
-                    }
-                    : null;
+                        window.location.href = link;
+                    };
+                } else {
+                    container.style.cursor = "default";
+                    container.onclick = null;
+                }
+
             } catch (e) {
-                console.error(`[index] slot load fail: ${position}`, e);
+                console.error(`[${position}] 슬롯 로드 오류:`, e);
             }
+        }
+
+        // ✅ Best Pick용 정규화 함수 개선
+        function normalizeImageUrl(originalUrl) {
+            const fallbackUrl = "/assets/no-image.png";
+
+            if (!originalUrl || typeof originalUrl !== "string") {
+                return fallbackUrl;
+            }
+
+            const trimmed = originalUrl.trim();
+            if (!trimmed) {
+                return fallbackUrl;
+            }
+
+            // 이미 절대 URL인 경우
+            if (/^https?:\/\//i.test(trimmed)) {
+                return trimmed;
+            }
+
+            // 상대 경로 변환
+            if (trimmed.startsWith("/")) {
+                return trimmed; // 서버가 정적 파일 제공 중이면 그대로 사용
+            }
+
+            return `/${trimmed}`;
         }
 
         async function loadTextSlot(slotId, page, position, defaultRender) {
