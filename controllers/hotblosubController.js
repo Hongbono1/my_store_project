@@ -2,31 +2,34 @@
 import pool from "../db.js";
 
 /**
- * 🔥 핫 서브카테고리 목록 가져오기
- * - hotsubcategory 테이블 기준
- * - id, title, category, store_name 만 사용
+ * 🔥 핫 서브카테고리 카드 목록
+ * - 기준 테이블: hotsubcategory
+ * - hotblogs 와 조인해서 cover_image 끌어옴
  */
 export async function getHotSubList(req, res) {
   try {
-    // 추후 category 필터 쓰고 싶으면 ?category=한식 이런 식으로 쿼리 파라미터 사용 가능
     const { category } = req.query;
     const params = [];
     let where = "";
 
+    // 나중에 ?category=한식 이런 식으로 필터 쓰고 싶을 때 대비
     if (category) {
-      where = "WHERE category = $1";
+      where = "WHERE hs.category = $1";
       params.push(category);
     }
 
     const query = `
       SELECT
-        id,
-        title,
-        category,
-        store_name
-      FROM hotsubcategory
+        hs.id,                         -- 핫블로그 id (디테일 이동용)
+        hs.title,                      -- 카드 제목(안 써도 됨)
+        hs.category,                   -- 업종 (한식 등)
+        hs.store_name,                 -- 상호명 (하늘식당 등)
+        COALESCE(hb.cover_image, '') AS cover_image
+      FROM hotsubcategory AS hs
+      LEFT JOIN hotblogs AS hb
+        ON hb.id = hs.id
       ${where}
-      ORDER BY id DESC
+      ORDER BY hs.id DESC;
     `;
 
     const { rows } = await pool.query(query, params);
