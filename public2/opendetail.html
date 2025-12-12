@@ -74,12 +74,44 @@
                 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
         }
 
-        /* ✅ 소개글이 HTML로 와도 보기 좋게 */
-        #desc p { margin: 0.75em 0; }
-        #desc ul, #desc ol { margin: 0.75em 0; padding-left: 1.25em; }
-        #desc li { margin: 0.25em 0; }
-        #desc img { max-width: 100%; height: auto; border-radius: 0.75rem; margin: 0.75em 0; }
-        #desc a { text-decoration: underline; text-underline-offset: 2px; }
+        /* ✅ 소개 미리보기 줄 제한(기본 박스 형태 유지) */
+        .desc-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 6;
+            overflow: hidden;
+        }
+
+        /* ✅ 모달 애니메이션(살짝 부드럽게) */
+        .modal-fade-in {
+            animation: fadeIn 0.16s ease-out forwards;
+        }
+
+        .modal-pop-in {
+            animation: popIn 0.18s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
     </style>
 </head>
 
@@ -204,13 +236,20 @@
 
             <!-- 4️⃣ 가게 소개 카드 -->
             <article class="neo-card p-4 sm:p-5 flex flex-col min-h-[260px]">
-                <header class="mb-3">
+                <header class="mb-3 flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2 text-sm font-semibold text-slate-600">
                         <span class="text-lg">📝</span>
                         <span>가게 소개</span>
                     </div>
+
+                    <!-- ✅ 더보기 버튼(필요할 때만 노출) -->
+                    <button id="descMoreBtn" type="button"
+                        class="hidden btn-3d px-4 py-2 text-[12px] sm:text-sm font-extrabold text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400 hover:from-indigo-600 hover:via-purple-600 hover:to-orange-500">
+                        더보기 ✨
+                    </button>
                 </header>
 
+                <!-- ✅ 미리보기 영역(길면 줄 제한) -->
                 <div id="desc"
                     class="flex-1 text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words">
                     등록된 설명이 없습니다.
@@ -246,6 +285,62 @@
     <!-- 공통 푸터 -->
     <div id="footer"></div>
 
+    <!-- ✅ 소개 모달 (예쁜 레이아웃 + 스크롤) -->
+    <div id="descModal" class="fixed inset-0 z-[999] hidden">
+        <!-- overlay -->
+        <div id="descModalOverlay" class="absolute inset-0 bg-slate-900/45 backdrop-blur-sm modal-fade-in"></div>
+
+        <!-- panel -->
+        <div class="relative w-full h-full flex items-center justify-center p-4 sm:p-6">
+            <div class="w-full max-w-3xl rounded-3xl border border-white/60 shadow-2xl modal-pop-in"
+                style="background: rgba(255,255,255,0.88); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);">
+                <!-- top glow header -->
+                <div class="px-5 sm:px-7 pt-5 sm:pt-6 pb-4 border-b border-slate-200/60 rounded-t-3xl"
+                    style="background: radial-gradient(circle at top left, rgba(99,102,241,0.18), rgba(168,85,247,0.12) 35%, rgba(251,146,60,0.10) 70%, rgba(255,255,255,0.0));">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-wider text-indigo-500">OPEN SOON</p>
+                            <h3 class="mt-1 text-xl sm:text-2xl font-extrabold title-grad flex items-center gap-2">
+                                <span class="text-2xl">📝</span>
+                                <span>가게 소개</span>
+                            </h3>
+                            <p class="mt-1 text-sm text-slate-500">
+                                <span id="modalStoreName" class="font-semibold text-slate-700">-</span>
+                                <span class="mx-1 text-slate-300">•</span>
+                                <span>전체 내용</span>
+                            </p>
+                        </div>
+
+                        <button id="descModalCloseBtn" type="button"
+                            class="btn-3d w-10 h-10 flex items-center justify-center bg-white/90 border border-slate-200 hover:bg-slate-50 text-slate-700">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- content -->
+                <div class="px-5 sm:px-7 py-5">
+                    <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 sm:p-5">
+                        <!-- ✅ 여기에서 길면 스크롤 -->
+                        <div id="modalDesc"
+                            class="text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words overflow-y-auto"
+                            style="max-height: 60vh;">
+                            -
+                        </div>
+                    </div>
+                </div>
+
+                <!-- footer -->
+                <div class="px-5 sm:px-7 pb-5 sm:pb-6 flex items-center justify-end gap-2">
+                    <button id="descModalOkBtn" type="button"
+                        class="btn-3d px-5 py-2.5 text-sm font-extrabold text-white bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600">
+                        닫기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ✅ 헤더/푸터 공통 로딩
         fetch('/components/header.html')
@@ -279,115 +374,19 @@
             return m.get(name);
         }
 
-        // ✅ 이미지 후보 경로 생성 + 순차 시도
-        function unique(arr) {
-            const out = [];
-            const seen = new Set();
-            for (const v of arr) {
-                const key = (v || '').trim();
-                if (!key) continue;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    out.push(key);
-                }
-            }
-            return out;
-        }
-
-        function buildImageCandidates(raw) {
-            const fallback1 = '/uploads/no-thumb.png';
-            const fallback2 = 'https://placehold.co/800x400?text=No+Image';
-
-            if (!raw || typeof raw !== 'string') return [fallback1, fallback2];
-
-            const v = raw.trim();
-            const base = v.split('/').pop();
-
-            const candidates = [];
-
-            // 그대로 / 절대경로 / http
-            if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:')) {
-                candidates.push(v);
-            } else if (v.startsWith('/')) {
-                candidates.push(v);
-            } else {
-                // "uploads/xxx.jpg" 같은 경우
-                candidates.push('/' + v);
-            }
-
-            // 파일명만 오는 케이스 대비
-            if (base) {
-                candidates.push('/uploads/' + base);
-                candidates.push('/uploads/open/' + base);
-            }
-
-            candidates.push(fallback1, fallback2);
-            return unique(candidates);
-        }
-
-        function setImageWithFallback(imgEl, rawPath) {
-            const list = buildImageCandidates(rawPath);
-            let i = 0;
-            imgEl.src = list[i];
-
-            imgEl.onerror = () => {
-                i += 1;
-                if (i < list.length) {
-                    imgEl.src = list[i];
-                } else {
-                    imgEl.onerror = null;
-                }
-            };
-        }
-
-        // ✅ 소개글 HTML 최소 안전 정리 (script 제거 + on* 제거)
-        function sanitizeHtml(dirtyHtml) {
-            try {
-                const doc = new DOMParser().parseFromString(String(dirtyHtml || ''), 'text/html');
-
-                doc.querySelectorAll('script, iframe, object, embed').forEach(n => n.remove());
-
-                doc.querySelectorAll('*').forEach(el => {
-                    [...el.attributes].forEach(attr => {
-                        const name = (attr.name || '').toLowerCase();
-                        const val = (attr.value || '').trim().toLowerCase();
-                        if (name.startsWith('on')) el.removeAttribute(attr.name);
-                        if ((name === 'href' || name === 'src') && val.startsWith('javascript:')) {
-                            el.removeAttribute(attr.name);
-                        }
-                    });
-                });
-
-                return doc.body.innerHTML || '';
-            } catch {
-                return '';
-            }
-        }
-
-        function hasMeaningfulHtml(html) {
-            try {
-                const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
-                const text = (doc.body.textContent || '').replace(/\u200B/g, '').trim();
-                const hasImg = !!doc.body.querySelector('img');
-                return text.length > 0 || hasImg;
-            } catch {
-                return false;
-            }
-        }
-
         // Kakao 지도
         let map, marker, geocoder;
         function initMap(centerLatLng) {
             const container = document.getElementById('map');
-            if (!container) return;
-
             map = new kakao.maps.Map(container, { center: centerLatLng, level: 3 });
             marker = new kakao.maps.Marker({ map, position: centerLatLng });
             geocoder = new kakao.maps.services.Geocoder();
         }
 
         function updateMapByAddress(address, storeName) {
-            if (!geocoder) geocoder = new kakao.maps.services.Geocoder();
+            if (!geocoder) {
+                geocoder = new kakao.maps.services.Geocoder();
+            }
 
             const normalizedAddress = address.trim()
                 .replace(/경기\s+의정부시/, '의정부시')
@@ -447,6 +446,65 @@
             tryGeocoding(0);
         }
 
+        // ✅ 소개 모달
+        function openDescModal() {
+            const modal = document.getElementById('descModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDescModal() {
+            const modal = document.getElementById('descModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            document.documentElement.style.overflow = '';
+            document.body.style.overflow = '';
+        }
+
+        function setDescPreviewAndModal(descPlain, storeName) {
+            const descEl = document.getElementById('desc');
+            const moreBtn = document.getElementById('descMoreBtn');
+            const modalDesc = document.getElementById('modalDesc');
+            const modalStoreName = document.getElementById('modalStoreName');
+
+            const text = (descPlain || '').trim();
+
+            if (!text) {
+                if (descEl) {
+                    descEl.classList.remove('desc-clamp');
+                    descEl.textContent = '등록된 설명이 없습니다.';
+                }
+                if (moreBtn) moreBtn.classList.add('hidden');
+                if (modalDesc) modalDesc.textContent = '등록된 설명이 없습니다.';
+                if (modalStoreName) modalStoreName.textContent = storeName || '-';
+                return;
+            }
+
+            // ✅ 미리보기는 줄 제한 + 더보기 버튼 노출(길이 기준)
+            const isLong = text.length >= 180 || text.split('\n').length >= 8;
+
+            if (descEl) {
+                descEl.textContent = text;
+                if (isLong) descEl.classList.add('desc-clamp');
+                else descEl.classList.remove('desc-clamp');
+            }
+
+            if (moreBtn) {
+                if (isLong) moreBtn.classList.remove('hidden');
+                else moreBtn.classList.add('hidden');
+            }
+
+            if (modalDesc) modalDesc.textContent = text;
+            if (modalStoreName) modalStoreName.textContent = storeName || '-';
+
+            // 버튼 이벤트
+            if (moreBtn) {
+                moreBtn.onclick = () => openDescModal();
+            }
+        }
+
         async function main() {
             const id = qs('id');
             const idFromPath = (location.pathname.match(/\/open\/(\d+)/) || [])[1];
@@ -462,9 +520,6 @@
             const data = await safeFetch(detailApi);
             const row = data.data || data;
 
-            console.log('✅ open detail row keys:', Object.keys(row || {}));
-            console.log('✅ open detail row:', row);
-
             // DOM 요소
             const heroName = document.getElementById('heroName');
             const nameEl = document.getElementById('storeName');
@@ -474,7 +529,6 @@
             const phoneLink = document.getElementById('phoneLink');
             const addrEl = document.getElementById('addressText');
             const imgEl = document.getElementById('storeImage');
-            const descEl = document.getElementById('desc');
 
             const storeName = row.store_name || '상호명 미정';
             const cat = row.category || '-';
@@ -483,11 +537,11 @@
             nameEl.textContent = storeName;
             catEl.textContent = cat;
 
-            // 날짜 (✅ 날짜 하루 밀림 방지)
+            // 날짜
             let openText = row.open_date || '-';
             try {
                 if (row.open_date) {
-                    const d = new Date(String(row.open_date).slice(0, 10) + 'T00:00:00');
+                    const d = new Date(row.open_date);
                     openText = d.toLocaleDateString('ko-KR');
                 }
             } catch { }
@@ -502,39 +556,28 @@
                 phoneLink.href = '#';
             }
 
-            // 주소 (✅ detail_address도 있으면 합치기)
-            const baseAddr = (row.address || '').trim();
-            const detailAddr = (row.detail_address || '').trim();
-            const fullAddr = (baseAddr + (detailAddr ? ` ${detailAddr}` : '')).trim();
+            // 주소
+            const fullAddr = (row.address || '').trim();
             addrEl.textContent = fullAddr || '-';
 
-            // ✅ 이미지 (필드명 호환 + 경로 후보 시도)
-            const rawImg =
-                row.image_path ||
-                row.img_path ||
-                row.image_url ||
-                row.img_url ||
-                row.img ||
-                row.image ||
-                '';
-            setImageWithFallback(imgEl, rawImg);
+            // 이미지
+            const imgSrc = row.image_path || '/uploads/no-thumb.png';
+            imgEl.src = imgSrc;
 
-            // ✅ 소개글 (필드명 호환 + HTML 유지)
-            const rawDesc =
-                (row.desc_html ?? row.descHtml ?? row.description ?? row.desc ?? row.desc_html ?? '') ?? '';
-
-            if (rawDesc && hasMeaningfulHtml(rawDesc)) {
-                descEl.innerHTML = sanitizeHtml(rawDesc);
-            } else {
-                // 혹시 HTML이 아니라 그냥 텍스트로 저장된 케이스도 커버
-                const plain = String(rawDesc || '').replace(/\u200B/g, '').trim();
-                descEl.textContent = plain || '등록된 설명이 없습니다.';
+            // 설명: HTML 제거 후 텍스트만 → 미리보기 + 모달 공통 적용
+            const rawDesc = (row.description || '').trim();
+            let plainDesc = '';
+            if (rawDesc) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = rawDesc;
+                plainDesc = (tmp.textContent || tmp.innerText || '').trim();
             }
+            setDescPreviewAndModal(plainDesc, storeName);
 
             // 지도
             kakao.maps.load(function () {
                 let defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
-                const lower = (fullAddr || '').toLowerCase();
+                const lower = fullAddr.toLowerCase();
                 if (lower.includes('의정부')) {
                     defaultCenter = new kakao.maps.LatLng(37.7381, 127.0342);
                 } else if (lower.includes('경기')) {
@@ -545,9 +588,6 @@
 
                 if (fullAddr && fullAddr !== '-') {
                     updateMapByAddress(fullAddr, storeName);
-                } else {
-                    const dir = document.getElementById('kakaoDirBtn');
-                    if (dir) dir.href = 'https://map.kakao.com/';
                 }
             });
         }
@@ -565,6 +605,25 @@
         // ✅ suggest.html과 동일한 네비게이션 함수
         function goBack() { window.history.back(); }
         function goNext() { window.history.forward(); }
+
+        // ✅ 모달 닫기 이벤트
+        document.addEventListener('DOMContentLoaded', () => {
+            const overlay = document.getElementById('descModalOverlay');
+            const closeBtn = document.getElementById('descModalCloseBtn');
+            const okBtn = document.getElementById('descModalOkBtn');
+
+            if (overlay) overlay.addEventListener('click', closeDescModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeDescModal);
+            if (okBtn) okBtn.addEventListener('click', closeDescModal);
+
+            // ESC 닫기
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('descModal');
+                    if (modal && !modal.classList.contains('hidden')) closeDescModal();
+                }
+            });
+        });
     </script>
 </body>
 
