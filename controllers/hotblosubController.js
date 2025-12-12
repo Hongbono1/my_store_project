@@ -3,40 +3,43 @@ import pool from "../db.js";
 
 /**
  * 🔥 핫 서브카테고리 카드 목록
- * - 기준 테이블: hotsubcategory
- * - hotblogs 와 조인해서 cover_image 끌어옴
+ * - 실제 글이 들어있는 hotblogs 테이블에서 직접 가져온다
+ * - 위: 대표 이미지(cover_image)
+ * - 아래: 상호(store_name) / 업종(category)
  */
 export async function getHotSubList(req, res) {
   try {
-    const { category } = req.query;
-    const params = [];
-    let where = "";
+    console.log("[hotblosub] getHotSubList called");
 
-    // 나중에 ?category=한식 이런 식으로 필터 쓰고 싶을 때 대비
-    if (category) {
-      where = "WHERE hs.category = $1";
-      params.push(category);
-    }
-
+    // 🔹 hotblogdetail 에 쓰는 테이블 이름과 반드시 맞춰줘야 함
+    //   → 거기서 hot_blogs 를 쓰고 있다면, 여기 FROM hotblogs 를 FROM hot_blogs 로 바꿔줘.
     const query = `
       SELECT
-        hs.id,                         -- 핫블로그 id (디테일 이동용)
-        hs.title,                      -- 카드 제목(안 써도 됨)
-        hs.category,                   -- 업종 (한식 등)
-        hs.store_name,                 -- 상호명 (하늘식당 등)
-        COALESCE(hb.cover_image, '') AS cover_image
-      FROM hotsubcategory AS hs
-      LEFT JOIN hotblogs AS hb
-        ON hb.id = hs.id
-      ${where}
-      ORDER BY hs.id DESC;
+        id,
+        title,
+        category,
+        store_name,
+        cover_image
+      FROM hotblogs
+      ORDER BY id DESC
+      LIMIT 120;   -- 최대 10페이지(12개*10) 정도 여유
     `;
 
-    const { rows } = await pool.query(query, params);
+    const { rows } = await pool.query(query);
+    console.log("[hotblosub] rows length:", rows.length);
+
+    // 그대로 내려줘도 되지만, 프론트 구조에 맞춰 한 번 정리해줌
+    const data = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      store_name: row.store_name,
+      cover_image: row.cover_image,
+    }));
 
     return res.json({
       ok: true,
-      data: rows,
+      data,
     });
   } catch (err) {
     console.error("[hotblosub] getHotSubList error:", err);

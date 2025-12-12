@@ -23,7 +23,6 @@ import ncombinedregister from "./routes/ncombinedregister.js";
 import subcategoryRouter from "./routes/subcategory.js";
 import hotblogRouter from "./routes/hotblogregister.js";
 import ownerRouter from "./routes/owner.js";
-import hotsubcategoryRouter from "./routes/hotsubcategoryRouter.js";
 import suggestRouter from "./routes/suggestRouter.js";
 import openregisterRouter from "./routes/openregisterRouter.js";
 import openRouter from "./routes/openRouter.js";
@@ -49,7 +48,6 @@ import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
 
 import managerAdRouter from "./routes/managerAdRouter.js";
-
 
 import pool from "./db.js";
 
@@ -238,7 +236,6 @@ app.post("/verify-biz", async (req, res) => {
   }
 });
 
-
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
 // ------------------------------------------------------------
@@ -249,7 +246,6 @@ app.use("/api/inquiry", inquiryBoardRouter);
 // 5. 주요 API 라우트
 // ------------------------------------------------------------
 app.use("/owner", ownerRouter);
-app.use("/api/hotsubcategory", hotsubcategoryRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
@@ -278,10 +274,11 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
+
+// ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
 
 app.use("/manager/ad", managerAdRouter);
-
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
@@ -311,14 +308,6 @@ app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
 // 8. 헬스체크
 // ------------------------------------------------------------
 app.get("/__ping", (req, res) => res.json({ ok: true }));
-
-// (선택) ENV 체크 라우트 (필요하면 사용)
-// app.get("/__env-check", (req, res) => {
-//   res.json({
-//     BIZ_API_KEY: !!process.env.BIZ_API_KEY,
-//     DATABASE_URL: !!process.env.DATABASE_URL
-//   });
-// });
 
 // ------------------------------------------------------------
 // 9. 에러 핸들러
