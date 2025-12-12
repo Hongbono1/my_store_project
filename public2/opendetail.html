@@ -73,6 +73,13 @@
                 0 6px 14px rgba(15, 23, 42, 0.2),
                 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
         }
+
+        /* ✅ 소개글이 HTML로 와도 보기 좋게 */
+        #desc p { margin: 0.75em 0; }
+        #desc ul, #desc ol { margin: 0.75em 0; padding-left: 1.25em; }
+        #desc li { margin: 0.25em 0; }
+        #desc img { max-width: 100%; height: auto; border-radius: 0.75rem; margin: 0.75em 0; }
+        #desc a { text-decoration: underline; text-underline-offset: 2px; }
     </style>
 </head>
 
@@ -272,19 +279,115 @@
             return m.get(name);
         }
 
+        // ✅ 이미지 후보 경로 생성 + 순차 시도
+        function unique(arr) {
+            const out = [];
+            const seen = new Set();
+            for (const v of arr) {
+                const key = (v || '').trim();
+                if (!key) continue;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    out.push(key);
+                }
+            }
+            return out;
+        }
+
+        function buildImageCandidates(raw) {
+            const fallback1 = '/uploads/no-thumb.png';
+            const fallback2 = 'https://placehold.co/800x400?text=No+Image';
+
+            if (!raw || typeof raw !== 'string') return [fallback1, fallback2];
+
+            const v = raw.trim();
+            const base = v.split('/').pop();
+
+            const candidates = [];
+
+            // 그대로 / 절대경로 / http
+            if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:')) {
+                candidates.push(v);
+            } else if (v.startsWith('/')) {
+                candidates.push(v);
+            } else {
+                // "uploads/xxx.jpg" 같은 경우
+                candidates.push('/' + v);
+            }
+
+            // 파일명만 오는 케이스 대비
+            if (base) {
+                candidates.push('/uploads/' + base);
+                candidates.push('/uploads/open/' + base);
+            }
+
+            candidates.push(fallback1, fallback2);
+            return unique(candidates);
+        }
+
+        function setImageWithFallback(imgEl, rawPath) {
+            const list = buildImageCandidates(rawPath);
+            let i = 0;
+            imgEl.src = list[i];
+
+            imgEl.onerror = () => {
+                i += 1;
+                if (i < list.length) {
+                    imgEl.src = list[i];
+                } else {
+                    imgEl.onerror = null;
+                }
+            };
+        }
+
+        // ✅ 소개글 HTML 최소 안전 정리 (script 제거 + on* 제거)
+        function sanitizeHtml(dirtyHtml) {
+            try {
+                const doc = new DOMParser().parseFromString(String(dirtyHtml || ''), 'text/html');
+
+                doc.querySelectorAll('script, iframe, object, embed').forEach(n => n.remove());
+
+                doc.querySelectorAll('*').forEach(el => {
+                    [...el.attributes].forEach(attr => {
+                        const name = (attr.name || '').toLowerCase();
+                        const val = (attr.value || '').trim().toLowerCase();
+                        if (name.startsWith('on')) el.removeAttribute(attr.name);
+                        if ((name === 'href' || name === 'src') && val.startsWith('javascript:')) {
+                            el.removeAttribute(attr.name);
+                        }
+                    });
+                });
+
+                return doc.body.innerHTML || '';
+            } catch {
+                return '';
+            }
+        }
+
+        function hasMeaningfulHtml(html) {
+            try {
+                const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+                const text = (doc.body.textContent || '').replace(/\u200B/g, '').trim();
+                const hasImg = !!doc.body.querySelector('img');
+                return text.length > 0 || hasImg;
+            } catch {
+                return false;
+            }
+        }
+
         // Kakao 지도
         let map, marker, geocoder;
         function initMap(centerLatLng) {
             const container = document.getElementById('map');
+            if (!container) return;
+
             map = new kakao.maps.Map(container, { center: centerLatLng, level: 3 });
             marker = new kakao.maps.Marker({ map, position: centerLatLng });
             geocoder = new kakao.maps.services.Geocoder();
         }
 
         function updateMapByAddress(address, storeName) {
-            if (!geocoder) {
-                geocoder = new kakao.maps.services.Geocoder();
-            }
+            if (!geocoder) geocoder = new kakao.maps.services.Geocoder();
 
             const normalizedAddress = address.trim()
                 .replace(/경기\s+의정부시/, '의정부시')
@@ -359,6 +462,9 @@
             const data = await safeFetch(detailApi);
             const row = data.data || data;
 
+            console.log('✅ open detail row keys:', Object.keys(row || {}));
+            console.log('✅ open detail row:', row);
+
             // DOM 요소
             const heroName = document.getElementById('heroName');
             const nameEl = document.getElementById('storeName');
@@ -377,11 +483,11 @@
             nameEl.textContent = storeName;
             catEl.textContent = cat;
 
-            // 날짜
+            // 날짜 (✅ 날짜 하루 밀림 방지)
             let openText = row.open_date || '-';
             try {
                 if (row.open_date) {
-                    const d = new Date(row.open_date);
+                    const d = new Date(String(row.open_date).slice(0, 10) + 'T00:00:00');
                     openText = d.toLocaleDateString('ko-KR');
                 }
             } catch { }
@@ -396,29 +502,39 @@
                 phoneLink.href = '#';
             }
 
-            // 주소
-            const fullAddr = (row.address || '').trim();
+            // 주소 (✅ detail_address도 있으면 합치기)
+            const baseAddr = (row.address || '').trim();
+            const detailAddr = (row.detail_address || '').trim();
+            const fullAddr = (baseAddr + (detailAddr ? ` ${detailAddr}` : '')).trim();
             addrEl.textContent = fullAddr || '-';
 
-            // 이미지
-            const imgSrc = row.image_path || '/uploads/no-thumb.png';
-            imgEl.src = imgSrc;
+            // ✅ 이미지 (필드명 호환 + 경로 후보 시도)
+            const rawImg =
+                row.image_path ||
+                row.img_path ||
+                row.image_url ||
+                row.img_url ||
+                row.img ||
+                row.image ||
+                '';
+            setImageWithFallback(imgEl, rawImg);
 
-            // 설명: HTML 제거 후 텍스트만
-            const rawDesc = (row.description || '').trim();
-            if (!rawDesc) {
-                descEl.textContent = '등록된 설명이 없습니다.';
+            // ✅ 소개글 (필드명 호환 + HTML 유지)
+            const rawDesc =
+                (row.desc_html ?? row.descHtml ?? row.description ?? row.desc ?? row.desc_html ?? '') ?? '';
+
+            if (rawDesc && hasMeaningfulHtml(rawDesc)) {
+                descEl.innerHTML = sanitizeHtml(rawDesc);
             } else {
-                const tmp = document.createElement('div');
-                tmp.innerHTML = rawDesc;
-                const plain = (tmp.textContent || tmp.innerText || '').trim();
+                // 혹시 HTML이 아니라 그냥 텍스트로 저장된 케이스도 커버
+                const plain = String(rawDesc || '').replace(/\u200B/g, '').trim();
                 descEl.textContent = plain || '등록된 설명이 없습니다.';
             }
 
             // 지도
             kakao.maps.load(function () {
                 let defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
-                const lower = fullAddr.toLowerCase();
+                const lower = (fullAddr || '').toLowerCase();
                 if (lower.includes('의정부')) {
                     defaultCenter = new kakao.maps.LatLng(37.7381, 127.0342);
                 } else if (lower.includes('경기')) {
@@ -429,6 +545,9 @@
 
                 if (fullAddr && fullAddr !== '-') {
                     updateMapByAddress(fullAddr, storeName);
+                } else {
+                    const dir = document.getElementById('kakaoDirBtn');
+                    if (dir) dir.href = 'https://map.kakao.com/';
                 }
             });
         }
