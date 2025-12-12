@@ -9,8 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Kakao 지도 -->
-    <script
-        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 
     <style>
         body {
@@ -40,6 +39,17 @@
             color: transparent;
         }
 
+        .k-label {
+            min-width: 5.5rem;
+            flex-shrink: 0;
+        }
+
+        .address-compact {
+            font-size: 0.92rem;
+            line-height: 1.4;
+            letter-spacing: -0.01em;
+        }
+
         .btn-3d {
             border-radius: 999px;
             box-shadow:
@@ -62,29 +72,32 @@
                 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
         }
 
-        /* ✅ 기본정보 “행 카드” 느낌 */
-        .info-row {
-            border-radius: 1.25rem;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            background: rgba(255, 255, 255, 0.7);
-            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+        /* ✅ line clamp (Tailwind 플러그인 없이 사용) */
+        .line-clamp-6 {
+            display: -webkit-box;
+            -webkit-line-clamp: 6;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
-        .chip {
+        /* ✅ 모달 스크롤바가 항상 “보이기”에 가깝게(브라우저별 차이 있음) */
+        .scrollbox {
+            overflow-y: auto;
+        }
+
+        .scrollbox::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .scrollbox::-webkit-scrollbar-thumb {
+            background: rgba(15, 23, 42, 0.18);
             border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            background: rgba(255, 255, 255, 0.7);
-            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+            border: 3px solid rgba(255, 255, 255, 0.65);
         }
 
-        /* 모달 */
-        .modal-hidden {
-            display: none;
-        }
-
-        .modal-scroll {
-            max-height: 65vh;
-            overflow-y: auto; /* ✅ 길면 자동 스크롤 */
+        .scrollbox::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.06);
+            border-radius: 999px;
         }
     </style>
 </head>
@@ -131,79 +144,104 @@
                 <div class="relative flex-1 rounded-2xl overflow-hidden border border-slate-100 bg-slate-900/5">
                     <img id="storeImage" src="/uploads/no-thumb.png" alt="대표 이미지"
                         class="w-full h-full max-h-72 object-cover" />
+                    <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                </div>
+
+                <div class="mt-3 flex items-center justify-between gap-3">
+                    <div class="text-[11px] text-slate-500">
+                        이미지가 없으면 기본 이미지가 표시됩니다.
+                    </div>
+                    <a id="openImageNewTab" href="#" target="_blank" rel="noopener"
+                        class="btn-3d px-3 py-1.5 bg-white/90 border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50">
+                        새창으로 보기
+                    </a>
                 </div>
             </article>
 
-            <!-- 2️⃣ 기본 정보 카드 (✅ 더 예쁘게 리디자인) -->
-            <article class="neo-card p-4 sm:p-5 flex flex-col justify-between min-h-[260px]">
+            <!-- 2️⃣ 기본 정보 카드 (✅ 좀 더 예쁘게) -->
+            <article class="neo-card p-4 sm:p-6 flex flex-col justify-between min-h-[260px]">
                 <header class="mb-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="min-w-0">
                             <p class="text-xs font-semibold tracking-wide text-indigo-500 uppercase">기본 정보</p>
                             <h2 id="storeName" class="mt-1 text-2xl sm:text-3xl font-extrabold title-grad break-words">
                                 상호명
                             </h2>
+
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <span id="badgeCategory"
+                                    class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    🏷️ <span id="badgeCategoryText">-</span>
+                                </span>
+                                <span id="badgeOpen"
+                                    class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                                    📅 <span id="badgeOpenText">-</span>
+                                </span>
+                            </div>
                         </div>
 
-                        <!-- 작은 배지 영역 -->
-                        <div class="flex flex-col items-end gap-2">
-                            <span class="chip px-3 py-1 text-[11px] font-semibold text-slate-600">
-                                ✅ 등록 정보 기준
+                        <div class="shrink-0">
+                            <span
+                                class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold bg-white/80 border border-slate-200 text-slate-600">
+                                OPEN SOON
                             </span>
-                            <span class="text-[11px] text-slate-400">오픈 전 정보</span>
-                        </div>
-                    </div>
-
-                    <!-- 칩 2개: 오픈일/카테고리 -->
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        <div class="chip px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-600 grid place-items-center">📅</span>
-                            <span class="text-slate-500 font-bold">오픈일</span>
-                            <span id="openDate" class="text-slate-900">-</span>
-                        </div>
-
-                        <div class="chip px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-full bg-purple-500/10 text-purple-600 grid place-items-center">🏷️</span>
-                            <span class="text-slate-500 font-bold">카테고리</span>
-                            <span id="category" class="text-slate-900">-</span>
                         </div>
                     </div>
                 </header>
 
-                <!-- 정보 행 카드들 -->
-                <div class="space-y-3 flex-1">
-                    <!-- 전화 -->
-                    <div class="info-row px-4 py-3 flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-3">
-                            <span class="w-10 h-10 rounded-2xl bg-sky-500/10 text-sky-700 grid place-items-center text-lg">📞</span>
-                            <div>
-                                <p class="text-xs text-slate-500 font-semibold">전화번호</p>
-                                <p class="text-sm sm:text-base font-extrabold text-slate-900">
-                                    <a id="phoneLink" href="#"
-                                        class="hover:text-blue-600 underline underline-offset-4">
-                                        <span id="phone">-</span>
-                                    </a>
-                                </p>
-                            </div>
-                        </div>
-
-                        <span class="text-[11px] text-slate-400 hidden sm:block">탭하면 전화 연결</span>
+                <dl class="mt-2 space-y-3 sm:space-y-4 text-sm sm:text-base leading-relaxed flex-1">
+                    <div class="flex gap-3 sm:gap-4 items-baseline">
+                        <dt class="k-label flex items-center gap-1 text-slate-500 text-sm sm:text-base">
+                            <span>📅</span><span>오픈일</span>
+                        </dt>
+                        <dd class="font-semibold text-slate-900">
+                            <span id="openDate" class="inline-flex rounded-xl bg-white/90 border border-slate-200 px-3 py-1.5">-</span>
+                        </dd>
                     </div>
 
-                    <!-- 주소 -->
-                    <div class="info-row px-4 py-3 flex items-start justify-between gap-3">
-                        <div class="flex items-start gap-3">
-                            <span class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-700 grid place-items-center text-lg mt-0.5">📍</span>
-                            <div class="min-w-0">
-                                <p class="text-xs text-slate-500 font-semibold">주소</p>
-                                <p class="text-sm sm:text-base font-extrabold text-slate-900 break-words">
-                                    <span id="addressText">-</span>
-                                </p>
-                            </div>
-                        </div>
-                        <span class="text-[11px] text-slate-400 hidden sm:block mt-1">지도 카드 참고</span>
+                    <div class="flex gap-3 sm:gap-4 items-baseline">
+                        <dt class="k-label flex items-center gap-1 text-slate-500 text-sm sm:text-base">
+                            <span>🏷️</span><span>카테고리</span>
+                        </dt>
+                        <dd id="category"
+                            class="font-semibold text-slate-900 inline-flex rounded-xl bg-white/90 border border-slate-200 px-3 py-1.5">
+                            -
+                        </dd>
                     </div>
-                </div>
+
+                    <div class="flex gap-3 sm:gap-4 items-baseline">
+                        <dt class="k-label flex items-center gap-1 text-slate-500 text-sm sm:text-base">
+                            <span>📞</span><span>전화</span>
+                        </dt>
+                        <dd class="font-semibold text-slate-900">
+                            <a id="phoneLink" href="#"
+                                class="btn-3d inline-flex items-center gap-2 rounded-xl bg-white/90 border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
+                                <span id="phone">-</span>
+                                <span class="text-[11px] text-slate-500">전화걸기</span>
+                            </a>
+                        </dd>
+                    </div>
+
+                    <div class="flex gap-3 sm:gap-4 items-start">
+                        <dt class="k-label flex items-center gap-1 text-slate-500 text-sm sm:text-base mt-0.5">
+                            <span>📍</span><span>주소</span>
+                        </dt>
+                        <dd class="font-semibold text-slate-900 flex-1">
+                            <div
+                                class="rounded-xl bg-white/90 border border-slate-200 px-3 py-2 flex items-start justify-between gap-3">
+                                <span id="addressText"
+                                    class="inline-block max-w-full address-compact whitespace-normal break-words">-</span>
+                                <button id="copyAddrBtn" type="button"
+                                    class="btn-3d px-3 py-1.5 bg-white/90 border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 shrink-0">
+                                    복사
+                                </button>
+                            </div>
+                            <p id="copyAddrToast" class="hidden mt-1 text-[11px] text-emerald-600 font-semibold">
+                                주소가 복사되었습니다.
+                            </p>
+                        </dd>
+                    </div>
+                </dl>
 
                 <p class="text-[11px] text-slate-400 mt-4">
                     ※ 실제 오픈 시점의 메뉴·운영 시간 등은 일부 달라질 수 있습니다.
@@ -232,29 +270,33 @@
                 </div>
             </article>
 
-            <!-- 4️⃣ 가게 소개 카드 -->
+            <!-- 4️⃣ 가게 소개 카드 (✅ 더보기 + 모달) -->
             <article class="neo-card p-4 sm:p-5 flex flex-col min-h-[260px]">
-                <header class="flex items-center justify-between mb-3">
+                <header class="mb-3 flex items-center justify-between">
                     <div class="flex items-center gap-2 text-sm font-semibold text-slate-600">
                         <span class="text-lg">📝</span>
                         <span>가게 소개</span>
                     </div>
-
-                    <button id="openDescModalBtn"
-                        class="btn-3d px-3 py-1.5 bg-white/90 text-xs font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50">
-                        더보기
-                    </button>
+                    <span id="descLenHint" class="text-[11px] text-slate-400 hidden">긴 글</span>
                 </header>
 
-                <!-- 미리보기 영역(기본 박스 형태 유지) -->
+                <!-- ✅ 기본 박스 형태 유지: 미리보기는 6줄까지만 -->
                 <div id="desc"
-                    class="flex-1 text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words overflow-hidden">
+                    class="flex-1 text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words line-clamp-6">
                     등록된 설명이 없습니다.
                 </div>
 
-                <p class="text-[11px] text-slate-400 mt-3">
-                    ※ 소개 글은 사장님이 직접 작성한 내용으로, 추후 수정될 수 있습니다.
-                </p>
+                <!-- ✅ 더보기 버튼 (내용이 길 때만 표시) -->
+                <div class="mt-4 flex items-center justify-between">
+                    <p class="text-[11px] text-slate-400">
+                        ※ 소개 글은 사장님이 직접 작성한 내용으로, 추후 수정될 수 있습니다.
+                    </p>
+
+                    <button id="openDescModalBtn" type="button"
+                        class="btn-3d px-4 py-2 bg-white/90 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 hidden">
+                        더보기
+                    </button>
+                </div>
             </article>
 
         </section>
@@ -279,34 +321,41 @@
         </div>
     </div>
 
-    <!-- ✅ 소개 모달 -->
-    <div id="descModal"
-        class="modal-hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center px-4">
-        <div class="w-full max-w-3xl neo-card p-0 overflow-hidden">
-            <div class="px-5 sm:px-6 py-4 border-b border-slate-200/60 bg-white/70 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-lg">📝</span>
-                    <p class="font-extrabold text-slate-900">가게 소개</p>
+    <!-- ✅ 소개 모달 (hidden으로 제어: 기본은 닫힘) -->
+    <div id="descModal" hidden
+        class="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center px-4">
+        <div class="w-full max-w-3xl neo-card border border-white/70 overflow-hidden">
+            <!-- 상단 헤더 -->
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-200/70 bg-white/60 flex items-center justify-between">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide">Open Soon</p>
+                    <h3 class="mt-0.5 text-lg sm:text-xl font-extrabold title-grad truncate">
+                        📝 <span id="descModalTitle">가게 소개</span>
+                    </h3>
+                    <p id="descModalSub" class="text-[12px] text-slate-500 mt-1 truncate">-</p>
                 </div>
-                <button id="closeDescModalBtn"
+
+                <button id="closeDescModalBtn" data-desc-close type="button"
                     class="btn-3d w-10 h-10 grid place-items-center bg-white/90 border border-slate-200 hover:bg-slate-50"
-                    aria-label="닫기">
-                    ✕
-                </button>
+                    aria-label="닫기">✕</button>
             </div>
 
-            <div class="px-5 sm:px-6 py-5 bg-white/80">
-                <div id="modalDesc"
-                    class="modal-scroll text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words">
-                    등록된 설명이 없습니다.
+            <!-- 본문(스크롤) -->
+            <div class="px-5 sm:px-6 py-5">
+                <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 sm:p-5">
+                    <!-- ✅ 여기 스크롤이 자동으로 생김 -->
+                    <div id="descFull"
+                        class="scrollbox max-h-[65vh] pr-2 text-sm sm:text-base leading-relaxed text-slate-800 whitespace-pre-line break-words">
+                        -
+                    </div>
                 </div>
-            </div>
 
-            <div class="px-5 sm:px-6 py-4 bg-white/70 border-t border-slate-200/60 flex justify-end">
-                <button id="closeDescModalBtn2"
-                    class="btn-3d px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-xs sm:text-sm font-semibold text-white hover:from-sky-600 hover:to-indigo-600">
-                    닫기
-                </button>
+                <div class="mt-4 flex items-center justify-end gap-2">
+                    <button id="closeDescModalBtn2" data-desc-close type="button"
+                        class="btn-3d px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-xs sm:text-sm font-semibold text-white hover:from-sky-600 hover:to-indigo-600">
+                        닫기
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -347,6 +396,44 @@
             return m.get(name);
         }
 
+        function basename(p) {
+            try {
+                const s = String(p || '');
+                const i = s.lastIndexOf('/');
+                return i >= 0 ? s.slice(i + 1) : s;
+            } catch { return ''; }
+        }
+
+        function setImageWithFallback(imgEl, rawSrc) {
+            const tried = new Set();
+            const candidates = [];
+
+            const src = (rawSrc || '').trim();
+
+            if (src) candidates.push(src);
+
+            // ✅ open 이미지가 open 폴더에 있을 수도 있으니 자동 폴백
+            if (src.startsWith('/uploads/') && !src.startsWith('/uploads/open/')) {
+                const base = basename(src);
+                if (base) candidates.push(`/uploads/open/${base}`);
+            }
+
+            // ✅ 최후 폴백
+            candidates.push('/uploads/no-thumb.png');
+
+            let idx = 0;
+            const next = () => {
+                while (idx < candidates.length && tried.has(candidates[idx])) idx++;
+                if (idx >= candidates.length) return;
+                const c = candidates[idx++];
+                tried.add(c);
+                imgEl.src = c;
+            };
+
+            imgEl.onerror = () => next();
+            next();
+        }
+
         // Kakao 지도
         let map, marker, geocoder;
         function initMap(centerLatLng) {
@@ -357,7 +444,9 @@
         }
 
         function updateMapByAddress(address, storeName) {
-            if (!geocoder) geocoder = new kakao.maps.services.Geocoder();
+            if (!geocoder) {
+                geocoder = new kakao.maps.services.Geocoder();
+            }
 
             const normalizedAddress = address.trim()
                 .replace(/경기\s+의정부시/, '의정부시')
@@ -366,9 +455,7 @@
             const addressVariations = [
                 normalizedAddress,
                 normalizedAddress.replace(/\s+\d+\s*$/, ''),
-                normalizedAddress.split(' ').slice(0, 3).join(' '),
-                '의정부시 부용로213번길',
-                '의정부시 부용로213번길 16'
+                normalizedAddress.split(' ').slice(0, 3).join(' ')
             ];
 
             function tryGeocoding(index) {
@@ -397,10 +484,14 @@
 
             function handleGeocodingFailure(originalAddress, storeName) {
                 let fallbackLat, fallbackLng;
-                if (originalAddress.includes('의정부')) {
+                const lower = (originalAddress || '').toLowerCase();
+
+                if (lower.includes('의정부')) {
                     fallbackLat = 37.7381; fallbackLng = 127.0342;
-                } else if (originalAddress.includes('서울')) {
+                } else if (lower.includes('서울')) {
                     fallbackLat = 37.5665; fallbackLng = 126.9780;
+                } else if (lower.includes('경기')) {
+                    fallbackLat = 37.4138; fallbackLng = 127.5183;
                 } else {
                     fallbackLat = 37.5665; fallbackLng = 126.9780;
                 }
@@ -417,34 +508,115 @@
             tryGeocoding(0);
         }
 
-        // ✅ 소개 모달
+        // ✅ 소개 모달 열고/닫기
         function setupDescModal() {
             const modal = document.getElementById('descModal');
             const openBtn = document.getElementById('openDescModalBtn');
-            const closeBtn = document.getElementById('closeDescModalBtn');
-            const closeBtn2 = document.getElementById('closeDescModalBtn2');
+            if (!modal || !openBtn) return;
 
-            if (!modal || !openBtn || !closeBtn || !closeBtn2) return;
+            const closeBtns = modal.querySelectorAll('[data-desc-close]');
 
-            function open() { modal.classList.remove('modal-hidden'); }
-            function close() { modal.classList.add('modal-hidden'); }
+            const open = () => {
+                modal.hidden = false;
+                document.body.style.overflow = 'hidden'; // 뒤 스크롤 잠금
+            };
 
-            openBtn.addEventListener('click', open);
-            closeBtn.addEventListener('click', close);
-            closeBtn2.addEventListener('click', close);
+            const close = () => {
+                modal.hidden = true;
+                document.body.style.overflow = '';
+            };
+
+            openBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                open();
+            });
+
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    close();
+                });
+            });
 
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) close();
+                if (e.target === modal) close(); // 바깥 클릭 닫기
             });
 
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && !modal.classList.contains('modal-hidden')) close();
+                if (e.key === 'Escape' && modal.hidden === false) close();
+            });
+        }
+
+        function setDescUI(storeName, plainText) {
+            const descEl = document.getElementById('desc');
+            const descFullEl = document.getElementById('descFull');
+            const openBtn = document.getElementById('openDescModalBtn');
+            const hint = document.getElementById('descLenHint');
+
+            const titleEl = document.getElementById('descModalTitle');
+            const subEl = document.getElementById('descModalSub');
+
+            const text = (plainText || '').trim();
+
+            // 모달 타이틀/서브
+            titleEl.textContent = '가게 소개';
+            subEl.textContent = storeName || '-';
+
+            if (!text) {
+                descEl.textContent = '등록된 설명이 없습니다.';
+                descFullEl.textContent = '등록된 설명이 없습니다.';
+                openBtn.classList.add('hidden');
+                hint.classList.add('hidden');
+                return;
+            }
+
+            // ✅ 카드에는 6줄 미리보기(기본 박스 유지)
+            descEl.textContent = text;
+
+            // ✅ 모달에는 전체 텍스트
+            descFullEl.textContent = text;
+
+            // ✅ “긴 글이면” 더보기 표시
+            const isLong = text.length > 220 || (text.split('\n').length >= 6);
+            if (isLong) {
+                openBtn.classList.remove('hidden');
+                hint.classList.remove('hidden');
+            } else {
+                openBtn.classList.add('hidden');
+                hint.classList.add('hidden');
+            }
+        }
+
+        function setupCopyAddress() {
+            const btn = document.getElementById('copyAddrBtn');
+            const addr = document.getElementById('addressText');
+            const toast = document.getElementById('copyAddrToast');
+            if (!btn || !addr || !toast) return;
+
+            let t = null;
+            btn.addEventListener('click', async () => {
+                const v = (addr.textContent || '').trim();
+                if (!v || v === '-') return;
+
+                try {
+                    await navigator.clipboard.writeText(v);
+                } catch {
+                    // fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = v;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                }
+
+                toast.classList.remove('hidden');
+                clearTimeout(t);
+                t = setTimeout(() => toast.classList.add('hidden'), 1500);
             });
         }
 
         async function main() {
-            setupDescModal();
-
             const id = qs('id');
             const idFromPath = (location.pathname.match(/\/open\/(\d+)/) || [])[1];
             const finalId = id || idFromPath;
@@ -468,8 +640,10 @@
             const phoneLink = document.getElementById('phoneLink');
             const addrEl = document.getElementById('addressText');
             const imgEl = document.getElementById('storeImage');
-            const descEl = document.getElementById('desc');
-            const modalDescEl = document.getElementById('modalDesc');
+            const openImageNewTab = document.getElementById('openImageNewTab');
+
+            const badgeCategoryText = document.getElementById('badgeCategoryText');
+            const badgeOpenText = document.getElementById('badgeOpenText');
 
             const storeName = row.store_name || '상호명 미정';
             const cat = row.category || '-';
@@ -477,6 +651,8 @@
             heroName.textContent = storeName;
             nameEl.textContent = storeName;
             catEl.textContent = cat;
+
+            badgeCategoryText.textContent = cat;
 
             // 날짜
             let openText = row.open_date || '-';
@@ -487,9 +663,10 @@
                 }
             } catch { }
             openEl.textContent = openText;
+            badgeOpenText.textContent = openText;
 
             // 전화
-            const phoneStr = row.phone || '';
+            const phoneStr = (row.phone || '').trim();
             phoneEl.textContent = phoneStr || '-';
             if (phoneStr) {
                 phoneLink.href = `tel:${phoneStr.replace(/[^\d+]/g, '')}`;
@@ -501,40 +678,28 @@
             const fullAddr = (row.address || '').trim();
             addrEl.textContent = fullAddr || '-';
 
-            // ✅ 이미지 (실패 시 /uploads/open/도 한번 더 시도)
-            const originalImgSrc = row.image_path || '/uploads/no-thumb.png';
-            imgEl.src = originalImgSrc;
+            // 이미지 (✅ /uploads/open 폴백까지 자동)
+            const imgSrcRaw = (row.image_path || '').trim();
+            setImageWithFallback(imgEl, imgSrcRaw);
 
-            let imgFallbackTried = false;
-            imgEl.onerror = () => {
-                if (!imgFallbackTried) {
-                    imgFallbackTried = true;
-                    const m = String(originalImgSrc).match(/\/uploads\/([^\/]+\.(png|jpg|jpeg|webp|gif))$/i);
-                    if (m && m[1]) {
-                        imgEl.src = `/uploads/open/${m[1]}`; // 1차 폴백
-                        return;
-                    }
-                }
-                imgEl.src = '/uploads/no-thumb.png'; // 최종 폴백
-            };
+            // 새창보기 링크도 같이 맞춰줌
+            const baseImg = imgSrcRaw || '/uploads/no-thumb.png';
+            openImageNewTab.href = baseImg.startsWith('/') ? baseImg : `/${baseImg}`;
 
             // 설명: HTML 제거 후 텍스트만
             const rawDesc = (row.description || '').trim();
-            let plainDesc = '';
+            let plain = '';
             if (rawDesc) {
                 const tmp = document.createElement('div');
                 tmp.innerHTML = rawDesc;
-                plainDesc = (tmp.textContent || tmp.innerText || '').trim();
+                plain = (tmp.textContent || tmp.innerText || '').trim();
             }
-
-            const finalDesc = plainDesc || '등록된 설명이 없습니다.';
-            descEl.textContent = finalDesc;
-            if (modalDescEl) modalDescEl.textContent = finalDesc;
+            setDescUI(storeName, plain);
 
             // 지도
             kakao.maps.load(function () {
                 let defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
-                const lower = fullAddr.toLowerCase();
+                const lower = (fullAddr || '').toLowerCase();
                 if (lower.includes('의정부')) {
                     defaultCenter = new kakao.maps.LatLng(37.7381, 127.0342);
                 } else if (lower.includes('경기')) {
@@ -545,8 +710,15 @@
 
                 if (fullAddr && fullAddr !== '-') {
                     updateMapByAddress(fullAddr, storeName);
+                } else {
+                    const dir = document.getElementById('kakaoDirBtn');
+                    dir.href = 'https://map.kakao.com/';
                 }
             });
+
+            // ✅ 기능 초기화
+            setupDescModal();
+            setupCopyAddress();
         }
 
         (async () => {
