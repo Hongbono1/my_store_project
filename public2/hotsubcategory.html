@@ -73,7 +73,8 @@
       color: #374151;
       border-radius: 0.75rem;
       padding: 0.45rem 0.75rem;
-      font-size: 0.875rem;
+      font-size: 0.9rem;
+      /* 살짝 키움 */
       transition: all .2s ease;
     }
 
@@ -95,9 +96,11 @@
 
   <!-- ✅ 상단 타이틀 -->
   <section class="text-center py-10 fade-in">
-    <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-gradient">🌦️ 오늘의 테마 추천</h1>
-    <p class="text-gray-500 text-sm">
-      사장님들이 작성한 핫 블로그를 가게 카드 형식으로 모아서 보여줍니다.
+    <h1 class="text-3xl sm:text-5xl font-bold mb-3 text-gradient">
+      🌦️ 오늘의 테마 추천
+    </h1>
+    <p class="text-gray-500 text-base sm:text-lg">
+      사장님들이 작성한 핫 블로그를 카드 형식으로 모아서 보여줍니다.
     </p>
   </section>
 
@@ -121,10 +124,9 @@
     const cardGrid = $("#cardGrid");
     const pagination = $("#pagination");
 
-    // 👉 전체 가게 카드 데이터
-    let allItems = [];
+    let allItems = [];    // 전체 카드 데이터(디테일 목록)
     let currentPage = 1;
-    const perPage = 12;   // 한 페이지 12개
+    const perPage = 12;   // 👉 한 페이지에 12개만
 
     // ✅ 헤더/푸터 로드
     Promise.all([
@@ -141,7 +143,7 @@
       );
     }
 
-    // ✅ 배열 랜덤 섞기 (Fisher-Yates)
+    // ✅ 배열 랜덤 섞기 (로드할 때 한 번만)
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -157,38 +159,29 @@
         const json = await res.json();
         console.log("🔥 /api/hotsubcategory 응답:", json);
 
-        // 👉 응답 형식: { success: true, data: [...] } 기준
-        if (!json || !json.success || !Array.isArray(json.data)) {
-          console.warn("hotsubcategory 데이터 형식이 예상과 다름");
+        if (!json.ok || !Array.isArray(json.data)) {
+          throw new Error("데이터 형식이 올바르지 않습니다.");
         }
 
-        const rows = Array.isArray(json.data) ? json.data : [];
-
-        if (!rows.length) {
-          allItems = [];
-          render();
-          return;
-        }
-
-        // 🔗 디테일과 동일 정보: 이미지 / 상호 / 업종
-        allItems = rows.map(row => {
+        // 🔗 핫 블로그 디테일과 동일한 정보(이미지, 상호, 업종)를 카드용으로 정리
+        allItems = json.data.map(row => {
           const id = row.id;
 
-          // 대표 이미지
+          // 대표 이미지: 디테일에서 쓰는 cover 이미지와 동일하게 맞추기
           const cover =
             row.cover_image ||
-            row.image_url ||
             row.thumbnail_url ||
+            row.image_url ||
             "/uploads/default.jpg";
 
-          // 상호
+          // 상호: store_name / business_name / title 순으로 최대한 맞춰줌
           const storeName =
             row.store_name ||
             row.business_name ||
             row.title ||
-            "상호 미입력";
+            "";
 
-          // 업종
+          // 업종: business_category / store_category / category 중에서 선택
           const bizType =
             row.business_category ||
             row.store_category ||
@@ -198,7 +191,7 @@
           return { id, cover, storeName, bizType };
         });
 
-        // 👉 한 번만 랜덤 섞기
+        // 👉 여기서 전부 랜덤 섞기
         shuffle(allItems);
 
         currentPage = 1;
@@ -206,7 +199,7 @@
       } catch (err) {
         console.error("❌ loadHotSubList 오류:", err);
         cardGrid.innerHTML = `
-          <div class="col-span-full text-center text-gray-500 py-12">
+          <div class="col-span-full text-center text-gray-500 py-12 text-lg">
             데이터를 불러오지 못했습니다.
           </div>
         `;
@@ -214,7 +207,7 @@
       }
     }
 
-    // ✅ 전체 렌더
+    // ✅ 전체 렌더링
     function render() {
       renderCards();
       renderPagination();
@@ -224,7 +217,7 @@
     function renderCards() {
       if (!allItems.length) {
         cardGrid.innerHTML = `
-          <div class="col-span-full text-center text-gray-500 py-12">
+          <div class="col-span-full text-center text-gray-500 py-12 text-lg">
             등록된 핫 블로그가 아직 없습니다.
           </div>
         `;
@@ -249,10 +242,10 @@
 
           <!-- 하단 상호 / 업종 -->
           <div class="p-4 text-center">
-            <p class="text-base font-semibold">
+            <p class="text-lg sm:text-xl font-semibold">
               ${escapeHtml(item.storeName || "상호 미입력")}
             </p>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm sm:text-base text-gray-500 mt-1">
               ${escapeHtml(item.bizType || "업종 미입력")}
             </p>
           </div>
@@ -323,7 +316,7 @@
 
       pagination.innerHTML = html;
 
-      // 페이지 버튼 클릭 이벤트
+      // 클릭 이벤트
       pagination.querySelectorAll("button[data-page]").forEach(btn => {
         btn.addEventListener("click", () => {
           const p = Number(btn.dataset.page);
