@@ -224,13 +224,11 @@
                             </button>
                         </div>
                     </div>
-
-                    <!-- ✅ 주소 카드(여기서 제거) -->
                 </div>
             </div>
 
-            <!-- 지도 -->
-            <div class="glass-box p-6 md:p-8" id="map-section">
+            <!-- ✅ 지도 (빈칸 채우기: flex + map flex-1) -->
+            <div class="glass-box p-6 md:p-8 flex flex-col h-full" id="map-section">
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-2xl md:text-3xl font-black text-slate-900">위치 안내</h2>
                     <button id="kakaoRouteBtn" type="button"
@@ -243,11 +241,12 @@
                     지도가 안 보이면 주소가 없거나 주소가 정확하지 않을 수 있어요.
                 </p>
 
+                <!-- ✅ 높이를 고정(h-72)하지 말고 남는 공간을 지도가 채우게 -->
                 <div id="map"
-                    class="mt-5 w-full h-72 rounded-2xl border border-white/80 bg-white/60 shadow-sm overflow-hidden">
+                    class="mt-5 w-full flex-1 min-h-[320px] md:min-h-[420px] rounded-2xl border border-white/80 bg-white/60 shadow-sm overflow-hidden">
                 </div>
 
-                <!-- ✅ 주소를 지도 아래로 이동 -->
+                <!-- 주소 (지도 아래) -->
                 <div class="neo-card p-4 mt-5">
                     <div class="text-xs font-bold text-slate-500 mb-1">주소</div>
                     <div class="flex items-center justify-between gap-3">
@@ -334,6 +333,7 @@
         let mapLat = null;
         let mapLng = null;
         let mapAddress = "";
+        let __kakaoMap = null; // ✅ relayout용
 
         function setCounter() {
             const el = document.getElementById("slideCounter");
@@ -409,7 +409,12 @@
             renderDots();
 
             // resize 대응
-            window.addEventListener("resize", () => goToSlide(currentSlide));
+            window.addEventListener("resize", () => {
+                goToSlide(currentSlide);
+                if (__kakaoMap) {
+                    __kakaoMap.relayout();
+                }
+            });
         }
 
         async function loadDetail() {
@@ -428,12 +433,8 @@
                 document.getElementById("title").textContent = data.title || "(제목 없음)";
                 document.getElementById("category").textContent = `${data.type || '공연'}`;
 
-                const phoneEl = document.getElementById("phone");
-                if (phoneEl) phoneEl.textContent = data.phone || "-";
-
-                const addressEl = document.getElementById("address");
-                if (addressEl) addressEl.textContent = data.address || "-";
-
+                document.getElementById("phone").textContent = data.phone || "-";
+                document.getElementById("address").textContent = data.address || "-";
                 mapAddress = data.address || "";
 
                 document.getElementById("start_date").textContent = data.start_date ? data.start_date.split('T')[0] : '-';
@@ -460,7 +461,6 @@
                 // 이미지(메인 + files)
                 const images = [data.main_img, ...(data.files || []).filter(f => f.file_type === 'image').map(f => f.file_path)]
                     .filter(Boolean);
-
                 buildSlider(images);
 
                 // 팜플렛
@@ -512,19 +512,15 @@
                 if (data.address) {
                     drawMap(data.address);
                 } else {
-                    document.getElementById('map-section')?.classList.add("hidden");
+                    document.getElementById('map-section').classList.add("hidden");
                 }
 
-                // 복사 버튼 (✅ 존재 체크)
-                const copyPhoneBtn = document.getElementById("copyPhoneBtn");
-                if (copyPhoneBtn) copyPhoneBtn.onclick = () => copyText(data.phone || "");
-
-                const copyAddrBtn = document.getElementById("copyAddrBtn");
-                if (copyAddrBtn) copyAddrBtn.onclick = () => copyText(data.address || "");
+                // 복사 버튼
+                document.getElementById("copyPhoneBtn").onclick = () => copyText(data.phone || "");
+                document.getElementById("copyAddrBtn").onclick = () => copyText(data.address || "");
 
                 // 카카오 길찾기 버튼
-                const kakaoRouteBtn = document.getElementById("kakaoRouteBtn");
-                if (kakaoRouteBtn) kakaoRouteBtn.onclick = () => openKakaoRoute();
+                document.getElementById("kakaoRouteBtn").onclick = () => openKakaoRoute();
 
             } catch (err) {
                 console.error('데이터 로드 오류:', err);
@@ -541,7 +537,6 @@
             navigator.clipboard.writeText(text).then(() => {
                 alert("복사 완료!");
             }).catch(() => {
-                // fallback
                 const ta = document.createElement("textarea");
                 ta.value = text;
                 document.body.appendChild(ta);
@@ -553,7 +548,6 @@
         }
 
         function openKakaoRoute() {
-            // 좌표 있으면 /to, 없으면 검색
             if (mapLat && mapLng) {
                 const url = `https://map.kakao.com/link/to/${encodeURIComponent(mapAddress || "목적지")},${mapLat},${mapLng}`;
                 window.open(url, "_blank", "noopener,noreferrer");
@@ -590,17 +584,24 @@
                         center: new kakao.maps.LatLng(lat, lng),
                         level: 3
                     });
+                    __kakaoMap = map;
 
                     new kakao.maps.Marker({
                         map,
                         position: new kakao.maps.LatLng(lat, lng)
                     });
 
+                    // ✅ flex로 높이가 달라질 수 있어서 relayout 한 번 보정
+                    setTimeout(() => {
+                        map.relayout();
+                        map.setCenter(new kakao.maps.LatLng(lat, lng));
+                    }, 50);
+
                     // 클릭 시 길찾기
                     mapContainer.style.cursor = 'pointer';
                     mapContainer.addEventListener('click', function () {
                         openKakaoRoute();
-                    }, { once: true }); // 중복 리스너 방지
+                    }, { once: true });
                 });
             });
         }
