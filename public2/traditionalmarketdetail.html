@@ -2,615 +2,470 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>전통시장 상세보기</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>전통시장 상세보기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- ✅ 카카오맵: autoload=false 필수 -->
-    <script id="kakao-sdk"
-        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
+  <!-- ✅ 카카오맵: autoload=false + defer 로 안전하게 로드 -->
+  <script id="kakao-sdk" defer
+    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=6286d4d9bc1d503495b03f46622b5dc8&autoload=false&libraries=services"></script>
 
-    <style>
-        body {
-            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            line-height: 1.7;
-            letter-spacing: -0.02em;
-        }
+  <style>
+    body {
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.7;
+      letter-spacing: -0.02em;
+    }
 
-        .neo-shell {
-            background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.9));
-            border-radius: 28px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.4);
-            backdrop-filter: blur(20px);
-        }
+    .neo-shell {
+      background: radial-gradient(circle at top left,
+          rgba(255, 255, 255, 0.95),
+          rgba(241, 245, 249, 0.9));
+      border-radius: 28px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow:
+        0 24px 60px rgba(15, 23, 42, 0.18),
+        0 0 0 1px rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(20px);
+    }
 
-        .neo-section {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.95));
-            border-radius: 18px;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            box-shadow: 10px 10px 30px rgba(148, 163, 184, 0.35), -6px -6px 20px rgba(255, 255, 255, 0.9);
-        }
+    .neo-section {
+      background: linear-gradient(135deg,
+          rgba(255, 255, 255, 0.96),
+          rgba(241, 245, 249, 0.95));
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow:
+        10px 10px 30px rgba(148, 163, 184, 0.35),
+        -6px -6px 20px rgba(255, 255, 255, 0.9);
+    }
 
-        .pill-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.35rem 0.9rem;
-            border-radius: 999px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            background: radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.18), rgba(129, 140, 248, 0.09));
-            border: 1px solid rgba(59, 130, 246, 0.35);
-            color: #1d4ed8;
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 10px 25px rgba(37, 99, 235, 0.25);
-        }
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: radial-gradient(circle at 0% 0%,
+          rgba(59, 130, 246, 0.18),
+          rgba(129, 140, 248, 0.09));
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #1d4ed8;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.6),
+        0 10px 25px rgba(37, 99, 235, 0.25);
+    }
 
-        .divider-soft {
-            height: 1px;
-            background: linear-gradient(to right, transparent, rgba(148, 163, 184, 0.5), transparent);
-        }
+    .divider-soft {
+      height: 1px;
+      background: linear-gradient(to right,
+          transparent,
+          rgba(148, 163, 184, 0.5),
+          transparent);
+    }
 
-        .tile {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.9rem;
-            padding: 1rem;
-            border-radius: 18px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            background: rgba(255, 255, 255, 0.75);
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
-        }
+    .content-text {
+      font-size: 1rem;
+      line-height: 1.8;
+    }
 
-        .tile-ico {
-            width: 46px;
-            height: 46px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(129, 140, 248, 0.12));
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            box-shadow: 0 10px 18px rgba(37, 99, 235, 0.12);
-            flex: 0 0 auto;
-            font-size: 18px;
-        }
-    </style>
+    .info-label {
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .info-value {
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .tile {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 1rem 1.1rem;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(255, 255, 255, 0.75);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.10);
+    }
+  </style>
 </head>
 
 <body
-    class="min-h-screen bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 flex items-start md:items-center justify-center py-10 px-4">
+  class="min-h-screen bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 flex items-start md:items-center justify-center py-10 px-4">
 
-    <div class="max-w-4xl w-full mx-auto neo-shell p-6 md:p-8 mb-10">
+  <div class="max-w-4xl w-full mx-auto neo-shell p-6 md:p-8 mb-10">
 
-        <!-- 상단 헤더 -->
-        <header class="mb-6 md:mb-8 text-center space-y-3">
-            <div class="pill-badge mx-auto">
-                <span>🏬 우리동네 전통시장</span>
-                <span class="text-[11px] text-sky-700/90">MARKET DETAIL</span>
-            </div>
+    <!-- 상단 헤더 / 타이틀 -->
+    <header class="mb-6 md:mb-8 text-center space-y-3">
+      <div class="pill-badge mx-auto">
+        <span>🏬 우리동네 전통시장</span>
+        <span class="text-[11px] text-sky-700/90">MARKET DETAIL</span>
+      </div>
 
-            <!-- ✅ 1) 상호 크게 -->
-            <h1 id="market_name"
-                class="text-4xl md:text-5xl font-extrabold text-slate-900 mt-2 bg-clip-text text-transparent bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500">
-            </h1>
+      <!-- ✅ 시장명 크게 -->
+      <h1 id="market_name"
+        class="text-4xl md:text-5xl font-extrabold text-slate-900 mt-2 bg-clip-text text-transparent bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 leading-tight">
+      </h1>
 
-            <p class="text-sm md:text-base text-slate-500">
-                따뜻한 사람과 이야기가 있는 우리동네 시장의 정보를 한눈에 확인해 보세요.
-            </p>
-        </header>
+      <p class="text-sm md:text-base text-slate-500">
+        따뜻한 사람과 이야기가 있는 우리동네 시장의 정보를 한눈에 확인해 보세요.
+      </p>
+    </header>
 
-        <div class="divider-soft mb-8"></div>
+    <div class="divider-soft mb-8"></div>
 
-        <!-- 상단: 이미지 + (이미지 하단에 전화/운영시간) + 오른쪽에 시장명/주소/품목 -->
-        <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
+    <!-- ✅ 상단 레이아웃: 대표 이미지(좌) + 정보 블록(우) -->
+    <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
 
-            <!-- ✅ 왼쪽: 대표 이미지 + 이미지 하단(전화/운영시간) -->
-            <div class="space-y-4">
-                <div
-                    class="neo-section relative overflow-hidden p-3 md:p-4 bg-slate-50/80 flex items-center justify-center group">
-                    <div
-                        class="absolute inset-0 bg-gradient-to-br from-sky-100/50 via-transparent to-indigo-100/50 pointer-events-none">
-                    </div>
-                    <img id="main_img"
-                        class="relative w-full h-56 md:h-72 object-cover rounded-2xl shadow-[0_18px_30px_rgba(15,23,42,0.25)] border border-white/70 transition-transform duration-500 group-hover:scale-105"
-                        alt="시장 대표 이미지">
-                </div>
-
-                <!-- ✅ 2) 전화번호 + 운영시간: 이미지 하단에 배치 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="tile">
-                        <div class="flex-1">
-                            <div class="text-sm font-extrabold text-slate-700">전화번호</div>
-                            <div id="phone" class="text-lg font-extrabold text-slate-900 mt-1">-</div>
-                        </div>
-                    </div>
-
-                    <div class="tile">
-                        <div class="flex-1">
-                            <div class="text-sm font-extrabold text-slate-700">운영 시간</div>
-                            <div id="opening_hours" class="text-lg font-extrabold text-indigo-600 mt-1">-</div>
-                            <div class="text-xs text-slate-500 mt-2">현장 사정에 따라 변동될 수 있어요.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ✅ 오른쪽: 시장명/주소/주요 품목 (배치 깔끔하게) -->
-                <div class="neo-section p-5 md:p-6 space-y-4">
-                    <div class="tile">
-                        <div class="tile-ico">🏷️</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-extrabold text-slate-700">시장명</div>
-                            <div id="market_name_2" class="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1">-
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tile">
-                        <div class="tile-ico">📍</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-extrabold text-slate-700">주소</div>
-                            <div id="address" class="text-base md:text-lg font-bold text-slate-900 mt-1 break-words">-
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tile">
-                        <div class="tile-ico">🧺</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-extrabold text-slate-700">주요 품목</div>
-                            <div id="main_products" class="text-base md:text-lg font-bold text-slate-900 mt-1">-</div>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 text-center text-xs text-slate-500">
-                        아래 섹션에서 이벤트/시설/교통 안내까지 확인해 보세요.
-                    </div>
-                </div>
-        </section>
-
-        <!-- ✅ 지도 -->
-        <section class="neo-section p-5 md:p-6 mb-8 md:mb-10">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                <div class="text-center md:text-left">
-                    <h2 class="text-xl md:text-2xl font-extrabold text-slate-900">🗺️ 시장 위치</h2>
-                    <p class="text-xs md:text-sm text-slate-500 mt-1">지도를 눌러 위치를 확인하고 주변을 둘러보세요.</p>
-                </div>
-
-                <div class="flex justify-center md:justify-end gap-2">
-                    <button id="btn_kakao_map" type="button" class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-extrabold text-white
-                   bg-gradient-to-r from-blue-600 to-indigo-600 shadow hover:shadow-lg hover:scale-[1.02] transition">
-                        🗺️ 카카오맵에서 보기
-                    </button>
-                </div>
-            </div>
-
-            <div id="map"
-                class="w-full h-60 md:h-72 rounded-2xl border border-white/70 bg-slate-100/80 shadow-[0_20px_40px_rgba(15,23,42,0.18)] overflow-hidden flex items-center justify-center">
-                <span class="text-slate-500 text-sm">지도를 불러오는 중...</span>
-            </div>
-        </section>
-
-        <!-- ✅ 이벤트 / 축제 & 편의시설 -->
-        <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
-            <div class="neo-section p-5 md:p-6">
-                <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">🎉 이벤트 / 축제</h2>
-                <p id="event_info" class="whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed"></p>
-            </div>
-
-            <div class="neo-section p-5 md:p-6">
-                <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">🧩 편의시설</h2>
-                <p id="facilities" class="whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed"></p>
-            </div>
-        </section>
-
-        <!-- ✅ 주차 / 대중교통 -->
-        <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
-            <div class="neo-section p-5 md:p-6">
-                <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">🚗 주차 정보</h2>
-                <p class="text-slate-700 mb-2 text-sm md:text-base">
-                    <strong class="font-extrabold">유무 :</strong> <span id="parking_available"></span>
-                </p>
-                <div id="parking_img_wrap" class="hidden mt-4">
-                    <img id="parking_img"
-                        class="w-full max-h-72 object-cover rounded-2xl border border-white/70 bg-slate-50/90 shadow-[0_16px_30px_rgba(15,23,42,0.22)]"
-                        alt="주차 이미지">
-                </div>
-            </div>
-
-            <div class="neo-section p-5 md:p-6">
-                <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">🚌 대중교통 안내</h2>
-                <p id="transport_info" class="whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed">
-                </p>
-                <div id="transport_img_wrap" class="hidden mt-4">
-                    <img id="transport_img"
-                        class="w-full max-h-72 object-cover rounded-2xl border border-white/70 bg-slate-50/90 shadow-[0_16px_30px_rgba(15,23,42,0.22)]"
-                        alt="대중교통 안내 이미지">
-                </div>
-            </div>
-        </section>
-
-        <!-- ✅ Q&A -->
-        <section class="neo-section p-5 md:p-6 mb-8 md:mb-10">
-            <!-- ✅ 4) 제목 변경 + 글자 키움 -->
-            <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">🙋 자주 묻는 질문</h2>
-
-            <div id="qa_list" class="space-y-5 md:space-y-6"></div>
-
-            <div class="divider-soft my-7"></div>
-
-            <!-- Q&A 작성 폼(사진 업로드 포함) -->
-            <div class="max-w-2xl mx-auto">
-                <h3 class="text-center font-extrabold text-slate-900 mb-4 text-lg md:text-xl">✍️ 질문/답변 추가하기</h3>
-
-                <form id="qaForm" class="space-y-3">
-                    <input id="qaQ" type="text" placeholder="질문을 입력하세요 (예: 주차 가능한가요?)"
-                        class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-
-                    <textarea id="qaA" rows="4" placeholder="답변을 입력하세요"
-                        class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
-
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <label
-                            class="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-extrabold text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
-                            🖼️ 사진 선택
-                            <input id="qaImg" type="file" accept="image/*" class="hidden">
-                        </label>
-
-                        <button id="qaAddBtn" type="submit"
-                            class="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-extrabold text-white
-                     bg-gradient-to-r from-blue-600 to-indigo-600 shadow hover:shadow-lg hover:scale-[1.02] transition">
-                            ➕ Q&A 추가
-                        </button>
-
-                        <button id="qaResetBtn" type="button" class="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-extrabold text-slate-700
-                     bg-white border border-slate-200 hover:bg-slate-50 transition">
-                            ↩️ 초기화
-                        </button>
-                    </div>
-
-                    <div id="qaPreviewWrap" class="hidden">
-                        <div class="mt-2 text-sm font-bold text-slate-700">미리보기</div>
-                        <img id="qaPreview"
-                            class="mt-2 rounded-2xl w-full max-h-[420px] object-contain border border-white/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.18)]"
-                            alt="Q&A 이미지 미리보기">
-                    </div>
-
-                    <p id="qaHint" class="text-xs text-slate-500 text-center pt-1"></p>
-                </form>
-            </div>
-        </section>
-
-        <!-- ✅ 운영자 한마디 -->
-        <section class="neo-section p-5 md:p-6 mb-4 md:mb-6">
-            <h2 class="text-xl md:text-2xl font-extrabold mb-4 text-center text-slate-900">💬 운영자 한마디</h2>
-            <p id="free_pr" class="whitespace-pre-line text-slate-700 break-words text-sm md:text-base leading-relaxed">
-            </p>
-        </section>
-
-    </div>
-
-    <!-- 우측 하단 고정 네비 -->
-    <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
-        <div class="flex flex-col items-center">
-            <button onclick="goBack()"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-gray-100 text-gray-800 border border-gray-200 shadow hover:bg-gray-50 transition">←</button>
-            <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
+      <!-- 좌측: 대표 이미지 + (이미지 하단) 전화번호/운영시간 -->
+      <div class="space-y-4">
+        <div class="neo-section relative overflow-hidden p-3 md:p-4 bg-slate-50/80 flex items-center justify-center group">
+          <div class="absolute inset-0 bg-gradient-to-br from-sky-100/50 via-transparent to-indigo-100/50 pointer-events-none"></div>
+          <img id="main_img"
+            class="relative w-full h-52 md:h-64 object-cover rounded-2xl shadow-[0_18px_30px_rgba(15,23,42,0.25)] border border-white/70 transition-transform duration-500 group-hover:scale-105"
+            alt="시장 대표 이미지">
         </div>
-        <div class="flex flex-col items-center">
-            <button onclick="goNext()"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-gray-100 text-gray-800 border border-gray-200 shadow hover:bg-gray-50 transition">→</button>
-            <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
-        </div>
-        <div class="flex flex-col items-center">
-            <a href="/index.html"
-                class="w-14 h-14 flex items-center justify-center rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 transition">🏠</a>
-            <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
-        </div>
-    </div>
 
-    <script>
-        const params = new URLSearchParams(location.search);
-        const id = params.get("id");
-
-        let __mapCoords = null; // { lat, lng }
-        let __mapAddress = "";
-        let __marketName = "";
-
-        const $ = (x) => document.getElementById(x);
-
-        if (!id) {
-            alert("잘못된 접근입니다. ID가 필요합니다.");
-            location.href = "/";
-        }
-
-        function normalizeImgPath(raw, fallback, defaultPrefix = "/uploads/traditionalmarket/") {
-            if (!raw) return fallback;
-            const v = String(raw).trim();
-            if (!v) return fallback;
-            if (v.startsWith("http://") || v.startsWith("https://")) return v;
-            if (v.startsWith("/")) return v;
-            return `${defaultPrefix}${v}`;
-        }
-
-        function withKakao(callback) {
-            const start = Date.now();
-            const tick = () => {
-                if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === "function") {
-                    window.kakao.maps.load(callback);
-                    return;
-                }
-                if (Date.now() - start > 4000) return;
-                setTimeout(tick, 50);
-            };
-            tick();
-        }
-
-        function drawMap(lat, lng) {
-            const mapEl = $("map");
-            if (!mapEl) return;
-
-            withKakao(() => {
-                try {
-                    const center = new kakao.maps.LatLng(lat, lng);
-                    const map = new kakao.maps.Map(mapEl, { center, level: 3 });
-                    new kakao.maps.Marker({ map, position: center });
-
-                    setTimeout(() => {
-                        map.relayout();
-                        map.setCenter(center);
-                    }, 50);
-                } catch (e) {
-                    console.error(e);
-                    mapEl.innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도를 표시할 수 없습니다.</p>';
-                }
-            });
-        }
-
-        function drawMapByAddress(address) {
-            const mapEl = $("map");
-            if (!mapEl) return;
-
-            withKakao(() => {
-                try {
-                    const geocoder = new kakao.maps.services.Geocoder();
-                    geocoder.addressSearch(address, (result, status) => {
-                        if (status === kakao.maps.services.Status.OK && result && result[0]) {
-                            const lat = parseFloat(result[0].y);
-                            const lng = parseFloat(result[0].x);
-                            drawMap(lat, lng);
-                            __mapCoords = { lat, lng };
-                        } else {
-                            mapEl.innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">주소로 지도를 찾을 수 없습니다.</p>';
-                        }
-                    });
-                } catch (e) {
-                    console.error(e);
-                    mapEl.innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도를 표시할 수 없습니다.</p>';
-                }
-            });
-        }
-
-        function openKakaoMap() {
-            const name = encodeURIComponent(__marketName || "시장 위치");
-            if (__mapCoords && typeof __mapCoords.lat === "number") {
-                const url = `https://map.kakao.com/link/map/${name},${__mapCoords.lat},${__mapCoords.lng}`;
-                window.open(url, "_blank", "noopener,noreferrer");
-                return;
-            }
-            const addr = (__mapAddress || "").trim();
-            if (addr) {
-                const url = `https://map.kakao.com/link/search/${encodeURIComponent(addr)}`;
-                window.open(url, "_blank", "noopener,noreferrer");
-                return;
-            }
-            alert("주소/좌표 정보가 없습니다.");
-        }
-
-        function renderQA(list) {
-            const wrap = $("qa_list");
-            if (!wrap) return;
-
-            if (!list || !list.length) {
-                wrap.innerHTML = "<p class='text-slate-500 text-center text-sm md:text-base'>등록된 Q&A가 없습니다.</p>";
-                return;
-            }
-
-            wrap.innerHTML = list.map(item => {
-                const q = (item?.q ?? "").toString();
-                const a = (item?.a ?? "").toString();
-                let img = item?.img ?? "";
-
-                if (img && !String(img).startsWith("http") && !String(img).startsWith("/")) {
-                    img = `/uploads/traditionalmarket/${String(img).trim()}`;
-                }
-
-                return `
-          <div class="border border-slate-200/80 rounded-2xl p-4 md:p-5 bg-slate-50/90 shadow-[0_14px_30px_rgba(15,23,42,0.12)]">
-            <p class="text-base md:text-lg font-extrabold mb-2 text-slate-900">Q. ${q}</p>
-            <p class="whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed">${a}</p>
-            ${img ? `<img src="${img}" class="mt-3 rounded-2xl w-full max-h-[420px] object-contain border border-white/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.18)]">` : ""}
+        <!-- ✅ 전화번호/운영시간: 이미지 하단 배치 (아이콘/전화하기/복사 제거) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="tile">
+            <div class="flex-1">
+              <div class="text-sm font-extrabold text-slate-700">전화번호</div>
+              <div id="phone" class="text-lg font-extrabold text-slate-900 mt-1">-</div>
+            </div>
           </div>
-        `;
-            }).join("");
-        }
 
-        function localQaKey() {
-            return `traditionalmarket_qa_${id}`;
-        }
+          <div class="tile">
+            <div class="flex-1">
+              <div class="text-sm font-extrabold text-slate-700">운영 시간</div>
+              <div id="opening_hours" class="text-lg font-extrabold text-indigo-600 mt-1">-</div>
+              <div class="text-xs text-slate-500 mt-2">현장 사정에 따라 변동될 수 있어요.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        function loadLocalQa() {
-            try {
-                const raw = localStorage.getItem(localQaKey());
-                const arr = raw ? JSON.parse(raw) : [];
-                return Array.isArray(arr) ? arr : [];
-            } catch {
-                return [];
+      <!-- 우측: ✅ 요청한 정보 블록(🏷️/📍/🧺 + 안내문) → 이미지 옆 -->
+      <div class="neo-section p-5 md:p-6">
+        <div class="space-y-5">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl leading-none mt-0.5">🏷️</div>
+            <div class="min-w-0">
+              <div class="text-xs font-black text-slate-500">시장명</div>
+              <div id="market_name_2" class="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight break-words"></div>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="text-2xl leading-none mt-0.5">📍</div>
+            <div class="min-w-0">
+              <div class="text-xs font-black text-slate-500">주소</div>
+              <div id="address" class="text-base md:text-lg font-bold text-slate-900 leading-snug break-words">-</div>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="text-2xl leading-none mt-0.5">🧺</div>
+            <div class="min-w-0">
+              <div class="text-xs font-black text-slate-500">주요 품목</div>
+              <div id="main_products" class="text-base md:text-lg font-bold text-slate-900 leading-snug break-words">-</div>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-200/70 text-sm md:text-base text-slate-600">
+            아래 섹션에서 <span class="font-extrabold text-slate-800">이벤트/시설/교통 안내</span>까지 확인해 보세요.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 지도 -->
+    <section class="neo-section p-5 md:p-6 mb-8 md:mb-10">
+      <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+        🗺️ 시장 위치
+      </h2>
+      <p class="text-xs md:text-sm text-slate-500 text-center mb-3">
+        지도를 눌러 위치를 확인하고 주변을 둘러보세요.
+      </p>
+
+      <!-- ✅ 높이 확실히 -->
+      <div id="map"
+        class="w-full h-64 md:h-80 rounded-2xl border border-white/70 bg-slate-100/80 shadow-[0_20px_40px_rgba(15,23,42,0.18)] overflow-hidden"
+        style="min-height: 260px;"></div>
+    </section>
+
+    <!-- 이벤트 / 축제 & 편의시설 -->
+    <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
+      <div class="neo-section p-5 md:p-6">
+        <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+          🎉 이벤트 / 축제
+        </h2>
+        <p id="event_info" class="content-text whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed"></p>
+      </div>
+
+      <div class="neo-section p-5 md:p-6">
+        <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+          🧩 편의시설
+        </h2>
+        <p id="facilities" class="content-text whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed"></p>
+      </div>
+    </section>
+
+    <!-- 주차 / 대중교통 -->
+    <section class="grid md:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
+      <div class="neo-section p-5 md:p-6">
+        <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+          🚗 주차 정보
+        </h2>
+        <p class="content-text text-slate-700 mb-2 text-sm md:text-base">
+          <strong class="font-semibold">유무 :</strong>
+          <span id="parking_available"></span>
+        </p>
+
+        <div id="parking_img_wrap" class="hidden mt-4">
+          <img id="parking_img"
+            class="w-full max-h-72 object-cover rounded-2xl border border-white/70 bg-slate-50/90 shadow-[0_16px_30px_rgba(15,23,42,0.22)]"
+            alt="주차 이미지">
+        </div>
+      </div>
+
+      <div class="neo-section p-5 md:p-6">
+        <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+          🚌 대중교통 안내
+        </h2>
+        <p id="transport_info"
+          class="content-text whitespace-pre-line text-slate-700 text-sm md:text-base leading-relaxed"></p>
+
+        <div id="transport_img_wrap" class="hidden mt-4">
+          <img id="transport_img"
+            class="w-full max-h-72 object-cover rounded-2xl border border-white/70 bg-slate-50/90 shadow-[0_16px_30px_rgba(15,23,42,0.22)]"
+            alt="대중교통 안내 이미지">
+        </div>
+      </div>
+    </section>
+
+    <!-- Q&A -->
+    <section class="neo-section p-5 md:p-6 mb-8 md:mb-10">
+      <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+        ❓ Q&A
+      </h2>
+      <div id="qa_list" class="space-y-5 md:space-y-6"></div>
+    </section>
+
+    <!-- 운영자 한마디 -->
+    <section class="neo-section p-5 md:p-6 mb-4 md:mb-6">
+      <h2 class="text-lg md:text-xl font-extrabold mb-3 md:mb-4 text-center text-slate-800">
+        💬 운영자 한마디
+      </h2>
+      <p id="free_pr" class="content-text whitespace-pre-line text-slate-700 break-words text-sm md:text-base leading-relaxed"></p>
+    </section>
+
+  </div>
+
+  <!-- 우측 하단 고정 네비 -->
+  <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
+    <div class="flex flex-col items-center">
+      <button onclick="goBack()"
+        class="w-14 h-14 flex items-center justify-center rounded-full bg-gray-100 text-gray-800 border border-gray-200 shadow hover:bg-gray-50 transition">←</button>
+      <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
+    </div>
+    <div class="flex flex-col items-center">
+      <button onclick="goNext()"
+        class="w-14 h-14 flex items-center justify-center rounded-full bg-gray-100 text-gray-800 border border-gray-200 shadow hover:bg-gray-50 transition">→</button>
+      <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
+    </div>
+    <div class="flex flex-col items-center">
+      <a href="/index.html"
+        class="w-14 h-14 flex items-center justify-center rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 transition">🏠</a>
+      <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+
+    if (!id) {
+      alert("잘못된 접근입니다. ID가 필요합니다.");
+      location.href = "/";
+    }
+
+    // ✅ 카카오맵 로더: 지도 안 보이는 문제(autoload/로드 타이밍) 해결
+    function waitKakaoMaps() {
+      return new Promise((resolve, reject) => {
+        try {
+          if (window.kakao && kakao.maps && kakao.maps.load) {
+            kakao.maps.load(resolve);
+            return;
+          }
+
+          const s = $("kakao-sdk");
+          if (!s) {
+            reject(new Error("Kakao SDK script tag not found"));
+            return;
+          }
+
+          s.addEventListener("load", () => {
+            if (window.kakao && kakao.maps && kakao.maps.load) {
+              kakao.maps.load(resolve);
+            } else {
+              reject(new Error("Kakao maps not available after script load"));
             }
+          }, { once: true });
+
+          s.addEventListener("error", () => reject(new Error("Kakao SDK load error")), { once: true });
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
+    async function loadDetail() {
+      try {
+        const res = await fetch(`/api/market/${id}`);
+        const json = await res.json();
+
+        if (!json.success || !json.data) {
+          alert("데이터를 불러올 수 없습니다.");
+          return;
         }
 
-        function saveLocalQa(list) {
-            try {
-                localStorage.setItem(localQaKey(), JSON.stringify(list));
-            } catch { }
+        const data = json.data;
+
+        // 기본 정보
+        $("market_name").textContent = data.market_name || "-";
+        $("market_name_2").textContent = data.market_name || "-";
+        $("address").textContent = data.address || "-";
+        $("phone").textContent = data.phone || "-";
+        $("opening_hours").textContent = data.opening_hours || "-";
+        $("main_products").textContent = data.main_products || "-";
+
+        // 대표 이미지 경로 보정
+        let mainImgPath = "/uploads/traditionalmarket/default.jpg";
+        if (data.main_img) {
+          const raw = String(data.main_img).trim();
+          if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/uploads")) {
+            mainImgPath = raw;
+          } else {
+            mainImgPath = `/uploads/traditionalmarket/${raw}`;
+          }
+        }
+        $("main_img").src = mainImgPath;
+
+        // 텍스트 정보
+        $("event_info").textContent = data.event_info || "";
+        $("facilities").textContent = data.facilities || "";
+        $("parking_available").textContent = data.parking_available || "";
+        $("transport_info").textContent = data.transport_info || "";
+        $("free_pr").textContent = data.free_pr || "";
+
+        // 주차 이미지
+        if (data.parking_img) {
+          $("parking_img_wrap").classList.remove("hidden");
+          $("parking_img").src = data.parking_img;
         }
 
-        function fileToDataURL(file) {
-            return new Promise((resolve, reject) => {
-                const r = new FileReader();
-                r.onload = () => resolve(String(r.result || ""));
-                r.onerror = reject;
-                r.readAsDataURL(file);
-            });
+        // 교통 이미지
+        if (data.transport_img) {
+          $("transport_img_wrap").classList.remove("hidden");
+          $("transport_img").src = data.transport_img;
         }
 
-        async function loadDetail() {
-            try {
-                const res = await fetch(`/api/market/${id}`);
-                const json = await res.json();
-
-                if (!json.success || !json.data) {
-                    alert("데이터를 불러올 수 없습니다.");
-                    return;
-                }
-
-                const data = json.data;
-
-                const marketName = data.market_name || "시장명 없음";
-                const addr = data.address || "-";
-                const ph = data.phone || "-";
-                const products = data.main_products || "-";
-                const hours = data.opening_hours || "-";
-
-                __marketName = marketName;
-                __mapAddress = addr;
-
-                $("market_name").textContent = marketName;
-                $("market_name_2").textContent = marketName;
-                $("address").textContent = addr;
-                $("phone").textContent = ph;
-                $("main_products").textContent = products;
-                $("opening_hours").textContent = hours;
-
-                
-                $("main_img").src = normalizeImgPath(data.main_img, "/uploads/traditionalmarket/default.jpg");
-
-                $("event_info").textContent = data.event_info || "";
-                $("facilities").textContent = data.facilities || "";
-                $("parking_available").textContent = data.parking_available || "";
-                $("transport_info").textContent = data.transport_info || "";
-                $("free_pr").textContent = data.free_pr || "";
-
-                if (data.parking_img) {
-                    $("parking_img_wrap").classList.remove("hidden");
-                    $("parking_img").src = normalizeImgPath(data.parking_img, data.parking_img, "/uploads/traditionalmarket/");
-                }
-                if (data.transport_img) {
-                    $("transport_img_wrap").classList.remove("hidden");
-                    $("transport_img").src = normalizeImgPath(data.transport_img, data.transport_img, "/uploads/traditionalmarket/");
-                }
-
-                let qaList = [];
-                try {
-                    if (data.qa_list) {
-                        qaList = typeof data.qa_list === "string" ? JSON.parse(data.qa_list) : data.qa_list;
-                    }
-                } catch (e) {
-                    console.error("Q&A 파싱 오류:", e);
-                }
-                if (!Array.isArray(qaList)) qaList = [];
-
-                const local = loadLocalQa();
-                renderQA([...qaList, ...local]);
-
-                if (data.lat && data.lng) {
-                    __mapCoords = { lat: Number(data.lat), lng: Number(data.lng) };
-                    drawMap(__mapCoords.lat, __mapCoords.lng);
-                } else if (addr && addr !== "-") {
-                    drawMapByAddress(addr);
-                } else {
-                    $("map").innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도 정보가 없습니다.</p>';
-                }
-            } catch (err) {
-                console.error("데이터 로드 오류:", err);
-                alert("데이터를 불러오는 중 오류가 발생했습니다.");
-            }
+        // Q&A - 안전한 파싱
+        let qaList = [];
+        try {
+          if (data.qa_list) qaList = typeof data.qa_list === "string" ? JSON.parse(data.qa_list) : data.qa_list;
+        } catch (e) {
+          console.error("Q&A 파싱 오류:", e);
         }
+        renderQA(qaList);
 
-        function setupQaForm() {
-            const qaForm = $("qaForm");
-            const qaQ = $("qaQ");
-            const qaA = $("qaA");
-            const qaImg = $("qaImg");
-            const qaPreviewWrap = $("qaPreviewWrap");
-            const qaPreview = $("qaPreview");
-            const qaResetBtn = $("qaResetBtn");
-            const qaHint = $("qaHint");
-
-            if (!qaForm) return;
-
-            let selectedFile = null;
-
-            qaImg.addEventListener("change", () => {
-                const f = qaImg.files && qaImg.files[0] ? qaImg.files[0] : null;
-                selectedFile = f;
-                if (!f) {
-                    qaPreviewWrap.classList.add("hidden");
-                    qaPreview.src = "";
-                    return;
-                }
-                const url = URL.createObjectURL(f);
-                qaPreview.src = url;
-                qaPreviewWrap.classList.remove("hidden");
-            });
-
-            qaResetBtn.addEventListener("click", () => {
-                qaQ.value = "";
-                qaA.value = "";
-                qaImg.value = "";
-                selectedFile = null;
-                qaPreviewWrap.classList.add("hidden");
-                qaPreview.src = "";
-                qaHint.textContent = "";
-            });
-
-            qaForm.addEventListener("submit", async (e) => {
-                e.preventDefault();
-
-                const q = (qaQ.value || "").trim();
-                const a = (qaA.value || "").trim();
-                if (!q || !a) {
-                    qaHint.textContent = "질문과 답변을 모두 입력해 주세요.";
-                    return;
-                }
-
-                let imgData = "";
-                if (selectedFile) {
-                    try { imgData = await fileToDataURL(selectedFile); } catch { imgData = ""; }
-                }
-
-                const local = loadLocalQa();
-                local.push({ q, a, img: imgData });
-                saveLocalQa(local);
-
-                await loadDetail();
-
-                qaResetBtn.click();
-                qaHint.textContent = "✅ Q&A가 추가되었습니다. (현재는 브라우저에 저장됨)";
-                setTimeout(() => (qaHint.textContent = ""), 1500);
-            });
+        // 지도
+        if (data.lat && data.lng) {
+          drawMap(data.lat, data.lng);
+        } else if (data.address) {
+          drawMapByAddress(data.address);
+        } else {
+          $("map").innerHTML =
+            '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도 정보가 없습니다.</p>';
         }
+      } catch (err) {
+        console.error("데이터 로드 오류:", err);
+        alert("데이터를 불러오는 중 오류가 발생했습니다.");
+      }
+    }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            $("btn_kakao_map")?.addEventListener("click", openKakaoMap);
-            setupQaForm();
-            loadDetail();
+    function renderQA(list) {
+      const wrap = $("qa_list");
+
+      if (!list || !list.length) {
+        wrap.innerHTML = "<p class='text-slate-500 text-center text-sm md:text-base'>등록된 Q&A가 없습니다.</p>";
+        return;
+      }
+
+      wrap.innerHTML = list.map(item => `
+        <div class="border border-slate-200/80 rounded-2xl p-4 md:p-5 bg-slate-50/90 shadow-[0_14px_30px_rgba(15,23,42,0.12)]">
+          <p class="text-base md:text-lg font-extrabold mb-2 text-slate-900">Q. ${item.q || ""}</p>
+          <p class="content-text whitespace-pre-line text-slate-700 text-sm md:text-base">${item.a || ""}</p>
+          ${item.img
+            ? `<img src="${item.img}" class="mt-3 rounded-2xl w-full max-h-[420px] object-contain border border-white/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.18)]">`
+            : ""
+          }
+        </div>
+      `).join("");
+    }
+
+    function drawMap(lat, lng) {
+      const mapEl = $("map");
+      waitKakaoMaps().then(() => {
+        const pos = new kakao.maps.LatLng(lat, lng);
+        const map = new kakao.maps.Map(mapEl, { center: pos, level: 3 });
+        new kakao.maps.Marker({ map, position: pos });
+
+        // ✅ 레이아웃/리사이즈 타이밍 보정(지도 안 보이는 케이스 대응)
+        setTimeout(() => {
+          map.relayout();
+          map.setCenter(pos);
+        }, 0);
+      }).catch(err => {
+        console.error("카카오맵 로드 실패:", err);
+        mapEl.innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도를 불러올 수 없습니다.</p>';
+      });
+    }
+
+    function drawMapByAddress(address) {
+      const mapEl = $("map");
+      waitKakaoMaps().then(() => {
+        const geocoder = new kakao.maps.services.Geocoder();
+        geocoder.addressSearch(address, (result, status) => {
+          if (status === kakao.maps.services.Status.OK && result && result[0]) {
+            const lat = parseFloat(result[0].y);
+            const lng = parseFloat(result[0].x);
+            drawMap(lat, lng);
+          } else {
+            mapEl.innerHTML =
+              '<p class="text-slate-500 text-center py-10 text-sm md:text-base">주소로 지도를 찾을 수 없습니다.</p>';
+          }
         });
+      }).catch(err => {
+        console.error("카카오맵 로드 실패:", err);
+        mapEl.innerHTML = '<p class="text-slate-500 text-center py-10 text-sm md:text-base">지도를 불러올 수 없습니다.</p>';
+      });
+    }
 
-        function goBack() { window.history.back(); }
-        function goNext() { window.history.forward(); }
-    </script>
+    function goBack() { window.history.back(); }
+    function goNext() { window.history.forward(); }
+
+    document.addEventListener("DOMContentLoaded", loadDetail);
+  </script>
+
 </body>
-
 </html>
