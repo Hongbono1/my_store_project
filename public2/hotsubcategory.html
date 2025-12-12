@@ -18,13 +18,17 @@
     .neo-card {
       background: #fff;
       border-radius: 1.25rem;
-      box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.08), -8px -8px 16px rgba(255, 255, 255, 0.9);
+      box-shadow:
+        8px 8px 16px rgba(0, 0, 0, 0.08),
+        -8px -8px 16px rgba(255, 255, 255, 0.9);
       transition: all .25s ease;
     }
 
     .neo-card:hover {
       transform: translateY(-4px);
-      box-shadow: 10px 10px 25px rgba(0, 0, 0, 0.12), -6px -6px 16px rgba(255, 255, 255, 0.8);
+      box-shadow:
+        10px 10px 25px rgba(0, 0, 0, 0.12),
+        -6px -6px 16px rgba(255, 255, 255, 0.8);
     }
 
     .text-gradient {
@@ -68,24 +72,29 @@
 </head>
 
 <body class="min-h-screen">
-  <!-- Header -->
+  <!-- ✅ 헤더 -->
   <div id="header"></div>
 
-  <!-- Hero -->
+  <!-- ✅ 상단 타이틀 -->
   <section class="text-center py-10 fade-in">
-    <h1 id="heroTitle" class="text-3xl sm:text-4xl font-bold mb-2 text-gradient">🔥 핫 서브카테고리</h1>
-    <p id="heroDesc" class="text-gray-500 text-sm">food / cafe만 랜덤으로 노출됩니다.</p>
+    <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-gradient">🌦️ 오늘의 테마 추천</h1>
+    <p class="text-gray-500 text-sm">
+      사장님들이 작성한 핫 블로그를 카드 형식으로 모아서 보여줍니다.
+    </p>
   </section>
 
-  <!-- Grid -->
+  <!-- ✅ 카드 목록 -->
   <main id="cardGrid"
     class="max-w-6xl mx-auto px-4 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <!-- JS에서 카드 렌더링 -->
   </main>
 
-  <!-- Pagination -->
-  <div id="pagination" class="max-w-6xl mx-auto px-4 pb-12 flex justify-center flex-wrap gap-2"></div>
+  <!-- ✅ 페이지 번호 -->
+  <div id="pagination"
+    class="max-w-6xl mx-auto px-4 pb-12 flex justify-center flex-wrap gap-2">
+  </div>
 
-  <!-- Footer -->
+  <!-- ✅ 푸터 -->
   <div id="footer"></div>
 
   <script>
@@ -93,20 +102,10 @@
 
     const cardGrid = $("#cardGrid");
     const pagination = $("#pagination");
-    const heroTitle = $("#heroTitle");
-    const heroDesc = $("#heroDesc");
 
-    // ✅ food/cafe만 허용 (그 외 전부 삭제/제외)
-    const ALLOWED = ["food", "cafe"];
-    const CATEGORY_LABEL = {
-      food: "오늘의 한식 맛집",
-      cafe: "감성 카페 리스트"
-    };
-
-    let allItems = [];       // 필터(허용)된 전체 목록
-    let viewItems = [];      // 현재 화면에 적용된 목록(카테고리 쿼리 적용 후)
+    let allItems = [];    // 전체 카드 데이터(디테일 목록)
     let currentPage = 1;
-    const perPage = 12;
+    const perPage = 12;   // 👉 한 페이지에 12개만
 
     // ✅ 헤더/푸터 로드
     Promise.all([
@@ -123,7 +122,7 @@
       );
     }
 
-    // ✅ 랜덤 섞기(로드 시 1회)
+    // ✅ 배열 랜덤 섞기 (로드할 때 한 번만)
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -132,53 +131,52 @@
       return arr;
     }
 
-    function getQueryCategory() {
-      const params = new URLSearchParams(location.search);
-      const cat = (params.get("category") || "").toLowerCase().trim();
-      return ALLOWED.includes(cat) ? cat : "";
-    }
-
-    async function loadList() {
+    // ✅ 서버에서 핫 블로그 목록 가져오기
+    async function loadHotSubList() {
       try {
         const res = await fetch("/api/hotsubcategory");
         const json = await res.json();
-        console.log("🔥 /api/hotsubcategory:", json);
+        console.log("🔥 /api/hotsubcategory 응답:", json);
 
-        // 서버가 ok/data 형태로 내려준다는 전제 (네가 올린 코드 스타일 그대로)
         if (!json.ok || !Array.isArray(json.data)) {
-          throw new Error("데이터 형식 오류 (ok/data)");
+          throw new Error("데이터 형식이 올바르지 않습니다.");
         }
 
-        // ✅ 정규화: 카드에 필요한 필드만 뽑고 category를 food/cafe만 남김
-        // - categoryKey: row.category (food/cafe/...)
-        // - cover: 대표 이미지 (thumbnail_url/cover_image/image_url)
-        // - storeName: 상호( store_name > business_name > title )
-        // - bizType: 업종(있으면 사용, 없으면 food/cafe 라벨로 대체)
-        const normalized = json.data.map(row => {
-          const categoryKey = String(row.category ?? "").toLowerCase().trim();
-          const cover = row.thumbnail_url || row.cover_image || row.image_url || "/uploads/default.jpg";
-          const storeName = row.store_name || row.business_name || row.title || "";
+        // 🔗 핫 블로그 디테일과 동일한 정보(이미지, 상호, 업종)를 카드용으로 정리
+        allItems = json.data.map(row => {
+          const id = row.id;
+
+          // 대표 이미지: 디테일에서 쓰는 cover 이미지와 동일하게 맞추기
+          const cover =
+            row.cover_image ||
+            row.thumbnail_url ||
+            row.image_url ||
+            "/uploads/default.jpg";
+
+          // 상호: store_name / business_name / title 순으로 최대한 맞춰줌
+          const storeName =
+            row.store_name ||
+            row.business_name ||
+            row.title ||
+            "";
+
+          // 업종: business_category / store_category / category 중에서 선택
           const bizType =
             row.business_category ||
             row.store_category ||
-            row.business_subcategory ||
-            (CATEGORY_LABEL[categoryKey] ? CATEGORY_LABEL[categoryKey] : "업종");
+            row.category ||
+            "업종 미입력";
 
-          return {
-            id: row.id,
-            categoryKey,
-            cover,
-            storeName,
-            bizType
-          };
-        }).filter(x => ALLOWED.includes(x.categoryKey)); // ✅ 여기서 food/cafe만 남김
+          return { id, cover, storeName, bizType };
+        });
 
-        // ✅ 랜덤 섞기 (전체 리스트 기준)
-        allItems = shuffle([...normalized]);
+        // 👉 여기서 전부 랜덤 섞기
+        shuffle(allItems);
 
-        applyCategoryFromQuery();
-      } catch (e) {
-        console.error("❌ loadList:", e);
+        currentPage = 1;
+        render();
+      } catch (err) {
+        console.error("❌ loadHotSubList 오류:", err);
         cardGrid.innerHTML = `
           <div class="col-span-full text-center text-gray-500 py-12">
             데이터를 불러오지 못했습니다.
@@ -188,34 +186,18 @@
       }
     }
 
-    function applyCategoryFromQuery() {
-      const cat = getQueryCategory(); // "" or "food" or "cafe"
-
-      if (cat) {
-        heroTitle.textContent = CATEGORY_LABEL[cat] || "핫 서브카테고리";
-        heroDesc.textContent = "해당 카테고리만 랜덤으로 노출됩니다.";
-        // 카테고리별로도 랜덤이 되게: 필터 후 다시 섞기
-        viewItems = shuffle(allItems.filter(x => x.categoryKey === cat));
-      } else {
-        heroTitle.textContent = "🔥 핫 서브카테고리";
-        heroDesc.textContent = "food / cafe만 랜덤으로 노출됩니다.";
-        viewItems = [...allItems];
-      }
-
-      currentPage = 1;
-      render();
-    }
-
+    // ✅ 전체 렌더링
     function render() {
       renderCards();
       renderPagination();
     }
 
+    // ✅ 카드 렌더링 (위: 이미지 / 아래: 상호 + 업종)
     function renderCards() {
-      if (!viewItems.length) {
+      if (!allItems.length) {
         cardGrid.innerHTML = `
           <div class="col-span-full text-center text-gray-500 py-12">
-            표시할 데이터가 없습니다. (food/cafe만 남겼습니다)
+            등록된 핫 블로그가 아직 없습니다.
           </div>
         `;
         return;
@@ -223,33 +205,36 @@
 
       const start = (currentPage - 1) * perPage;
       const end = start + perPage;
-      const pageItems = viewItems.slice(start, end);
+      const pageItems = allItems.slice(start, end);
 
       cardGrid.innerHTML = pageItems.map(item => `
-        <article class="neo-card overflow-hidden cursor-pointer fade-in"
+        <article
+          class="neo-card overflow-hidden cursor-pointer fade-in"
           onclick="location.href='/hotblogdetail.html?id=${encodeURIComponent(item.id)}'">
           <!-- 상단 이미지 -->
           <div class="relative aspect-[4/3] overflow-hidden">
-            <img src="${item.cover}" alt="${escapeHtml(item.storeName)}"
+            <img
+              src="${item.cover}"
+              alt="${escapeHtml(item.storeName || "가게 이미지")}"
               class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
-            <div class="absolute top-3 left-3">
-              <span class="text-xs px-2 py-1 rounded-full bg-white/90 border border-gray-200 shadow">
-                ${escapeHtml(item.categoryKey)}
-              </span>
-            </div>
           </div>
 
           <!-- 하단 상호 / 업종 -->
           <div class="p-4 text-center">
-            <p class="text-base font-semibold">${escapeHtml(item.storeName || "상호 미입력")}</p>
-            <p class="text-sm text-gray-500 mt-1">${escapeHtml(item.bizType || "업종 미입력")}</p>
+            <p class="text-base font-semibold">
+              ${escapeHtml(item.storeName || "상호 미입력")}
+            </p>
+            <p class="text-sm text-gray-500 mt-1">
+              ${escapeHtml(item.bizType || "업종 미입력")}
+            </p>
           </div>
         </article>
       `).join("");
     }
 
+    // ✅ 페이지 번호 렌더링 (12개 넘으면 자동으로 2,3,4... 생성)
     function renderPagination() {
-      const totalPages = Math.ceil(viewItems.length / perPage);
+      const totalPages = Math.ceil(allItems.length / perPage);
 
       if (totalPages <= 1) {
         pagination.innerHTML = "";
@@ -266,35 +251,59 @@
       let html = "";
 
       // 이전
-      html += `<button class="page-btn" ${currentPage === 1 ? "disabled style='opacity:.5;cursor:not-allowed'" : ""} data-page="${currentPage - 1}">이전</button>`;
+      html += `
+        <button class="page-btn"
+          ${currentPage === 1 ? "disabled style='opacity:.5;cursor:not-allowed'" : ""}
+          data-page="${currentPage - 1}">
+          이전
+        </button>
+      `;
 
-      // 1 ... 
+      // 1 ...
       if (start > 1) {
         html += `<button class="page-btn" data-page="1">1</button>`;
-        if (start > 2) html += `<span class="px-2 text-gray-400">…</span>`;
+        if (start > 2) {
+          html += `<span class="px-2 text-gray-400">…</span>`;
+        }
       }
 
       // 중간 페이지들
       for (let p = start; p <= end; p++) {
-        html += `<button class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`;
+        html += `
+          <button class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">
+            ${p}
+          </button>
+        `;
       }
 
       // ... 마지막
       if (end < totalPages) {
-        if (end < totalPages - 1) html += `<span class="px-2 text-gray-400">…</span>`;
+        if (end < totalPages - 1) {
+          html += `<span class="px-2 text-gray-400">…</span>`;
+        }
         html += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
       }
 
       // 다음
-      html += `<button class="page-btn" ${currentPage === totalPages ? "disabled style='opacity:.5;cursor:not-allowed'" : ""} data-page="${currentPage + 1}">다음</button>`;
+      html += `
+        <button class="page-btn"
+          ${currentPage === totalPages ? "disabled style='opacity:.5;cursor:not-allowed'" : ""}
+          data-page="${currentPage + 1}">
+          다음
+        </button>
+      `;
 
       pagination.innerHTML = html;
 
+      // 클릭 이벤트
       pagination.querySelectorAll("button[data-page]").forEach(btn => {
         btn.addEventListener("click", () => {
           const p = Number(btn.dataset.page);
           if (!Number.isFinite(p)) return;
-          if (p < 1 || p > totalPages) return;
+
+          const total = Math.ceil(allItems.length / perPage);
+          if (p < 1 || p > total) return;
+
           currentPage = p;
           renderCards();
           renderPagination();
@@ -303,7 +312,8 @@
       });
     }
 
-    loadList();
+    // ✅ 실행
+    loadHotSubList();
   </script>
 </body>
 
