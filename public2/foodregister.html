@@ -1217,6 +1217,22 @@
         async function onSubmitSimple(e) {
             e.preventDefault();
 
+            // ✅ 제출 직전 이메일 hidden 갱신
+            updateEmail();
+
+            const formEl = qs("#storeForm");
+
+            // ✅ 사업자 인증 체크 (테스트 중인 지금은 이걸로 강제하는 게 맞음)
+            const bizVerifiedVal = (qs("#bizVerified")?.value || "N").trim();
+            const bizNoVal = onlyDigits(qs("#bizNumber")?.value || "");
+
+            console.log("[SUBMIT] bizVerified=", bizVerifiedVal, "bizNumber=", bizNoVal);
+
+            if (bizVerifiedVal !== "Y" || !bizNoVal) {
+                alert("사업자 인증을 먼저 완료해 주세요.");
+                return;
+            }
+
             const businessName = qs("#businessName")?.value.trim();
             const roadAddress = qs("#roadAddress")?.value.trim();
             if (!businessName || !roadAddress) {
@@ -1225,10 +1241,30 @@
             }
 
             const hasAnyMenu = qsa('input[name="menuName[]"]').some(i => i.value.trim() !== "");
-            if (!hasAnyMenu) { alert("메뉴를 최소 1개 이상 입력해 주세요."); return; }
+            if (!hasAnyMenu) {
+                alert("메뉴를 최소 1개 이상 입력해 주세요.");
+                return;
+            }
 
             // 숫자만 남기기 (기존 로직 유지)
             qsa('input[name="menuPrice[]"]').forEach(i => { i.value = onlyDigits(i.value); });
+
+            // ✅ FormData 생성
+            const fd = new FormData(formEl);
+
+            // ✅ 서버가 어떤 키를 기대하든 무조건 잡히게 "동일값"을 여러 키로 주입
+            // (서버가 bizNumber를 안 읽고 business_number나 bizNo를 읽는 경우를 대비)
+            fd.set("bizVerified", bizVerifiedVal);
+            fd.set("bizNumber", bizNoVal);
+            fd.set("bizNo", bizNoVal);
+            fd.set("businessNumber", bizNoVal);
+            fd.set("business_number", bizNoVal);
+
+            // ✅ 확인 로그 (FormData에 실제 들어갔는지 확정)
+            console.log("[SUBMIT] fd.get('bizNumber')=", fd.get("bizNumber"));
+            console.log("[SUBMIT] fd.get('bizNo')=", fd.get("bizNo"));
+            console.log("[SUBMIT] fd.get('businessNumber')=", fd.get("businessNumber"));
+            console.log("[SUBMIT] fd.get('business_number')=", fd.get("business_number"));
 
             // 디버그: 제출 전 입력 개수/요약
             const menuNames = qsa('input[name="menuName[]"]').map(i => i.value.trim()).filter(Boolean);
@@ -1236,8 +1272,6 @@
             const menuCats = qsa('input[name="menuCategory[]"]').map(i => i.value.trim()).filter(Boolean);
             const menuImageInputs = qsa('input[name="menuImage[]"]');
             const menuImageCount = menuImageInputs.reduce((n, el) => n + (el.files?.length || 0), 0);
-
-            const fd = new FormData(qs('#storeForm'));
 
             // 💡 FormData 내용 요약 로거 (파일은 이름/크기만)
             (function logFormDataSummary() {
@@ -1249,50 +1283,47 @@
                         (summary[k] ||= []).push(String(v));
                     }
                 }
-                console.groupCollapsed('[REGISTER] FormData summary');
-                console.log('menuNames:', menuNames.length, menuNames);
-                console.log('menuPrices:', menuPrices.length, menuPrices);
-                console.log('menuCategories:', menuCats.length, menuCats);
-                console.log('menuImage files total:', menuImageCount);
+                console.groupCollapsed("[REGISTER] FormData summary");
+                console.log("menuNames:", menuNames.length, menuNames);
+                console.log("menuPrices:", menuPrices.length, menuPrices);
+                console.log("menuCategories:", menuCats.length, menuCats);
+                console.log("menuImage files total:", menuImageCount);
                 console.dir(summary);
                 console.groupEnd();
             })();
 
             try {
                 const res = await fetch(API.REGISTER, {
-                    method: 'POST',
+                    method: "POST",
                     body: fd,
-                    // 헤더는 넣지 마세요: Content-Type은 브라우저가 boundary 포함해 자동 지정
+                    // Content-Type 헤더는 넣지 마세요 (boundary 자동)
                 });
 
-                // 🔍 응답 메타/헤더/본문(스니펫)까지 로그
                 const meta = {
                     ok: res.ok,
                     status: res.status,
                     statusText: res.statusText,
-                    url: res.url
+                    url: res.url,
                 };
                 const headers = Object.fromEntries(res.headers.entries());
-                const raw = await res.text(); // 본문 선확보 (JSON이 아니어도 확인 가능)
-                const rawSnippet = raw?.slice(0, 2000); // 너무 길면 잘라서
+                const raw = await res.text();
+                const rawSnippet = raw?.slice(0, 2000);
 
-                console.groupCollapsed('[REGISTER] Response debug');
-                console.log('meta:', meta);
-                console.log('headers:', headers);
-                console.log('body(raw):', rawSnippet);
+                console.groupCollapsed("[REGISTER] Response debug");
+                console.log("meta:", meta);
+                console.log("headers:", headers);
+                console.log("body(raw):", rawSnippet);
                 console.groupEnd();
 
                 if (!res.ok) {
-                    // 서버가 에러 메시지를 텍스트로 내려주면 그대로 띄움
-                    throw new Error(`HTTP ${res.status}${rawSnippet ? `: ${rawSnippet}` : ''}`);
+                    throw new Error(`HTTP ${res.status}${rawSnippet ? `: ${rawSnippet}` : ""}`);
                 }
 
-                // OK이면 JSON 파싱 시도
                 let data = {};
                 try {
                     data = raw ? JSON.parse(raw) : {};
                 } catch (e) {
-                    console.warn('[REGISTER] JSON parse 실패, raw 사용:', e);
+                    console.warn("[REGISTER] JSON parse 실패, raw 사용:", e);
                     data = {};
                 }
 
@@ -1301,18 +1332,18 @@
                 // 성공 처리
                 const modal = qs("#successModal");
                 const okBtn = qs("#successOk");
-                const goDetail = () =>
-                    location.href = `/ndetail.html?id=${encodeURIComponent(data.id)}&type=food`;
+                const goDetail = () => location.href = `/ndetail.html?id=${encodeURIComponent(data.id)}&type=food`;
+
                 if (modal) {
                     modal.classList.remove("hidden");
                     if (okBtn) okBtn.onclick = goDetail;
                     setTimeout(goDetail, 1200);
                 } else {
-                    alert("등록 완료!"); goDetail();
+                    alert("등록 완료!");
+                    goDetail();
                 }
-
             } catch (err) {
-                console.error('[REGISTER] 실패:', err);
+                console.error("[REGISTER] 실패:", err);
                 alert("등록 실패: " + (err?.message || "unknown"));
             }
         }
