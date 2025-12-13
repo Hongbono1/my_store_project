@@ -981,63 +981,66 @@
                 return { ok: true, items: json.items, status: res.status };
             }
 
+            function renderTextPreview(defEl, rawText) {
+                const text = (rawText ?? "").toString().trim();
+                const lines = text ? text.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
+                const previewLines = lines.slice(0, 6);
+                const more = lines.length > 6 ? `\n… (+${lines.length - 6}줄)` : "";
+                const finalText = (previewLines.join("\n") + more) || "내용 없음";
+
+                defEl.innerHTML = `
+      <div class="w-full p-3 text-left">
+        <div class="text-[11px] font-extrabold text-slate-600 mb-1">텍스트</div>
+        <div class="text-[12px] leading-relaxed text-slate-900 whitespace-pre-line">${finalText
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#39;")}</div>
+      </div>
+    `;
+            }
+
             /* ============================================================
                ✅ 박스에 적용 (이미지/가게 + 텍스트 미리보기)
             ============================================================ */
             function applySlotToBox(box, slot) {
-                const position = box.dataset.position || "";
                 const img = qs(".slot-img", box);
                 const def = qs(".slot-default", box);
                 const storeBadge = qs(".slot-badge.store", box);
 
-                const isTextOnly =
-                    TEXT_ONLY_POSITIONS.has(position) ||
-                    slot?.slot_type === "text" ||
-                    slot?.slotType === "text";
+                const position = box?.dataset?.position || "";
+                const slotType = slot?.slot_type || slot?.slotType || "";
+                const textContent = slot?.text_content || slot?.textContent || "";
 
-                // store badge 기본 숨김
-                if (storeBadge) {
-                    storeBadge.classList.add("hidden");
-                    storeBadge.textContent = "";
-                }
+                // ✅ 텍스트 전용(4칸) / 혹은 slot_type=text 는 글로 렌더링
+                const isTextSlot =
+                    slotType === "text" ||
+                    position === "index_sub_keywords" ||
+                    position === "index_sub_news" ||
+                    position === "index_sub_events" ||
+                    position === "index_sub_recommends";
 
-                // ✅ 텍스트 전용: text_content를 박스에 표시
-                if (isTextOnly) {
+                if (isTextSlot) {
+                    // 이미지 숨김
                     if (img) {
                         img.classList.add("hidden");
                         img.removeAttribute("src");
                     }
+                    // default 영역에 텍스트 표시
                     if (def) {
-                        // flex 가운데정렬 → 텍스트는 위쪽 정렬로 살짝 변경
-                        def.style.alignItems = "stretch";
-                        def.style.justifyContent = "stretch";
-                        def.style.padding = "0";
-
-                        const raw = (slot?.text_content ?? slot?.textContent ?? slot?.content ?? "").trim();
-                        const lines = raw ? raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
-                        const preview = lines.slice(0, 5).join("\n");
-                        const more = lines.length > 5 ? `\n… (+${lines.length - 5}줄)` : "";
-                        const finalText = preview ? (preview + more) : "내용 없음";
-
-                        def.innerHTML = `
-          <div class="w-full p-3 text-left">
-            <div class="text-[11px] font-extrabold text-slate-700 mb-1">텍스트 미리보기</div>
-            <div class="text-xs text-slate-800 leading-5 whitespace-pre-line">${escapeHtml(finalText)}</div>
-          </div>
-        `;
                         def.classList.remove("hidden");
+                        renderTextPreview(def, textContent);
+                    }
+                    // 가게배지 숨김
+                    if (storeBadge) {
+                        storeBadge.classList.add("hidden");
+                        storeBadge.textContent = "";
                     }
                     return;
                 }
 
-                // ✅ 일반 슬롯(이미지/가게)
-                if (def) {
-                    // 혹시 텍스트 전용에서 바뀐 style 복구
-                    def.style.alignItems = "";
-                    def.style.justifyContent = "";
-                    def.style.padding = "";
-                }
-
+                // ✅ 이미지/가게 슬롯은 기존 방식 유지
                 const imageUrl =
                     slot?.image_url ||
                     slot?.image ||
@@ -1046,11 +1049,11 @@
                     slot?.image_path ||
                     "";
 
-                safeSetImage(img, imageUrl, def);
-
                 const mode = slot?.slot_mode || slot?.slotMode || "";
                 const businessName = slot?.business_name || slot?.businessName || "";
                 const businessNo = slot?.business_no || slot?.businessNo || "";
+
+                safeSetImage(img, imageUrl, def);
 
                 if (storeBadge) {
                     if (mode === "store" && (businessName || businessNo)) {

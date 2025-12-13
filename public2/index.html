@@ -441,20 +441,20 @@
                 }
 
                 // ✅ 다양한 키 패턴 대응
-                const rawImg = 
-                    slot.image_url || 
-                    slot.imageUrl || 
-                    slot.image || 
-                    slot.banner_url || 
-                    slot.img_url || 
-                    slot.image_path || 
+                const rawImg =
+                    slot.image_url ||
+                    slot.imageUrl ||
+                    slot.image ||
+                    slot.banner_url ||
+                    slot.img_url ||
+                    slot.image_path ||
                     "";
 
-                const link = 
-                    slot.link_url || 
-                    slot.linkUrl || 
-                    slot.link || 
-                    slot.href || 
+                const link =
+                    slot.link_url ||
+                    slot.linkUrl ||
+                    slot.link ||
+                    slot.href ||
                     "";
 
                 if (!rawImg || !img) {
@@ -910,6 +910,52 @@
                 window.location.href = `/search?q=${encodeURIComponent(query)}`;
             }
         }
+
+        (async () => {
+            const PAGE = "index";
+
+            const targets = [
+                { id: "slot_index_sub_keywords", position: "index_sub_keywords" },
+                { id: "slot_index_sub_news", position: "index_sub_news" },
+                { id: "slot_index_sub_events", position: "index_sub_events" },
+                { id: "slot_index_sub_recommends", position: "index_sub_recommends" },
+            ];
+
+            async function fetchSlot(position) {
+                const url = `/manager/ad/slot?page=${encodeURIComponent(PAGE)}&position=${encodeURIComponent(position)}`;
+                const res = await fetch(url, { cache: "no-store" });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json?.success || !json?.slot) return null;
+                return json.slot;
+            }
+
+            function renderText(box, rawText) {
+                const def = box.querySelector(".slot-default") || box;
+                const text = (rawText ?? "").toString().trim();
+                const lines = text ? text.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
+                const out = lines.length ? lines.join("\n") : "내용 없음";
+
+                def.innerHTML = `
+      <div style="width:100%; padding:12px; text-align:left;">
+        <div style="font-size:11px; font-weight:800; color:#334155; margin-bottom:6px;">텍스트</div>
+        <div style="font-size:12px; line-height:1.6; color:#0f172a; white-space:pre-line;">${out.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+                    }</div>
+      </div>
+    `;
+            }
+
+            for (const t of targets) {
+                const box = document.getElementById(t.id);
+                if (!box) continue;
+
+                const slot = await fetchSlot(t.position);
+                if (!slot) continue;
+
+                renderText(box, slot.text_content || "");
+            }
+
+            console.log("✅ INDEX TEXT BOXES APPLIED");
+        })();
     </script>
 
 </body>
