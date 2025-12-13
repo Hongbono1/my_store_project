@@ -2,72 +2,2005 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘의 기분별 추천</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>관리자 페이지</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .hidden-section {
+            display: none;
+        }
+
+        .active-link {
+            background: linear-gradient(to right, #60a5fa, #8b5cf6);
+            color: white !important;
+        }
+
+        /* 우측 드로어(세부 정보) */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: none;
+            z-index: 60;
+        }
+
+        .drawer-overlay.show {
+            display: block;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: min(520px, 92vw);
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-left: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: -24px 0 60px rgba(15, 23, 42, 0.15);
+            transform: translateX(110%);
+            transition: transform .25s ease;
+            z-index: 61;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .drawer.show {
+            transform: translateX(0);
+        }
+    </style>
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div class="flex min-h-screen">
 
-    <!-- 상단 헤더 -->
-    <section class="text-center py-10">
-        <h1 class="text-3xl font-bold mb-2">오늘 기분/상황별 추천</h1>
-        <p class="text-gray-600">기분에 맞는 제철 음식과 장소를 선택해보세요</p>
-    </section>
+        <!-- ✅ 사이드바 -->
+        <aside
+            class="w-64 bg-white/60 backdrop-blur-xl border-r border-gray-200 shadow-[8px_8px_20px_rgba(0,0,0,0.1),-8px_-8px_20px_rgba(255,255,255,0.7)] flex flex-col">
+            <div
+                class="p-6 text-center font-extrabold text-2xl bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+                관리자 메뉴
+            </div>
 
-    <!-- 카테고리 버튼 -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mb-10">
-        <button class="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600">🍲 해장 필요</button>
-        <button class="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600">😊 기분 좋음</button>
-        <button class="px-4 py-2 rounded-full bg-gray-500 text-white hover:bg-gray-600">😴 피곤함</button>
-        <button class="px-4 py-2 rounded-full bg-rose-400 text-white hover:bg-rose-500">💕 데이트</button>
-        <button class="px-4 py-2 rounded-full bg-yellow-500 text-white hover:bg-yellow-600">👨‍👩‍👧‍👦 가족 모임</button>
-        <button class="px-4 py-2 rounded-full bg-indigo-500 text-white hover:bg-indigo-600">😔 우울할 때</button>
-        <button class="px-4 py-2 rounded-full bg-green-600 text-white hover:bg-green-700">🍻 회식 자리</button>
-        <button class="px-4 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600">😡 스트레스 </button>
-        <button class="px-4 py-2 rounded-full bg-purple-500 text-white hover:bg-purple-600">🎉 축하/파티</button>
-        <button class="px-4 py-2 rounded-full bg-teal-500 text-white hover:bg-teal-600">💪 운동 후</button>
-        <button class="px-4 py-2 rounded-full bg-sky-500 text-white hover:bg-sky-600">🌧️ 비 오는 날</button>
-        <button class="px-4 py-2 rounded-full bg-gray-700 text-white hover:bg-gray-800">🍱 혼밥할 때</button>
+            <nav id="sidebarMenu" class="flex-1 px-4 py-6 space-y-4">
+                <a href="#" data-section="dashboard"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    대시보드
+                </a>
+
+                <a href="#" data-section="approvals"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    승인 · 검수
+                </a>
+
+                <a href="#" data-section="ads"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    광고 슬롯 관리
+                </a>
+
+                <a href="#" data-section="billing"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    광고 결제 · 청구
+                </a>
+
+                <a href="#" data-section="content"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    콘텐츠 관리
+                </a>
+
+                <a href="#" data-section="users"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    사용자 · 가게 관리
+                </a>
+
+                <a href="#" data-section="cs"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    신고 · CS
+                </a>
+
+                <!-- ✅ 등록 바로가기 (섹션 전환 X, 하위 메뉴 토글) -->
+                <a href="#" data-section="register"
+                    class="nav-link flex items-center justify-between px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    <span>등록 바로가기</span>
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 text-gray-500 transition-transform duration-300" id="registerArrow" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </a>
+
+                <div id="subRegisterMenu" class="submenu hidden pl-6 space-y-2">
+                    <a href="#" data-target="ncombinedregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-purple-100 hover:text-purple-700 transition">
+                        🏪 통합 가게 등록
+                    </a>
+                    <a href="#" data-target="openregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 transition">
+                        🆕 오픈예정 등록
+                    </a>
+                    <a href="#" data-target="storeprideregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-amber-100 hover:text-amber-700 transition">
+                        🏆 가게 자랑 등록
+                    </a>
+                    <a href="#" data-target="traditionalmarketregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-emerald-100 hover:text-emerald-700 transition">
+                        🏛️ 전통시장 등록
+                    </a>
+                    <a href="#" data-target="performingartregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-yellow-100 hover:text-yellow-700 transition">
+                        🎭 공연/예술 등록
+                    </a>
+                    <a href="#" data-target="eventregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-rose-100 hover:text-rose-700 transition">
+                        🎉 이벤트 등록
+                    </a>
+                    <a href="#" data-target="shoppingregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-sky-100 hover:text-sky-700 transition">
+                        🛒 쇼핑 등록
+                    </a>
+                    <a href="#" data-target="inquiryregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-slate-100 hover:text-slate-700 transition">
+                        💬 문의 등록
+                    </a>
+                    <a href="#" data-target="hotblogregister"
+                        class="sub-link block px-4 py-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-pink-100 hover:text-pink-700 transition">
+                        📰 홍보 블로그 등록
+                    </a>
+                </div>
+
+                <a href="#" data-section="settings"
+                    class="nav-link block px-4 py-2 rounded-xl bg-white hover:bg-blue-50 transition shadow">
+                    설정 · 로그
+                </a>
+            </nav>
+        </aside>
+
+        <!-- ✅ 메인 -->
+        <main class="flex-1 p-8">
+            <!-- 상단 헤더 -->
+            <header class="flex justify-between items-center mb-8">
+                <div class="space-y-1">
+                    <h1 class="text-3xl font-bold drop-shadow-sm">관리자 페이지</h1>
+                    <span id="realtime-indicator"
+                        class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600 font-semibold">
+                        실시간 알림:
+                        <span id="realtime-count" class="ml-1 font-bold">없음</span>
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-refresh"
+                        class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                        새로고침
+                    </button>
+                    <button
+                        class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow hover:opacity-90 transition text-sm font-semibold">
+                        로그아웃
+                    </button>
+                </div>
+            </header>
+
+            <!-- ========================= -->
+            <!-- 📊 대시보드 -->
+            <!-- ========================= -->
+            <section id="dashboard" class="content-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 class="text-xl font-bold">📊 오늘 vs 어제</h2>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            class="range-btn px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold hover:bg-blue-200"
+                            data-range="today">
+                            오늘
+                        </button>
+                        <button
+                            class="range-btn px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+                            data-range="7d">
+                            최근 7일
+                        </button>
+                        <button
+                            class="range-btn px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+                            data-range="30d">
+                            최근 30일
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ✅ 비교 카드 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                    <!-- 노출 -->
+                    <button type="button" data-metric="impressions"
+                        class="metric-card p-6 rounded-2xl bg-white shadow text-left hover:-translate-y-1 transition">
+                        <p class="text-gray-500 text-sm">오늘 광고 노출</p>
+                        <p id="m-impressions" class="text-2xl font-extrabold text-blue-600 mt-1">0</p>
+                        <p id="m-impressions-delta" class="text-xs font-semibold mt-2 text-gray-600">어제 대비 -</p>
+                    </button>
+
+                    <!-- 클릭 -->
+                    <button type="button" data-metric="clicks"
+                        class="metric-card p-6 rounded-2xl bg-white shadow text-left hover:-translate-y-1 transition">
+                        <p class="text-gray-500 text-sm">오늘 광고 클릭</p>
+                        <p id="m-clicks" class="text-2xl font-extrabold text-purple-600 mt-1">0</p>
+                        <p id="m-clicks-delta" class="text-xs font-semibold mt-2 text-gray-600">어제 대비 -</p>
+                    </button>
+
+                    <!-- CTR -->
+                    <button type="button" data-metric="ctr"
+                        class="metric-card p-6 rounded-2xl bg-white shadow text-left hover:-translate-y-1 transition">
+                        <p class="text-gray-500 text-sm">CTR</p>
+                        <p id="m-ctr" class="text-2xl font-extrabold text-emerald-600 mt-1">0%</p>
+                        <p id="m-ctr-delta" class="text-xs font-semibold mt-2 text-gray-600">어제 대비 -</p>
+                    </button>
+
+                    <!-- 광고 매출 -->
+                    <button type="button" data-metric="ad_revenue"
+                        class="metric-card p-6 rounded-2xl bg-white shadow text-left hover:-translate-y-1 transition">
+                        <p class="text-gray-500 text-sm">오늘 광고 매출</p>
+                        <p id="m-adrevenue" class="text-2xl font-extrabold text-orange-500 mt-1">₩0</p>
+                        <p id="m-adrevenue-delta" class="text-xs font-semibold mt-2 text-gray-600">어제 대비 -</p>
+                    </button>
+
+                    <!-- 승인 대기 -->
+                    <button type="button" data-metric="approvals"
+                        class="metric-card p-6 rounded-2xl bg-white shadow text-left hover:-translate-y-1 transition">
+                        <p class="text-gray-500 text-sm">승인 대기</p>
+                        <p id="m-approvals" class="text-2xl font-extrabold text-red-500 mt-1">0</p>
+                        <p id="m-approvals-delta" class="text-xs font-semibold mt-2 text-gray-600">어제 대비 -</p>
+                    </button>
+                </div>
+
+                <!-- 🔔 운영 알림 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                    <div class="p-5 rounded-2xl bg-white shadow flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-800">🚨 신고/차단 대기</h3>
+                            <span id="badge-reports"
+                                class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-semibold">
+                                0건
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            신고된 글/가게/댓글을 빠르게 확인하고 블라인드 처리할 수 있어요.
+                        </p>
+                        <button
+                            class="mt-2 self-start px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-blue-50"
+                            onclick="jumpTo('cs')">
+                            신고 관리로 이동
+                        </button>
+                    </div>
+
+                    <div class="p-5 rounded-2xl bg-white shadow flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-800">🧾 광고 만료 임박</h3>
+                            <span id="badge-expiring"
+                                class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-semibold">
+                                0개
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            기간형 광고의 만료 임박(예: 1일/20분/10분 전) 알림 영역.
+                        </p>
+                        <button
+                            class="mt-2 self-start px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-blue-50"
+                            onclick="jumpTo('ads')">
+                            광고 슬롯으로 이동
+                        </button>
+                    </div>
+
+                    <div class="p-5 rounded-2xl bg-white shadow flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-800">🧩 신규 등록</h3>
+                            <span id="badge-new"
+                                class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+                                0건
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            새로 등록된 콘텐츠/가게를 검수/승인으로 연결할 수 있어요.
+                        </p>
+                        <button
+                            class="mt-2 self-start px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-blue-50"
+                            onclick="jumpTo('approvals')">
+                            승인 · 검수로 이동
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 📈 그래프 -->
+                <div class="bg-white rounded-2xl shadow p-6 mb-10">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <h3 class="text-lg font-bold">📈 시간대별 비교 (오늘 vs 어제)</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                class="kpi-btn px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold hover:bg-blue-200"
+                                data-kpi="impressions">
+                                노출
+                            </button>
+                            <button
+                                class="kpi-btn px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+                                data-kpi="clicks">
+                                클릭
+                            </button>
+                            <button
+                                class="kpi-btn px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+                                data-kpi="ad_revenue">
+                                매출
+                            </button>
+                        </div>
+                    </div>
+                    <canvas id="hourlyChart" height="110"></canvas>
+                    <p class="text-xs text-gray-400 mt-3">
+                        그래프 막대를 클릭하면 해당 시간대 세부 정보가 우측에 열립니다.
+                    </p>
+                </div>
+
+                <!-- 🧷 Top 광고/슬롯 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl shadow p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold">🏆 오늘 Top 광고(클릭)</h3>
+                            <button class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-blue-50"
+                                onclick="openDrawer('오늘 Top 광고(클릭)', renderTopAdsHtml(window.__adminState?.top_ads || []))">
+                                전체 보기
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-gray-700">
+                                <thead>
+                                    <tr class="border-b bg-gray-50">
+                                        <th class="text-left py-2 px-3">슬롯</th>
+                                        <th class="text-left py-2 px-3">광고명</th>
+                                        <th class="text-left py-2 px-3">클릭</th>
+                                        <th class="text-left py-2 px-3">CTR</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="top-ads-body">
+                                    <tr>
+                                        <td colspan="4" class="py-6 text-center text-gray-400">로딩 중...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold">🧾 승인 대기 목록</h3>
+                            <button class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-blue-50"
+                                onclick="jumpTo('approvals')">
+                                관리로 이동
+                            </button>
+                        </div>
+                        <div class="space-y-3" id="approvals-mini">
+                            <div class="p-4 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-400">
+                                로딩 중...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 승인 · 검수 -->
+            <!-- ========================= -->
+            <section id="approvals" class="content-section hidden-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <h2 class="text-xl font-bold">✅ 승인 · 검수</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="approval-type" class="border rounded-full px-3 py-1 text-sm">
+                            <option value="all">전체</option>
+                            <option value="store">가게</option>
+                            <option value="content">콘텐츠</option>
+                            <option value="ad">광고 소재</option>
+                        </select>
+                        <input id="approval-q" type="text" placeholder="검색 (상호/제목/ID)"
+                            class="border rounded-full px-3 py-1 text-sm w-56">
+                        <button id="btn-approval-refresh"
+                            class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">유형</th>
+                                    <th class="text-left py-2 px-3">제목/상호</th>
+                                    <th class="text-left py-2 px-3">등록자</th>
+                                    <th class="text-left py-2 px-3">등록일</th>
+                                    <th class="text-left py-2 px-3">상태</th>
+                                    <th class="text-left py-2 px-3">처리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="approval-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4">
+                        승인/반려는 지금은 UI만 동작. 나중에 서버 API 연결하면 실제 처리됩니다.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 광고 슬롯 관리 -->
+            <!-- ========================= -->
+            <section id="ads" class="content-section hidden-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <h2 class="text-xl font-bold">📢 광고 슬롯 관리</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="slot-page" class="border rounded-full px-3 py-1 text-sm">
+                            <option value="index">index</option>
+                            <option value="hot">hot</option>
+                            <option value="shopping">shopping</option>
+                            <option value="performingart">performingart</option>
+                            <option value="etc">etc</option>
+                        </select>
+                        <input id="slot-q" type="text" placeholder="슬롯/가게/URL 검색"
+                            class="border rounded-full px-3 py-1 text-sm w-56">
+                        <button id="btn-slot-refresh"
+                            class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="p-5 rounded-2xl bg-white shadow">
+                        <p class="text-gray-500 text-sm">전체 슬롯</p>
+                        <p id="slot-total" class="text-2xl font-extrabold text-blue-600 mt-1">0</p>
+                    </div>
+                    <div class="p-5 rounded-2xl bg-white shadow">
+                        <p class="text-gray-500 text-sm">운영 중</p>
+                        <p id="slot-running" class="text-2xl font-extrabold text-emerald-600 mt-1">0</p>
+                    </div>
+                    <div class="p-5 rounded-2xl bg-white shadow">
+                        <p class="text-gray-500 text-sm">만료 임박</p>
+                        <p id="slot-expiring" class="text-2xl font-extrabold text-orange-500 mt-1">0</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">페이지</th>
+                                    <th class="text-left py-2 px-3">포지션</th>
+                                    <th class="text-left py-2 px-3">타입/모드</th>
+                                    <th class="text-left py-2 px-3">링크</th>
+                                    <th class="text-left py-2 px-3">기간</th>
+                                    <th class="text-left py-2 px-3">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slot-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4">
+                        슬롯 편집/저장은 추후 네가 만든 manager/ad API로 연결하면 됨.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 광고 결제 · 청구 -->
+            <!-- ========================= -->
+            <section id="billing" class="content-section hidden-section">
+                <h2 class="text-xl font-bold mb-6">💳 광고 결제 · 청구</h2>
+                <div class="bg-white rounded-2xl shadow p-6 space-y-4 text-sm">
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <p class="font-semibold text-gray-800 mb-1">현재 상태</p>
+                        <p class="text-gray-600">
+                            광고만 제공하는 구조라면, 결제/청구는 “광고 계약/기간/금액/영수증” 위주로 단순하게 가져가면 돼.
+                        </p>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">결제ID</th>
+                                    <th class="text-left py-2 px-3">광고주</th>
+                                    <th class="text-left py-2 px-3">슬롯</th>
+                                    <th class="text-left py-2 px-3">금액</th>
+                                    <th class="text-left py-2 px-3">상태</th>
+                                    <th class="text-left py-2 px-3">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="billing-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 콘텐츠 관리 -->
+            <!-- ========================= -->
+            <section id="content" class="content-section hidden-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <h2 class="text-xl font-bold">🗂️ 콘텐츠 관리</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="content-type" class="border rounded-full px-3 py-1 text-sm">
+                            <option value="all">전체</option>
+                            <option value="hotblog">홍보 블로그</option>
+                            <option value="storepride">가게 자랑</option>
+                            <option value="event">이벤트</option>
+                            <option value="performingart">공연/예술</option>
+                            <option value="localboard">지역게시판</option>
+                        </select>
+                        <input id="content-q" type="text" placeholder="검색 (제목/상호/ID)"
+                            class="border rounded-full px-3 py-1 text-sm w-56">
+                        <button id="btn-content-refresh"
+                            class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">유형</th>
+                                    <th class="text-left py-2 px-3">제목</th>
+                                    <th class="text-left py-2 px-3">작성자</th>
+                                    <th class="text-left py-2 px-3">작성일</th>
+                                    <th class="text-left py-2 px-3">상태</th>
+                                    <th class="text-left py-2 px-3">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="content-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4">
+                        블라인드/고정/추천/삭제(또는 숨김) 같은 운영 기능 넣기 좋은 영역.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 사용자 · 가게 관리 -->
+            <!-- ========================= -->
+            <section id="users" class="content-section hidden-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <h2 class="text-xl font-bold">👤 사용자 · 가게 관리</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="users-type" class="border rounded-full px-3 py-1 text-sm">
+                            <option value="store">가게</option>
+                            <option value="user">사용자</option>
+                        </select>
+                        <input id="users-q" type="text" placeholder="검색 (상호/이메일/ID/연락처)"
+                            class="border rounded-full px-3 py-1 text-sm w-64">
+                        <button id="btn-users-refresh"
+                            class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">구분</th>
+                                    <th class="text-left py-2 px-3">이름/상호</th>
+                                    <th class="text-left py-2 px-3">연락처</th>
+                                    <th class="text-left py-2 px-3">상태</th>
+                                    <th class="text-left py-2 px-3">등록일</th>
+                                    <th class="text-left py-2 px-3">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-xs text-gray-400 mt-4">
+                        차단/해제, 상태 변경, 사업자 인증 상태 확인 같은 걸 여기에서 처리.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 신고 · CS -->
+            <!-- ========================= -->
+            <section id="cs" class="content-section hidden-section">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <h2 class="text-xl font-bold">🆘 신고 · CS</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="report-type" class="border rounded-full px-3 py-1 text-sm">
+                            <option value="all">전체</option>
+                            <option value="content">콘텐츠 신고</option>
+                            <option value="store">가게 신고</option>
+                            <option value="comment">댓글 신고</option>
+                        </select>
+                        <input id="report-q" type="text" placeholder="검색 (사유/ID)"
+                            class="border rounded-full px-3 py-1 text-sm w-56">
+                        <button id="btn-report-refresh"
+                            class="px-4 py-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 transition text-sm font-semibold">
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm text-gray-700">
+                            <thead>
+                                <tr class="border-b bg-gray-50">
+                                    <th class="text-left py-2 px-3">유형</th>
+                                    <th class="text-left py-2 px-3">대상</th>
+                                    <th class="text-left py-2 px-3">사유</th>
+                                    <th class="text-left py-2 px-3">신고일</th>
+                                    <th class="text-left py-2 px-3">상태</th>
+                                    <th class="text-left py-2 px-3">처리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-body">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-gray-400">로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- ✅ 설정 · 로그 -->
+            <!-- ========================= -->
+            <section id="settings" class="content-section hidden-section">
+                <h2 class="text-xl font-bold mb-4">⚙️ 설정 · 로그</h2>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl shadow p-6 space-y-4 text-sm">
+                        <h3 class="font-bold text-gray-800">관리자 권한/정책 (UI)</h3>
+                        <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                            <p class="font-semibold mb-1">광고 플랫폼 운영 정책</p>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                                <li>금지 업종/소재(도박/성인/불법/저작권 위반 등) 노출 차단</li>
+                                <li>신고 접수 시 블라인드/검수 재진행</li>
+                                <li>광고 기간/슬롯/노출 기준 변경 시 로그 기록</li>
+                            </ul>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                            <p class="font-semibold mb-1">알림 설정(예시)</p>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" class="rounded" checked>
+                                <span>광고 만료 1일 전 알림</span>
+                            </label>
+                            <label class="flex items-center gap-2 mt-2">
+                                <input type="checkbox" class="rounded">
+                                <span>광고 만료 20분 전 알림</span>
+                            </label>
+                            <label class="flex items-center gap-2 mt-2">
+                                <input type="checkbox" class="rounded">
+                                <span>광고 만료 10분 전 알림</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-gray-800">운영 로그(샘플)</h3>
+                            <button class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-blue-50"
+                                onclick="openDrawer('운영 로그', document.getElementById('log-box').innerHTML)">
+                                크게 보기
+                            </button>
+                        </div>
+                        <div id="log-box" class="text-sm text-gray-700 space-y-2">
+                            <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                <p class="font-semibold">[광고] 슬롯 변경</p>
+                                <p class="text-xs text-gray-500 mt-1">index / best_pick_1 · 2025-12-13 10:22</p>
+                            </div>
+                            <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                <p class="font-semibold">[승인] 콘텐츠 승인</p>
+                                <p class="text-xs text-gray-500 mt-1">performingart #12 · 2025-12-13 09:50</p>
+                            </div>
+                            <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                <p class="font-semibold">[신고] 블라인드 처리</p>
+                                <p class="text-xs text-gray-500 mt-1">localboard #33 · 2025-12-13 09:10</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
-    <!-- 추천 박스 영역 -->
-    <section class="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        <!-- 박스 1 -->
-        <div class="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-xl transition">
-            <img src="https://via.placeholder.com/400x250" alt="추천 이미지" class="w-full h-48 object-cover">
-            <div class="p-4">
-                <h2 class="text-lg font-bold">따뜻한 국밥</h2>
-                <p class="text-gray-600 text-sm">몸과 마음을 따뜻하게 해줄 음식</p>
+
+    <!-- ✅ 우측 드로어 -->
+    <div id="drawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
+    <aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-gray-500 font-semibold">세부 정보</p>
+                <h3 id="drawerTitle" class="text-lg font-extrabold text-gray-900">-</h3>
             </div>
+            <button class="w-10 h-10 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50"
+                onclick="closeDrawer()" aria-label="닫기">
+                ✕
+            </button>
         </div>
+        <div id="drawerBody" class="p-5 overflow-auto flex-1">
+            <div class="text-sm text-gray-500">내용 없음</div>
+        </div>
+        <div class="p-4 border-t border-gray-200 bg-white/70">
+            <button
+                class="w-full px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold shadow hover:opacity-90"
+                onclick="closeDrawer()">
+                닫기
+            </button>
+        </div>
+    </aside>
 
-        <!-- 박스 2 -->
-        <div class="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-xl transition">
-            <img src="https://via.placeholder.com/400x250" alt="추천 이미지" class="w-full h-48 object-cover">
-            <div class="p-4">
-                <h2 class="text-lg font-bold">해물 파전 + 막걸리</h2>
-                <p class="text-gray-600 text-sm">친구랑 어울릴 때 최고의 조합</p>
+    <script>
+        // ===============================
+        // 🌐 공통 설정 (오너 페이지 방식 유지)
+        // ===============================
+        const isLocal =
+            location.hostname === "127.0.0.1" ||
+            location.hostname === "localhost" ||
+            location.hostname === "0.0.0.0";
+
+        const API_BASE = isLocal ? "https://www.hongbono1.com" : "";
+        const HTML_BASE = ""; // public2 루트 서빙 가정
+
+        async function fetchJson(path) {
+            const url = API_BASE + path;
+            const res = await fetch(url, { credentials: "include" });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`API 실패: ${res.status} ${url} ${text}`);
+            }
+            return res.json();
+        }
+
+        // ===============================
+        // ✅ 전역 상태
+        // ===============================
+        window.__adminState = {
+            range: "today",
+            kpi: "impressions",  // impressions | clicks | ad_revenue
+            today: null,
+            yesterday: null,
+            hourly: [],
+            top_ads: [],
+            approvals: [],
+            reports: [],
+            expiring_ads: [],
+            new_items: 0,
+            slots: [],
+            billing: [],
+            content: [],
+            users: []
+        };
+
+        // ===============================
+        // ✅ 유틸
+        // ===============================
+        function fmtNumber(n) { return Number(n || 0).toLocaleString(); }
+        function fmtMoney(n) { return "₩" + Number(n || 0).toLocaleString(); }
+        function pct(a, b) {
+            // a: today, b: yesterday
+            const aa = Number(a || 0);
+            const bb = Number(b || 0);
+            if (bb === 0) return aa === 0 ? 0 : 100;
+            return ((aa - bb) / bb) * 100;
+        }
+        function deltaText(today, yesterday, suffix = "") {
+            const d = Number(today || 0) - Number(yesterday || 0);
+            const p = pct(today, yesterday);
+            const sign = d > 0 ? "▲" : d < 0 ? "▼" : "—";
+            const color = d > 0 ? "text-emerald-600" : d < 0 ? "text-red-600" : "text-gray-600";
+            const abs = Math.abs(d);
+            const pAbs = Math.abs(p).toFixed(1);
+            return `<span class="${color}">${sign} ${fmtNumber(abs)}${suffix} (${pAbs}%)</span>`;
+        }
+        function safeText(v, fallback = "-") {
+            const s = String(v ?? "").trim();
+            return s ? s : fallback;
+        }
+        function nowKST() {
+            // 브라우저는 로컬이 KST일 확률 높지만, UI용으로만 사용
+            return new Date();
+        }
+
+        // ===============================
+        // ✅ 드로어(세부 정보)
+        // ===============================
+        function openDrawer(title, html) {
+            const overlay = document.getElementById("drawerOverlay");
+            const drawer = document.getElementById("drawer");
+            const t = document.getElementById("drawerTitle");
+            const b = document.getElementById("drawerBody");
+            if (!overlay || !drawer || !t || !b) return;
+
+            t.textContent = title || "세부 정보";
+            b.innerHTML = html || `<div class="text-sm text-gray-500">내용 없음</div>`;
+
+            overlay.classList.add("show");
+            drawer.classList.add("show");
+            drawer.setAttribute("aria-hidden", "false");
+            document.body.style.overflow = "hidden";
+        }
+        function closeDrawer() {
+            const overlay = document.getElementById("drawerOverlay");
+            const drawer = document.getElementById("drawer");
+            if (!overlay || !drawer) return;
+            overlay.classList.remove("show");
+            drawer.classList.remove("show");
+            drawer.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "auto";
+        }
+
+        // ===============================
+        // ✅ 사이드바 전환(오너 페이지 방식 유지)
+        // ===============================
+        const links = document.querySelectorAll(".nav-link");
+        const sections = document.querySelectorAll(".content-section");
+
+        function jumpTo(sectionId) {
+            const link = document.querySelector(`[data-section="${sectionId}"]`);
+            if (link) link.click();
+        }
+
+        links.forEach((link) => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                const section = link.dataset.section;
+
+                if (section === "register") {
+                    const submenu = document.getElementById("subRegisterMenu");
+                    const arrow = document.getElementById("registerArrow");
+                    if (submenu) submenu.classList.toggle("hidden");
+                    if (arrow) arrow.classList.toggle("rotate-180");
+                    return;
+                }
+
+                links.forEach((l) => l.classList.remove("active-link"));
+                link.classList.add("active-link");
+
+                sections.forEach((sec) => sec.classList.add("hidden-section"));
+                const target = document.getElementById(section);
+                if (target) target.classList.remove("hidden-section");
+            });
+        });
+
+        // 기본 활성
+        const dashLink = document.querySelector('[data-section="dashboard"]');
+        if (dashLink) dashLink.classList.add("active-link");
+
+        // 하위 등록 메뉴 이동
+        document.querySelectorAll(".sub-link").forEach((sub) => {
+            sub.addEventListener("click", (e) => {
+                e.preventDefault();
+                const target = sub.dataset.target;
+                const map = {
+                    openregister: "openregister.html",
+                    storeprideregister: "storeprideregister.html",
+                    traditionalmarketregister: "traditionalmarketregister.html",
+                    performingartregister: "performingartregister.html",
+                    eventregister: "eventregister.html",
+                    shoppingregister: "shoppingregister.html",
+                    inquiryregister: "inquiryregister.html",
+                    foodregister: "foodregister.html",
+                    ncombinedregister: "ncombinedregister.html",
+                    hotblogregister: "hotblogregister.html",
+                };
+                if (map[target]) window.location.href = `${HTML_BASE}/${map[target]}`;
+            });
+        });
+
+        // ===============================
+        // ✅ 더미 데이터 생성 (API 없을 때도 화면 동작)
+        // ===============================
+        function seededRand(seed) {
+            // 간단한 LCG
+            let s = seed % 2147483647;
+            if (s <= 0) s += 2147483646;
+            return function () {
+                s = s * 16807 % 2147483647;
+                return (s - 1) / 2147483646;
+            };
+        }
+
+        function makeMockState() {
+            const d = nowKST();
+            const seed = Number(String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0"));
+            const r = seededRand(seed);
+
+            const todayImpr = Math.floor(12000 + r() * 18000);
+            const yestImpr = Math.floor(10000 + r() * 17000);
+
+            const todayClicks = Math.floor(todayImpr * (0.012 + r() * 0.018));
+            const yestClicks = Math.floor(yestImpr * (0.010 + r() * 0.018));
+
+            const todayRev = Math.floor(150000 + r() * 450000);
+            const yestRev = Math.floor(120000 + r() * 420000);
+
+            const approvals = Math.floor(r() * 14);
+            const reports = Math.floor(r() * 9);
+            const expiring = Math.floor(r() * 6);
+            const newItems = Math.floor(r() * 18);
+
+            // 시간대별 24개
+            const hourly = Array.from({ length: 24 }).map((_, h) => {
+                const base = 200 + Math.floor(r() * 520);
+                const t = base + Math.floor(r() * 220);
+                const y = base - 40 + Math.floor(r() * 220);
+                const tClicks = Math.floor(t * (0.010 + r() * 0.020));
+                const yClicks = Math.floor(y * (0.010 + r() * 0.020));
+                const tRev = Math.floor(3000 + r() * 18000);
+                const yRev = Math.floor(2500 + r() * 16000);
+                return {
+                    hour: h,
+                    impressions_today: t,
+                    impressions_yesterday: y,
+                    clicks_today: tClicks,
+                    clicks_yesterday: yClicks,
+                    revenue_today: tRev,
+                    revenue_yesterday: yRev,
+                };
+            });
+
+            const top_ads = Array.from({ length: 8 }).map((_, i) => {
+                const clicks = 60 + Math.floor(r() * 260);
+                const imp = 1200 + Math.floor(r() * 6200);
+                const ctr = imp ? (clicks / imp) * 100 : 0;
+                return {
+                    slot: ["index:best_pick_1", "index:best_pick_2", "index:promo_1", "hot:theme_1", "index:event"][i % 5],
+                    title: `광고 #${i + 1}`,
+                    clicks,
+                    impressions: imp,
+                    ctr: Number(ctr.toFixed(2)),
+                };
+            }).sort((a, b) => b.clicks - a.clicks);
+
+            const approvalsList = Array.from({ length: Math.min(approvals, 10) }).map((_, i) => ({
+                type: ["가게", "콘텐츠", "광고 소재"][i % 3],
+                title: ["새 가게 등록", "공연 등록", "홍보 블로그"][i % 3] + ` #${100 + i}`,
+                by: `user_${300 + i}`,
+                created_at: new Date(Date.now() - (i + 1) * 3600 * 1000).toISOString(),
+                status: "대기",
+                id: 1000 + i
+            }));
+
+            const reportsList = Array.from({ length: Math.min(reports, 10) }).map((_, i) => ({
+                type: ["콘텐츠", "가게", "댓글"][i % 3],
+                target: `#${500 + i}`,
+                reason: ["욕설", "허위정보", "저작권", "스팸"][i % 4],
+                created_at: new Date(Date.now() - (i + 2) * 7200 * 1000).toISOString(),
+                status: "대기",
+                id: 900 + i
+            }));
+
+            const slots = Array.from({ length: 12 }).map((_, i) => {
+                const page = ["index", "hot", "shopping"][i % 3];
+                const position = ["best_pick_1", "best_pick_2", "promo_1", "event", "theme"][i % 5] + (i % 2 ? "" : "");
+                const mode = ["store", "url", "text"][i % 3];
+                const type = ["banner", "card", "mini"][i % 3];
+                const start = new Date(Date.now() - (i + 1) * 86400000);
+                const end = new Date(Date.now() + (i % 6) * 86400000);
+                return {
+                    page, position, slot_mode: mode, slot_type: type,
+                    link_url: mode === "store" ? `/ndetail.html?id=${10 + i}&type=store` : `https://example.com/${i}`,
+                    start_date: start.toISOString().slice(0, 10),
+                    end_date: end.toISOString().slice(0, 10),
+                    no_end: (i % 7 === 0)
+                };
+            });
+
+            const billing = Array.from({ length: 8 }).map((_, i) => ({
+                id: 2000 + i,
+                advertiser: `광고주_${i + 1}`,
+                slot: slots[i]?.page + ":" + slots[i]?.position,
+                amount: 50000 + i * 25000,
+                status: ["완료", "대기", "취소"][i % 3]
+            }));
+
+            const content = Array.from({ length: 10 }).map((_, i) => ({
+                type: ["홍보 블로그", "가게 자랑", "이벤트", "공연/예술"][i % 4],
+                title: `콘텐츠 제목 #${i + 1}`,
+                by: `writer_${i + 10}`,
+                created_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+                status: ["정상", "블라인드", "대기"][i % 3],
+                id: 700 + i
+            }));
+
+            const users = Array.from({ length: 10 }).map((_, i) => ({
+                kind: i % 2 ? "가게" : "사용자",
+                name: i % 2 ? `상호_${i + 1}` : `user_${i + 1}`,
+                phone: `010-12${i}4-56${i}8`,
+                status: ["정상", "제한", "차단"][i % 3],
+                created_at: new Date(Date.now() - (i + 3) * 86400000).toISOString(),
+                id: 400 + i
+            }));
+
+            return {
+                today: { impressions: todayImpr, clicks: todayClicks, ad_revenue: todayRev, approvals },
+                yesterday: { impressions: yestImpr, clicks: yestClicks, ad_revenue: yestRev, approvals: Math.max(0, approvals - 2) },
+                hourly,
+                top_ads,
+                approvalsList,
+                reportsList,
+                expiring,
+                newItems,
+                slots,
+                billing,
+                content,
+                users
+            };
+        }
+
+        // ===============================
+        // ✅ 대시보드 렌더
+        // ===============================
+        function setRealtimeIndicator(count) {
+            const wrap = document.getElementById("realtime-indicator");
+            const cnt = document.getElementById("realtime-count");
+            if (!wrap || !cnt) return;
+            if (count > 0) {
+                cnt.textContent = `${count}건`;
+                wrap.classList.remove("bg-gray-100", "text-gray-600");
+                wrap.classList.add("bg-red-100", "text-red-700");
+            } else {
+                cnt.textContent = "없음";
+                wrap.classList.remove("bg-red-100", "text-red-700");
+                wrap.classList.add("bg-gray-100", "text-gray-600");
+            }
+        }
+
+        function renderMetricCards() {
+            const s = window.__adminState;
+            const t = s.today || {};
+            const y = s.yesterday || {};
+            const ctrT = t.impressions ? (t.clicks / t.impressions) * 100 : 0;
+            const ctrY = y.impressions ? (y.clicks / y.impressions) * 100 : 0;
+
+            document.getElementById("m-impressions").textContent = fmtNumber(t.impressions);
+            document.getElementById("m-clicks").textContent = fmtNumber(t.clicks);
+            document.getElementById("m-ctr").textContent = (ctrT || 0).toFixed(2) + "%";
+            document.getElementById("m-adrevenue").textContent = fmtMoney(t.ad_revenue);
+            document.getElementById("m-approvals").textContent = fmtNumber(t.approvals);
+
+            document.getElementById("m-impressions-delta").innerHTML = "어제 대비 " + deltaText(t.impressions, y.impressions);
+            document.getElementById("m-clicks-delta").innerHTML = "어제 대비 " + deltaText(t.clicks, y.clicks);
+            document.getElementById("m-ctr-delta").innerHTML = "어제 대비 " + deltaText(ctrT, ctrY, "%");
+            document.getElementById("m-adrevenue-delta").innerHTML = "어제 대비 " + deltaText(t.ad_revenue, y.ad_revenue, "원");
+            document.getElementById("m-approvals-delta").innerHTML = "어제 대비 " + deltaText(t.approvals, y.approvals);
+
+            // badges
+            document.getElementById("badge-reports").textContent = fmtNumber((s.reports || []).length) + "건";
+            document.getElementById("badge-expiring").textContent = fmtNumber(s.expiring_ads || 0) + "개";
+            document.getElementById("badge-new").textContent = fmtNumber(s.new_items || 0) + "건";
+
+            // 실시간 느낌(샘플)
+            setRealtimeIndicator(Math.min(3, (s.reports || []).length));
+        }
+
+        function renderTopAds() {
+            const tbody = document.getElementById("top-ads-body");
+            const rows = (window.__adminState.top_ads || []).slice(0, 6);
+            if (!tbody) return;
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-gray-400">데이터 없음</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = rows.map(a => `
+        <tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="openDrawer('광고 상세', renderAdDetailHtml(${JSON.stringify(a).replace(/"/g, "&quot;")}))">
+          <td class="py-2 px-3">${safeText(a.slot)}</td>
+          <td class="py-2 px-3">${safeText(a.title)}</td>
+          <td class="py-2 px-3 font-semibold">${fmtNumber(a.clicks)}</td>
+          <td class="py-2 px-3">${(Number(a.ctr) || 0).toFixed(2)}%</td>
+        </tr>
+      `).join("");
+        }
+
+        function renderApprovalsMini() {
+            const wrap = document.getElementById("approvals-mini");
+            const list = (window.__adminState.approvals || []).slice(0, 4);
+            if (!wrap) return;
+
+            if (!list.length) {
+                wrap.innerHTML = `<div class="p-4 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-500">
+          승인 대기 항목이 없습니다.
+        </div>`;
+                return;
+            }
+
+            wrap.innerHTML = list.map(a => `
+        <button type="button" class="w-full text-left p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition"
+          onclick="openDrawer('승인 상세', renderApprovalDetailHtml(${JSON.stringify(a).replace(/"/g, "&quot;")}))">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-semibold text-gray-800">${safeText(a.type)} · ${safeText(a.title)}</div>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 font-semibold">대기</span>
+          </div>
+          <div class="text-xs text-gray-500 mt-1">등록자: ${safeText(a.by)} · ${safeText(a.created_at).slice(0, 16).replace('T', ' ')}</div>
+        </button>
+      `).join("");
+        }
+
+        // ===============================
+        // ✅ 표(승인/슬롯/결제/콘텐츠/유저/신고) 렌더
+        // ===============================
+        function renderApprovalTable() {
+            const tbody = document.getElementById("approval-body");
+            if (!tbody) return;
+
+            const q = (document.getElementById("approval-q")?.value || "").trim().toLowerCase();
+            const type = (document.getElementById("approval-type")?.value || "all");
+
+            let rows = window.__adminState.approvals || [];
+            rows = rows.filter(r => {
+                const okType = (type === "all") ? true : (type === "store" ? r.type === "가게" : type === "content" ? r.type === "콘텐츠" : r.type === "광고 소재");
+                const blob = (r.type + " " + r.title + " " + r.by + " " + r.id).toLowerCase();
+                const okQ = !q || blob.includes(q);
+                return okType && okQ;
+            });
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">표시할 항목이 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">${safeText(r.type)}</td>
+          <td class="py-2 px-3">
+            <button class="text-blue-700 font-semibold hover:underline"
+              onclick="openDrawer('승인 상세', renderApprovalDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">
+              ${safeText(r.title)}
+            </button>
+            <div class="text-xs text-gray-500">ID: ${safeText(r.id)}</div>
+          </td>
+          <td class="py-2 px-3">${safeText(r.by)}</td>
+          <td class="py-2 px-3">${safeText(r.created_at).slice(0, 10)}</td>
+          <td class="py-2 px-3">
+            <span class="inline-flex px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-semibold">대기</span>
+          </td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+              <button class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs border border-emerald-200"
+                onclick="uiApprove(${r.id})">승인</button>
+              <button class="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs border border-red-200"
+                onclick="uiReject(${r.id})">반려</button>
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+                onclick="openDrawer('승인 상세', renderApprovalDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">상세</button>
             </div>
-        </div>
+          </td>
+        </tr>
+      `).join("");
+        }
 
-        <!-- 박스 3 -->
-        <div class="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-xl transition">
-            <img src="https://via.placeholder.com/400x250" alt="추천 이미지" class="w-full h-48 object-cover">
-            <div class="p-4">
-                <h2 class="text-lg font-bold">녹차 아이스크림</h2>
-                <p class="text-gray-600 text-sm">달콤한 힐링이 필요할 때</p>
+        function renderSlotTable() {
+            const tbody = document.getElementById("slot-body");
+            if (!tbody) return;
+
+            const page = (document.getElementById("slot-page")?.value || "index");
+            const q = (document.getElementById("slot-q")?.value || "").trim().toLowerCase();
+
+            let rows = (window.__adminState.slots || []).filter(s => s.page === page);
+            if (q) {
+                rows = rows.filter(s => (s.page + " " + s.position + " " + s.link_url + " " + s.slot_mode + " " + s.slot_type).toLowerCase().includes(q));
+            }
+
+            // 요약 카드
+            const total = rows.length;
+            const running = rows.filter(s => !s.no_end).length; // UI용
+            const expiring = rows.filter(s => !s.no_end && s.end_date).slice(0, 3).length;
+            document.getElementById("slot-total").textContent = fmtNumber(total);
+            document.getElementById("slot-running").textContent = fmtNumber(running);
+            document.getElementById("slot-expiring").textContent = fmtNumber(expiring);
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">슬롯이 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(s => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">${safeText(s.page)}</td>
+          <td class="py-2 px-3 font-semibold">${safeText(s.position)}</td>
+          <td class="py-2 px-3">
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">${safeText(s.slot_type)}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 ml-1">${safeText(s.slot_mode)}</span>
+          </td>
+          <td class="py-2 px-3">
+            <a class="text-blue-700 hover:underline break-all" href="${safeText(s.link_url, '#')}" target="_blank">
+              ${safeText(s.link_url, '-')}
+            </a>
+          </td>
+          <td class="py-2 px-3 text-xs text-gray-700">
+            ${s.no_end ? `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">무기한</span>`
+                    : `<div>${safeText(s.start_date)} ~ ${safeText(s.end_date)}</div>`}
+          </td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+                onclick="openDrawer('슬롯 상세', renderSlotDetailHtml(${JSON.stringify(s).replace(/"/g, "&quot;")}))">상세</button>
+              <button class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-200"
+                onclick="alert('UI만 동작: 슬롯 수정은 나중에 API 연결')">수정</button>
             </div>
+          </td>
+        </tr>
+      `).join("");
+        }
+
+        function renderBillingTable() {
+            const tbody = document.getElementById("billing-body");
+            if (!tbody) return;
+            const rows = window.__adminState.billing || [];
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">결제 내역이 없습니다.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = rows.map(b => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">#${safeText(b.id)}</td>
+          <td class="py-2 px-3">${safeText(b.advertiser)}</td>
+          <td class="py-2 px-3">${safeText(b.slot)}</td>
+          <td class="py-2 px-3 font-semibold">${fmtMoney(b.amount)}</td>
+          <td class="py-2 px-3">${safeText(b.status)}</td>
+          <td class="py-2 px-3">
+            <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+              onclick="openDrawer('결제 상세', renderBillingDetailHtml(${JSON.stringify(b).replace(/"/g, "&quot;")}))">상세</button>
+          </td>
+        </tr>
+      `).join("");
+        }
+
+        function renderContentTable() {
+            const tbody = document.getElementById("content-body");
+            if (!tbody) return;
+
+            const type = (document.getElementById("content-type")?.value || "all");
+            const q = (document.getElementById("content-q")?.value || "").trim().toLowerCase();
+
+            let rows = window.__adminState.content || [];
+            if (type !== "all") {
+                const map = { hotblog: "홍보 블로그", storepride: "가게 자랑", event: "이벤트", performingart: "공연/예술", localboard: "지역게시판" };
+                rows = rows.filter(r => r.type === map[type]);
+            }
+            if (q) {
+                rows = rows.filter(r => (r.type + " " + r.title + " " + r.by + " " + r.id).toLowerCase().includes(q));
+            }
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">표시할 콘텐츠가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">${safeText(r.type)}</td>
+          <td class="py-2 px-3">
+            <button class="text-blue-700 font-semibold hover:underline"
+              onclick="openDrawer('콘텐츠 상세', renderContentDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">
+              ${safeText(r.title)}
+            </button>
+            <div class="text-xs text-gray-500">ID: ${safeText(r.id)}</div>
+          </td>
+          <td class="py-2 px-3">${safeText(r.by)}</td>
+          <td class="py-2 px-3">${safeText(r.created_at).slice(0, 10)}</td>
+          <td class="py-2 px-3">${safeText(r.status)}</td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+                onclick="openDrawer('콘텐츠 상세', renderContentDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">상세</button>
+              <button class="px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs border border-yellow-200"
+                onclick="alert('UI만 동작: 고정/추천은 나중에 API 연결')">고정/추천</button>
+              <button class="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs border border-red-200"
+                onclick="alert('UI만 동작: 블라인드/삭제는 나중에 API 연결')">블라인드</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById("users-body");
+            if (!tbody) return;
+
+            const type = (document.getElementById("users-type")?.value || "store"); // store|user
+            const q = (document.getElementById("users-q")?.value || "").trim().toLowerCase();
+
+            let rows = window.__adminState.users || [];
+            rows = rows.filter(r => type === "store" ? r.kind === "가게" : r.kind === "사용자");
+            if (q) {
+                rows = rows.filter(r => (r.kind + " " + r.name + " " + r.phone + " " + r.status + " " + r.id).toLowerCase().includes(q));
+            }
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">표시할 데이터가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">${safeText(r.kind)}</td>
+          <td class="py-2 px-3">
+            <button class="text-blue-700 font-semibold hover:underline"
+              onclick="openDrawer('계정 상세', renderUserDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">
+              ${safeText(r.name)}
+            </button>
+            <div class="text-xs text-gray-500">ID: ${safeText(r.id)}</div>
+          </td>
+          <td class="py-2 px-3">${safeText(r.phone)}</td>
+          <td class="py-2 px-3">${safeText(r.status)}</td>
+          <td class="py-2 px-3">${safeText(r.created_at).slice(0, 10)}</td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+                onclick="openDrawer('계정 상세', renderUserDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">상세</button>
+              <button class="px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs border border-yellow-200"
+                onclick="alert('UI만 동작: 제한/해제는 나중에 API 연결')">제한</button>
+              <button class="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs border border-red-200"
+                onclick="alert('UI만 동작: 차단/해제는 나중에 API 연결')">차단</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+        }
+
+        function renderReportTable() {
+            const tbody = document.getElementById("report-body");
+            if (!tbody) return;
+
+            const type = (document.getElementById("report-type")?.value || "all");
+            const q = (document.getElementById("report-q")?.value || "").trim().toLowerCase();
+
+            let rows = window.__adminState.reports || [];
+            if (type !== "all") {
+                const map = { content: "콘텐츠", store: "가게", comment: "댓글" };
+                rows = rows.filter(r => r.type === map[type]);
+            }
+            if (q) {
+                rows = rows.filter(r => (r.type + " " + r.target + " " + r.reason + " " + r.id).toLowerCase().includes(q));
+            }
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">신고가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 px-3">${safeText(r.type)}</td>
+          <td class="py-2 px-3">${safeText(r.target)}</td>
+          <td class="py-2 px-3">${safeText(r.reason)}</td>
+          <td class="py-2 px-3">${safeText(r.created_at).slice(0, 10)}</td>
+          <td class="py-2 px-3">
+            <span class="inline-flex px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-semibold">대기</span>
+          </td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-1">
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border border-gray-200"
+                onclick="openDrawer('신고 상세', renderReportDetailHtml(${JSON.stringify(r).replace(/"/g, "&quot;")}))">상세</button>
+              <button class="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs border border-red-200"
+                onclick="alert('UI만 동작: 블라인드 처리 API 연결 예정')">블라인드</button>
+              <button class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs border border-emerald-200"
+                onclick="alert('UI만 동작: 처리완료 API 연결 예정')">완료</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+        }
+
+        // UI용 승인/반려(임시)
+        function uiApprove(id) { alert(`UI만 동작: 승인 처리 (id=${id})`); }
+        function uiReject(id) { alert(`UI만 동작: 반려 처리 (id=${id})`); }
+
+        // ===============================
+        // ✅ 드로어 내용 템플릿
+        // ===============================
+        function renderTopAdsHtml(list) {
+            const rows = (list || []).map(a => `
+        <tr class="border-b">
+          <td class="py-2 px-3">${safeText(a.slot)}</td>
+          <td class="py-2 px-3">${safeText(a.title)}</td>
+          <td class="py-2 px-3 font-semibold">${fmtNumber(a.clicks)}</td>
+          <td class="py-2 px-3">${(Number(a.ctr) || 0).toFixed(2)}%</td>
+        </tr>
+      `).join("");
+
+            return `
+        <div class="text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 mb-4">
+            <p class="font-semibold text-gray-900">요약</p>
+            <p class="text-gray-600 mt-1">오늘 클릭이 많은 광고/슬롯 목록입니다.</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-gray-700">
+              <thead>
+                <tr class="border-b bg-gray-50">
+                  <th class="text-left py-2 px-3">슬롯</th>
+                  <th class="text-left py-2 px-3">광고명</th>
+                  <th class="text-left py-2 px-3">클릭</th>
+                  <th class="text-left py-2 px-3">CTR</th>
+                </tr>
+              </thead>
+              <tbody>${rows || `<tr><td colspan="4" class="py-8 text-center text-gray-400">데이터 없음</td></tr>`}</tbody>
+            </table>
+          </div>
         </div>
-    </section>
+      `;
+        }
 
-    <!-- 페이지네이션 -->
-    <div class="flex justify-center items-center gap-2 mt-10 mb-20">
-        <button class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">1</button>
-        <button class="px-4 py-2 rounded bg-blue-500 text-white">2</button>
-        <button class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">3</button>
-    </div>
+        function renderAdDetailHtml(a) {
+            const ctr = a.impressions ? (a.clicks / a.impressions) * 100 : a.ctr;
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">광고 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">슬롯:</span> <span class="font-semibold">${safeText(a.slot)}</span></div>
+              <div><span class="text-gray-500">광고명:</span> <span class="font-semibold">${safeText(a.title)}</span></div>
+            </div>
+          </div>
 
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-4 rounded-xl bg-white border border-gray-200">
+              <p class="text-gray-500 text-xs font-semibold">노출</p>
+              <p class="text-lg font-extrabold text-blue-600 mt-1">${fmtNumber(a.impressions)}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-gray-200">
+              <p class="text-gray-500 text-xs font-semibold">클릭</p>
+              <p class="text-lg font-extrabold text-purple-600 mt-1">${fmtNumber(a.clicks)}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-gray-200 col-span-2">
+              <p class="text-gray-500 text-xs font-semibold">CTR</p>
+              <p class="text-lg font-extrabold text-emerald-600 mt-1">${(Number(ctr) || 0).toFixed(2)}%</p>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">운영 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                onclick="alert('UI만 동작: 광고 수정')">수정</button>
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 광고 중단')">중단</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderApprovalDetailHtml(a) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">승인 항목</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">유형:</span> <span class="font-semibold">${safeText(a.type)}</span></div>
+              <div><span class="text-gray-500">제목:</span> <span class="font-semibold">${safeText(a.title)}</span></div>
+              <div><span class="text-gray-500">등록자:</span> ${safeText(a.by)}</div>
+              <div><span class="text-gray-500">등록일:</span> ${safeText(a.created_at).slice(0, 16).replace("T", " ")}</div>
+              <div><span class="text-gray-500">ID:</span> ${safeText(a.id)}</div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">검수 체크(예시)</p>
+            <ul class="list-disc list-inside text-gray-600 mt-2 space-y-1">
+              <li>금지 업종/소재 여부</li>
+              <li>연락처/주소/이미지 최소 요건</li>
+              <li>저작권/상표권 위반 여부</li>
+            </ul>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button class="px-4 py-2 rounded-full bg-emerald-600 text-white font-bold shadow"
+              onclick="alert('UI만 동작: 승인 처리')">승인</button>
+            <button class="px-4 py-2 rounded-full bg-red-600 text-white font-bold shadow"
+              onclick="alert('UI만 동작: 반려 처리')">반려</button>
+            <button class="px-4 py-2 rounded-full bg-gray-100 text-gray-700 font-bold border border-gray-200"
+              onclick="closeDrawer()">닫기</button>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderSlotDetailHtml(s) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">슬롯 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">페이지:</span> <span class="font-semibold">${safeText(s.page)}</span></div>
+              <div><span class="text-gray-500">포지션:</span> <span class="font-semibold">${safeText(s.position)}</span></div>
+              <div><span class="text-gray-500">타입:</span> ${safeText(s.slot_type)}</div>
+              <div><span class="text-gray-500">모드:</span> ${safeText(s.slot_mode)}</div>
+              <div><span class="text-gray-500">링크:</span> <a class="text-blue-700 hover:underline break-all" href="${safeText(s.link_url, '#')}" target="_blank">${safeText(s.link_url)}</a></div>
+              <div><span class="text-gray-500">기간:</span> ${s.no_end ? "무기한" : `${safeText(s.start_date)} ~ ${safeText(s.end_date)}`}</div>
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">관리 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                onclick="alert('UI만 동작: 슬롯 수정')">수정</button>
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 슬롯 비활성')">비활성</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderBillingDetailHtml(b) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">결제 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">결제ID:</span> <span class="font-semibold">#${safeText(b.id)}</span></div>
+              <div><span class="text-gray-500">광고주:</span> ${safeText(b.advertiser)}</div>
+              <div><span class="text-gray-500">슬롯:</span> ${safeText(b.slot)}</div>
+              <div><span class="text-gray-500">금액:</span> <span class="font-semibold">${fmtMoney(b.amount)}</span></div>
+              <div><span class="text-gray-500">상태:</span> ${safeText(b.status)}</div>
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">관리 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                onclick="alert('UI만 동작: 영수증/청구서 출력')">영수증</button>
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 환불 처리')">환불</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderContentDetailHtml(c) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">콘텐츠 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">유형:</span> <span class="font-semibold">${safeText(c.type)}</span></div>
+              <div><span class="text-gray-500">제목:</span> <span class="font-semibold">${safeText(c.title)}</span></div>
+              <div><span class="text-gray-500">작성자:</span> ${safeText(c.by)}</div>
+              <div><span class="text-gray-500">작성일:</span> ${safeText(c.created_at).slice(0, 16).replace("T", " ")}</div>
+              <div><span class="text-gray-500">상태:</span> ${safeText(c.status)}</div>
+              <div><span class="text-gray-500">ID:</span> ${safeText(c.id)}</div>
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">관리 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 font-semibold"
+                onclick="alert('UI만 동작: 고정/추천')">고정/추천</button>
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 블라인드')">블라인드</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderUserDetailHtml(u) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">계정 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">구분:</span> <span class="font-semibold">${safeText(u.kind)}</span></div>
+              <div><span class="text-gray-500">이름/상호:</span> <span class="font-semibold">${safeText(u.name)}</span></div>
+              <div><span class="text-gray-500">연락처:</span> ${safeText(u.phone)}</div>
+              <div><span class="text-gray-500">상태:</span> ${safeText(u.status)}</div>
+              <div><span class="text-gray-500">등록일:</span> ${safeText(u.created_at).slice(0, 10)}</div>
+              <div><span class="text-gray-500">ID:</span> ${safeText(u.id)}</div>
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">관리 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 font-semibold"
+                onclick="alert('UI만 동작: 제한')">제한</button>
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 차단')">차단</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        function renderReportDetailHtml(r) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">신고 정보</p>
+            <div class="mt-2 space-y-1">
+              <div><span class="text-gray-500">유형:</span> <span class="font-semibold">${safeText(r.type)}</span></div>
+              <div><span class="text-gray-500">대상:</span> ${safeText(r.target)}</div>
+              <div><span class="text-gray-500">사유:</span> ${safeText(r.reason)}</div>
+              <div><span class="text-gray-500">신고일:</span> ${safeText(r.created_at).slice(0, 16).replace("T", " ")}</div>
+              <div><span class="text-gray-500">ID:</span> ${safeText(r.id)}</div>
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">처리 액션(예정)</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button class="px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
+                onclick="alert('UI만 동작: 블라인드')">블라인드</button>
+              <button class="px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold"
+                onclick="alert('UI만 동작: 처리완료')">처리완료</button>
+            </div>
+          </div>
+        </div>
+      `;
+        }
+
+        // ===============================
+        // ✅ 차트
+        // ===============================
+        let hourlyChart;
+        function buildHourlyChart() {
+            const ctx = document.getElementById("hourlyChart");
+            if (!ctx) return;
+
+            if (hourlyChart) hourlyChart.destroy();
+
+            const rows = window.__adminState.hourly || [];
+            const labels = rows.map(r => String(r.hour).padStart(2, "0") + "시");
+
+            const kpi = window.__adminState.kpi;
+            const tKey = kpi === "impressions" ? "impressions_today" : kpi === "clicks" ? "clicks_today" : "revenue_today";
+            const yKey = kpi === "impressions" ? "impressions_yesterday" : kpi === "clicks" ? "clicks_yesterday" : "revenue_yesterday";
+
+            const todayData = rows.map(r => Number(r[tKey] || 0));
+            const yestData = rows.map(r => Number(r[yKey] || 0));
+
+            hourlyChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: "오늘",
+                            data: todayData,
+                            borderWidth: 0,
+                            backgroundColor: "rgba(59,130,246,0.35)"
+                        },
+                        {
+                            label: "어제",
+                            data: yestData,
+                            borderWidth: 0,
+                            backgroundColor: "rgba(168,85,247,0.25)"
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    onClick: (evt, elements) => {
+                        if (!elements || !elements.length) return;
+                        const idx = elements[0].index;
+                        const row = rows[idx];
+                        openDrawer(
+                            `시간대 상세 · ${String(row.hour).padStart(2, "0")}시`,
+                            renderHourDetailHtml(row)
+                        );
+                    }
+                }
+            });
+        }
+
+        function renderHourDetailHtml(row) {
+            return `
+        <div class="space-y-4 text-sm text-gray-700">
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <p class="font-semibold text-gray-900">시간대 지표</p>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div class="p-4 rounded-xl bg-white border border-gray-200">
+                <p class="text-xs text-gray-500 font-semibold">오늘 노출</p>
+                <p class="text-lg font-extrabold text-blue-600 mt-1">${fmtNumber(row.impressions_today)}</p>
+              </div>
+              <div class="p-4 rounded-xl bg-white border border-gray-200">
+                <p class="text-xs text-gray-500 font-semibold">어제 노출</p>
+                <p class="text-lg font-extrabold text-purple-600 mt-1">${fmtNumber(row.impressions_yesterday)}</p>
+              </div>
+              <div class="p-4 rounded-xl bg-white border border-gray-200">
+                <p class="text-xs text-gray-500 font-semibold">오늘 클릭</p>
+                <p class="text-lg font-extrabold text-blue-600 mt-1">${fmtNumber(row.clicks_today)}</p>
+              </div>
+              <div class="p-4 rounded-xl bg-white border border-gray-200">
+                <p class="text-xs text-gray-500 font-semibold">어제 클릭</p>
+                <p class="text-lg font-extrabold text-purple-600 mt-1">${fmtNumber(row.clicks_yesterday)}</p>
+              </div>
+              <div class="p-4 rounded-xl bg-white border border-gray-200 col-span-2">
+                <p class="text-xs text-gray-500 font-semibold">오늘 매출</p>
+                <p class="text-lg font-extrabold text-orange-600 mt-1">${fmtMoney(row.revenue_today)}</p>
+                <p class="text-xs text-gray-500 mt-1">어제: ${fmtMoney(row.revenue_yesterday)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-white border border-gray-200">
+            <p class="font-semibold text-gray-900">이 시간대 Top 광고(예정)</p>
+            <p class="text-gray-500 mt-1">
+              나중에 “클릭 로그 테이블” 붙이면 이 시간대에 클릭된 광고를 여기로 뽑아주면 돼.
+            </p>
+          </div>
+        </div>
+      `;
+        }
+
+        // ===============================
+        // ✅ 데이터 로드 (지금은 더미 우선)
+        // ===============================
+        async function loadAll(range = "today") {
+            window.__adminState.range = range;
+
+            // ✅ 지금은 서버 API가 없어도 동작해야 하니까:
+            // 1) API 시도
+            // 2) 실패하면 더미
+            let payload = null;
+
+            try {
+                // 네가 나중에 서버에 만들 API(예시)
+                // payload = await fetchJson(`/admin/overview?range=${range}`);
+                // if (!payload || !payload.ok) throw new Error("no payload");
+
+                throw new Error("API not wired"); // 현재는 강제로 더미 사용
+            } catch (e) {
+                const m = makeMockState();
+                payload = {
+                    ok: true,
+                    today: m.today,
+                    yesterday: m.yesterday,
+                    hourly: m.hourly,
+                    top_ads: m.top_ads,
+                    approvals: m.approvalsList,
+                    reports: m.reportsList,
+                    expiring_ads: m.expiring,
+                    new_items: m.newItems,
+                    slots: m.slots,
+                    billing: m.billing,
+                    content: m.content,
+                    users: m.users,
+                };
+            }
+
+            // 상태 반영
+            window.__adminState.today = payload.today || {};
+            window.__adminState.yesterday = payload.yesterday || {};
+            window.__adminState.hourly = payload.hourly || [];
+            window.__adminState.top_ads = payload.top_ads || [];
+            window.__adminState.approvals = payload.approvals || [];
+            window.__adminState.reports = payload.reports || [];
+            window.__adminState.expiring_ads = payload.expiring_ads || 0;
+            window.__adminState.new_items = payload.new_items || 0;
+            window.__adminState.slots = payload.slots || [];
+            window.__adminState.billing = payload.billing || [];
+            window.__adminState.content = payload.content || [];
+            window.__adminState.users = payload.users || [];
+
+            // 렌더
+            renderMetricCards();
+            renderTopAds();
+            renderApprovalsMini();
+            buildHourlyChart();
+
+            renderApprovalTable();
+            renderSlotTable();
+            renderBillingTable();
+            renderContentTable();
+            renderUsersTable();
+            renderReportTable();
+        }
+
+        // ===============================
+        // ✅ 카드 클릭(세부)
+        // ===============================
+        function openMetricDetail(metric) {
+            const s = window.__adminState;
+            const t = s.today || {};
+            const y = s.yesterday || {};
+            const rows = s.top_ads || [];
+
+            if (metric === "impressions") {
+                openDrawer("오늘 광고 노출 상세", `
+          <div class="space-y-4 text-sm text-gray-700">
+            <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <p class="font-semibold text-gray-900">오늘 노출</p>
+              <p class="text-2xl font-extrabold text-blue-600 mt-1">${fmtNumber(t.impressions)}</p>
+              <p class="text-sm mt-2">어제: <span class="font-semibold">${fmtNumber(y.impressions)}</span></p>
+              <p class="text-sm mt-1">변화: ${deltaText(t.impressions, y.impressions)}</p>
+            </div>
+            ${renderTopAdsHtml(rows.slice(0, 8))}
+          </div>
+        `);
+                return;
+            }
+
+            if (metric === "clicks") {
+                openDrawer("오늘 광고 클릭 상세", `
+          <div class="space-y-4 text-sm text-gray-700">
+            <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <p class="font-semibold text-gray-900">오늘 클릭</p>
+              <p class="text-2xl font-extrabold text-purple-600 mt-1">${fmtNumber(t.clicks)}</p>
+              <p class="text-sm mt-2">어제: <span class="font-semibold">${fmtNumber(y.clicks)}</span></p>
+              <p class="text-sm mt-1">변화: ${deltaText(t.clicks, y.clicks)}</p>
+            </div>
+            ${renderTopAdsHtml(rows.slice(0, 8))}
+          </div>
+        `);
+                return;
+            }
+
+            if (metric === "ctr") {
+                const ctrT = t.impressions ? (t.clicks / t.impressions) * 100 : 0;
+                const ctrY = y.impressions ? (y.clicks / y.impressions) * 100 : 0;
+                openDrawer("CTR 상세", `
+          <div class="space-y-4 text-sm text-gray-700">
+            <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <p class="font-semibold text-gray-900">오늘 CTR</p>
+              <p class="text-2xl font-extrabold text-emerald-600 mt-1">${ctrT.toFixed(2)}%</p>
+              <p class="text-sm mt-2">어제: <span class="font-semibold">${ctrY.toFixed(2)}%</span></p>
+              <p class="text-sm mt-1">변화: ${deltaText(ctrT, ctrY, "%")}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-gray-200">
+              <p class="font-semibold text-gray-900">참고</p>
+              <p class="text-gray-600 mt-1">CTR = 클릭 / 노출. 슬롯별 CTR을 뽑아서 “효율 좋은 광고”를 자동 추천하는 것도 가능.</p>
+            </div>
+          </div>
+        `);
+                return;
+            }
+
+            if (metric === "ad_revenue") {
+                openDrawer("광고 매출 상세", `
+          <div class="space-y-4 text-sm text-gray-700">
+            <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <p class="font-semibold text-gray-900">오늘 광고 매출</p>
+              <p class="text-2xl font-extrabold text-orange-600 mt-1">${fmtMoney(t.ad_revenue)}</p>
+              <p class="text-sm mt-2">어제: <span class="font-semibold">${fmtMoney(y.ad_revenue)}</span></p>
+              <p class="text-sm mt-1">변화: ${deltaText(t.ad_revenue, y.ad_revenue, "원")}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-gray-200">
+              <p class="font-semibold text-gray-900">구성(예정)</p>
+              <p class="text-gray-600 mt-1">결제 테이블/청구서 테이블을 붙이면 “오늘 결제 완료/대기/취소”를 여기서 바로 볼 수 있어.</p>
+            </div>
+          </div>
+        `);
+                return;
+            }
+
+            if (metric === "approvals") {
+                openDrawer("승인 대기 상세", `
+          <div class="space-y-4 text-sm text-gray-700">
+            <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <p class="font-semibold text-gray-900">승인 대기</p>
+              <p class="text-2xl font-extrabold text-red-600 mt-1">${fmtNumber(t.approvals)}</p>
+              <p class="text-sm mt-1">어제: ${fmtNumber(y.approvals)}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-gray-200">
+              <p class="font-semibold text-gray-900">대기 목록</p>
+              <div class="mt-2 space-y-2">
+                ${(s.approvals || []).slice(0, 8).map(a => `
+                  <button class="w-full text-left p-3 rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100"
+                    onclick="openDrawer('승인 상세', renderApprovalDetailHtml(${JSON.stringify(a).replace(/"/g, "&quot;")}))">
+                    <div class="font-semibold">${safeText(a.type)} · ${safeText(a.title)}</div>
+                    <div class="text-xs text-gray-500 mt-1">등록자: ${safeText(a.by)} · ID: ${safeText(a.id)}</div>
+                  </button>
+                `).join("") || `<div class="text-gray-400">대기 목록이 없습니다.</div>`}
+              </div>
+            </div>
+          </div>
+        `);
+                return;
+            }
+        }
+
+        document.querySelectorAll(".metric-card").forEach(btn => {
+            btn.addEventListener("click", () => openMetricDetail(btn.dataset.metric));
+        });
+
+        // ===============================
+        // ✅ KPI 버튼(그래프 지표 변경)
+        // ===============================
+        document.querySelectorAll(".kpi-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".kpi-btn").forEach(b => {
+                    b.classList.remove("bg-blue-100", "text-blue-700");
+                    b.classList.add("bg-gray-100", "text-gray-700");
+                });
+                btn.classList.remove("bg-gray-100", "text-gray-700");
+                btn.classList.add("bg-blue-100", "text-blue-700");
+                window.__adminState.kpi = btn.dataset.kpi;
+                buildHourlyChart();
+            });
+        });
+
+        // ===============================
+        // ✅ 기간 버튼(오늘/7일/30일)
+        // ===============================
+        document.querySelectorAll(".range-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                document.querySelectorAll(".range-btn").forEach(b => {
+                    b.classList.remove("bg-blue-100", "text-blue-700");
+                    b.classList.add("bg-gray-100", "text-gray-700");
+                });
+                btn.classList.remove("bg-gray-100", "text-gray-700");
+                btn.classList.add("bg-blue-100", "text-blue-700");
+                await loadAll(btn.dataset.range);
+            });
+        });
+
+        // ===============================
+        // ✅ 각 섹션 새로고침/필터 이벤트
+        // ===============================
+        document.getElementById("btn-refresh")?.addEventListener("click", () => loadAll(window.__adminState.range));
+
+        document.getElementById("btn-approval-refresh")?.addEventListener("click", renderApprovalTable);
+        document.getElementById("approval-type")?.addEventListener("change", renderApprovalTable);
+        document.getElementById("approval-q")?.addEventListener("input", renderApprovalTable);
+
+        document.getElementById("btn-slot-refresh")?.addEventListener("click", renderSlotTable);
+        document.getElementById("slot-page")?.addEventListener("change", renderSlotTable);
+        document.getElementById("slot-q")?.addEventListener("input", renderSlotTable);
+
+        document.getElementById("btn-content-refresh")?.addEventListener("click", renderContentTable);
+        document.getElementById("content-type")?.addEventListener("change", renderContentTable);
+        document.getElementById("content-q")?.addEventListener("input", renderContentTable);
+
+        document.getElementById("btn-users-refresh")?.addEventListener("click", renderUsersTable);
+        document.getElementById("users-type")?.addEventListener("change", renderUsersTable);
+        document.getElementById("users-q")?.addEventListener("input", renderUsersTable);
+
+        document.getElementById("btn-report-refresh")?.addEventListener("click", renderReportTable);
+        document.getElementById("report-type")?.addEventListener("change", renderReportTable);
+        document.getElementById("report-q")?.addEventListener("input", renderReportTable);
+
+        // ESC로 드로어 닫기
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeDrawer();
+        });
+
+        // ===============================
+        // ✅ 최초 로드
+        // ===============================
+        window.addEventListener("DOMContentLoaded", async () => {
+            setRealtimeIndicator(0);
+            await loadAll("today");
+        });
+    </script>
 </body>
 
 </html>
