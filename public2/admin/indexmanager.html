@@ -643,6 +643,33 @@
 
                     <div class="divider"></div>
 
+                    <!-- ✅ 우선순위(1이 가장 우선) - 기간 설정 바로 위에 추가 -->
+                    <div class="mt-4 p-3 rounded-xl border border-blue-100 bg-white/70">
+                        <div class="flex flex-col md:flex-row md:items-end gap-3">
+                            <div class="flex-1">
+                                <label class="text-sm font-semibold text-gray-700">우선순위</label>
+                                <input name="priority" id="adPriority" type="number" min="1" step="1" value="1"
+                                    class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-300" />
+                                <p class="mt-1 text-xs text-gray-500">1이 가장 먼저 노출됩니다. (1,2,3… 여러 개 등록 가능)</p>
+                            </div>
+
+                            <button type="button" id="btnLoadPriority"
+                                class="rounded-xl px-4 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100">
+                                이 우선순위 불러오기
+                            </button>
+
+                            <button type="button" id="btnDeletePriority"
+                                class="rounded-xl px-4 py-2 border border-red-200 bg-red-50 hover:bg-red-100">
+                                이 우선순위 삭제
+                            </button>
+                        </div>
+
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-sm text-gray-700">후보 목록 보기</summary>
+                            <div id="candidateList" class="mt-2 grid gap-2"></div>
+                        </details>
+                    </div>
+
                     <!-- 기간 -->
                     <div class="rounded-xl border border-slate-100 p-4">
                         <div class="flex items-center justify-between">
@@ -1377,6 +1404,116 @@
             bindAllBoxes();
             await loadAllSlotsPreview();
         });
+
+        // ✅ 폼 name 기준으로 값 자동 채우기(레이아웃/ID 의존 최소화)
+        function fillAdFormFromSlot(slot) {
+            const form = document.querySelector('form'); // 모달 폼이 1개라는 전제(대부분 그렇고, 아니면 모달 폼 selector로 바꿔줘)
+            if (!form || !slot) return;
+
+            const set = (name, val) => {
+                const el = form.querySelector(`[name="${name}"]`);
+                if (!el) return;
+                if (el.type === "checkbox") el.checked = !!val;
+                else el.value = (val ?? "");
+            };
+
+            set("priority", slot.priority ?? 1);
+            set("slotType", slot.slot_type ?? "");
+            set("slotMode", slot.slot_mode ?? "");
+            set("linkUrl", slot.link_url ?? "");
+            set("textContent", slot.text_content ?? "");
+            set("businessNo", slot.business_no ?? "");
+            set("businessName", slot.business_name ?? "");
+            set("storeId", slot.store_id ?? "");
+            set("startAt", slot.start_at_local ?? "");
+            set("endAt", slot.end_at_local ?? "");
+            set("noEnd", slot.no_end ?? false);
+        }
+
+        async function refreshCandidates(page, position) {
+            const box = document.getElementById("candidateList");
+            if (!box) return;
+
+            const res = await fetch(`/manager/ad/slot-items?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+            const data = await res.json();
+            box.innerHTML = "";
+
+            if (!data?.success || !Array.isArray(data.items) || data.items.length === 0) {
+                box.innerHTML = `<div class="text-sm text-gray-500">등록된 후보가 없습니다.</div>`;
+                return;
+            }
+
+            for (const it of data.items) {
+                const pr = it.priority ?? "-";
+                const img = it.image_url ? `<img src="${it.image_url}" class="w-12 h-12 rounded-lg object-cover border" />`
+                    : `<div class="w-12 h-12 rounded-lg bg-gray-100 border"></div>`;
+                const activeHint = (it.no_end || it.end_at_local || it.start_at_local)
+                    ? `<div class="text-xs text-gray-500">기간: ${it.start_at_local || "-"} ~ ${it.no_end ? "무기한" : (it.end_at_local || "-")}</div>`
+                    : `<div class="text-xs text-gray-400">기간 미설정</div>`;
+
+                const row = document.createElement("button");
+                row.type = "button";
+                row.className = "w-full text-left p-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 flex gap-3 items-center";
+                row.innerHTML = `
+        ${img}
+        <div class="flex-1">
+          <div class="text-sm font-semibold text-gray-800">우선순위 ${pr}</div>
+          <div class="text-xs text-gray-600">${it.business_name || it.link_url || it.text_content || "(내용 없음)"}</div>
+          ${activeHint}
+        </div>
+      `;
+                row.addEventListener("click", async () => {
+                    const p = it.priority ?? 1;
+                    const r = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(p)}`);
+                    const d = await r.json();
+                    if (d?.success) fillAdFormFromSlot(d.slot);
+                });
+
+                box.appendChild(row);
+            }
+        }
+
+        // ✅ "이 우선순위 불러오기" / "삭제"
+        document.addEventListener("click", async (e) => {
+            const loadBtn = e.target.closest("#btnLoadPriority");
+            const delBtn = e.target.closest("#btnDeletePriority");
+            if (!loadBtn && !delBtn) return;
+
+            // 모달에 page/position을 저장해둔 값 사용(아래에 '모달 열 때 dataset 넣기' 참고)
+            const modal = document.querySelector("[data-ad-modal]") || document.body;
+            const page = modal.dataset.page;
+            const position = modal.dataset.position;
+            const prEl = document.getElementById("adPriority");
+            const pr = prEl ? Number(prEl.value || 1) : 1;
+
+            if (!page || !position) {
+                alert("page/position 정보를 찾을 수 없습니다. (모달 open 시 dataset 설정 필요)");
+                return;
+            }
+
+            if (loadBtn) {
+                const r = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(pr)}`);
+                const d = await r.json();
+                if (d?.success) fillAdFormFromSlot(d.slot);
+                await refreshCandidates(page, position);
+            }
+
+            if (delBtn) {
+                if (!confirm(`우선순위 ${pr} 후보를 삭제할까요?`)) return;
+                const r = await fetch(`/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(pr)}`, { method: "DELETE" });
+                const d = await r.json();
+                if (!d?.success) alert(d?.error || "삭제 실패");
+                await refreshCandidates(page, position);
+            }
+        });
+
+        /**
+         * ✅ 매우 중요: "모달 열 때" 아래 2줄을 꼭 넣어줘야 함
+         * modalEl.dataset.page = page;
+         * modalEl.dataset.position = position;
+         *
+         * 그리고 모달 열리자마자 refreshCandidates(page, position) 호출하면 끝.
+         */
     </script>
 </body>
 
