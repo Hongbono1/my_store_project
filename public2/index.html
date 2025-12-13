@@ -527,37 +527,61 @@
             return `/${trimmed}`;
         }
 
-        async function loadTextSlot(slotId, page, position, defaultRender) {
+        function escapeHtml(s) {
+            return String(s ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function renderTextLines(container, rawText) {
+            const textEl = container.querySelector(".slot-default-text") || container;
+
+            const text = (rawText ?? "").toString();
+            const lines = text
+                .split(/\r?\n/)
+                .map(v => v.trim())
+                .filter(Boolean);
+
+            // 보기 좋게 스타일(기존 클래스는 유지하고 추가만)
+            textEl.classList.add("text-left");
+
+            if (!lines.length) {
+                textEl.innerHTML = `<p class="text-sm text-gray-400">내용 없음</p>`;
+                return;
+            }
+
+            // 줄 단위로 표시
+            textEl.innerHTML = lines
+                .slice(0, 12) // 너무 길면 12줄까지만(원하면 늘려도 됨)
+                .map(line => `<p class="text-sm sm:text-base leading-relaxed text-gray-900">${escapeHtml(line)}</p>`)
+                .join("");
+        }
+
+        async function loadTextSlot(slotId, page, position, defaultRender, priority = 1) {
             const container = document.getElementById(slotId);
             if (!container) return;
 
             try {
-                const res = await fetch(`/manager/ad/text/get?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`);
+                // ✅ 너가 curl로 확인한 저장/조회 경로와 동일하게 맞춤
+                const url = `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
+                const res = await fetch(url, { cache: "no-store" });
+
                 if (!res.ok) {
                     defaultRender(container);
                     return;
                 }
 
-                const json = await res.json();
+                const json = await res.json().catch(() => ({}));
+                const slot = json?.slot || null;
 
-                // ✅ 컨트롤러/프론트 키 혼용 대응
-                const content =
-                    json?.text?.content ||
-                    json?.text?.text_content ||
-                    json?.slot?.text_content ||
-                    json?.slot?.content ||
-                    "";
-
-                // ✅ 서버 응답 키 불일치 해결
-                const isOk = !!(json.ok || json.success);
-
-                if (isOk && content && String(content).trim() !== "") {
-                    const textEl = container.querySelector(".slot-default-text") || container;
-                    textEl.innerHTML = content;
+                if (json?.success && slot && String(slot.text_content ?? "").trim() !== "") {
+                    renderTextLines(container, slot.text_content);
                 } else {
                     defaultRender(container);
                 }
-
             } catch (err) {
                 console.error(`텍스트 슬롯 로드 실패 [${position}]:`, err);
                 defaultRender(container);
@@ -576,8 +600,7 @@
         };
 
         function renderDefaultList(container, items) {
-            const textEl = container.querySelector(".slot-default-text") || container;
-            textEl.innerHTML = items.map(t => `<p class="text-xl leading-relaxed tracking-wide">${t}</p>`).join("");
+            renderTextLines(container, (items || []).join("\n"));
         }
 
         // ============================================================
@@ -910,52 +933,6 @@
                 window.location.href = `/search?q=${encodeURIComponent(query)}`;
             }
         }
-
-        (async () => {
-            const PAGE = "index";
-
-            const targets = [
-                { id: "slot_index_sub_keywords", position: "index_sub_keywords" },
-                { id: "slot_index_sub_news", position: "index_sub_news" },
-                { id: "slot_index_sub_events", position: "index_sub_events" },
-                { id: "slot_index_sub_recommends", position: "index_sub_recommends" },
-            ];
-
-            async function fetchSlot(position) {
-                const url = `/manager/ad/slot?page=${encodeURIComponent(PAGE)}&position=${encodeURIComponent(position)}`;
-                const res = await fetch(url, { cache: "no-store" });
-                const json = await res.json().catch(() => ({}));
-                if (!res.ok || !json?.success || !json?.slot) return null;
-                return json.slot;
-            }
-
-            function renderText(box, rawText) {
-                const def = box.querySelector(".slot-default") || box;
-                const text = (rawText ?? "").toString().trim();
-                const lines = text ? text.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
-                const out = lines.length ? lines.join("\n") : "내용 없음";
-
-                def.innerHTML = `
-      <div style="width:100%; padding:12px; text-align:left;">
-        <div style="font-size:11px; font-weight:800; color:#334155; margin-bottom:6px;">텍스트</div>
-        <div style="font-size:12px; line-height:1.6; color:#0f172a; white-space:pre-line;">${out.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
-                    }</div>
-      </div>
-    `;
-            }
-
-            for (const t of targets) {
-                const box = document.getElementById(t.id);
-                if (!box) continue;
-
-                const slot = await fetchSlot(t.position);
-                if (!slot) continue;
-
-                renderText(box, slot.text_content || "");
-            }
-
-            console.log("✅ INDEX TEXT BOXES APPLIED");
-        })();
     </script>
 
 </body>
