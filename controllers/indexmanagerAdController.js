@@ -620,71 +620,131 @@ export async function deleteSlot(req, res) {
 export async function searchStore(req, res) {
   const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
 
+  function splitTableRef(full) {
+    const [schema, name] = String(full).includes(".")
+      ? String(full).split(".")
+      : ["public", String(full)];
+    return { schema, name };
+  }
+
+  async function pickExistingColumn(client, fullTable, candidates) {
+    const { schema, name } = splitTableRef(fullTable);
+    const list = (candidates || []).filter(Boolean);
+
+    if (!list.length) return null;
+
+    const { rows } = await client.query(
+      `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1
+      AND table_name   = $2
+      AND column_name = ANY($3::text[])
+    ORDER BY array_position($3::text[], column_name)
+    LIMIT 1
+    `,
+      [schema, name, list]
+    );
+
+    return rows?.[0]?.column_name || null;
+  }
+
   // ✅ 프론트가 name/businessName을 보내도 검색되게 흡수
   const q = cleanStr(
     req.query.q ??
     req.query.keyword ??
-    req.query.name ??          // ✅ 추가
-    req.query.businessName ??  // ✅ 추가
+    req.query.name ??
+    req.query.businessName ??
     req.query.business_name
   );
 
   const client = await pool.connect();
   try {
-    const candidates = [
-      { table: "public.combined_store_info", id: "id", biz: "business_no", name: "business_name" },
-      { table: "public.store_info", id: "id", biz: "business_no", name: "business_name" },
-      { table: "public.food_stores", id: "id", biz: "business_no", name: "store_name" },
+    const sources = [
+      {
+        table: "public.combined_store_info",
+        idCandidates: ["id", "store_id"],
+        bizCandidates: ["business_number", "business_no", "businessno", "biz_no", "bizno", "business_num", "b_no", "bno"],
+        nameCandidates: ["business_name", "store_name", "name", "title"],
+      },
+
+      {
+        table: "public.store_info",
+        idCandidates: ["id", "store_id"],
+        bizCandidates: ["business_no", "businessno", "biz_no", "bizno", "business_number", "business_num", "b_no", "bno"],
+        nameCandidates: ["business_name", "store_name", "name", "title"],
+      },
+      {
+        table: "public.food_stores",
+        idCandidates: ["id", "store_id"],
+        bizCandidates: ["business_no", "businessno", "biz_no", "bizno", "business_number", "business_num", "b_no", "bno"],
+        nameCandidates: ["store_name", "business_name", "name", "title"],
+      },
     ];
 
     const found = [];
 
-    for (const c of candidates) {
-      const ok = await tableExists(client, c.table);
-      if (!ok) continue;
+    async function runSearch({ table, idCandidates, bizCandidates, nameCandidates }, mode, value) {
+      const ok = await tableExists(client, table);
+      if (!ok) return;
 
-      // ✅ bizNo 우선
-      if (bizNo) {
+      const idCol = await pickExistingColumn(client, table, idCandidates);
+      const bizCol = await pickExistingColumn(client, table, bizCandidates);
+      const nameCol = await pickExistingColumn(client, table, nameCandidates);
+
+      // id/name/biz 중 하나라도 없으면 이 소스는 스킵
+      if (!idCol || !nameCol || !bizCol) return;
+
+      if (mode === "biz") {
         const r = await client.query(
           `
           SELECT
-            ${c.id}::text AS id,
-            ${c.biz}::text AS business_no,     -- ✅ 타입 통일
-            ${c.name} AS business_name
-          FROM ${c.table}
-          WHERE ${c.biz}::text = $1            -- ✅ 타입 불일치 방지
-          ORDER BY ${c.id} DESC
+            ${idCol}::text        AS id,
+            ${bizCol}::text       AS business_no,
+            ${nameCol}            AS business_name
+          FROM ${table}
+          WHERE ${bizCol}::text = $1
+          ORDER BY ${idCol} DESC
           LIMIT 30
           `,
-          [bizNo]
+          [value]
         );
         found.push(...r.rows);
-        continue;
+        return;
       }
 
-      // ✅ q 검색
-      if (q) {
+      if (mode === "q") {
         const r = await client.query(
           `
           SELECT
-            ${c.id}::text AS id,
-            ${c.biz}::text AS business_no,     -- ✅ 타입 통일
-            ${c.name} AS business_name
-          FROM ${c.table}
-          WHERE ${c.name} ILIKE '%' || $1 || '%'
-             OR ${c.biz}::text ILIKE '%' || $1 || '%'   -- ✅ 숫자컬럼도 검색 가능
-          ORDER BY ${c.id} DESC
+            ${idCol}::text        AS id,
+            ${bizCol}::text       AS business_no,
+            ${nameCol}            AS business_name
+          FROM ${table}
+          WHERE ${nameCol} ILIKE '%' || $1 || '%'
+             OR ${bizCol}::text ILIKE '%' || $1 || '%'
+          ORDER BY ${idCol} DESC
           LIMIT 30
           `,
-          [q]
+          [value]
         );
         found.push(...r.rows);
       }
     }
 
+    // 1) bizNo로 먼저 검색
+    if (bizNo) {
+      for (const s of sources) await runSearch(s, "biz", bizNo);
+    }
+
+    // ✅ bizNo로 못 찾으면(또는 bizNo가 없으면) q로 검색(프론트가 name/businessName 보냈을 때 여기로 잡힘)
+    if (!found.length && q) {
+      for (const s of sources) await runSearch(s, "q", q);
+    }
+
     const uniq = new Map();
     for (const s of found) {
-      const key = `${s.id}|${s.business_no}`;
+      const key = `${s.id}|${s.business_no}|${s.business_name}`;
       if (!uniq.has(key)) uniq.set(key, s);
     }
 
@@ -696,6 +756,7 @@ export async function searchStore(req, res) {
     client.release();
   }
 }
+
 
 /* -------------------------
  *  multer helper (라우터에서 사용)
