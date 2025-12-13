@@ -46,8 +46,6 @@ import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
-
-import express from "express";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
 
