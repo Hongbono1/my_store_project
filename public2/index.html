@@ -125,37 +125,41 @@
     <!-- ⑥ 상단 서브 박스 (검색어/최신소식/이벤트/추천) -->
     <section
         class="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+
         <div>
             <h3 class="font-bold text-xl sm:text-2xl mb-2">검색어</h3>
-            <a href="search.html">
-                <div id="slot_index_sub_keywords" class="neo-card min-h-28 p-4">
-                    <div class="slot-default-text"></div>
-                </div>
-            </a>
+            <div id="slot_index_sub_keywords" class="neo-card min-h-28 p-4">
+                <div class="slot-default-text"></div>
+            </div>
+            <a href="search.html" class="inline-block mt-2 text-xs text-gray-500 underline">더보기</a>
         </div>
+
         <div>
             <h3 class="font-bold text-xl sm:text-2xl mb-2">최신 소식</h3>
-            <a href="news.html">
-                <div id="slot_index_sub_news" class="neo-card min-h-28 p-4">
-                    <div class="slot-default-text"></div>
-                </div>
-            </a>
+            <div id="slot_index_sub_news" class="neo-card min-h-28 p-4">
+                <div class="slot-default-text"></div>
+            </div>
+            <a href="news.html" class="inline-block mt-2 text-xs text-gray-500 underline">더보기</a>
         </div>
+
         <div>
             <h3 class="font-bold text-xl sm:text-2xl mb-2">이벤트 정보</h3>
             <div id="slot_index_sub_events" class="neo-card min-h-28 p-4">
                 <div class="slot-default-text"></div>
             </div>
+            <a href="event.html" class="inline-block mt-2 text-xs text-gray-500 underline">더보기</a>
         </div>
+
         <div>
             <h3 class="font-bold text-xl sm:text-2xl mb-2">추천 제품</h3>
-            <a href="recommend.html">
-                <div id="slot_index_sub_recommends" class="neo-card min-h-28 p-4">
-                    <div class="slot-default-text"></div>
-                </div>
-            </a>
+            <div id="slot_index_sub_recommends" class="neo-card min-h-28 p-4">
+                <div class="slot-default-text"></div>
+            </div>
+            <a href="recommend.html" class="inline-block mt-2 text-xs text-gray-500 underline">더보기</a>
         </div>
+
     </section>
+
 
     <!-- ⑦ Best Pick -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
@@ -401,6 +405,7 @@
             if (/^https?:\/\//i.test(u)) return u;
             return u.startsWith("/") ? u : ("/" + u);
         }
+
         // 캐시 무효화 쿼리스트링
         function withBust(u) {
             const sep = u.includes("?") ? "&" : "?";
@@ -426,21 +431,19 @@
                     `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}`,
                     { cache: "no-store" }
                 );
+
                 if (!res.ok) {
                     console.warn(`[${position}] API 응답 실패: ${res.status}`);
                     return;
                 }
 
-                const json = await res.json();
-                console.log(`[${position}] 서버 응답:`, json);
-
+                const json = await res.json().catch(() => ({}));
                 const slot = json.slot || json.data || null;
                 if (!slot) {
                     console.warn(`[${position}] slot 데이터 없음`);
                     return;
                 }
 
-                // ✅ 다양한 키 패턴 대응
                 const rawImg =
                     slot.image_url ||
                     slot.imageUrl ||
@@ -458,33 +461,25 @@
                     "";
 
                 if (!rawImg || !img) {
-                    console.warn(`[${position}] 이미지 URL 없음: ${rawImg}`);
+                    console.warn(`[${position}] 이미지 URL 없음`);
                     return;
                 }
 
-                // ✅ 순서 수정: 절대경로 변환 → 캐시 무효화
                 const absUrl = toAbs(rawImg);
                 const finalSrc = withBust(absUrl);
 
-                console.log(`[${position}] 이미지 로드 시도: ${finalSrc}`);
-
-                // ✅ 이벤트 핸들러를 src 설정 **전에** 등록
                 img.onload = () => {
-                    console.log(`[${position}] 이미지 로드 성공`);
                     img.classList.remove("hidden");
                     if (def) def.classList.add("hidden");
                 };
 
-                img.onerror = (e) => {
-                    console.error(`[${position}] 이미지 로드 실패:`, finalSrc, e);
+                img.onerror = () => {
                     img.classList.add("hidden");
                     if (def) def.classList.remove("hidden");
                 };
 
-                // ✅ 마지막에 src 설정
                 img.src = finalSrc;
 
-                // 링크 설정
                 if (link) {
                     container.style.cursor = "pointer";
                     container.onclick = (e) => {
@@ -495,37 +490,14 @@
                     container.style.cursor = "default";
                     container.onclick = null;
                 }
-
             } catch (e) {
                 console.error(`[${position}] 슬롯 로드 오류:`, e);
             }
         }
 
-        // ✅ Best Pick용 정규화 함수 개선
-        function normalizeImageUrl(originalUrl) {
-            const fallbackUrl = "/assets/no-image.png";
-
-            if (!originalUrl || typeof originalUrl !== "string") {
-                return fallbackUrl;
-            }
-
-            const trimmed = originalUrl.trim();
-            if (!trimmed) {
-                return fallbackUrl;
-            }
-
-            // 이미 절대 URL인 경우
-            if (/^https?:\/\//i.test(trimmed)) {
-                return trimmed;
-            }
-
-            // 상대 경로 변환
-            if (trimmed.startsWith("/")) {
-                return trimmed; // 서버가 정적 파일 제공 중이면 그대로 사용
-            }
-
-            return `/${trimmed}`;
-        }
+        // ============================================================
+        // ✅ 텍스트 박스 (검색어/최신소식/이벤트/추천) : 글자 크게 + 줄별 클릭
+        // ============================================================
 
         function escapeHtml(s) {
             return String(s ?? "")
@@ -536,7 +508,21 @@
                 .replace(/'/g, "&#39;");
         }
 
-        function renderTextLines(container, rawText) {
+        function buildLineHref(position, line) {
+            const q = encodeURIComponent(line);
+
+            // ✅ 검색어: 줄 클릭 → search.html?q=
+            if (position === "index_sub_keywords") return `search.html?q=${q}`;
+
+            // ✅ 나머지 3개는 일단 해당 페이지로 + q 파라미터
+            if (position === "index_sub_news") return `news.html?q=${q}`;
+            if (position === "index_sub_events") return `event.html?q=${q}`;
+            if (position === "index_sub_recommends") return `recommend.html?q=${q}`;
+
+            return "javascript:void(0)";
+        }
+
+        function renderTextLines(container, rawText, position) {
             const textEl = container.querySelector(".slot-default-text") || container;
 
             const text = (rawText ?? "").toString();
@@ -545,18 +531,28 @@
                 .map(v => v.trim())
                 .filter(Boolean);
 
-            // 보기 좋게 스타일(기존 클래스는 유지하고 추가만)
             textEl.classList.add("text-left");
 
             if (!lines.length) {
-                textEl.innerHTML = `<p class="text-sm text-gray-400">내용 없음</p>`;
+                textEl.innerHTML = `<p class="text-base sm:text-lg text-gray-400">내용 없음</p>`;
                 return;
             }
 
-            // 줄 단위로 표시
+            // ✅ 글자 크게 + ✅ 줄별 클릭(각 줄이 a 태그)
             textEl.innerHTML = lines
-                .slice(0, 12) // 너무 길면 12줄까지만(원하면 늘려도 됨)
-                .map(line => `<p class="text-sm sm:text-base leading-relaxed text-gray-900">${escapeHtml(line)}</p>`)
+                .slice(0, 12)
+                .map((line, idx) => {
+                    const href = buildLineHref(position, line);
+                    return `
+                    <a href="${href}"
+                       class="block w-full rounded-xl px-3 py-2
+                              text-lg sm:text-xl font-semibold text-gray-900
+                              hover:bg-gray-100 active:bg-gray-200 transition"
+                       title="${escapeHtml(line)}">
+                      <span class="mr-2 text-gray-400">${idx + 1}.</span>${escapeHtml(line)}
+                    </a>
+                `;
+                })
                 .join("");
         }
 
@@ -565,7 +561,7 @@
             if (!container) return;
 
             try {
-                // ✅ 너가 curl로 확인한 저장/조회 경로와 동일하게 맞춤
+                // ✅ 너가 curl로 확인한 저장/조회와 동일 경로
                 const url = `/manager/ad/slot?page=${encodeURIComponent(page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
                 const res = await fetch(url, { cache: "no-store" });
 
@@ -578,7 +574,7 @@
                 const slot = json?.slot || null;
 
                 if (json?.success && slot && String(slot.text_content ?? "").trim() !== "") {
-                    renderTextLines(container, slot.text_content);
+                    renderTextLines(container, slot.text_content, position);
                 } else {
                     defaultRender(container);
                 }
@@ -589,9 +585,8 @@
         }
 
         // ============================================================
-        // 📌 기본값 렌더 함수들
+        // 📌 기본값 렌더
         // ============================================================
-
         const DEFAULT_DATA = {
             keywords: ["검색어1", "검색어2", "검색어3", "검색어4", "검색어5"],
             news: ["신제품 출시", "업데이트 소식", "공지사항", "점검 안내", "서비스 개선"],
@@ -599,27 +594,26 @@
             recommends: ["추천 상품 A", "추천 상품 B", "추천 상품 C", "추천 상품 D", "추천 상품 E"]
         };
 
-        function renderDefaultList(container, items) {
-            renderTextLines(container, (items || []).join("\n"));
+        function renderDefaultList(container, items, position) {
+            renderTextLines(container, (items || []).join("\n"), position);
         }
 
         // ============================================================
-        // 📌 우리동네 한마디 로더 (기존 API + 관리자 슬롯 통합)
+        // 📌 우리동네 한마디 로더
         // ============================================================
         async function loadOneWord() {
             const contentEl = document.getElementById("oneword-content");
             if (!contentEl) return;
 
             try {
-                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword");
+                const slotRes = await fetch("/manager/ad/text/get?page=index&position=index_oneword", { cache: "no-store" });
                 if (slotRes.ok) {
-                    const slotJson = await slotRes.json();
+                    const slotJson = await slotRes.json().catch(() => ({}));
                     const content =
                         slotJson?.text?.content ||
                         slotJson?.slot?.text_content ||
                         "";
 
-                    // ✅ 서버 응답 키 불일치 해결
                     const isOk = !!(slotJson.ok || slotJson.success);
 
                     if (isOk && content && String(content).trim() !== "") {
@@ -629,11 +623,11 @@
                 }
 
                 const userRegion = localStorage.getItem("userRegion") || "의정부";
-                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`);
+                const onewordRes = await fetch(`/api/oneword?region=${encodeURIComponent(userRegion)}`, { cache: "no-store" });
 
                 if (onewordRes.ok) {
-                    const onewordData = await onewordRes.json();
-                    let displayMessage = onewordData.message;
+                    const onewordData = await onewordRes.json().catch(() => ({}));
+                    let displayMessage = onewordData.message || "우리동네가 오늘은 차분한 하루네요 🙂";
 
                     if (onewordData.keyword) {
                         displayMessage = displayMessage.replace(
@@ -645,7 +639,6 @@
                 } else {
                     contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
                 }
-
             } catch (err) {
                 console.error("우리동네 한마디 로드 실패:", err);
                 contentEl.textContent = "우리동네가 오늘은 차분한 하루네요 🙂";
@@ -653,134 +646,85 @@
         }
 
         // ============================================================
-        // 📌 Best Pick 슬라이더 (✅ 관리자 슬롯 기반)
+        // 📌 Best Pick (기존 유지)
         // ============================================================
 
-        async function fetchBestPickSlot(n) {
-            const position = `best_pick_${n}`;
-            try {
-                const res = await fetch(
-                    `/manager/ad/slot?page=${encodeURIComponent("index")}&position=${encodeURIComponent(position)}`
-                );
-                if (!res.ok) return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
-
-                const json = await res.json();
-
-                // 디버깅: 서버 응답을 전역으로 노출
-                window.__bestPickResponse = json;
-                console.log(`Best Pick ${n} 서버 응답:`, json);
-
-                // ✅ 서버 응답 키 불일치 해결
-                const isOk = !!(json.ok || json.success);
-                const slot = json.slot || null;
-
-                const image = slot?.image_url || "";
-                const link = slot?.link_url || "";
-                const businessName = slot?.business_name || "";
-
-                console.log(`Best Pick ${n} 매핑 결과:`, { image, link, businessName, isOk });
-
-                return {
-                    image: image || "",
-                    link: link || "",
-                    businessName: businessName || "",
-                    label: `Best Pick ${n}`
-                };
-            } catch (e) {
-                console.error(`Best Pick ${n} 슬롯 로드 실패:`, e);
-                return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
-            }
-        }
-
-        // ✅ 안전한 이미지 로딩 유틸리티
         function safeImageLoader(img, src, fallbackSrc = "/assets/no-image.png") {
+            if (!img) return;
             if (img.__errorHandled) return;
 
             img.onerror = function () {
                 this.onerror = null;
                 this.__errorHandled = true;
-                console.log(`이미지 로드 실패: ${src} → ${fallbackSrc}`);
                 this.src = fallbackSrc;
             };
 
             img.src = src;
         }
 
-        // ✅ 이미지 URL 정규화 및 폴백 처리
         function normalizeImageUrl(originalUrl) {
             const fallbackUrl = "/assets/no-image.png";
-
-            if (!originalUrl || typeof originalUrl !== "string") {
-                return fallbackUrl;
-            }
+            if (!originalUrl || typeof originalUrl !== "string") return fallbackUrl;
 
             const trimmed = originalUrl.trim();
-            if (!trimmed) {
-                return fallbackUrl;
-            }
+            if (!trimmed) return fallbackUrl;
 
-            // 이미 절대 URL인 경우
-            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                return trimmed;
-            }
+            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
 
-            // 상대 경로인 경우 절대 경로로 변환
-            if (trimmed.startsWith("/")) {
-                return `${location.origin}${trimmed}`;
-            }
+            if (trimmed.startsWith("/")) return `${location.origin}${trimmed}`;
 
             return `${location.origin}/${trimmed}`;
+        }
+
+        async function fetchBestPickSlot(n) {
+            const position = `best_pick_${n}`;
+            try {
+                const res = await fetch(
+                    `/manager/ad/slot?page=${encodeURIComponent("index")}&position=${encodeURIComponent(position)}`,
+                    { cache: "no-store" }
+                );
+                if (!res.ok) return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
+
+                const json = await res.json().catch(() => ({}));
+                const slot = json.slot || null;
+
+                const image = slot?.image_url || "";
+                const link = slot?.link_url || "";
+                const businessName = slot?.business_name || "";
+
+                return { image, link, businessName, label: `Best Pick ${n}` };
+            } catch (e) {
+                console.error(`Best Pick ${n} 슬롯 로드 실패:`, e);
+                return { image: "", link: "", businessName: "", label: `Best Pick ${n}` };
+            }
         }
 
         async function loadBestPick() {
             const track = document.getElementById("bestTrack");
             if (!track) return;
 
-            console.log("🔍 베스트 픽 로드 시작...");
-
             const slots = await Promise.all(
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
 
-            window.__bestPickSlots = slots;
-            console.log("🎯 로드된 베스트 픽 슬롯들:", slots);
-
             const groups = [];
-            for (let i = 0; i < slots.length; i += 6) {
-                groups.push(slots.slice(i, i + 6));
-            }
+            for (let i = 0; i < slots.length; i += 6) groups.push(slots.slice(i, i + 6));
 
-            let index = 0;
+            track.innerHTML = "";
 
-            function createGroup(items) {
+            groups.forEach((items, groupIndex) => {
                 const group = document.createElement("div");
                 group.className = "flex justify-center gap-6 basis-full shrink-0";
 
                 items.forEach((slot, idx) => {
-                    const n = index * 6 + idx + 1;
+                    const n = groupIndex * 6 + idx + 1;
 
-                    // ✅ 수정된 이미지 처리 로직
                     const originalImage = slot.image || "";
-                    const normalizedImage = normalizeImageUrl(originalImage);
-                    const fallbackImage = "/assets/no-image.png";
-
-                    // ✅ hasImage는 원본 데이터 기준으로 판단
                     const hasOriginalImage = !!(originalImage && originalImage.trim());
-
-                    // ✅ 실제 표시할 이미지는 fallback 포함
-                    const displayImage = hasOriginalImage ? normalizedImage : fallbackImage;
+                    const displayImage = hasOriginalImage ? normalizeImageUrl(originalImage) : "/assets/no-image.png";
 
                     const hasLink = !!(slot.link && slot.link.trim());
                     const hasName = !!(slot.businessName && slot.businessName.trim());
-
-                    console.log(`Best Pick ${n} 렌더링:`, {
-                        originalImage,
-                        displayImage,
-                        hasOriginalImage,
-                        hasLink,
-                        hasName,
-                        slot
-                    });
 
                     const card = document.createElement("a");
                     card.className = "block text-center w-28 sm:w-40";
@@ -796,66 +740,27 @@
                     const titleText = `Best Pick ${n}`;
                     const bottomTitle = hasName ? slot.businessName : `Best Pick ${n}`;
 
-                    // ✅ 상태 표시 로직 개선
-                    let bottomSub = "";
-                    let statusClass = "";
-
-                    if (hasOriginalImage && hasName && hasLink) {
-                        bottomSub = "등록 완료";
-                        statusClass = "text-green-600";
-                    } else if (hasOriginalImage && hasName) {
-                        bottomSub = "링크 설정 필요";
-                        statusClass = "text-blue-500";
-                    } else if (hasName) {
-                        bottomSub = "이미지 대기중";
-                        statusClass = "text-orange-500";
-                    } else if (hasOriginalImage) {
-                        bottomSub = "정보 입력 필요";
-                        statusClass = "text-orange-500";
-                    } else {
-                        bottomSub = "준비중";
-                        statusClass = "text-gray-400";
-                    }
-
                     card.innerHTML = `
-                        <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                            <img class="w-full h-full object-cover ${hasOriginalImage ? "" : "opacity-40"}"
-                                 alt="${titleText}">
-                        </div>
-                        <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">
-                            ${bottomTitle}
-                        </p>
-                        <p class="text-xs sm:text-sm ${statusClass}">
-                            ${bottomSub}
-                        </p>
-                    `;
+                    <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+                        <img class="w-full h-full object-cover ${hasOriginalImage ? "" : "opacity-40"}" alt="${titleText}">
+                    </div>
+                    <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">${bottomTitle}</p>
+                `;
 
-                    // ✅ 안전한 이미지 로딩 적용
                     const img = card.querySelector("img");
-                    safeImageLoader(img, displayImage, fallbackImage);
+                    safeImageLoader(img, displayImage, "/assets/no-image.png");
 
                     group.appendChild(card);
                 });
 
-                return group;
-            }
-
-            // 슬라이더 로직은 기존과 동일
-            track.innerHTML = "";
-            groups.forEach((items, i) => {
-                const group = createGroup(items);
                 track.appendChild(group);
-                index++;
             });
 
             let currentIndex = 0;
-
             function updatePosition() {
-                const translateX = -currentIndex * 100;
-                track.style.transform = `translateX(${translateX}%)`;
+                track.style.transform = `translateX(${-currentIndex * 100}%)`;
             }
 
-            // 자동 슬라이드 설정
             setInterval(() => {
                 currentIndex = (currentIndex + 1) % groups.length;
                 updatePosition();
@@ -865,10 +770,10 @@
         }
 
         // ============================================================
-        // 🚀 페이지 로드 시 모든 슬롯 로드
+        // 🚀 페이지 로드 시
         // ============================================================
         document.addEventListener("DOMContentLoaded", async () => {
-            console.log("INDEX VERSION CHECK 2025-12-07 - FIXED API KEYS");
+            console.log("INDEX SCRIPT REPLACED 2025-12-13");
 
             fetch("/components/header.html")
                 .then(r => r.text())
@@ -911,14 +816,18 @@
 
             await Promise.all(bannerSlots.map(([id, page, pos]) => loadBannerSlot(id, page, pos)));
 
+            // ✅ 4개 텍스트 박스: 글자 크게 + 줄별 클릭
             loadTextSlot("slot_index_sub_keywords", "index", "index_sub_keywords",
-                (c) => renderDefaultList(c, DEFAULT_DATA.keywords));
+                (c) => renderDefaultList(c, DEFAULT_DATA.keywords, "index_sub_keywords"));
+
             loadTextSlot("slot_index_sub_news", "index", "index_sub_news",
-                (c) => renderDefaultList(c, DEFAULT_DATA.news));
+                (c) => renderDefaultList(c, DEFAULT_DATA.news, "index_sub_news"));
+
             loadTextSlot("slot_index_sub_events", "index", "index_sub_events",
-                (c) => renderDefaultList(c, DEFAULT_DATA.events));
+                (c) => renderDefaultList(c, DEFAULT_DATA.events, "index_sub_events"));
+
             loadTextSlot("slot_index_sub_recommends", "index", "index_sub_recommends",
-                (c) => renderDefaultList(c, DEFAULT_DATA.recommends));
+                (c) => renderDefaultList(c, DEFAULT_DATA.recommends, "index_sub_recommends"));
 
             loadOneWord();
             loadBestPick();
@@ -929,9 +838,7 @@
 
         function performSearch() {
             const query = document.getElementById('searchInput')?.value?.trim();
-            if (query) {
-                window.location.href = `/search?q=${encodeURIComponent(query)}`;
-            }
+            if (query) window.location.href = `/search?q=${encodeURIComponent(query)}`;
         }
     </script>
 
