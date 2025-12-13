@@ -556,6 +556,40 @@
                             닫기
                         </button>
                     </div>
+
+                    <!-- ✅ [추가] 모달 헤더 안에 넣기: 사용법 버튼/팝오버 -->
+                    <div class="relative">
+                        <button type="button" id="adHelpBtn"
+                            class="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white/80 px-3 py-1.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-white"
+                            aria-expanded="false" aria-controls="adHelpPopover" title="사용법 보기">
+                            <span
+                                class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs leading-none">?</span>
+                            사용법
+                        </button>
+
+                        <!-- ✅ 클릭 시 보이는 안내 박스 -->
+                        <div id="adHelpPopover"
+                            class="hidden absolute right-0 mt-2 w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-blue-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="font-extrabold text-slate-800">✅ 사용 흐름</div>
+                                <button type="button" id="adHelpCloseBtn"
+                                    class="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">닫기</button>
+                            </div>
+
+                            <ol class="mt-3 space-y-2 text-sm text-slate-700 leading-relaxed list-decimal pl-5">
+                                <li><b>/admin/indexmanager.html</b> 접속</li>
+                                <li>원하는 슬롯 클릭 → <b>모달 열림</b></li>
+                                <li>모달 상단에서 <b>우선순위 1</b> 선택 → 내용/이미지/기간 입력 → <b>저장</b></li>
+                                <li>다시 같은 슬롯 클릭 → 모달 열기</li>
+                                <li>이번엔 <b>우선순위 2</b> 선택 → 입력 → <b>저장</b></li>
+                                <li><b>우선순위 3</b>도 동일</li>
+                            </ol>
+
+                            <div class="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                ※ 실제 노출은 “기간 조건이 맞는 후보들 중 우선순위 숫자가 가장 작은 것(1)”이 선택됩니다.
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 본문 -->
@@ -1506,6 +1540,50 @@
                 await refreshCandidates(page, position);
             }
         });
+
+        // ✅ 모달 사용법 팝오버 토글
+        (function () {
+            const btn = document.getElementById("adHelpBtn");
+            const pop = document.getElementById("adHelpPopover");
+            const closeBtn = document.getElementById("adHelpCloseBtn");
+            if (!btn || !pop) return;
+
+            function openHelp() {
+                pop.classList.remove("hidden");
+                btn.setAttribute("aria-expanded", "true");
+            }
+            function closeHelp() {
+                pop.classList.add("hidden");
+                btn.setAttribute("aria-expanded", "false");
+            }
+            function toggleHelp(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pop.classList.contains("hidden")) openHelp();
+                else closeHelp();
+            }
+
+            btn.addEventListener("click", toggleHelp);
+            closeBtn && closeBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeHelp();
+            });
+
+            // 팝오버 내부 클릭은 닫히지 않게
+            pop.addEventListener("click", (e) => e.stopPropagation());
+
+            // 바깥 클릭하면 닫기
+            document.addEventListener("click", () => closeHelp());
+
+            // ESC로 닫기
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") closeHelp();
+            });
+
+            // 다른 코드에서 닫아야 할 때 쓸 수 있게 노출(선택)
+            window.__closeAdHelp = closeHelp;
+        })();
 
         /**
          * ✅ 매우 중요: "모달 열 때" 아래 2줄을 꼭 넣어줘야 함
