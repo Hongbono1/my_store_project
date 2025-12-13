@@ -14,8 +14,8 @@ export const UPLOAD_SUBDIR = "manager_ad";
 export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
-/** ✅ DB 테이블명 (필요시 여기만 바꾸면 됨) */
-const TABLE = "admin_ad_slots";
+/** ✅ DB 테이블명 (⚠️ 반드시 public 스키마 고정) */
+const TABLE = "public.admin_ad_slots";
 
 /** -------------------------
  *  유틸
@@ -86,11 +86,9 @@ function pickBody(req) {
   };
 }
 
-async function tableExists(client, tableName) {
-  const { rows } = await client.query(
-    `SELECT to_regclass($1) as reg`,
-    [`public.${tableName}`]
-  );
+async function tableExists(client, tableFullName) {
+  // ✅ TABLE이 이미 "public.admin_ad_slots" 형태이므로 그대로 검사
+  const { rows } = await client.query(`SELECT to_regclass($1) as reg`, [tableFullName]);
   return !!rows?.[0]?.reg;
 }
 
@@ -131,9 +129,7 @@ export async function getSlot(req, res) {
   const position = cleanStr(req.query.position);
 
   if (!page || !position) {
-    return res
-      .status(400)
-      .json({ success: false, error: "page, position 필수" });
+    return res.status(400).json({ success: false, error: "page, position 필수" });
   }
 
   const client = await pool.connect();
@@ -244,9 +240,7 @@ export async function upsertSlot(req, res) {
   } = body;
 
   if (!page || !position) {
-    return res
-      .status(400)
-      .json({ success: false, error: "page, position 필수" });
+    return res.status(400).json({ success: false, error: "page, position 필수" });
   }
 
   // 업로드 파일 (multer)
@@ -274,16 +268,13 @@ export async function upsertSlot(req, res) {
     if (clearImage) nextImageUrl = null;
     if (file) nextImageUrl = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
     if (!file && !keepImage && prevImageUrl && !clearImage) {
-      // keepImage=false로 오면 "이미지 유지"가 아니라 "그대로"로 두는게 보통이라
-      // 여기서는 prev 유지(=nextImageUrl 유지)로 처리
-      // (프론트에서 진짜 비우려면 clearImage=true로 보내면 됨)
+      // keepImage=false로 오더라도 기본은 prev 유지
       nextImageUrl = prevImageUrl;
     }
 
-    const startAtTz = noEnd ? toKstTimestamptz(startAt) : toKstTimestamptz(startAt);
+    const startAtTz = toKstTimestamptz(startAt);
     const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
 
-    // 업서트
     const { rows } = await client.query(
       `
       INSERT INTO ${TABLE} (
@@ -361,9 +352,7 @@ export async function deleteSlot(req, res) {
   const position = cleanStr(req.query.position);
 
   if (!page || !position) {
-    return res
-      .status(400)
-      .json({ success: false, error: "page, position 필수" });
+    return res.status(400).json({ success: false, error: "page, position 필수" });
   }
 
   const client = await pool.connect();
@@ -392,10 +381,6 @@ export async function deleteSlot(req, res) {
 
 /** -------------------------
  *  API: 가게 검색(사업자번호/키워드)
- *  GET /manager/ad/store/search?bizNo=2910...
- *  GET /manager/ad/store/search?q=미례
- *
- *  ⚠️ 여러 테이블 후보를 "존재하는 것만" 자동으로 조회
  * ------------------------- */
 export async function searchStore(req, res) {
   const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo);
@@ -403,7 +388,6 @@ export async function searchStore(req, res) {
 
   const client = await pool.connect();
   try {
-    // 후보 테이블들(프로젝트에서 실제 존재하는 것만 골라서 사용됨)
     const candidates = [
       { table: "combined_store_info", id: "id", biz: "business_no", name: "business_name" },
       { table: "store_info", id: "id", biz: "business_no", name: "business_name" },
@@ -412,7 +396,7 @@ export async function searchStore(req, res) {
 
     const found = [];
     for (const c of candidates) {
-      const ok = await tableExists(client, c.table);
+      const ok = await tableExists(client, `public.${c.table}`);
       if (!ok) continue;
 
       if (bizNo) {
@@ -422,7 +406,7 @@ export async function searchStore(req, res) {
             ${c.id}::text AS id,
             ${c.biz}      AS business_no,
             ${c.name}     AS business_name
-          FROM ${c.table}
+          FROM public.${c.table}
           WHERE ${c.biz} = $1
           ORDER BY ${c.id} DESC
           LIMIT 30
@@ -437,7 +421,7 @@ export async function searchStore(req, res) {
             ${c.id}::text AS id,
             ${c.biz}      AS business_no,
             ${c.name}     AS business_name
-          FROM ${c.table}
+          FROM public.${c.table}
           WHERE ${c.name} ILIKE '%' || $1 || '%'
              OR ${c.biz}  ILIKE '%' || $1 || '%'
           ORDER BY ${c.id} DESC
@@ -449,7 +433,6 @@ export async function searchStore(req, res) {
       }
     }
 
-    // 중복 제거 (id+bizNo 기준)
     const uniq = new Map();
     for (const s of found) {
       const key = `${s.id}|${s.business_no}`;
@@ -467,27 +450,26 @@ export async function searchStore(req, res) {
 
 /** -------------------------
  *  (옵션) Neon에서 테이블 만들 때 쓰는 SQL
- *  - 요청하면 이걸 그대로 SQL Editor에 실행하면 됨
  * ------------------------- */
 export function getCreateTableSQL() {
   return `
 -- ✅ 관리자 광고 슬롯 테이블 (기본형)
 CREATE TABLE IF NOT EXISTS ${TABLE} (
-  page         TEXT NOT NULL,
-  position     TEXT NOT NULL,
-  image_url    TEXT,
-  link_url     TEXT,
-  text_content TEXT,
-  business_no  TEXT,
+  page          TEXT NOT NULL,
+  position      TEXT NOT NULL,
+  image_url     TEXT,
+  link_url      TEXT,
+  text_content  TEXT,
+  business_no   TEXT,
   business_name TEXT,
-  store_id     TEXT,
-  slot_type    TEXT,
-  slot_mode    TEXT,
-  start_at     TIMESTAMPTZ,
-  end_at       TIMESTAMPTZ,
-  no_end       BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  store_id      TEXT,
+  slot_type     TEXT,
+  slot_mode     TEXT,
+  start_at      TIMESTAMPTZ,
+  end_at        TIMESTAMPTZ,
+  no_end        BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (page, position)
 );
 `;
@@ -511,13 +493,7 @@ export function makeMulterStorage() {
 }
 
 export function fileFilter(req, file, cb) {
-  const allowed = [
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/webp",
-    "image/gif",
-  ];
+  const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
   if (allowed.includes(file.mimetype)) return cb(null, true);
   return cb(new Error("이미지 파일만 업로드 가능(png/jpg/webp/gif)"), false);
 }
