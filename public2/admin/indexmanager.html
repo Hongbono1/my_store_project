@@ -958,9 +958,72 @@
         }
 
         function applySlotToBox(box, slot) {
+            const position = box.dataset.position || "";
+
             const img = qs(".slot-img", box);
             const def = qs(".slot-default", box);
             const storeBadge = qs(".slot-badge.store", box);
+
+            // ✅ 텍스트 전용 판단 (포지션 기준 + 서버 slot_type 기준)
+            const isTextOnly =
+                TEXT_ONLY_POSITIONS.has(position) ||
+                slot?.slot_type === "text" ||
+                slot?.slotType === "text";
+
+            // 기본: store badge 숨김
+            if (storeBadge) {
+                storeBadge.classList.add("hidden");
+                storeBadge.textContent = "";
+            }
+
+            // =========================================================
+            // ✅ 텍스트 전용 슬롯: 이미지 무시하고 텍스트를 박스 안에 표시
+            // =========================================================
+            if (isTextOnly) {
+                // 이미지 완전 숨김
+                if (img) {
+                    img.classList.add("hidden");
+                    img.removeAttribute("src");
+                }
+
+                if (def) {
+                    // 상단 정렬 느낌으로 보이게
+                    def.style.alignItems = "stretch";
+                    def.style.justifyContent = "flex-start";
+
+                    const raw =
+                        (slot?.text_content ?? slot?.textContent ?? slot?.content ?? "").trim();
+
+                    const lines = raw
+                        ? raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+                        : [];
+
+                    const previewLines = lines.slice(0, 5);
+                    const preview = previewLines.join("\n");
+                    const more = lines.length > 5 ? `\n… (+${lines.length - 5}줄)` : "";
+
+                    const finalText = preview ? (preview + more) : "내용이 비어있음";
+
+                    // ✅ 박스 안에 텍스트 미리보기 출력
+                    def.innerHTML = `
+        <div class="w-full p-3 text-left">
+          <div class="text-[11px] font-extrabold text-slate-700 mb-1">텍스트 미리보기</div>
+          <div class="text-xs text-slate-800 leading-5 whitespace-pre-line">${escapeHtml(finalText)}</div>
+        </div>
+      `;
+
+                    def.classList.remove("hidden");
+                }
+                return;
+            }
+
+            // =========================================================
+            // ✅ 일반 슬롯(이미지/가게연결) 기존 동작
+            // =========================================================
+            if (def) {
+                def.style.alignItems = "";
+                def.style.justifyContent = "";
+            }
 
             const imageUrl =
                 slot?.image_url ||
@@ -970,11 +1033,11 @@
                 slot?.image_path ||
                 "";
 
+            safeSetImage(img, imageUrl, def);
+
             const mode = slot?.slot_mode || slot?.slotMode || "";
             const businessName = slot?.business_name || slot?.businessName || "";
             const businessNo = slot?.business_no || slot?.businessNo || "";
-
-            safeSetImage(img, imageUrl, def);
 
             if (storeBadge) {
                 if (mode === "store" && (businessName || businessNo)) {
