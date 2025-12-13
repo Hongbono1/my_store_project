@@ -20,7 +20,6 @@ const fieldsDef = [
 
 /* ------------------------------------------------------------------
  * 2) 업로드 저장소 경로 (서버 공통: /data/uploads)
- *    - server.js 의 UPLOAD_ROOT = "/data/uploads" 와 동일하게 맞춤
  * ------------------------------------------------------------------ */
 const UPLOAD_ROOT = "/data/uploads";
 
@@ -36,9 +35,7 @@ if (!fs.existsSync(UPLOAD_ROOT)) {
  * 3) multer 저장소 설정
  * ------------------------------------------------------------------ */
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOAD_ROOT);
-  },
+  destination: (_req, _file, cb) => cb(null, UPLOAD_ROOT),
   filename: (_req, file, cb) => {
     const ext = (path.extname(file?.originalname || "") || ".jpg").toLowerCase();
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -83,12 +80,16 @@ const uploadWithCatch = (req, res, next) => {
  *    - server.js 에서 /store 로 마운트되므로 여기서는 "/" 부터만
  * ------------------------------------------------------------------ */
 
+// ✅ 리스트(카테고리/서브카테고리용) : /store/list?type=food&category=한식&sub=밥
+router.get("/list", ctrl.listFoodStores);
+
 // 등록
 router.post("/", uploadWithCatch, ctrl.createFoodStore);
 
 // 상세 조회: 최종 경로는 /store/:id/full
 router.get("/:id/full", ctrl.getFoodStoreFull);
 
-// 필요 시 다른 라우트도 여기 추가 (예: 수정 등)
+// 수정(필요하면 사용)
+router.put("/:id", uploadWithCatch, ctrl.updateFoodStore);
 
 export default router;
