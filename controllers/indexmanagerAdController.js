@@ -618,8 +618,16 @@ export async function deleteSlot(req, res) {
  *  GET /manager/ad/store/search?bizNo=...  or  ?q=...
  * ------------------------- */
 export async function searchStore(req, res) {
-  const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo);
-  const q = cleanStr(req.query.q ?? req.query.keyword);
+  const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
+
+  // ✅ 프론트가 name/businessName을 보내도 검색되게 흡수
+  const q = cleanStr(
+    req.query.q ??
+    req.query.keyword ??
+    req.query.name ??          // ✅ 추가
+    req.query.businessName ??  // ✅ 추가
+    req.query.business_name
+  );
 
   const client = await pool.connect();
   try {
@@ -630,35 +638,41 @@ export async function searchStore(req, res) {
     ];
 
     const found = [];
+
     for (const c of candidates) {
       const ok = await tableExists(client, c.table);
       if (!ok) continue;
 
+      // ✅ bizNo 우선
       if (bizNo) {
         const r = await client.query(
           `
           SELECT
             ${c.id}::text AS id,
-            ${c.biz}      AS business_no,
-            ${c.name}     AS business_name
+            ${c.biz}::text AS business_no,     -- ✅ 타입 통일
+            ${c.name} AS business_name
           FROM ${c.table}
-          WHERE ${c.biz} = $1
+          WHERE ${c.biz}::text = $1            -- ✅ 타입 불일치 방지
           ORDER BY ${c.id} DESC
           LIMIT 30
           `,
           [bizNo]
         );
         found.push(...r.rows);
-      } else if (q) {
+        continue;
+      }
+
+      // ✅ q 검색
+      if (q) {
         const r = await client.query(
           `
           SELECT
             ${c.id}::text AS id,
-            ${c.biz}      AS business_no,
-            ${c.name}     AS business_name
+            ${c.biz}::text AS business_no,     -- ✅ 타입 통일
+            ${c.name} AS business_name
           FROM ${c.table}
           WHERE ${c.name} ILIKE '%' || $1 || '%'
-             OR ${c.biz}  ILIKE '%' || $1 || '%'
+             OR ${c.biz}::text ILIKE '%' || $1 || '%'   -- ✅ 숫자컬럼도 검색 가능
           ORDER BY ${c.id} DESC
           LIMIT 30
           `,
