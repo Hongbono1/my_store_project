@@ -47,7 +47,9 @@ import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
 
-import managerAdRouter from "./routes/managerAdRouter.js";
+import express from "express";
+import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
+
 
 import pool from "./db.js";
 
@@ -277,8 +279,9 @@ app.use("/api/hot", hotRouter);
 
 // ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
+app.use("/uploads", express.static("/data/uploads"));
+app.use("/manager/ad", indexmanagerAdRouter);
 
-app.use("/manager/ad", managerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
