@@ -1,4 +1,3 @@
-
 // controllers/indexmanagerAdController.js
 import fs from "fs";
 import path from "path";
@@ -13,7 +12,7 @@ export const UPLOAD_SUBDIR = "manager_ad";
 export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
-// ✅ 다른 가게 이미지들도 /data/uploads 아래에 있다고 가정(서버.js와 동일 컨셉)
+// ✅ 다른 모듈들도 /data/uploads 아래 저장한다고 가정
 const DATA_UPLOAD_ROOT = "/data/uploads";
 
 /** ✅ 기존(단일 저장) 테이블 */
@@ -62,10 +61,14 @@ function digitsOnly(v) {
 function toKstTimestamptz(dtLocal) {
   const s = cleanStr(dtLocal);
   if (!s) return null;
+
+  // 이미 tz 들어있으면 그대로
   if (/[zZ]|[+\-]\d{2}:\d{2}$/.test(s)) return s;
+
   const normalized = s.replace("T", " ");
   const [d, tRaw] = normalized.split(" ");
   if (!d || !tRaw) return null;
+
   const t = tRaw.length === 5 ? `${tRaw}:00` : tRaw;
   return `${d} ${t}+09:00`;
 }
@@ -74,7 +77,7 @@ function normalizeImageUrl(p) {
   const s = cleanStr(p);
   if (!s) return null;
 
-  // 이미 절대 URL이면 그대로
+  // 절대 URL이면 그대로
   if (/^https?:\/\//i.test(s)) return s;
 
   // /data/uploads/... 로 저장돼있으면 /uploads/... 로 변환
@@ -88,7 +91,7 @@ function normalizeImageUrl(p) {
   // /uploads/... 형태면 그대로
   if (s.startsWith("/uploads/")) return s;
 
-  // 그 외: 이미 / 로 시작하면 그대로, 아니면 /uploads/ 로 붙임(안전용)
+  // 그 외: /로 시작하면 그대로, 아니면 /uploads/ 붙임
   if (s.startsWith("/")) return s;
   return `/uploads/${s}`;
 }
@@ -99,7 +102,7 @@ function pickBody(req) {
     page: cleanStr(b.page),
     position: cleanStr(b.position),
 
-    // ✅ 우선순위 (추가)
+    // ✅ 우선순위 (후보 저장 모드)
     priority: toInt(b.priority),
 
     // 타입/모드
@@ -136,8 +139,6 @@ function mapSlotRow(r) {
   return {
     page: r.page,
     position: r.position,
-
-    // ✅ 우선순위가 있으면 포함(없으면 null)
     priority: r.priority ?? null,
 
     image_url: r.image_url,
@@ -170,7 +171,7 @@ function pickUploadFile(req) {
 }
 
 /* -------------------------
- *  공통: 컬럼 존재 확인 유틸 (동적 테이블/컬럼 대응)
+ *  공통: 컬럼 존재 확인 유틸
  * ------------------------- */
 function splitTableRef(full) {
   const [schema, name] = String(full).includes(".")
@@ -221,56 +222,61 @@ async function pickExistingColumns(client, fullTable, candidates) {
 }
 
 /* -------------------------
- * ✅ 핵심: "가게 대표이미지 자동 대입"
- * - 슬롯 이미지가 없으면 store_id/business_no 기준으로 대표 이미지 찾아줌
- * - 가능한 테이블들에서 순차 탐색
+ * ✅ store 모드일 때, 슬롯 이미지가 없으면 자동 대표이미지 찾기
  * ------------------------- */
 async function resolveStoreMainImage(client, { storeId, businessNo, businessName }) {
   const sid = cleanStr(storeId);
   const bizDigits = digitsOnly(businessNo);
   const bname = cleanStr(businessName);
 
-  // 탐색 대상(필요하면 여기만 늘리면 됨)
   const sources = [
     {
       table: "public.combined_store_info",
       idCandidates: ["id", "store_id"],
-      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "businessnum", "b_no", "bno"],
+      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
       nameCandidates: ["business_name", "store_name", "name", "title"],
-      // 대표이미지 후보 우선순위
       imgCandidates: ["main_image_url", "main_img", "image_url", "cover_image", "image_path", "image1", "image2", "image3"],
-      updatedCandidates: ["updated_at", "modified_at"],
+      updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
     },
     {
       table: "public.store_info",
       idCandidates: ["id", "store_id"],
-      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "businessnum", "b_no", "bno"],
+      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
       nameCandidates: ["business_name", "store_name", "name", "title"],
       imgCandidates: ["main_image_url", "main_img", "image_url", "image_path", "image1", "image2", "image3"],
-      updatedCandidates: ["updated_at", "modified_at"],
+      updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
     },
     {
       table: "public.food_store_images",
-      // 이미지 테이블은 store_id + image_url 형태가 일반적
       storeIdColCandidates: ["store_id", "id"],
       imgCandidates: ["image_url", "image_path", "file_path", "url"],
       updatedCandidates: ["updated_at", "created_at", "id"],
       kind: "images",
     },
-    // 혹시 다른 이미지 테이블이 있으면 여기 추가 가능
-    { table: "public.store_images", storeIdColCandidates: ["store_id", "id"], imgCandidates: ["image_url", "image_path", "file_path", "url"], updatedCandidates: ["updated_at", "created_at", "id"], kind: "images" },
-    { table: "public.combined_store_images", storeIdColCandidates: ["store_id", "id"], imgCandidates: ["image_url", "image_path", "file_path", "url"], updatedCandidates: ["updated_at", "created_at", "id"], kind: "images" },
+    {
+      table: "public.store_images",
+      storeIdColCandidates: ["store_id", "id"],
+      imgCandidates: ["image_url", "image_path", "file_path", "url"],
+      updatedCandidates: ["updated_at", "created_at", "id"],
+      kind: "images",
+    },
+    {
+      table: "public.combined_store_images",
+      storeIdColCandidates: ["store_id", "id"],
+      imgCandidates: ["image_url", "image_path", "file_path", "url"],
+      updatedCandidates: ["updated_at", "created_at", "id"],
+      kind: "images",
+    },
   ];
 
   for (const s of sources) {
     const ok = await tableExists(client, s.table);
     if (!ok) continue;
 
-    // 이미지 컬럼 확보
     const imgCols = await pickExistingColumns(client, s.table, s.imgCandidates);
     if (!imgCols.length) continue;
 
-    // images 테이블(다건) 처리
+    // 이미지 다건 테이블
     if (s.kind === "images") {
       const storeIdCol = await pickExistingColumn(client, s.table, s.storeIdColCandidates || ["store_id"]);
       if (!storeIdCol || !sid) continue;
@@ -293,13 +299,12 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
       continue;
     }
 
-    // 단일(또는 1행에서 coalesce) 테이블 처리
+    // 단일 테이블
     const idCol = await pickExistingColumn(client, s.table, s.idCandidates);
     const bizCol = await pickExistingColumn(client, s.table, s.bizCandidates);
     const nameCol = await pickExistingColumn(client, s.table, s.nameCandidates);
     const updatedCol = await pickExistingColumn(client, s.table, s.updatedCandidates || ["updated_at"]);
 
-    // 조건 하나도 못 만들면 스킵
     const where = [];
     const params = [];
 
@@ -318,15 +323,8 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
 
     if (!where.length) continue;
 
-    // 대표이미지: 가능한 컬럼들 coalesce
-    const coalesceExpr =
-      imgCols.length >= 2
-        ? `COALESCE(${imgCols.join(", ")})`
-        : `${imgCols[0]}`;
-
-    const orderExpr = updatedCol
-      ? `${updatedCol} DESC`
-      : (idCol ? `${idCol} DESC` : "1");
+    const coalesceExpr = imgCols.length >= 2 ? `COALESCE(${imgCols.join(", ")})` : `${imgCols[0]}`;
+    const orderExpr = updatedCol ? `${updatedCol} DESC` : (idCol ? `${idCol} DESC` : "1");
 
     const q = `
       SELECT ${coalesceExpr} AS img
@@ -349,6 +347,8 @@ async function attachAutoStoreImage(client, slotObj) {
 
   const hasImage = !!cleanStr(slotObj.image_url);
   const mode = cleanStr(slotObj.slot_mode)?.toLowerCase();
+
+  // store 모드 + 이미지 없음일 때만 자동 보정
   if (hasImage) return slotObj;
   if (mode !== "store") return slotObj;
 
@@ -409,7 +409,8 @@ async function getLegacySlot(client, page, position) {
 }
 
 /* -------------------------
- *  GET /manager/ad/slot?page=index&position=best_pick_1
+ *  GET /manager/ad/slot?page=index&position=...
+ *  (priority 있으면 후보 1개 편집용 조회)
  * ------------------------- */
 export async function getSlot(req, res) {
   const page = cleanStr(req.query.page);
@@ -425,7 +426,7 @@ export async function getSlot(req, res) {
     const itemsOk = await tableExists(client, ITEMS_TABLE);
     const legacyOk = await tableExists(client, LEGACY_TABLE);
 
-    // ✅ 특정 priority 편집용 조회
+    // ✅ 특정 priority 편집용
     if (priority && itemsOk) {
       const { rows } = await client.query(
         `
@@ -444,13 +445,12 @@ export async function getSlot(req, res) {
         `,
         [page, position, priority]
       );
-
       const mapped = mapSlotRow(rows[0] || null);
       await attachAutoStoreImage(client, mapped);
       return res.json({ success: true, slot: mapped });
     }
 
-    // ✅ 기본: 노출 1개(우선순위 후보 우선)
+    // ✅ 노출 1개 (후보 테이블 우선)
     if (itemsOk) {
       const row = await getEffectiveSlotFromItems(client, page, position);
       if (row) {
@@ -481,6 +481,7 @@ export async function getSlot(req, res) {
 
 /* -------------------------
  *  GET /manager/ad/slots?page=index
+ *  (각 position별 노출 1개씩)
  * ------------------------- */
 export async function listSlots(req, res) {
   const page = cleanStr(req.query.page);
@@ -490,7 +491,7 @@ export async function listSlots(req, res) {
     const itemsOk = await tableExists(client, ITEMS_TABLE);
     const legacyOk = await tableExists(client, LEGACY_TABLE);
 
-    const map = new Map(); // key: page|position -> row
+    const map = new Map(); // key: page|position -> slot
 
     if (itemsOk) {
       const { rows } = await client.query(
@@ -543,7 +544,6 @@ export async function listSlots(req, res) {
       }
     }
 
-    // ✅ 응답 보정: store 슬롯인데 image_url 없으면 가게 대표이미지 자동 첨부
     const slots = Array.from(map.values());
     for (const s of slots) {
       await attachAutoStoreImage(client, s);
@@ -559,7 +559,7 @@ export async function listSlots(req, res) {
 }
 
 /* -------------------------
- *  GET /manager/ad/slot-items?page=index&position=best_pick_1
+ *  GET /manager/ad/slot-items?page=index&position=...
  * ------------------------- */
 export async function listSlotItems(req, res) {
   const page = cleanStr(req.query.page);
@@ -575,7 +575,7 @@ export async function listSlotItems(req, res) {
     if (!itemsOk) {
       return res.status(500).json({
         success: false,
-        error: `테이블 없음: ${ITEMS_TABLE} (Neon SQL 실행 필요)`,
+        error: `테이블 없음: ${ITEMS_TABLE}`,
       });
     }
 
@@ -612,20 +612,30 @@ export async function listSlotItems(req, res) {
 }
 
 /* -------------------------
- *  POST /manager/ad/slot  (multipart/form-data)
- *  ✅ 슬롯 이미지 없으면 "가게 대표이미지" 자동 대입
+ *  POST /manager/ad/slot (multipart/form-data)
+ *  - priority 있으면 후보테이블(admin_ad_slot_items) 저장
+ *  - priority 없으면 legacy(admin_ad_slots) 저장
  * ------------------------- */
 export async function upsertSlot(req, res) {
   ensureUploadDir();
 
   const body = pickBody(req);
   const {
-    page, position, priority,
-    slotType, slotMode,
-    linkUrl, textContent,
-    storeId, businessNo, businessName,
-    startAt, endAt, noEnd,
-    keepImage, clearImage,
+    page,
+    position,
+    priority,
+    slotType,
+    slotMode,
+    linkUrl,
+    textContent,
+    storeId,
+    businessNo,
+    businessName,
+    startAt,
+    endAt,
+    noEnd,
+    keepImage,
+    clearImage,
   } = body;
 
   if (!page || !position) {
@@ -641,23 +651,21 @@ export async function upsertSlot(req, res) {
 
     const modeLower = cleanStr(slotMode)?.toLowerCase();
 
-    // ✅ 후보 저장 모드(priority가 있으면 무조건 후보 테이블)
+    // ✅ 후보 저장 (priority 있으면 무조건 후보 테이블)
     if (priority) {
       if (!itemsOk) {
         return res.status(500).json({
           success: false,
-          error: `테이블 없음: ${ITEMS_TABLE} (Neon SQL 실행 필요)`,
+          error: `테이블 없음: ${ITEMS_TABLE}`,
         });
       }
 
-      // 기존 후보 이미지
       const prev = await client.query(
         `SELECT image_url FROM ${ITEMS_TABLE} WHERE page=$1 AND position=$2 AND priority=$3 LIMIT 1`,
         [page, position, priority]
       );
       const prevImageUrl = prev.rows?.[0]?.image_url ?? null;
 
-      // 이미지 결정 로직
       let nextImageUrl = prevImageUrl;
 
       if (clearImage) nextImageUrl = null;
@@ -667,7 +675,7 @@ export async function upsertSlot(req, res) {
       } else if (keepImage) {
         nextImageUrl = prevImageUrl;
       } else {
-        // ✅ 파일도 없고 기존도 없고, store 슬롯이면 가게 대표이미지 자동 대입
+        // 이미지 없고 store 모드면 자동 대입
         if (!cleanStr(nextImageUrl) && modeLower === "store") {
           const autoImg = await resolveStoreMainImage(client, {
             storeId,
@@ -724,11 +732,20 @@ export async function upsertSlot(req, res) {
           created_at, updated_at
         `,
         [
-          page, position, priority,
-          nextImageUrl, linkUrl, textContent,
-          businessNo, businessName, storeId,
-          slotType, slotMode,
-          startAtTz, endAtTz, noEnd,
+          page,
+          position,
+          priority,
+          nextImageUrl,
+          linkUrl,
+          textContent,
+          businessNo,
+          businessName,
+          storeId,
+          slotType,
+          slotMode,
+          startAtTz,
+          endAtTz,
+          noEnd,
         ]
       );
 
@@ -736,11 +753,11 @@ export async function upsertSlot(req, res) {
       return res.json({ success: true, slot: mapped });
     }
 
-    // ✅ legacy 저장(기존 방식)
+    // ✅ legacy 저장
     if (!legacyOk) {
       return res.status(500).json({
         success: false,
-        error: `테이블 없음: ${LEGACY_TABLE} (Neon에서 생성 필요)`,
+        error: `테이블 없음: ${LEGACY_TABLE}`,
       });
     }
 
@@ -759,7 +776,6 @@ export async function upsertSlot(req, res) {
     } else if (keepImage) {
       nextImageUrl = prevImageUrl;
     } else {
-      // ✅ 파일도 없고 기존도 없고, store 슬롯이면 가게 대표이미지 자동 대입
       if (!cleanStr(nextImageUrl) && modeLower === "store") {
         const autoImg = await resolveStoreMainImage(client, {
           storeId,
@@ -816,11 +832,19 @@ export async function upsertSlot(req, res) {
         created_at, updated_at
       `,
       [
-        page, position,
-        nextImageUrl, linkUrl, textContent,
-        businessNo, businessName, storeId,
-        slotType, slotMode,
-        startAtTz, endAtTz, noEnd,
+        page,
+        position,
+        nextImageUrl,
+        linkUrl,
+        textContent,
+        businessNo,
+        businessName,
+        storeId,
+        slotType,
+        slotMode,
+        startAtTz,
+        endAtTz,
+        noEnd,
       ]
     );
 
@@ -835,7 +859,7 @@ export async function upsertSlot(req, res) {
 }
 
 /* -------------------------
- *  DELETE /manager/ad/slot?page=index&position=...&priority=2
+ *  DELETE /manager/ad/slot?page=...&position=...&priority=...
  * ------------------------- */
 export async function deleteSlot(req, res) {
   const page = cleanStr(req.query.page);
@@ -853,10 +877,7 @@ export async function deleteSlot(req, res) {
 
     if (priority) {
       if (!itemsOk) {
-        return res.status(500).json({
-          success: false,
-          error: `테이블 없음: ${ITEMS_TABLE}`,
-        });
+        return res.status(500).json({ success: false, error: `테이블 없음: ${ITEMS_TABLE}` });
       }
       await client.query(
         `DELETE FROM ${ITEMS_TABLE} WHERE page=$1 AND position=$2 AND priority=$3`,
@@ -866,10 +887,7 @@ export async function deleteSlot(req, res) {
     }
 
     if (!legacyOk) {
-      return res.status(500).json({
-        success: false,
-        error: `테이블 없음: ${LEGACY_TABLE}`,
-      });
+      return res.status(500).json({ success: false, error: `테이블 없음: ${LEGACY_TABLE}` });
     }
 
     await client.query(`DELETE FROM ${LEGACY_TABLE} WHERE page=$1 AND position=$2`, [page, position]);
@@ -883,18 +901,17 @@ export async function deleteSlot(req, res) {
 }
 
 /* -------------------------
- *  GET /manager/ad/store/search?bizNo=...  or  ?q=...
+ *  GET /manager/ad/store/search?bizNo=... or ?q=...
  * ------------------------- */
 export async function searchStore(req, res) {
   const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
 
-  // ✅ 프론트가 name/businessName을 보내도 검색되게 흡수
   const q = cleanStr(
     req.query.q ??
-    req.query.keyword ??
-    req.query.name ??
-    req.query.businessName ??
-    req.query.business_name
+      req.query.keyword ??
+      req.query.name ??
+      req.query.businessName ??
+      req.query.business_name
   );
 
   const client = await pool.connect();
@@ -903,19 +920,19 @@ export async function searchStore(req, res) {
       {
         table: "public.combined_store_info",
         idCandidates: ["id", "store_id"],
-        bizCandidates: ["business_number", "business_no", "businessno", "biz_no", "bizno", "business_num", "b_no", "bno"],
+        bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
         nameCandidates: ["business_name", "store_name", "name", "title"],
       },
       {
         table: "public.store_info",
         idCandidates: ["id", "store_id"],
-        bizCandidates: ["business_no", "businessno", "biz_no", "bizno", "business_number", "business_num", "b_no", "bno"],
+        bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
         nameCandidates: ["business_name", "store_name", "name", "title"],
       },
       {
         table: "public.food_stores",
         idCandidates: ["id", "store_id"],
-        bizCandidates: ["business_no", "businessno", "biz_no", "bizno", "business_number", "business_num", "b_no", "bno"],
+        bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
         nameCandidates: ["store_name", "business_name", "name", "title"],
       },
     ];
@@ -936,9 +953,9 @@ export async function searchStore(req, res) {
         const r = await client.query(
           `
           SELECT
-            ${idCol}::text        AS id,
-            ${bizCol}::text       AS business_no,
-            ${nameCol}            AS business_name
+            ${idCol}::text  AS id,
+            ${bizCol}::text AS business_no,
+            ${nameCol}      AS business_name
           FROM ${table}
           WHERE ${bizCol}::text = $1
           ORDER BY ${idCol} DESC
@@ -954,9 +971,9 @@ export async function searchStore(req, res) {
         const r = await client.query(
           `
           SELECT
-            ${idCol}::text        AS id,
-            ${bizCol}::text       AS business_no,
-            ${nameCol}            AS business_name
+            ${idCol}::text  AS id,
+            ${bizCol}::text AS business_no,
+            ${nameCol}      AS business_name
           FROM ${table}
           WHERE ${nameCol} ILIKE '%' || $1 || '%'
              OR ${bizCol}::text ILIKE '%' || $1 || '%'
@@ -969,12 +986,10 @@ export async function searchStore(req, res) {
       }
     }
 
-    // 1) bizNo로 먼저 검색
     if (bizNo) {
       for (const s of sources) await runSearch(s, "biz", bizNo);
     }
 
-    // 2) bizNo로 못 찾으면 q로 검색
     if (!found.length && q) {
       for (const s of sources) await runSearch(s, "q", q);
     }
@@ -996,12 +1011,13 @@ export async function searchStore(req, res) {
 
 /* -------------------------
  *  multer helper (라우터에서 사용)
+ *  ✅ makeMulterStorage() 는 "diskStorage 옵션 객체"를 반환해야 함
  * ------------------------- */
 export function makeMulterStorage() {
   ensureUploadDir();
   return {
-    destination: (req, file, cb) => cb(null, UPLOAD_ABS_DIR),
-    filename: (req, file, cb) => {
+    destination: (_req, _file, cb) => cb(null, UPLOAD_ABS_DIR),
+    filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase();
       const safeExt = ext && ext.length <= 10 ? ext : "";
       const name = `${Date.now()}-${crypto.randomUUID()}${safeExt}`;
@@ -1010,7 +1026,7 @@ export function makeMulterStorage() {
   };
 }
 
-export function fileFilter(req, file, cb) {
+export function fileFilter(_req, file, cb) {
   const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
   if (allowed.includes(file.mimetype)) return cb(null, true);
   return cb(new Error("이미지 파일만 업로드 가능(png/jpg/webp/gif)"), false);

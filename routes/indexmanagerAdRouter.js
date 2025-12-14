@@ -1,9 +1,6 @@
 // routes/indexmanagerAdRouter.js
-import express from "express";
+import { Router } from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { randomUUID } from "crypto";
 
 import {
   getSlot,
@@ -12,49 +9,59 @@ import {
   upsertSlot,
   deleteSlot,
   searchStore,
-  fileFilter, // 기존 필터 그대로 사용
+  makeMulterStorage,
+  fileFilter,
 } from "../controllers/indexmanagerAdController.js";
 
-const router = express.Router();
+const router = Router();
 
-// ✅ indexmanager 광고 업로드는 무조건 여기로 저장
-const MANAGER_AD_DIR = "/data/uploads/manager_ad";
-if (!fs.existsSync(MANAGER_AD_DIR)) fs.mkdirSync(MANAGER_AD_DIR, { recursive: true });
-
-// ✅ multer “엔진”을 라우터에서 확정
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, MANAGER_AD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase();
-    cb(null, `${randomUUID()}${ext}`);
-  },
-});
+/**
+ * ✅ 중요:
+ * - makeMulterStorage() 는 { destination, filename } "옵션 객체"를 리턴
+ * - diskStorage(옵션) => "storage 엔진" 생성 (엔진에 _handleFile 존재)
+ */
+const storage = multer.diskStorage(makeMulterStorage());
 
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
 });
 
-// ✅ 파일 필드 이름 여러개 허용 (기존 그대로)
-const uploadFields = upload.fields([
-  { name: "image", maxCount: 1 },
-  { name: "slotImage", maxCount: 1 },
-  { name: "file", maxCount: 1 },
-]);
+/** ✅ 프론트에서 어떤 name으로 보내도 받게 (image/slotImage/file) */
+function uploadWithCatch(req, res, next) {
+  const handler = upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "slotImage", maxCount: 1 },
+    { name: "file", maxCount: 1 },
+  ]);
+
+  handler(req, res, (err) => {
+    if (err) {
+      console.error("[indexmanagerAdRouter] multer error:", err);
+      return res.status(400).json({
+        success: false,
+        error: err.message || "파일 업로드 오류",
+      });
+    }
+    next();
+  });
+}
 
 // 조회
 router.get("/slot", getSlot);
 router.get("/slots", listSlots);
-
-// 후보 전체
 router.get("/slot-items", listSlotItems);
-
-// 저장/삭제
-router.post("/slot", uploadFields, upsertSlot);
-router.delete("/slot", deleteSlot);
 
 // 가게 검색
 router.get("/store/search", searchStore);
+
+// 저장(업로드 포함)
+router.post("/slot", uploadWithCatch, upsertSlot);
+
+// 삭제
+router.delete("/slot", deleteSlot);
 
 export default router;
