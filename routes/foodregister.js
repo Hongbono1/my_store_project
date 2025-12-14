@@ -3,23 +3,25 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import * as ctrl from "../controllers/foodregisterController.js";
+
+// ✅ "undefined handler" 방지: 필요한 것만 명시 import
+import { createFoodStore, getFoodRegisterFull } from "../controllers/foodregisterController.js";
 
 const router = Router();
 
 /* ------------------------------------------------------------------
- * 1) 업로드 받을 필드 정의 (현재 폼 구조와 호환)
+ * 업로드 받을 필드 정의 (현재 폼 구조와 호환)
  * ------------------------------------------------------------------ */
 const fieldsDef = [
   { name: "storeImages", maxCount: 10 },
-  { name: "storeImages[]", maxCount: 10 }, // 혹시 []로 오는 경우 대비
+  { name: "storeImages[]", maxCount: 10 },
   { name: "menuImage", maxCount: 200 },
   { name: "menuImage[]", maxCount: 200 },
   { name: "businessCertImage", maxCount: 1 },
 ];
 
 /* ------------------------------------------------------------------
- * 2) 업로드 저장소 경로 (서버 공통: /data/uploads)
+ * 업로드 저장소 경로 (서버 공통: /data/uploads)
  * ------------------------------------------------------------------ */
 const UPLOAD_ROOT = "/data/uploads";
 
@@ -32,7 +34,7 @@ if (!fs.existsSync(UPLOAD_ROOT)) {
 }
 
 /* ------------------------------------------------------------------
- * 3) multer 저장소 설정
+ * multer 저장소 설정
  * ------------------------------------------------------------------ */
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_ROOT),
@@ -46,7 +48,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
+    fileSize: 20 * 1024 * 1024,
     files: 200,
     fields: 2000,
     parts: 2300,
@@ -54,7 +56,7 @@ const upload = multer({
 });
 
 /* ------------------------------------------------------------------
- * 4) multer 에러 핸들링 래퍼
+ * multer 에러 핸들링 래퍼
  * ------------------------------------------------------------------ */
 const uploadWithCatch = (req, res, next) => {
   const mw = upload.fields(fieldsDef);
@@ -76,20 +78,14 @@ const uploadWithCatch = (req, res, next) => {
 };
 
 /* ------------------------------------------------------------------
- * 5) 라우트
- *    - server.js 에서 /store 로 마운트되므로 여기서는 "/" 부터만
+ * 라우트
+ * server.js 에서 /store 로 마운트되므로 여기서는 "/" 기준
  * ------------------------------------------------------------------ */
 
-// ✅ 리스트(카테고리/서브카테고리용) : /store/list?type=food&category=한식&sub=밥
-router.get("/list", ctrl.listFoodStores);
-
 // 등록
-router.post("/", uploadWithCatch, ctrl.createFoodStore);
+router.post("/", uploadWithCatch, createFoodStore);
 
-// 상세 조회: 최종 경로는 /store/:id/full
-router.get("/:id/full", ctrl.getFoodStoreFull);
-
-// 수정(필요하면 사용)
-router.put("/:id", uploadWithCatch, ctrl.updateFoodStore);
+// 상세 조회: /store/:id/full
+router.get("/:id/full", getFoodRegisterFull);
 
 export default router;
