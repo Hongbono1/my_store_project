@@ -679,15 +679,7 @@
                             </div>
                         </div>
 
-                        <!-- ✅ 텍스트 전용 블록 (검색어/최신 소식/이벤트 정보/추천 제품) -->
-                        <div id="textBlock" class="space-y-3 hidden">
-                            <div>
-                                <label class="text-sm font-semibold">텍스트 내용</label>
-                                <textarea id="fieldTextContent" class="field mt-2 h-44"
-                                    placeholder="줄바꿈으로 여러 줄 입력 가능&#10;예)&#10;1) 검색어A&#10;2) 검색어B"></textarea>
-                                <p class="text-xs text-gray-500 mt-1">※ 줄바꿈(Enter) 기준으로 여러 줄이 저장됩니다.</p>
-                            </div>
-                        </div>
+                        <!-- ✅ (중복 id였던 textBlock/fieldTextContent 블록 제거됨) -->
 
                         <div class="flex items-center gap-2">
                             <button id="btnSearchStore"
@@ -972,7 +964,6 @@
             }
 
             async function fetchCandidates(position) {
-                // 후보 목록 API가 있다면 사용
                 const url = `/manager/ad/slot-items?page=${encodeURIComponent(PAGE)}&position=${encodeURIComponent(position)}`;
                 const { res, json } = await fetchJson(url);
                 if (!res.ok || !json?.success || !Array.isArray(json.items)) {
@@ -1013,7 +1004,6 @@
                 const slotType = slot?.slot_type || slot?.slotType || "";
                 const textContent = slot?.text_content || slot?.textContent || "";
 
-                // ✅ 텍스트 전용(4칸) / 혹은 slot_type=text 는 글로 렌더링
                 const isTextSlot =
                     slotType === "text" ||
                     position === "index_sub_keywords" ||
@@ -1022,17 +1012,14 @@
                     position === "index_sub_recommends";
 
                 if (isTextSlot) {
-                    // 이미지 숨김
                     if (img) {
                         img.classList.add("hidden");
                         img.removeAttribute("src");
                     }
-                    // default 영역에 텍스트 표시
                     if (def) {
                         def.classList.remove("hidden");
                         renderTextPreview(def, textContent);
                     }
-                    // 가게배지 숨김
                     if (storeBadge) {
                         storeBadge.classList.add("hidden");
                         storeBadge.textContent = "";
@@ -1040,7 +1027,6 @@
                     return;
                 }
 
-                // ✅ 이미지/가게 슬롯은 기존 방식 유지
                 const imageUrl =
                     slot?.image_url ||
                     slot?.image ||
@@ -1066,14 +1052,15 @@
                 }
             }
 
+            // ✅ 변경: 관리자 화면은 priority=1 후보를 먼저 보여줌(없으면 기본 호출)
             async function loadAllSlotsPreview() {
                 const boxes = getAllSlotElements();
                 await Promise.all(boxes.map(async (box) => {
                     const position = box.dataset.position;
                     if (!position) return;
                     try {
-                        // 미리보기는 “현재 노출용(기본)” 슬롯을 가져오는 걸로
-                        const slot = await fetchSlot(position);
+                        const slotP1 = await fetchSlot(position, 1);
+                        const slot = slotP1 || await fetchSlot(position);
                         if (slot) applySlotToBox(box, slot);
                     } catch (e) {
                         console.warn("slot preview fail:", position, e);
@@ -1113,11 +1100,11 @@
             const btnSaveSlot = qs("#btnSaveSlot");
             const btnResetModal = qs("#btnResetModal");
 
-            const modeBlock = qs("#modeBlock");      // ✅ id 추가된 곳
+            const modeBlock = qs("#modeBlock");
             const imageBlock = qs("#imageBlock");
             const storeBlock = qs("#storeBlock");
 
-            const textBlock = qs("#textBlock");      // ✅ 새로 추가된 블록
+            const textBlock = qs("#textBlock");
             const fieldTextContent = qs("#fieldTextContent");
 
             const fieldLinkUrl = qs("#fieldLinkUrl");
@@ -1139,7 +1126,6 @@
             const textSelectedImage = qs("#textSelectedImage");
             const textSelectedStore = qs("#textSelectedStore");
 
-            // ✅ 우선순위 UI
             const adPriority = qs("#adPriority");
             const btnLoadPriority = qs("#btnLoadPriority");
             const btnDeletePriority = qs("#btnDeletePriority");
@@ -1152,9 +1138,9 @@
             let activeLabel = "";
             let lastLoadedSlot = null;
 
-            /* ============================================================
-               ✅ 모달 open/close
-            ============================================================ */
+            // ✅ 파일 선택 즉시 미리보기용
+            let __localPreviewUrl = null;
+
             function openModal() {
                 modalRoot.classList.remove("hidden");
             }
@@ -1188,7 +1174,6 @@
                 setModeUI(mode);
             }
 
-            // ✅ position에 따라 텍스트 전용 모달로 전환
             function setModalTypeForPosition(position) {
                 const isText = TEXT_ONLY_POSITIONS.has(position);
 
@@ -1230,10 +1215,29 @@
                 else textSelectedStore.textContent = lastLoadedSlot?.business_name || "없음";
             }
 
+            function showLocalPreview(file) {
+                if (__localPreviewUrl) {
+                    URL.revokeObjectURL(__localPreviewUrl);
+                    __localPreviewUrl = null;
+                }
+                if (!file || !currentPreviewImg) return;
+
+                __localPreviewUrl = URL.createObjectURL(file);
+                currentPreviewImg.src = __localPreviewUrl;
+                currentPreviewImg.classList.remove("hidden");
+                currentPreviewEmpty?.classList.add("hidden");
+            }
+
             function resetModalFields(keepMode = true) {
                 if (!keepMode) setSelectedMode("image");
 
                 if (fieldLinkUrl) fieldLinkUrl.value = "";
+
+                // ✅ 로컬 프리뷰 revoke
+                if (__localPreviewUrl) {
+                    URL.revokeObjectURL(__localPreviewUrl);
+                    __localPreviewUrl = null;
+                }
 
                 if (fieldImageFile) fieldImageFile.value = "";
                 if (currentPreviewImg) {
@@ -1259,21 +1263,15 @@
                 if (textSelectedStore) textSelectedStore.textContent = "없음";
             }
 
-            /* ============================================================
-               ✅ 슬롯 → 모달 프리필
-            ============================================================ */
             function fillModalFromSlot(slot) {
                 lastLoadedSlot = slot || null;
 
-                // 우선순위
                 if (adPriority) adPriority.value = String(slot?.priority ?? adPriority.value ?? 1);
 
-                // 텍스트 전용이면 텍스트값 채우기
                 if (TEXT_ONLY_POSITIONS.has(activePosition) && fieldTextContent) {
                     fieldTextContent.value = (slot?.text_content ?? slot?.textContent ?? slot?.content ?? "") || "";
                 }
 
-                // 일반 슬롯만 모드/이미지/가게 프리필
                 const mode = slot?.slot_mode || slot?.slotMode || "image";
                 if (!TEXT_ONLY_POSITIONS.has(activePosition)) {
                     setSelectedMode(mode === "store" ? "store" : "image");
@@ -1296,7 +1294,6 @@
                 if (fieldStartAt) fieldStartAt.value = normalizeDateTimeForInput(start);
                 if (fieldEndAt) fieldEndAt.value = normalizeDateTimeForInput(end);
 
-                // no_end 우선, 없으면 end 비어있으면 체크
                 const noEnd = !!slot?.no_end || (!fieldEndAt?.value);
                 if (fieldNoEnd) fieldNoEnd.checked = noEnd;
                 applyNoEndState();
@@ -1322,16 +1319,12 @@
                 updateSelectedSummary();
             }
 
-            /* ============================================================
-               ✅ 후보 목록 렌더링
-            ============================================================ */
             async function refreshCandidates() {
                 if (!candidateList) return;
                 candidateList.innerHTML = `<div class="text-sm text-gray-500">불러오는 중...</div>`;
 
                 const { ok, items, status } = await fetchCandidates(activePosition);
 
-                // API 미구현/404 등
                 if (!ok) {
                     if (status === 404) {
                         candidateList.innerHTML = `<div class="text-sm text-gray-500">후보 목록 API(/manager/ad/slot-items)가 아직 없습니다.</div>`;
@@ -1388,9 +1381,6 @@
                 }
             }
 
-            /* ============================================================
-               ✅ 가게 검색
-            ============================================================ */
             async function searchStores() {
                 const bizNo = (fieldBizNo?.value || "").trim();
                 const name = (fieldBizName?.value || "").trim();
@@ -1486,9 +1476,6 @@
                 }
             }
 
-            /* ============================================================
-               ✅ 저장
-            ============================================================ */
             async function saveSlot() {
                 if (!activePosition) return;
 
@@ -1510,10 +1497,8 @@
                 fd.append("page", PAGE);
                 fd.append("position", activePosition);
 
-                // ✅ priority
                 fd.append("priority", String(priority));
 
-                // ✅ 텍스트 전용
                 if (isTextOnly) {
                     const txt = (fieldTextContent?.value || "").trim();
                     fd.append("slotType", "text");
@@ -1523,7 +1508,6 @@
                     fd.append("textContent", txt);
                     fd.append("text_content", txt);
                 } else {
-                    // ✅ 일반 배너
                     fd.append("slotType", "banner");
                     fd.append("slot_type", "banner");
                     fd.append("slotMode", mode);
@@ -1567,8 +1551,11 @@
 
                 const file = fieldImageFile?.files?.[0];
                 if (!isTextOnly && mode === "image" && file) {
+                    // 서버가 어떤 키로 받아도 되게 여러 키로 같이 전송
                     fd.append("image", file);
                     fd.append("slotImage", file);
+                    fd.append("imageFile", file);
+                    fd.append("adImage", file);
                 }
 
                 btnSaveSlot.disabled = true;
@@ -1582,13 +1569,12 @@
                         return;
                     }
 
-                    // ✅ 모달은 “현재 priority 후보”를 다시 불러와 프리필/미리보기 갱신
+                    // ✅ 저장된 “해당 priority 후보”를 바로 박스에 적용해서 확실히 보이게 함
                     const saved = await fetchSlot(activePosition, priority);
-                    if (saved) fillModalFromSlot(saved);
-
-                    // ✅ 박스 미리보기 갱신(노출용 기본 슬롯)
-                    const previewSlot = await fetchSlot(activePosition);
-                    if (previewSlot && activeBox) applySlotToBox(activeBox, previewSlot);
+                    if (saved) {
+                        fillModalFromSlot(saved);
+                        if (activeBox) applySlotToBox(activeBox, saved);
+                    }
 
                     closeModal();
                 } catch (e) {
@@ -1600,9 +1586,6 @@
                 }
             }
 
-            /* ============================================================
-               ✅ 우선순위 버튼: 불러오기 / 삭제
-            ============================================================ */
             async function loadPriority() {
                 const p = Number(adPriority?.value || 1) || 1;
                 const slot = await fetchSlot(activePosition, p);
@@ -1636,14 +1619,12 @@
 
                 await refreshCandidates();
 
-                // 박스 미리보기 갱신
-                const previewSlot = await fetchSlot(activePosition);
-                if (previewSlot && activeBox) applySlotToBox(activeBox, previewSlot);
+                // ✅ 삭제 후에도 priority=1 먼저 갱신
+                const slotP1 = await fetchSlot(activePosition, 1);
+                const slot = slotP1 || await fetchSlot(activePosition);
+                if (slot && activeBox) applySlotToBox(activeBox, slot);
             }
 
-            /* ============================================================
-               ✅ 박스 클릭 → 모달 오픈
-            ============================================================ */
             async function handleBoxClick(box) {
                 activeBox = box;
                 activePosition = box.dataset.position || "";
@@ -1651,7 +1632,6 @@
 
                 if (!activePosition) return;
 
-                // dataset 저장(나중에 확장 대비)
                 modalRoot.dataset.page = PAGE;
                 modalRoot.dataset.position = activePosition;
 
@@ -1659,19 +1639,14 @@
                 modalPositionText.textContent = activePosition;
 
                 resetModalFields(true);
-
-                // 텍스트 슬롯이면 자동 전환
                 setModalTypeForPosition(activePosition);
 
-                // 기본 우선순위 1 로딩
                 if (adPriority) adPriority.value = "1";
 
                 try {
-                    // 우선순위 1 후보 먼저 시도
                     const slotP1 = await fetchSlot(activePosition, 1);
                     if (slotP1) fillModalFromSlot(slotP1);
                     else {
-                        // 없으면 현재 노출 슬롯(기본)도 한번 로딩
                         const slot = await fetchSlot(activePosition);
                         if (slot) fillModalFromSlot(slot);
                         else updateSelectedSummary();
@@ -1685,9 +1660,6 @@
                 await refreshCandidates();
             }
 
-            /* ============================================================
-               ✅ 이벤트 바인딩
-            ============================================================ */
             function bindAllBoxes() {
                 const boxes = getAllSlotElements();
                 boxes.forEach(box => {
@@ -1703,7 +1675,22 @@
                 });
             });
 
-            fieldImageFile?.addEventListener("change", () => updateSelectedSummary());
+            // ✅ 변경: 파일 선택 즉시 미리보기
+            fieldImageFile?.addEventListener("change", () => {
+                const file = fieldImageFile?.files?.[0];
+                if (file) showLocalPreview(file);
+                else {
+                    if (__localPreviewUrl) {
+                        URL.revokeObjectURL(__localPreviewUrl);
+                        __localPreviewUrl = null;
+                    }
+                    currentPreviewImg?.classList.add("hidden");
+                    currentPreviewImg?.removeAttribute("src");
+                    currentPreviewEmpty?.classList.remove("hidden");
+                }
+                updateSelectedSummary();
+            });
+
             [fieldBizNo, fieldBizName].forEach(el => el?.addEventListener("input", updateSelectedSummary));
 
             fieldNoEnd?.addEventListener("change", () => applyNoEndState());
@@ -1723,9 +1710,6 @@
                 if (e.key === "Escape" && !modalRoot.classList.contains("hidden")) closeModal();
             });
 
-            /* ============================================================
-               ✅ 모달 사용법 팝오버
-            ============================================================ */
             (function setupHelpPopover() {
                 const btn = document.getElementById("adHelpBtn");
                 const pop = document.getElementById("adHelpPopover");
@@ -1761,9 +1745,6 @@
                 window.__closeAdHelp = closeHelp;
             })();
 
-            /* ============================================================
-               ✅ 초기 로드
-            ============================================================ */
             document.addEventListener("DOMContentLoaded", async () => {
                 buildBestPickGrid();
                 bindAllBoxes();
