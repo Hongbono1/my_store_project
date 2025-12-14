@@ -679,8 +679,6 @@
                             </div>
                         </div>
 
-                        <!-- ✅ (중복 id였던 textBlock/fieldTextContent 블록 제거됨) -->
-
                         <div class="flex items-center gap-2">
                             <button id="btnSearchStore"
                                 class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
@@ -831,26 +829,41 @@
                 return `${u}${sep}v=${Date.now()}`;
             }
 
+            // ✅ FIX: stray duplicated block 제거 + 안전 이미지 세팅
             function safeSetImage(imgEl, rawUrl, defEl) {
                 if (!imgEl) return;
+
                 const url = rawUrl ? withBust(toAbs(rawUrl)) : "";
 
-                // 초기화
+                const show = () => {
+                    imgEl.classList.remove("hidden");
+                    if (defEl) defEl.classList.add("hidden");
+                };
+
+                const hide = () => {
+                    imgEl.classList.add("hidden");
+                    imgEl.removeAttribute("src");
+                    if (defEl) defEl.classList.remove("hidden");
+                };
+
+                // reset
+                imgEl.onload = null;
+                imgEl.onerror = null;
                 imgEl.classList.add("hidden");
                 imgEl.removeAttribute("src");
                 if (defEl) defEl.classList.remove("hidden");
 
                 if (!url) return;
 
-                imgEl.onload = () => {
-                    imgEl.classList.remove("hidden");
-                    if (defEl) defEl.classList.add("hidden");
-                };
-                imgEl.onerror = () => {
-                    imgEl.classList.add("hidden");
-                    if (defEl) defEl.classList.remove("hidden");
-                };
+                imgEl.onload = () => show();
+                imgEl.onerror = () => hide();
                 imgEl.src = url;
+
+                // ✅ 캐시/즉시 로드 대응
+                if (imgEl.complete) {
+                    if (imgEl.naturalWidth > 0) show();
+                    else hide();
+                }
             }
 
             function pickOk(json) { return !!(json?.ok || json?.success); }
@@ -1307,11 +1320,10 @@
                     "";
 
                 if (!TEXT_ONLY_POSITIONS.has(activePosition) && imageUrl && currentPreviewImg) {
-                    currentPreviewImg.src = withBust(toAbs(imageUrl));
-                    currentPreviewImg.classList.remove("hidden");
-                    if (currentPreviewEmpty) currentPreviewEmpty.classList.add("hidden");
+                    safeSetImage(currentPreviewImg, imageUrl, currentPreviewEmpty);
                 } else {
                     currentPreviewImg?.classList.add("hidden");
+                    currentPreviewImg?.removeAttribute("src");
                     currentPreviewEmpty?.classList.remove("hidden");
                 }
 
@@ -1569,7 +1581,7 @@
                         return;
                     }
 
-                    // ✅ 저장된 “해당 priority 후보”를 바로 박스에 적용해서 확실히 보이게 함
+                    // ✅ 저장된 “해당 priority 후보”를 바로 박스에 적용
                     const saved = await fetchSlot(activePosition, priority);
                     if (saved) {
                         fillModalFromSlot(saved);
