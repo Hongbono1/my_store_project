@@ -141,6 +141,14 @@ uploadDirs.forEach((dir) => {
   } else {
     console.log("📁 폴더 존재:", dir);
   }
+
+  const uploadDirs = [
+    UPLOAD_ROOT,
+    path.join(UPLOAD_ROOT, "inquiry"),
+    path.join(UPLOAD_ROOT, "traditionalmarket"),
+    path.join(UPLOAD_ROOT, "performingart"),
+    path.join(UPLOAD_ROOT, "manager_ad"), // ✅ 추가
+  ];
 });
 
 // ------------------------------------------------------------

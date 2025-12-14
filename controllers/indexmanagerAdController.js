@@ -156,10 +156,23 @@ function mapSlotRow(r) {
 }
 
 /** ✅ 업로드 파일(라우터 fields 대응) */
+/** ✅ 업로드 파일(라우터 any/fields 모두 대응) */
 function pickUploadFile(req) {
   if (req.file) return req.file;
+
+  // ✅ upload.any() 사용 시: req.files는 Array
+  if (Array.isArray(req.files) && req.files.length) {
+    return req.files[0];
+  }
+
+  // ✅ upload.fields() 사용 시: req.files는 Object
   const f = req.files || {};
-  return f.image?.[0] || f.slotImage?.[0] || f.file?.[0] || null;
+  return (
+    f.image?.[0] ||
+    f.slotImage?.[0] ||
+    f.file?.[0] ||
+    null
+  );
 }
 
 /* -------------------------
@@ -906,10 +919,10 @@ export async function searchStore(req, res) {
   // ✅ 프론트가 name/businessName을 보내도 검색되게 흡수
   const q = cleanStr(
     req.query.q ??
-      req.query.keyword ??
-      req.query.name ??
-      req.query.businessName ??
-      req.query.business_name
+    req.query.keyword ??
+    req.query.name ??
+    req.query.businessName ??
+    req.query.business_name
   );
 
   const client = await pool.connect();
