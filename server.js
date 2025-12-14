@@ -47,6 +47,8 @@ import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
+import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
+
 
 import pool from "./db.js";
 
@@ -282,6 +284,8 @@ app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
+app.use("/manager/ad", foodcategorymanagerAdRouter);
+
 
 // ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
