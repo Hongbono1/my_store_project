@@ -281,6 +281,29 @@
 
             </ul>
 
+            <!-- ✅ (관리자) 추가 카테고리 링크 슬롯 -->
+            <div class="mt-6">
+                <h3 class="font-bold text-sm text-slate-700 mb-2 text-center">추가 카테고리(관리자)</h3>
+
+                <div id="slot_food_sidebar_links" class="slot neo-card p-3 border-2 border-dashed border-blue-300"
+                    data-page="foodcategory" data-position="food_sidebar_links" data-label="FOOD CATEGORY 추가 링크"
+                    data-size="텍스트 목록">
+
+                    <div class="slot-empty">클릭해서 카테고리 링크 추가</div>
+
+                    <!-- ✅ 여기에 저장된 목록이 렌더됨 -->
+                    <ul class="space-y-2 text-sm" data-role="sidebar-links"></ul>
+
+                    <span class="slot-badge">Links</span>
+                </div>
+
+                <p class="text-xs text-slate-500 font-bold mt-2 leading-relaxed">
+                    입력 형식: 한 줄에 <b>이름|링크</b><br>
+                    예) <b>라면|/subcategory.html?type=food&category=분식</b><br>
+                    (선택) 앞에 공백 2칸 넣으면 하위처럼 보임
+                </p>
+            </div>
+
             <!-- ✅ 광고박스 (레이아웃 동일 + 슬롯化) -->
             <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300">
                 <h3 class="font-bold text-lg mb-2">광고 영역</h3>
@@ -1281,6 +1304,13 @@
 
             modalSlotInfo.textContent = `${label} / position=${position} / ${size}`;
 
+            // ✅ 사이드바 링크 슬롯은 기본을 텍스트 모드로
+            if ((position || "") === "food_sidebar_links") {
+                f_slotType.value = "text";
+                f_slotMode.value = "text";
+                setActiveTab("text");
+            }
+
             setActiveTab("banner");
             modalBackdrop.style.display = "flex";
             updatePreview();
@@ -1572,6 +1602,59 @@
             updateSlider();
             startAuto();
         });
+
+        function escapeHtml(str) {
+            return String(str || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function renderSidebarLinks(slotEl, text) {
+            const ul = slotEl.querySelector('[data-role="sidebar-links"]');
+            const empty = slotEl.querySelector(".slot-empty");
+            if (!ul) return;
+
+            const t = String(text || "").replace(/\r/g, "").trim();
+            ul.innerHTML = "";
+
+            if (!t) {
+                if (empty) empty.style.display = "flex";
+                return;
+            }
+            if (empty) empty.style.display = "none";
+
+            const lines = t.split("\n").filter(l => l.trim());
+
+            const items = lines.map(line => {
+                const m = line.match(/^(\s*)(.*)$/);
+                const lead = m ? m[1] : "";
+                const rest = m ? m[2] : line;
+
+                const indent = Math.min(3, Math.floor(lead.replace(/\t/g, "  ").length / 2));
+                const parts = rest.split("|");
+
+                const label = (parts[0] || "").trim();
+                const href = (parts.slice(1).join("|") || "").trim();
+
+                if (!label) return null;
+                return { label, href: href || "#", indent };
+            }).filter(Boolean);
+
+            ul.innerHTML = items.map(it => {
+                const ml = it.indent === 0 ? "" : (it.indent === 1 ? "ml-4" : it.indent === 2 ? "ml-8" : "ml-12");
+                return `
+      <li class="${ml}">
+        <div class="neo-card px-3 py-2 flex items-center justify-between gap-2">
+          <span class="font-bold text-slate-800 truncate">${escapeHtml(it.label)}</span>
+          <span class="text-[11px] font-bold text-slate-500 truncate max-w-[140px]">${escapeHtml(it.href)}</span>
+        </div>
+      </li>
+    `;
+            }).join("");
+        }
     </script>
 </body>
 
