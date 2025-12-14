@@ -1,6 +1,10 @@
 // routes/indexmanagerAdRouter.js
 import express from "express";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { randomUUID } from "crypto";
+
 import {
   getSlot,
   listSlots,
@@ -14,20 +18,37 @@ import {
 
 const router = express.Router();
 
-/**
- * ✅ 핵심
- * - makeMulterStorage()가
- *   1) diskStorage 엔진(_handleFile 있음)을 주면 그대로 사용
- *   2) diskStorage 옵션({destination, filename} 등)을 주면 diskStorage로 감싸서 엔진 생성
- */
-const storageCandidate = makeMulterStorage();
-const storage =
-  storageCandidate && typeof storageCandidate._handleFile === "function"
-    ? storageCandidate
-    : multer.diskStorage(storageCandidate || {});
+// ✅ 최후 폴백 저장 경로 (서버.js에서 /uploads -> /data/uploads 서빙 중)
+const FALLBACK_DIR = "/data/uploads";
+if (!fs.existsSync(FALLBACK_DIR)) fs.mkdirSync(FALLBACK_DIR, { recursive: true });
+
+const fallbackStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, FALLBACK_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+// ✅ makeMulterStorage()가 뭘 주든 “엔진”으로 통일
+const candidate = makeMulterStorage?.();
+let storage = fallbackStorage;
+
+// 1) 이미 엔진이면 그대로 사용
+if (candidate && typeof candidate._handleFile === "function") {
+  storage = candidate;
+}
+// 2) { destination, filename } 옵션이면 diskStorage로 엔진 생성
+else if (
+  candidate &&
+  typeof candidate === "object" &&
+  (candidate.destination || candidate.filename)
+) {
+  storage = multer.diskStorage(candidate);
+}
 
 const upload = multer({
-  storage, // ✅ 반드시 'storage 엔진'이 들어가야 함
+  storage, // ✅ 여기 반드시 '엔진'이 들어가야 함
   fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
@@ -43,7 +64,7 @@ const uploadFields = upload.fields([
 router.get("/slot", getSlot);
 router.get("/slots", listSlots);
 
-// ✅ 후보 전체(우선순위 관리용)
+// 후보 전체
 router.get("/slot-items", listSlotItems);
 
 // 저장/삭제
