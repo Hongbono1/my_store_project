@@ -1,3 +1,4 @@
+
 // controllers/indexmanagerAdController.js
 import fs from "fs";
 import path from "path";
@@ -11,6 +12,9 @@ import pool from "../db.js";
 export const UPLOAD_SUBDIR = "manager_ad";
 export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
+
+// ✅ 다른 가게 이미지들도 /data/uploads 아래에 있다고 가정(서버.js와 동일 컨셉)
+const DATA_UPLOAD_ROOT = "/data/uploads";
 
 /** ✅ 기존(단일 저장) 테이블 */
 const LEGACY_TABLE = "public.admin_ad_slots";
@@ -45,6 +49,13 @@ function toInt(v) {
   return i;
 }
 
+function digitsOnly(v) {
+  const s = cleanStr(v);
+  if (!s) return null;
+  const d = s.replace(/[^0-9]/g, "");
+  return d.length ? d : null;
+}
+
 /**
  * ✅ datetime-local(YYYY-MM-DDTHH:mm) → 'YYYY-MM-DD HH:mm:00+09:00'
  */
@@ -57,6 +68,29 @@ function toKstTimestamptz(dtLocal) {
   if (!d || !tRaw) return null;
   const t = tRaw.length === 5 ? `${tRaw}:00` : tRaw;
   return `${d} ${t}+09:00`;
+}
+
+function normalizeImageUrl(p) {
+  const s = cleanStr(p);
+  if (!s) return null;
+
+  // 이미 절대 URL이면 그대로
+  if (/^https?:\/\//i.test(s)) return s;
+
+  // /data/uploads/... 로 저장돼있으면 /uploads/... 로 변환
+  if (s.startsWith(`${DATA_UPLOAD_ROOT}/`)) {
+    return `/uploads/${s.slice(`${DATA_UPLOAD_ROOT}/`.length)}`;
+  }
+
+  // uploads/... 형태면 /uploads/... 로
+  if (s.startsWith("uploads/")) return `/${s}`;
+
+  // /uploads/... 형태면 그대로
+  if (s.startsWith("/uploads/")) return s;
+
+  // 그 외: 이미 / 로 시작하면 그대로, 아니면 /uploads/ 로 붙임(안전용)
+  if (s.startsWith("/")) return s;
+  return `/uploads/${s}`;
 }
 
 function pickBody(req) {
@@ -97,33 +131,6 @@ async function tableExists(client, tableName) {
   return !!rows?.[0]?.reg;
 }
 
-/* ✅ 정보스키마 컬럼 탐색 유틸(재사용) */
-function splitTableRef(full) {
-  const [schema, name] = String(full).includes(".") ? String(full).split(".") : ["public", String(full)];
-  return { schema, name };
-}
-
-async function pickExistingColumn(client, fullTable, candidates) {
-  const { schema, name } = splitTableRef(fullTable);
-  const list = (candidates || []).filter(Boolean);
-  if (!list.length) return null;
-
-  const { rows } = await client.query(
-    `
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema = $1
-      AND table_name   = $2
-      AND column_name = ANY($3::text[])
-    ORDER BY array_position($3::text[], column_name)
-    LIMIT 1
-    `,
-    [schema, name, list]
-  );
-
-  return rows?.[0]?.column_name || null;
-}
-
 function mapSlotRow(r) {
   if (!r) return null;
   return {
@@ -156,273 +163,203 @@ function mapSlotRow(r) {
 }
 
 /** ✅ 업로드 파일(라우터 fields 대응) */
-/** ✅ 업로드 파일(라우터 any/fields 모두 대응) */
 function pickUploadFile(req) {
   if (req.file) return req.file;
-
-  // ✅ upload.any() 사용 시: req.files는 Array
-  if (Array.isArray(req.files) && req.files.length) {
-    return req.files[0];
-  }
-
-  // ✅ upload.fields() 사용 시: req.files는 Object
   const f = req.files || {};
-  return (
-    f.image?.[0] ||
-    f.slotImage?.[0] ||
-    f.file?.[0] ||
-    null
-  );
+  return f.image?.[0] || f.slotImage?.[0] || f.file?.[0] || null;
 }
 
 /* -------------------------
- * ✅ 슬롯 이미지가 NULL이면 "가게 대표 이미지"로 자동 채움(fallback)
- * - slot_mode = 'store' 일 때만 동작
- * - 우선순위: combined_store_info > store_info > food_store_images
+ *  공통: 컬럼 존재 확인 유틸 (동적 테이블/컬럼 대응)
  * ------------------------- */
-function digitsOnly(s) {
-  const v = cleanStr(s);
-  if (!v) return null;
-  const d = String(v).replace(/[^0-9]/g, "");
-  return d.length ? d : null;
+function splitTableRef(full) {
+  const [schema, name] = String(full).includes(".")
+    ? String(full).split(".")
+    : ["public", String(full)];
+  return { schema, name };
 }
 
-function pickFirstImageValue(val) {
-  if (!val) return null;
-  if (typeof val === "string") {
-    const s = val.trim();
-    return s.length ? s : null;
-  }
-  // JSON array / JS array 모두 대응
-  if (Array.isArray(val)) {
-    for (const x of val) {
-      const picked = pickFirstImageValue(x);
-      if (picked) return picked;
-    }
-    return null;
-  }
-  // JSON object 형태면 흔한 키들을 탐색
-  if (typeof val === "object") {
-    const keys = ["image_url", "url", "path", "src", "main_image_url", "main_img"];
-    for (const k of keys) {
-      if (val[k]) {
-        const picked = pickFirstImageValue(val[k]);
-        if (picked) return picked;
-      }
-    }
-  }
-  return null;
+async function pickExistingColumn(client, fullTable, candidates) {
+  const { schema, name } = splitTableRef(fullTable);
+  const list = (candidates || []).filter(Boolean);
+  if (!list.length) return null;
+
+  const { rows } = await client.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1
+      AND table_name   = $2
+      AND column_name = ANY($3::text[])
+    ORDER BY array_position($3::text[], column_name)
+    LIMIT 1
+    `,
+    [schema, name, list]
+  );
+
+  return rows?.[0]?.column_name || null;
 }
 
-async function findStoreMainImage(client, { storeId, businessNo, businessName }) {
-  const storeIdStr = cleanStr(storeId);
+async function pickExistingColumns(client, fullTable, candidates) {
+  const { schema, name } = splitTableRef(fullTable);
+  const list = (candidates || []).filter(Boolean);
+  if (!list.length) return [];
+
+  const { rows } = await client.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1
+      AND table_name   = $2
+      AND column_name = ANY($3::text[])
+    ORDER BY array_position($3::text[], column_name)
+    `,
+    [schema, name, list]
+  );
+
+  return (rows || []).map((r) => r.column_name).filter(Boolean);
+}
+
+/* -------------------------
+ * ✅ 핵심: "가게 대표이미지 자동 대입"
+ * - 슬롯 이미지가 없으면 store_id/business_no 기준으로 대표 이미지 찾아줌
+ * - 가능한 테이블들에서 순차 탐색
+ * ------------------------- */
+async function resolveStoreMainImage(client, { storeId, businessNo, businessName }) {
+  const sid = cleanStr(storeId);
   const bizDigits = digitsOnly(businessNo);
-  const nameQ = cleanStr(businessName);
+  const bname = cleanStr(businessName);
 
-  // 1) combined_store_info (가장 가능성 높음)
-  {
-    const table = "public.combined_store_info";
-    if (await tableExists(client, table)) {
-      const idCol = await pickExistingColumn(client, table, ["id", "store_id"]);
-      const bizCol = await pickExistingColumn(client, table, [
-        "business_number",
-        "business_no",
-        "businessno",
-        "biz_no",
-        "bizno",
-        "business_num",
-        "b_no",
-        "bno",
-      ]);
-      const nameCol = await pickExistingColumn(client, table, ["business_name", "store_name", "name", "title"]);
-      const imgCol = await pickExistingColumn(client, table, [
-        "main_image_url",
-        "image_url",
-        "main_img",
-        "cover_image",
-        "image_path",
-        "thumbnail_url",
-      ]);
+  // 탐색 대상(필요하면 여기만 늘리면 됨)
+  const sources = [
+    {
+      table: "public.combined_store_info",
+      idCandidates: ["id", "store_id"],
+      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "businessnum", "b_no", "bno"],
+      nameCandidates: ["business_name", "store_name", "name", "title"],
+      // 대표이미지 후보 우선순위
+      imgCandidates: ["main_image_url", "main_img", "image_url", "cover_image", "image_path", "image1", "image2", "image3"],
+      updatedCandidates: ["updated_at", "modified_at"],
+    },
+    {
+      table: "public.store_info",
+      idCandidates: ["id", "store_id"],
+      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "businessnum", "b_no", "bno"],
+      nameCandidates: ["business_name", "store_name", "name", "title"],
+      imgCandidates: ["main_image_url", "main_img", "image_url", "image_path", "image1", "image2", "image3"],
+      updatedCandidates: ["updated_at", "modified_at"],
+    },
+    {
+      table: "public.food_store_images",
+      // 이미지 테이블은 store_id + image_url 형태가 일반적
+      storeIdColCandidates: ["store_id", "id"],
+      imgCandidates: ["image_url", "image_path", "file_path", "url"],
+      updatedCandidates: ["updated_at", "created_at", "id"],
+      kind: "images",
+    },
+    // 혹시 다른 이미지 테이블이 있으면 여기 추가 가능
+    { table: "public.store_images", storeIdColCandidates: ["store_id", "id"], imgCandidates: ["image_url", "image_path", "file_path", "url"], updatedCandidates: ["updated_at", "created_at", "id"], kind: "images" },
+    { table: "public.combined_store_images", storeIdColCandidates: ["store_id", "id"], imgCandidates: ["image_url", "image_path", "file_path", "url"], updatedCandidates: ["updated_at", "created_at", "id"], kind: "images" },
+  ];
 
-      if (imgCol) {
-        // (a) storeId로 먼저
-        if (storeIdStr && idCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE ${idCol}::text = $1
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol} DESC
-            LIMIT 1
-            `,
-            [storeIdStr]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
+  for (const s of sources) {
+    const ok = await tableExists(client, s.table);
+    if (!ok) continue;
 
-        // (b) businessNo(숫자)로
-        if (bizDigits && bizCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g')
-                = regexp_replace($1, '[^0-9]', '', 'g')
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol ? `${idCol} DESC` : "1"}
-            LIMIT 1
-            `,
-            [bizDigits]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
+    // 이미지 컬럼 확보
+    const imgCols = await pickExistingColumns(client, s.table, s.imgCandidates);
+    if (!imgCols.length) continue;
 
-        // (c) 상호명으로
-        if (nameQ && nameCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE ${nameCol} ILIKE '%' || $1 || '%'
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol ? `${idCol} DESC` : "1"}
-            LIMIT 1
-            `,
-            [nameQ]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
-      }
+    // images 테이블(다건) 처리
+    if (s.kind === "images") {
+      const storeIdCol = await pickExistingColumn(client, s.table, s.storeIdColCandidates || ["store_id"]);
+      if (!storeIdCol || !sid) continue;
+
+      const orderCol = (await pickExistingColumn(client, s.table, s.updatedCandidates || ["id"])) || storeIdCol;
+
+      const q = `
+        SELECT ${imgCols[0]} AS img
+        FROM ${s.table}
+        WHERE ${storeIdCol}::text = $1
+          AND ${imgCols[0]} IS NOT NULL
+          AND ${imgCols[0]} <> ''
+        ORDER BY ${orderCol} DESC
+        LIMIT 1
+      `;
+      const r = await client.query(q, [sid]);
+      const img = normalizeImageUrl(r.rows?.[0]?.img);
+      if (img) return img;
+
+      continue;
     }
-  }
 
-  // 2) store_info
-  {
-    const table = "public.store_info";
-    if (await tableExists(client, table)) {
-      const idCol = await pickExistingColumn(client, table, ["id", "store_id"]);
-      const bizCol = await pickExistingColumn(client, table, [
-        "business_number",
-        "business_no",
-        "businessno",
-        "biz_no",
-        "bizno",
-        "business_num",
-        "b_no",
-        "bno",
-      ]);
-      const nameCol = await pickExistingColumn(client, table, ["business_name", "store_name", "name", "title"]);
-      const imgCol = await pickExistingColumn(client, table, [
-        "image1",
-        "image2",
-        "image3",
-        "main_image_url",
-        "image_url",
-        "main_img",
-        "cover_image",
-        "image_path",
-      ]);
+    // 단일(또는 1행에서 coalesce) 테이블 처리
+    const idCol = await pickExistingColumn(client, s.table, s.idCandidates);
+    const bizCol = await pickExistingColumn(client, s.table, s.bizCandidates);
+    const nameCol = await pickExistingColumn(client, s.table, s.nameCandidates);
+    const updatedCol = await pickExistingColumn(client, s.table, s.updatedCandidates || ["updated_at"]);
 
-      if (imgCol) {
-        if (storeIdStr && idCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE ${idCol}::text = $1
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol} DESC
-            LIMIT 1
-            `,
-            [storeIdStr]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
+    // 조건 하나도 못 만들면 스킵
+    const where = [];
+    const params = [];
 
-        if (bizDigits && bizCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g')
-                = regexp_replace($1, '[^0-9]', '', 'g')
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol ? `${idCol} DESC` : "1"}
-            LIMIT 1
-            `,
-            [bizDigits]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
-
-        if (nameQ && nameCol) {
-          const r = await client.query(
-            `
-            SELECT ${imgCol} AS img
-            FROM ${table}
-            WHERE ${nameCol} ILIKE '%' || $1 || '%'
-              AND ${imgCol} IS NOT NULL
-            ORDER BY ${idCol ? `${idCol} DESC` : "1"}
-            LIMIT 1
-            `,
-            [nameQ]
-          );
-          const picked = pickFirstImageValue(r.rows?.[0]?.img);
-          if (picked) return picked;
-        }
-      }
+    if (sid && idCol) {
+      params.push(sid);
+      where.push(`${idCol}::text = $${params.length}`);
     }
-  }
-
-  // 3) food_store_images (store_id 기반)
-  {
-    const table = "public.food_store_images";
-    if (storeIdStr && (await tableExists(client, table))) {
-      const idCol = await pickExistingColumn(client, table, ["id"]);
-      const storeCol = await pickExistingColumn(client, table, ["store_id"]);
-      const imgCol = await pickExistingColumn(client, table, ["image_url", "image_path", "file_path"]);
-
-      if (storeCol && imgCol) {
-        const r = await client.query(
-          `
-          SELECT ${imgCol} AS img
-          FROM ${table}
-          WHERE ${storeCol}::text = $1
-            AND ${imgCol} IS NOT NULL
-            AND ${imgCol} <> ''
-          ORDER BY ${idCol ? `${idCol} DESC` : "1"}
-          LIMIT 1
-          `,
-          [storeIdStr]
-        );
-        const picked = pickFirstImageValue(r.rows?.[0]?.img);
-        if (picked) return picked;
-      }
+    if (bizDigits && bizCol) {
+      params.push(bizDigits);
+      where.push(`regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') = $${params.length}`);
     }
+    if (bname && nameCol) {
+      params.push(bname);
+      where.push(`${nameCol} ILIKE '%' || $${params.length} || '%'`);
+    }
+
+    if (!where.length) continue;
+
+    // 대표이미지: 가능한 컬럼들 coalesce
+    const coalesceExpr =
+      imgCols.length >= 2
+        ? `COALESCE(${imgCols.join(", ")})`
+        : `${imgCols[0]}`;
+
+    const orderExpr = updatedCol
+      ? `${updatedCol} DESC`
+      : (idCol ? `${idCol} DESC` : "1");
+
+    const q = `
+      SELECT ${coalesceExpr} AS img
+      FROM ${s.table}
+      WHERE (${where.join(" OR ")})
+      ORDER BY ${orderExpr}
+      LIMIT 1
+    `;
+
+    const r = await client.query(q, params);
+    const img = normalizeImageUrl(r.rows?.[0]?.img);
+    if (img) return img;
   }
 
   return null;
 }
 
-async function applyStoreImageFallback(client, mappedSlot) {
-  if (!mappedSlot) return mappedSlot;
-  if (mappedSlot.image_url) return mappedSlot;
-  if (String(mappedSlot.slot_mode || "").toLowerCase() !== "store") return mappedSlot;
+async function attachAutoStoreImage(client, slotObj) {
+  if (!slotObj) return slotObj;
 
-  const fallback = await findStoreMainImage(client, {
-    storeId: mappedSlot.store_id,
-    businessNo: mappedSlot.business_no,
-    businessName: mappedSlot.business_name,
+  const hasImage = !!cleanStr(slotObj.image_url);
+  const mode = cleanStr(slotObj.slot_mode)?.toLowerCase();
+  if (hasImage) return slotObj;
+  if (mode !== "store") return slotObj;
+
+  const img = await resolveStoreMainImage(client, {
+    storeId: slotObj.store_id,
+    businessNo: slotObj.business_no,
+    businessName: slotObj.business_name,
   });
 
-  if (fallback) mappedSlot.image_url = fallback;
-  return mappedSlot;
+  if (img) slotObj.image_url = img;
+  return slotObj;
 }
 
 /* ------------------------- 핵심: "노출 1개" 선택 ------------------------- */
@@ -509,16 +446,16 @@ export async function getSlot(req, res) {
       );
 
       const mapped = mapSlotRow(rows[0] || null);
-      await applyStoreImageFallback(client, mapped);
+      await attachAutoStoreImage(client, mapped);
       return res.json({ success: true, slot: mapped });
     }
 
-    // ✅ 기본: 노출 1개
+    // ✅ 기본: 노출 1개(우선순위 후보 우선)
     if (itemsOk) {
       const row = await getEffectiveSlotFromItems(client, page, position);
       if (row) {
         const mapped = mapSlotRow(row);
-        await applyStoreImageFallback(client, mapped);
+        await attachAutoStoreImage(client, mapped);
         return res.json({ success: true, slot: mapped });
       }
     }
@@ -526,7 +463,7 @@ export async function getSlot(req, res) {
     if (legacyOk) {
       const row = await getLegacySlot(client, page, position);
       const mapped = mapSlotRow(row);
-      await applyStoreImageFallback(client, mapped);
+      await attachAutoStoreImage(client, mapped);
       return res.json({ success: true, slot: mapped });
     }
 
@@ -553,7 +490,7 @@ export async function listSlots(req, res) {
     const itemsOk = await tableExists(client, ITEMS_TABLE);
     const legacyOk = await tableExists(client, LEGACY_TABLE);
 
-    const map = new Map(); // key: page|position -> slot(obj)
+    const map = new Map(); // key: page|position -> row
 
     if (itemsOk) {
       const { rows } = await client.query(
@@ -577,9 +514,7 @@ export async function listSlots(req, res) {
       );
 
       for (const r of rows) {
-        const mapped = mapSlotRow(r);
-        await applyStoreImageFallback(client, mapped);
-        map.set(`${r.page}|${r.position}`, mapped);
+        map.set(`${r.page}|${r.position}`, mapSlotRow(r));
       }
     }
 
@@ -604,15 +539,17 @@ export async function listSlots(req, res) {
 
       for (const r of rows) {
         const key = `${r.page}|${r.position}`;
-        if (!map.has(key)) {
-          const mapped = mapSlotRow(r);
-          await applyStoreImageFallback(client, mapped);
-          map.set(key, mapped);
-        }
+        if (!map.has(key)) map.set(key, mapSlotRow(r));
       }
     }
 
-    return res.json({ success: true, slots: Array.from(map.values()) });
+    // ✅ 응답 보정: store 슬롯인데 image_url 없으면 가게 대표이미지 자동 첨부
+    const slots = Array.from(map.values());
+    for (const s of slots) {
+      await attachAutoStoreImage(client, s);
+    }
+
+    return res.json({ success: true, slots });
   } catch (e) {
     console.error("❌ listSlots error:", e);
     return res.status(500).json({ success: false, error: "서버 오류" });
@@ -660,14 +597,12 @@ export async function listSlotItems(req, res) {
       [page, position]
     );
 
-    const mapped = [];
-    for (const r of rows) {
-      const m = mapSlotRow(r);
-      await applyStoreImageFallback(client, m);
-      mapped.push(m);
+    const items = rows.map(mapSlotRow);
+    for (const it of items) {
+      await attachAutoStoreImage(client, it);
     }
 
-    return res.json({ success: true, items: mapped });
+    return res.json({ success: true, items });
   } catch (e) {
     console.error("❌ listSlotItems error:", e);
     return res.status(500).json({ success: false, error: "서버 오류" });
@@ -678,6 +613,7 @@ export async function listSlotItems(req, res) {
 
 /* -------------------------
  *  POST /manager/ad/slot  (multipart/form-data)
+ *  ✅ 슬롯 이미지 없으면 "가게 대표이미지" 자동 대입
  * ------------------------- */
 export async function upsertSlot(req, res) {
   ensureUploadDir();
@@ -697,11 +633,13 @@ export async function upsertSlot(req, res) {
   }
 
   const file = pickUploadFile(req);
-
   const client = await pool.connect();
+
   try {
     const itemsOk = await tableExists(client, ITEMS_TABLE);
     const legacyOk = await tableExists(client, LEGACY_TABLE);
+
+    const modeLower = cleanStr(slotMode)?.toLowerCase();
 
     // ✅ 후보 저장 모드(priority가 있으면 무조건 후보 테이블)
     if (priority) {
@@ -712,16 +650,33 @@ export async function upsertSlot(req, res) {
         });
       }
 
+      // 기존 후보 이미지
       const prev = await client.query(
         `SELECT image_url FROM ${ITEMS_TABLE} WHERE page=$1 AND position=$2 AND priority=$3 LIMIT 1`,
         [page, position, priority]
       );
       const prevImageUrl = prev.rows?.[0]?.image_url ?? null;
 
+      // 이미지 결정 로직
       let nextImageUrl = prevImageUrl;
+
       if (clearImage) nextImageUrl = null;
-      if (file) nextImageUrl = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
-      if (!file && keepImage) nextImageUrl = prevImageUrl;
+
+      if (file) {
+        nextImageUrl = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
+      } else if (keepImage) {
+        nextImageUrl = prevImageUrl;
+      } else {
+        // ✅ 파일도 없고 기존도 없고, store 슬롯이면 가게 대표이미지 자동 대입
+        if (!cleanStr(nextImageUrl) && modeLower === "store") {
+          const autoImg = await resolveStoreMainImage(client, {
+            storeId,
+            businessNo,
+            businessName,
+          });
+          if (autoImg) nextImageUrl = autoImg;
+        }
+      }
 
       const startAtTz = toKstTimestamptz(startAt);
       const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
@@ -777,7 +732,8 @@ export async function upsertSlot(req, res) {
         ]
       );
 
-      return res.json({ success: true, slot: mapSlotRow(rows[0]) });
+      const mapped = mapSlotRow(rows[0]);
+      return res.json({ success: true, slot: mapped });
     }
 
     // ✅ legacy 저장(기존 방식)
@@ -795,9 +751,24 @@ export async function upsertSlot(req, res) {
     const prevImageUrl = prev.rows?.[0]?.image_url ?? null;
 
     let nextImageUrl = prevImageUrl;
+
     if (clearImage) nextImageUrl = null;
-    if (file) nextImageUrl = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
-    if (!file && keepImage) nextImageUrl = prevImageUrl;
+
+    if (file) {
+      nextImageUrl = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
+    } else if (keepImage) {
+      nextImageUrl = prevImageUrl;
+    } else {
+      // ✅ 파일도 없고 기존도 없고, store 슬롯이면 가게 대표이미지 자동 대입
+      if (!cleanStr(nextImageUrl) && modeLower === "store") {
+        const autoImg = await resolveStoreMainImage(client, {
+          storeId,
+          businessNo,
+          businessName,
+        });
+        if (autoImg) nextImageUrl = autoImg;
+      }
+    }
 
     const startAtTz = toKstTimestamptz(startAt);
     const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
@@ -853,7 +824,8 @@ export async function upsertSlot(req, res) {
       ]
     );
 
-    return res.json({ success: true, slot: mapSlotRow(rows[0]) });
+    const mapped = mapSlotRow(rows[0]);
+    return res.json({ success: true, slot: mapped });
   } catch (e) {
     console.error("❌ upsertSlot error:", e);
     return res.status(500).json({ success: false, error: "서버 오류" });
@@ -997,10 +969,12 @@ export async function searchStore(req, res) {
       }
     }
 
+    // 1) bizNo로 먼저 검색
     if (bizNo) {
       for (const s of sources) await runSearch(s, "biz", bizNo);
     }
 
+    // 2) bizNo로 못 찾으면 q로 검색
     if (!found.length && q) {
       for (const s of sources) await runSearch(s, "q", q);
     }
