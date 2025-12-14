@@ -15,7 +15,7 @@ import {
 
 const router = express.Router();
 
-// ✅ multer 설정 (컨트롤러의 makeMulterStorage는 diskStorage 옵션 객체를 반환)
+// ✅ diskStorage 형태로 만들어야 multer 엔진이 정상 동작함
 const storage = multer.diskStorage(makeMulterStorage());
 
 const upload = multer({
@@ -24,25 +24,15 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 });
 
-// ✅ 프론트에서 어떤 키로 보내도 "Unexpected field" 안 뜨게 전부 허용
-// (indexmanager.html에서 사용하는 키가 뭔지 몰라도 여기서 흡수)
-const slotUpload = upload.fields([
-  { name: "image", maxCount: 1 },
-  { name: "slotImage", maxCount: 1 },
-  { name: "slot_image", maxCount: 1 },
-  { name: "adImage", maxCount: 1 },
-  { name: "ad_image", maxCount: 1 },
-  { name: "banner", maxCount: 1 },
-  { name: "bannerImage", maxCount: 1 },
-  { name: "banner_image", maxCount: 1 },
-  { name: "file", maxCount: 1 },
-]);
+// ✅ 어떤 필드명으로 와도 받기 (Unexpected field 완전 차단)
+const uploadAny = upload.any();
 
-// ✅ 멀터 에러를 JSON으로 깔끔하게 반환
-function multerErrorHandler(err, _req, res, next) {
-  if (!err) return next();
-  // 대표: "Unexpected field"
-  return res.status(400).json({ success: false, error: err.message || "upload error" });
+// ✅ multer 에러를 JSON으로 반환
+function multerErrorHandler(err, _req, res, _next) {
+  return res.status(400).json({
+    success: false,
+    error: err?.message || "upload error",
+  });
 }
 
 // ===== routes =====
@@ -50,9 +40,9 @@ router.get("/slot", getSlot);
 router.get("/slots", listSlots);
 router.get("/slot-items", listSlotItems);
 
-router.post("/slot", (req, res, next) => {
-  slotUpload(req, res, (err) => {
-    if (err) return multerErrorHandler(err, req, res, next);
+router.post("/slot", (req, res) => {
+  uploadAny(req, res, (err) => {
+    if (err) return multerErrorHandler(err, req, res);
     return upsertSlot(req, res);
   });
 });

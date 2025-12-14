@@ -166,6 +166,13 @@ function mapSlotRow(r) {
 /** ✅ 업로드 파일(라우터 fields 대응) */
 function pickUploadFile(req) {
   if (req.file) return req.file;
+
+  // ✅ upload.any() 사용 시: req.files는 배열
+  if (Array.isArray(req.files) && req.files.length) {
+    return req.files[0];
+  }
+
+  // ✅ fields 사용 시: req.files는 객체
   const f = req.files || {};
   return f.image?.[0] || f.slotImage?.[0] || f.file?.[0] || null;
 }
