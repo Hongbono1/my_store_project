@@ -1,5 +1,5 @@
 // routes/indexmanagerAdRouter.js
-import { Router } from "express";
+import express from "express";
 import multer from "multer";
 
 import {
@@ -13,55 +13,51 @@ import {
   fileFilter,
 } from "../controllers/indexmanagerAdController.js";
 
-const router = Router();
+const router = express.Router();
 
-/**
- * ✅ 중요:
- * - makeMulterStorage() 는 { destination, filename } "옵션 객체"를 리턴
- * - diskStorage(옵션) => "storage 엔진" 생성 (엔진에 _handleFile 존재)
- */
+// ✅ multer 설정 (컨트롤러의 makeMulterStorage는 diskStorage 옵션 객체를 반환)
 const storage = multer.diskStorage(makeMulterStorage());
 
 const upload = multer({
   storage,
   fileFilter,
-  limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
-  },
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 });
 
-/** ✅ 프론트에서 어떤 name으로 보내도 받게 (image/slotImage/file) */
-function uploadWithCatch(req, res, next) {
-  const handler = upload.fields([
-    { name: "image", maxCount: 1 },
-    { name: "slotImage", maxCount: 1 },
-    { name: "file", maxCount: 1 },
-  ]);
+// ✅ 프론트에서 어떤 키로 보내도 "Unexpected field" 안 뜨게 전부 허용
+// (indexmanager.html에서 사용하는 키가 뭔지 몰라도 여기서 흡수)
+const slotUpload = upload.fields([
+  { name: "image", maxCount: 1 },
+  { name: "slotImage", maxCount: 1 },
+  { name: "slot_image", maxCount: 1 },
+  { name: "adImage", maxCount: 1 },
+  { name: "ad_image", maxCount: 1 },
+  { name: "banner", maxCount: 1 },
+  { name: "bannerImage", maxCount: 1 },
+  { name: "banner_image", maxCount: 1 },
+  { name: "file", maxCount: 1 },
+]);
 
-  handler(req, res, (err) => {
-    if (err) {
-      console.error("[indexmanagerAdRouter] multer error:", err);
-      return res.status(400).json({
-        success: false,
-        error: err.message || "파일 업로드 오류",
-      });
-    }
-    next();
-  });
+// ✅ 멀터 에러를 JSON으로 깔끔하게 반환
+function multerErrorHandler(err, _req, res, next) {
+  if (!err) return next();
+  // 대표: "Unexpected field"
+  return res.status(400).json({ success: false, error: err.message || "upload error" });
 }
 
-// 조회
+// ===== routes =====
 router.get("/slot", getSlot);
 router.get("/slots", listSlots);
 router.get("/slot-items", listSlotItems);
 
-// 가게 검색
-router.get("/store/search", searchStore);
+router.post("/slot", (req, res, next) => {
+  slotUpload(req, res, (err) => {
+    if (err) return multerErrorHandler(err, req, res, next);
+    return upsertSlot(req, res);
+  });
+});
 
-// 저장(업로드 포함)
-router.post("/slot", uploadWithCatch, upsertSlot);
-
-// 삭제
 router.delete("/slot", deleteSlot);
+router.get("/store/search", searchStore);
 
 export default router;
