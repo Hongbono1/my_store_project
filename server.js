@@ -48,7 +48,6 @@ import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 
-
 import pool from "./db.js";
 
 // ------------------------------------------------------------
@@ -131,7 +130,8 @@ const uploadDirs = [
   UPLOAD_ROOT,
   path.join(UPLOAD_ROOT, "inquiry"),
   path.join(UPLOAD_ROOT, "traditionalmarket"),
-  path.join(UPLOAD_ROOT, "performingart")
+  path.join(UPLOAD_ROOT, "performingart"),
+  path.join(UPLOAD_ROOT, "manager_ad"), // ✅ indexmanager 광고 업로드 폴더(추가)
 ];
 
 uploadDirs.forEach((dir) => {
@@ -186,7 +186,7 @@ app.post("/verify-biz", async (req, res) => {
     if (!rawBizNo) {
       return res.status(400).json({
         ok: false,
-        message: "사업자등록번호가 없습니다."
+        message: "사업자등록번호가 없습니다.",
       });
     }
 
@@ -195,7 +195,7 @@ app.post("/verify-biz", async (req, res) => {
       console.error("❌ BIZ_API_KEY 환경변수가 없습니다. (.env 확인 필요)");
       return res.status(500).json({
         ok: false,
-        message: "서버 설정 오류(BIZ_API_KEY 미설정)"
+        message: "서버 설정 오류(BIZ_API_KEY 미설정)",
       });
     }
 
@@ -207,7 +207,7 @@ app.post("/verify-biz", async (req, res) => {
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ b_no: [cleanBizNo] })
+      body: JSON.stringify({ b_no: [cleanBizNo] }),
     });
 
     const data = await response.json();
@@ -217,21 +217,21 @@ app.post("/verify-biz", async (req, res) => {
       return res.status(500).json({
         ok: false,
         message: "국세청 응답 없음",
-        raw: data
+        raw: data,
       });
     }
 
     // ✅ 프론트에서 d.data[0] 접근할 수 있게 배열 그대로 내려줌
     return res.json({
       ok: true,
-      data: data.data
+      data: data.data,
     });
 
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
     return res.status(500).json({
       ok: false,
-      message: "서버 오류"
+      message: "서버 오류",
     });
   }
 });
@@ -277,9 +277,9 @@ app.use("/api/hot", hotRouter);
 
 // ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
-app.use("/uploads", express.static("/data/uploads"));
-app.use("/manager/ad", indexmanagerAdRouter);
 
+// ✅ 인덱스 광고 관리자 API
+app.use("/manager/ad", indexmanagerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
@@ -293,12 +293,13 @@ app.use(
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
       }
-    }
+    },
   })
 );
 
 // ------------------------------------------------------------
 // 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
+//    ✅ 중복 제거: /uploads는 여기서 1번만 서빙
 // ------------------------------------------------------------
 app.use("/uploads", express.static(UPLOAD_ROOT));
 
