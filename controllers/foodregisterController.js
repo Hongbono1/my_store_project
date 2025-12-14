@@ -46,6 +46,21 @@ function pickBusinessNumber(body) {
   return digits ? digits : null;
 }
 
+// ✅ (핵심) 한식 소분류(detail_category) 키가 뭐로 오든 잡기
+function pickDetailCategory(body) {
+  const raw =
+    body?.detailCategory ??
+    body?.detail_category ??
+    body?.subCategory ??
+    body?.sub_category ??
+    body?.foodSub ??
+    body?.food_sub ??
+    body?.sub ??
+    "";
+  const v = String(raw ?? "").trim();
+  return v ? v : null;
+}
+
 /* ===== 메뉴 파싱 유틸: 신규 브래킷 + 구형 배열 ===== */
 function extractMenusFromBody(body) {
   const out = [];
@@ -77,16 +92,14 @@ function extractMenusFromBody(body) {
   // (B) 브래킷 키: storeMenus[i][j][field]
   const buckets = {};
   for (const [k, v] of Object.entries(body || {})) {
-    const m = k.match(
-      /^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url|theme)\]$/
-    );
+    const m = k.match(/^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url|theme)\]$/);
     if (!m) continue;
     const idx = `${m[1]}:${m[2]}`;
     (buckets[idx] ||= { category: null, name: "", price: 0, description: "", image_url: null, theme: null });
     const val = String(v ?? "").trim();
     if (m[3] === "price") buckets[idx].price = toInt(val);
     else if (m[3] === "category") buckets[idx].category = val || null;
-    else buckets[idx][m[3]] = val;
+    else buckets[idx][m[3]] = val || null;
   }
   Object.values(buckets).forEach(pushItem);
 
@@ -109,88 +122,15 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
     const price = toInt(prices[i]);
     const category = (cats[i] || "").trim() || null;
     const description = (descs[i] || "").trim() || null;
+
     const img = menuFiles[i] ? toWebPath(menuFiles[i]) : null;
+    const theme = (themes[i] || "").trim() || null;
 
     if (name && price > 0) {
-      const theme = (themes[i] || "").trim() || null;
       rows.push({ name, price, category, description, image_url: img, theme });
     }
   }
   return rows;
-}
-
-/* ===================== ✅ 리스트(GET /list) ===================== */
-/**
- * /store/list?type=food&category=한식&sub=밥&limit=100
- * - 지금 “카테고리 눌러도 한식만 나오는 문제” 잡을 때 핵심 엔드포인트
- */
-export async function listFoodStores(req, res) {
-  try {
-    const type = String(req.query.type || "food").trim();
-    if (type !== "food") {
-      return res.json({ ok: true, stores: [] });
-    }
-
-    const category = String(req.query.category || "").trim();
-    const sub = String(req.query.sub || "").trim();
-    const limitRaw = Number.parseInt(String(req.query.limit || "200"), 10);
-    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 200;
-
-    // 1차: category(+sub)로 시도
-    const baseWhere = [`business_type = '음식점'`];
-    const params1 = [];
-    if (category) { params1.push(category); baseWhere.push(`business_category = $${params1.length}`); }
-    if (sub) { params1.push(sub); baseWhere.push(`detail_category = $${params1.length}`); }
-
-    const q1 = `
-      SELECT
-        s.id,
-        s.business_name,
-        s.business_type,
-        s.business_category,
-        s.detail_category,
-        s.address,
-        s.phone,
-        s.created_at,
-        (SELECT url FROM store_images WHERE store_id = s.id ORDER BY sort_order, id LIMIT 1) AS image_url
-      FROM store_info s
-      WHERE ${baseWhere.join(" AND ")}
-      ORDER BY s.created_at DESC
-      LIMIT ${limit}
-    `;
-
-    let rows = (await pool.query(q1, params1)).rows;
-
-    // 2차: sub로 걸었는데 결과가 0이면(현재 detail_category 비어있을 가능성) category만으로 재시도
-    if (sub && rows.length === 0) {
-      const baseWhere2 = [`business_type = '음식점'`];
-      const params2 = [];
-      if (category) { params2.push(category); baseWhere2.push(`business_category = $${params2.length}`); }
-
-      const q2 = `
-        SELECT
-          s.id,
-          s.business_name,
-          s.business_type,
-          s.business_category,
-          s.detail_category,
-          s.address,
-          s.phone,
-          s.created_at,
-          (SELECT url FROM store_images WHERE store_id = s.id ORDER BY sort_order, id LIMIT 1) AS image_url
-        FROM store_info s
-        WHERE ${baseWhere2.join(" AND ")}
-        ORDER BY s.created_at DESC
-        LIMIT ${limit}
-      `;
-      rows = (await pool.query(q2, params2)).rows;
-    }
-
-    return res.json({ ok: true, stores: rows });
-  } catch (err) {
-    console.error("[listFoodStores] error:", err);
-    return res.status(500).json({ ok: false, error: "server_error" });
-  }
 }
 
 /* ===================== 등록(POST) ===================== */
@@ -201,7 +141,7 @@ export async function createFoodStore(req, res) {
   const client = await pool.connect();
   try {
     const businessName = (req.body.businessName || "").trim();
-    const roadAddress = (req.body.roadAddress || req.body.address || "").trim();
+    const roadAddress = (req.body.roadAddress || "").trim();
     const phone = (req.body.phone || "").trim();
 
     if (!businessName || !roadAddress) {
@@ -212,9 +152,12 @@ export async function createFoodStore(req, res) {
       });
     }
 
-    const businessType = (req.body.businessType || "음식점").trim();
+    const businessType = (req.body.businessType || "").trim();
     const businessCategory = (req.body.businessCategory || "").trim();
-    const detailCategory = (req.body.detailCategory || req.body.subCategory || req.body.sub || "").trim(); // ✅ 있으면 저장
+
+    // ✅ (핵심) detail_category 저장
+    const detailCategory = pickDetailCategory(req.body);
+
     const businessHours = (req.body.businessHours || "").trim();
     const deliveryOption = (req.body.deliveryOption || "").trim();
 
@@ -227,27 +170,33 @@ export async function createFoodStore(req, res) {
 
     const facilities = (req.body.facilities || "").trim();
     const petsAllowed =
-      req.body.petsAllowed === "true" ? true : req.body.petsAllowed === "false" ? false : null;
+      req.body.petsAllowed === "true"
+        ? true
+        : req.body.petsAllowed === "false"
+          ? false
+          : null;
     const parking = (req.body.parking || "").trim();
 
-    // ✅ 사업자번호(숫자만)
     const businessNumber = pickBusinessNumber(req.body);
-    console.log("[createFoodStore] businessNumber:", businessNumber);
+    const bizVerified = String(req.body.bizVerified || "").trim();
+    console.log("[createFoodStore] bizVerified:", bizVerified, "businessNumber:", businessNumber, "detailCategory:", detailCategory);
 
     await client.query("BEGIN");
 
-    // ✅ store_info에 저장 (여기 컬럼이 실제로 존재해야 함: business_number)
+    // ✅ store_info에 detail_category 저장하도록 컬럼 추가
     const insertStoreQ = `
       INSERT INTO store_info (
         business_name, owner_name, phone, email, address,
-        business_type, business_category, detail_category, business_hours, delivery_option,
+        business_type, business_category, detail_category,
+        business_hours, delivery_option,
         service_details, additional_desc,
         homepage, instagram, facebook,
         facilities, pets_allowed, parking,
         business_number
       ) VALUES (
         $1,$2,$3,$4,$5,
-        $6,$7,$8,$9,$10,
+        $6,$7,$8,
+        $9,$10,
         $11,$12,
         $13,$14,$15,
         $16,$17,$18,
@@ -332,6 +281,9 @@ export async function createFoodStore(req, res) {
       .filter(Boolean);
 
     if (events.length) {
+      // 기존 삭제(안전)
+      await client.query(`DELETE FROM store_events WHERE store_id=$1`, [storeId]);
+
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
       await client.query(
         `INSERT INTO store_events (store_id, content, ord) VALUES ${values}`,
@@ -341,18 +293,45 @@ export async function createFoodStore(req, res) {
 
     await client.query("COMMIT");
 
-    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
     return res.status(200).json({
       ok: true,
-      id: toSafeInt(storeId) || Date.now(),
+      id: Number(storeId),
       business_number: businessNumber || null,
+      detail_category: detailCategory || null,
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch {}
+    try { client.release(); } catch { }
+  }
+}
+
+/* ===================== 단건 조회(GET /:id) ===================== */
+export async function getFoodStoreById(req, res) {
+  try {
+    const storeId = parseId(req.params.id);
+    if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    const q = `
+      SELECT
+        id,
+        business_name AS "businessName",
+        address AS "roadAddress",
+        phone,
+        created_at AS "createdAt",
+        business_category AS "businessCategory",
+        detail_category AS "detailCategory"
+      FROM store_info
+      WHERE id = $1
+    `;
+    const { rows } = await pool.query(q, [storeId]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+    return res.json({ ok: true, store: rows[0] });
+  } catch (err) {
+    console.error("[getFoodStoreById] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
   }
 }
 
@@ -369,7 +348,8 @@ export async function getFoodRegisterFull(req, res) {
          address,
          phone,
          created_at,
-         business_type, business_category, detail_category, business_hours, delivery_option,
+         business_type, business_category, detail_category,
+         business_hours, delivery_option,
          service_details, additional_desc,
          homepage, instagram, facebook,
          facilities, pets_allowed, parking,
@@ -426,15 +406,13 @@ export async function updateFoodStore(req, res) {
     const mapBool = (v) =>
       v === true || v === "true" ? true : v === false || v === "false" ? false : null;
 
-    const businessNumber = pickBusinessNumber(raw);
-
     const candidate = {
       business_name: raw.businessName?.trim(),
       address: (raw.roadAddress ?? raw.address)?.trim(),
       phone: raw.phone?.trim(),
       business_type: raw.businessType?.trim(),
       business_category: raw.businessCategory?.trim(),
-      detail_category: (raw.detailCategory ?? raw.subCategory ?? raw.sub)?.trim(),
+      detail_category: (raw.detailCategory ?? raw.detail_category ?? raw.sub)?.trim(),
       business_hours: raw.businessHours?.trim(),
       delivery_option: raw.deliveryOption?.trim(),
       service_details: raw.serviceDetails?.trim(),
@@ -445,17 +423,10 @@ export async function updateFoodStore(req, res) {
       facilities: raw.facilities?.trim(),
       pets_allowed: raw.petsAllowed !== undefined ? mapBool(raw.petsAllowed) : undefined,
       parking: raw.parking?.trim(),
-      business_number: businessNumber !== null ? businessNumber : undefined,
     };
-
-    const events = Object.entries(raw)
-      .filter(([k]) => /^event\d+$/i.test(k))
-      .map(([, v]) => String(v || "").trim())
-      .filter(Boolean);
 
     await client.query("BEGIN");
 
-    // ✅ store_info 부분 업데이트
     const set = [];
     const params = [];
     Object.entries(candidate).forEach(([col, val]) => {
@@ -473,39 +444,38 @@ export async function updateFoodStore(req, res) {
       );
     }
 
-    // ✅ 메뉴 저장 → store_menu로 통일
+    // 메뉴 갱신(사용 시)
     const allFiles = collectFiles(req);
     const menuImgFiles = filesByField(allFiles, "menuImage[]", "menuImage");
 
-    const menusA = extractMenusFromBody(raw);
-    const menusB = extractLegacyMenusFromBody(raw, menuImgFiles);
+    const menusA = extractMenusFromBody(req.body);
+    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
     const menus = [...menusA, ...menusB].filter(m => m.name && m.price > 0);
 
-    await client.query(`DELETE FROM store_menu WHERE store_id = $1`, [storeId]);
-
+    await client.query(`DELETE FROM store_menu WHERE store_id=$1`, [storeId]);
     if (menus.length) {
       const values = menus
         .map((_, i) => `($1,$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6},$${i * 6 + 7})`)
         .join(",");
 
-      const p = menus.flatMap(m => [
-        m.name,
-        m.price,
-        (m.category || null),
-        (m.image_url || null),
-        (m.description || null),
-        (m.theme || null),
+      const params2 = menus.flatMap(m => [
+        m.name, m.price, m.category || null, m.image_url || null, m.description || null, m.theme || null,
       ]);
 
       await client.query(
         `INSERT INTO store_menu (store_id, name, price, category, image_url, description, theme)
          VALUES ${values}`,
-        [storeId, ...p]
+        [storeId, ...params2]
       );
     }
 
-    // ✅ 이벤트 갱신
-    await client.query(`DELETE FROM store_events WHERE store_id = $1`, [storeId]);
+    // 이벤트 갱신(사용 시)
+    const events = Object.entries(raw)
+      .filter(([k]) => /^event\d+$/i.test(k))
+      .map(([, v]) => String(v || "").trim())
+      .filter(Boolean);
+
+    await client.query(`DELETE FROM store_events WHERE store_id=$1`, [storeId]);
     if (events.length) {
       const values = events.map((_, i) => `($1,$${i + 2},${i})`).join(",");
       await client.query(
@@ -517,14 +487,15 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch {}
+    try { client.release(); } catch { }
   }
 }
 
 /* ── 호환용 export ───────────────────── */
 export const getFoodStoreFull = getFoodRegisterFull;
 export const createFoodRegister = createFoodStore;
+export const getFoodRegisterDetail = getFoodStoreById;
