@@ -2,179 +2,268 @@
 <html lang="ko">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>서브 카테고리 페이지</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>서브 카테고리 페이지</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-white text-gray-800 min-h-screen flex flex-col">
-  <div id="header-placeholder"></div>
+    <div id="header-placeholder"></div>
 
-  <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
-    <div class="flex-1 flex justify-center">
-      <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
+    <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
+        <div class="flex-1 flex justify-center">
+            <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
+        </div>
+        <div class="flex-1 text-left">
+            <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
+            <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
+            <button id="btnMore" class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg">MORE VIEW</button>
+        </div>
+    </section>
+
+    <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
+        <h2 class="text-xl md:text-2xl font-bold text-center mb-6">All of the items</h2>
+        <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
+        <div id="lineGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+    </section>
+
+    <section class="max-w-6xl mx-auto py-12 px-4">
+        <h2 class="text-xl md:text-2xl font-bold text-center mb-8">Best Seller</h2>
+        <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+    </section>
+
+    <section class="max-w-6xl mx-auto py-12 px-4">
+        <h2 class="text-xl md:text-2xl font-bold text-center mb-8">New registration</h2>
+        <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+    </section>
+
+    <div id="footer-placeholder"></div>
+
+    <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
+        <div class="flex flex-col items-center">
+            <button onclick="goBack()"
+                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">←</button>
+            <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
+        </div>
+
+        <div class="flex flex-col items-center">
+            <button onclick="goNext()"
+                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">→</button>
+            <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
+        </div>
+
+        <div class="flex flex-col items-center">
+            <a href="/index.html"
+                class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow hover:from-blue-600 hover:to-blue-700 transition">🏠</a>
+            <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
+        </div>
     </div>
-    <div class="flex-1 text-left">
-      <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
-      <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
-      <button id="btnMore" class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg">MORE VIEW</button>
-    </div>
-  </section>
 
-  <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
-    <h2 class="text-xl md:text-2xl font-bold text-center mb-6">All of the items</h2>
+    <script>
+        // header/footer
+        fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById("header-placeholder").innerHTML = d));
+        fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
-    <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
+        // URL params
+        const params = new URLSearchParams(window.location.search);
+        const TYPE = (params.get("type") || "food").toLowerCase();
+        const CATEGORY = params.get("category") || "";
+        const SUB = (params.get("sub") || "").trim();
 
-    <div id="lineGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
-  </section>
+        // 한식 소제목(고정)
+        const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
 
-  <section class="max-w-6xl mx-auto py-12 px-4">
-    <h2 class="text-xl md:text-2xl font-bold text-center mb-8">Best Seller</h2>
-    <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-  </section>
+        // 전체 데이터를 1번만 받아두고, 화면은 여기서 필터링
+        let ALL_STORES = [];
 
-  <section class="max-w-6xl mx-auto py-12 px-4">
-    <h2 class="text-xl md:text-2xl font-bold text-center mb-8">New registration</h2>
-    <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-  </section>
+        const DEFAULT_DATA = {
+            hero: { title: "샘플 카테고리", subtitle: "기본 설명 텍스트", image: "/uploads/sample-banner-product.png" },
+            filters: [],
+            stores: [],
+            best: [],
+            new: []
+        };
+        let DATA = { ...DEFAULT_DATA };
 
-  <div id="footer-placeholder"></div>
-
-  <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
-    <div class="flex flex-col items-center">
-      <button onclick="goBack()"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">←</button>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">이전</span>
-    </div>
-
-    <div class="flex flex-col items-center">
-      <button onclick="goNext()"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">→</button>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">다음</span>
-    </div>
-
-    <div class="flex flex-col items-center">
-      <a href="/index.html"
-        class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow hover:from-blue-600 hover:to-blue-700 transition">🏠</a>
-      <span class="text-xs mt-1 text-gray-600 font-semibold">홈</span>
-    </div>
-  </div>
-
-  <script>
-    fetch("/components/header.html")
-      .then(r => r.text())
-      .then(d => (document.getElementById("header-placeholder").innerHTML = d));
-    fetch("/components/footer.html")
-      .then(r => r.text())
-      .then(d => (document.getElementById("footer-placeholder").innerHTML = d));
-
-    const params = new URLSearchParams(window.location.search);
-    const TYPE = (params.get("type") || "food").toLowerCase();
-    const CATEGORY = params.get("category");
-    const SUB = params.get("sub") || "";
-
-    const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
-
-    const DEFAULT_DATA = {
-      hero: { title: "샘플 카테고리", subtitle: "기본 설명 텍스트", image: "/uploads/sample-banner-product.png" },
-      filters: [],
-      stores: [],
-      best: [],
-      new: []
-    };
-    let DATA = DEFAULT_DATA;
-
-    async function loadData() {
-      try {
-        if (TYPE === "food") {
-          const q = new URLSearchParams();
-          q.set("category", CATEGORY || "");
-          if (SUB) q.set("sub", SUB); // ✅ URL에 sub가 있으면 API도 sub로 조회
-
-          const res = await fetch(`/api/subcategory/food?${q.toString()}`);
-          const json = await res.json();
-          DATA = { ...DEFAULT_DATA, stores: json.stores || [] };
-        } else if (TYPE === "beauty" || TYPE === "combined") {
-          const res = await fetch(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY || "")}`);
-          const json = await res.json();
-          DATA = { ...DEFAULT_DATA, stores: json.stores || [] };
-        } else {
-          DATA = DEFAULT_DATA;
+        function escapeHtml(input) {
+            const s = input == null ? "" : String(input);
+            return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
 
-        // ✅ 한식이면: SUB가 없을 때는 “소제목 전체”를 필터로 보여줌
-        if (TYPE === "food" && CATEGORY === "한식") {
-          const titleBase = "한식";
-          const subLabel = SUB ? ` · ${SUB}` : "";
-
-          DATA.hero = {
-            title: `${titleBase}${subLabel}`,
-            subtitle:
-              SUB === "밥" ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
-              : SUB === "찌개탕" ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
-              : SUB === "고기구이" ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
-              : SUB === "생선" ? "구이 · 조림 · 회 등 다양한 생선 요리"
-              : SUB === "족발보쌈" ? "족발 · 보쌈 · 수육까지 푸짐하게"
-              : SUB === "국밥" ? "뜨끈한 국밥 한 그릇으로 든든하게"
-              : SUB === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
-              : SUB === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
-              : "우리동네 한식 맛집들을 모았습니다.",
-            image: "/uploads/sample-banner-product.png"
-          };
-
-          DATA.filters = SUB ? [SUB] : HANSIK_SUBS;
-        } else {
-          DATA.filters = [];
+        function normalizeSrc(src) {
+            if (!src) return "/uploads/no-image.png";
+            if (/^https?:\/\//i.test(src)) return src;
+            return src.startsWith("/") ? src : "/" + src;
         }
-      } catch (e) {
-        console.error("데이터 불러오기 실패:", e);
-        DATA = DEFAULT_DATA;
-      }
-      init();
-    }
 
-    function escapeHtml(input) {
-      const s = input == null ? "" : String(input);
-      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-    }
+        function getDetailCategory(store) {
+            // ✅ detail_category가 비어있으면 기타한식으로 보내기
+            const raw = (store.detail_category ?? store.detailCategory ?? "").toString().trim();
+            return raw ? raw : "기타한식";
+        }
 
-    function normalizeSrc(src) {
-      if (!src) return "/uploads/no-image.png";
-      if (/^https?:\/\//i.test(src)) return src;
-      return src.startsWith("/") ? src : "/" + src;
-    }
+        function setHansikHero(subVal) {
+            const titleBase = "한식";
+            const subLabel = subVal ? ` · ${subVal}` : "";
 
-    function renderPagedAdStores(stores) {
-      const grid = document.getElementById("lineGrid");
-      grid.innerHTML = "";
+            DATA.hero = {
+                title: `${titleBase}${subLabel}`,
+                subtitle:
+                    subVal === "밥" ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
+                        : subVal === "찌개탕" ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
+                            : subVal === "고기구이" ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
+                                : subVal === "생선" ? "구이 · 조림 · 회 등 다양한 생선 요리"
+                                    : subVal === "족발보쌈" ? "족발 · 보쌈 · 수육까지 푸짐하게"
+                                        : subVal === "국밥" ? "뜨끈한 국밥 한 그릇으로 든든하게"
+                                            : subVal === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
+                                                : subVal === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
+                                                    : "우리동네 한식 맛집들을 모았습니다.",
+                image: "/uploads/sample-banner-product.png"
+            };
+        }
 
-      if (!stores.length) {
-        grid.innerHTML = `
+        async function fetchJson(url) {
+            const res = await fetch(url);
+            return await res.json();
+        }
+
+        async function loadData() {
+            try {
+                DATA = { ...DEFAULT_DATA };
+
+                // ✅ stores
+                if (TYPE === "food") {
+                    // 한식은 sub 버튼으로 화면에서 분리할 거라, 항상 “전체 한식”을 먼저 가져온다
+                    const q = new URLSearchParams();
+                    q.set("category", CATEGORY);
+                    const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
+                    ALL_STORES = json.stores || [];
+
+                    // 한식 hero/filters
+                    if (CATEGORY === "한식") {
+                        DATA.filters = HANSIK_SUBS.slice();
+                        setHansikHero(SUB); // SUB 있으면 sub용 설명
+                    } else {
+                        DATA.filters = [];
+                        ALL_STORES = json.stores || [];
+                        DATA.hero = {
+                            title: CATEGORY || "카테고리",
+                            subtitle: "카테고리별 가게를 확인하세요.",
+                            image: "/uploads/sample-banner-product.png"
+                        };
+                    }
+
+                    // ✅ 최초 렌더는 URL sub 기준으로 필터 적용
+                    applySubFilter(SUB, false);
+
+                    // best/new (있으면 가져오기)
+                    try {
+                        const best = await fetchJson(`/api/subcategory/food/best`);
+                        DATA.best = best.stores || [];
+                    } catch (_) { }
+                    try {
+                        const nw = await fetchJson(`/api/subcategory/food/new`);
+                        DATA.new = nw.stores || [];
+                    } catch (_) { }
+
+                } else if (TYPE === "beauty" || TYPE === "combined") {
+                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
+                    ALL_STORES = json.stores || [];
+                    DATA.stores = ALL_STORES;
+
+                    DATA.hero = {
+                        title: CATEGORY || "카테고리",
+                        subtitle: "카테고리별 가게를 확인하세요.",
+                        image: "/uploads/sample-banner-product.png"
+                    };
+                    DATA.filters = [];
+
+                    // best/new (있으면 가져오기)
+                    try {
+                        const best = await fetchJson(`/api/subcategory/beauty/best`);
+                        DATA.best = best.stores || [];
+                    } catch (_) { }
+                    try {
+                        const nw = await fetchJson(`/api/subcategory/beauty/new`);
+                        DATA.new = nw.stores || [];
+                    } catch (_) { }
+
+                } else {
+                    ALL_STORES = [];
+                    DATA = { ...DEFAULT_DATA };
+                }
+
+            } catch (e) {
+                console.error("데이터 불러오기 실패:", e);
+                ALL_STORES = [];
+                DATA = { ...DEFAULT_DATA };
+            }
+
+            init();
+        }
+
+        function applySubFilter(subVal, updateHistory = true) {
+            // ✅ 한식에서만 detail_category로 분리
+            if (TYPE === "food" && CATEGORY === "한식") {
+                const sub = (subVal || "").trim();
+
+                if (!sub) {
+                    DATA.stores = ALL_STORES.slice();
+                    setHansikHero("");
+                    if (updateHistory) {
+                        const q = new URLSearchParams(location.search);
+                        q.delete("sub");
+                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+                    }
+                    return;
+                }
+
+                // ✅ detail_category가 비어있으면 기타한식으로 처리
+                DATA.stores = ALL_STORES.filter(s => getDetailCategory(s) === sub);
+                setHansikHero(sub);
+
+                if (updateHistory) {
+                    const q = new URLSearchParams(location.search);
+                    q.set("sub", sub);
+                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+                }
+                return;
+            }
+
+            // 한식이 아니면 필터 없음
+            DATA.stores = ALL_STORES.slice();
+        }
+
+        function renderPagedAdStores(stores) {
+            const grid = document.getElementById("lineGrid");
+            grid.innerHTML = "";
+
+            if (!stores || !stores.length) {
+                grid.innerHTML = `
           <div class="col-span-full flex justify-center items-center py-16">
             <div class="p-8 text-center max-w-md">
               <h3 class="text-lg font-semibold text-gray-700 mb-2">등록된 가게가 없습니다</h3>
               <p class="text-sm text-gray-500">빠른 시일 내에 새로운 가게가 추가될 예정입니다.</p>
             </div>
           </div>`;
-        return;
-      }
+                return;
+            }
 
-      const wrapper = document.createElement("div");
-      wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
+            const wrapper = document.createElement("div");
+            wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
 
-      stores.forEach(store => {
-        const card = document.createElement("div");
-        card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white";
+            stores.forEach(store => {
+                const card = document.createElement("div");
+                card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white";
 
-        const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
-        const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
-        const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
-        const imgNorm = normalizeSrc(imgSrc);
+                const dispName = store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-";
+                const dispCategory = store.category ?? store.business_category ?? store.businessCategory ?? "";
+                const imgSrc = store.image ?? store.image_url ?? store.url ?? "/uploads/no-image.png";
+                const imgNorm = normalizeSrc(imgSrc);
 
-        card.innerHTML = `
+                card.innerHTML = `
           <div class="relative h-[260px]">
             <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
@@ -183,91 +272,95 @@
             </div>
           </div>`;
 
-        card.addEventListener("click", () => {
-          const bt = store.business_type ?? store.businessType ?? store.business_category ?? "";
-          const type = bt === "음식점" || bt === "음식" ? "food" : "combined";
-          window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
-        });
+                card.addEventListener("click", () => {
+                    const bt = store.business_type ?? store.businessType ?? "";
+                    const type = (bt === "음식점" || bt === "음식") ? "food" : "combined";
+                    window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
+                });
 
-        wrapper.appendChild(card);
-      });
+                wrapper.appendChild(card);
+            });
 
-      grid.appendChild(wrapper);
-    }
-
-    function bindHero() {
-      document.getElementById("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
-      document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
-      document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
-    }
-
-    function makeFilterBtn(label, tagVal) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
-      btn.textContent = label;
-
-      btn.onclick = () => {
-        const all = DATA.stores || [];
-
-        // ✅ All
-        if (!tagVal) {
-          // URL sub 제거(화면만 갱신)
-          const q = new URLSearchParams(location.search);
-          q.delete("sub");
-          history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-          renderPagedAdStores(all);
-          return;
+            grid.appendChild(wrapper);
         }
 
-        // ✅ detail_category로 필터 (이게 “소제목 분리”의 핵심)
-        const filtered = all.filter(s => String(s.detail_category || "").trim() === tagVal);
+        function renderSmallGrid(gridId, items) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = "";
 
-        // URL에도 반영(새로고침 없이)
-        const q = new URLSearchParams(location.search);
-        q.set("sub", tagVal);
-        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+            if (!items || !items.length) {
+                grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
+                return;
+            }
 
-        renderPagedAdStores(filtered);
-      };
-      return btn;
-    }
+            items.forEach(item => {
+                const name = item.name ?? item.business_name ?? "-";
+                const img = normalizeSrc(item.image ?? item.image_url ?? "/uploads/no-image.png");
+                const card = document.createElement("a");
+                card.href = "#";
+                card.className = "block rounded-2xl overflow-hidden bg-white hover:shadow-lg transition";
+                card.innerHTML = `
+          <div class="h-40">
+            <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover">
+          </div>
+          <div class="p-3 text-sm font-semibold truncate">${escapeHtml(name)}</div>
+        `;
+                grid.appendChild(card);
+            });
+        }
 
-    function renderFilters() {
-      const wrap = document.getElementById("filterContainer");
-      wrap.innerHTML = "";
+        function bindHero() {
+            document.getElementById("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
+            document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
+            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
+        }
 
-      // ✅ SUB가 없는 한식 페이지에서만 “소제목 전체”를 보여주고, All도 제공
-      if (TYPE === "food" && CATEGORY === "한식" && !SUB) {
-        wrap.appendChild(makeFilterBtn("All", ""));
-        (DATA.filters || []).forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-        return;
-      }
+        function makeFilterBtn(label, tagVal) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
+            btn.textContent = label;
 
-      // ✅ SUB가 있으면 버튼 하나만 보여줘도 되고(원하면 All도 추가 가능)
-      if (DATA.filters && DATA.filters.length) {
-        wrap.appendChild(makeFilterBtn("All", ""));
-        DATA.filters.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-      }
-    }
+            btn.onclick = () => {
+                if (!tagVal) applySubFilter("", true);
+                else applySubFilter(tagVal, true);
 
-    function init() {
-      bindHero();
-      renderFilters();
+                bindHero();
+                renderPagedAdStores(DATA.stores || []);
+            };
+            return btn;
+        }
 
-      // ✅ 처음 렌더:
-      // - URL에 sub가 있으면 이미 API에서 sub로 조회됨(해당 것만 들어옴)
-      // - URL에 sub가 없으면 전체 한식이 들어오고, 필터 버튼으로 분리
-      renderPagedAdStores(DATA.stores || []);
-    }
+        function renderFilters() {
+            const wrap = document.getElementById("filterContainer");
+            wrap.innerHTML = "";
 
-    document.addEventListener("DOMContentLoaded", loadData);
+            // ✅ 한식이면 항상 소제목 버튼 보여주기 (SUB 유무와 무관)
+            if (TYPE === "food" && CATEGORY === "한식") {
+                wrap.appendChild(makeFilterBtn("All", ""));
+                HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
+                return;
+            }
 
-    function goBack() {
-      if (document.referrer && document.referrer !== location.href) window.history.back();
-      else window.location.href = "/category.html";
-    }
-    function goNext() { window.history.forward(); }
-  </script>
+            // 그 외는 필터 숨김(원하면 여기에 확장)
+        }
+
+        function init() {
+            bindHero();
+            renderFilters();
+            renderPagedAdStores(DATA.stores || []);
+            renderSmallGrid("bestGrid", DATA.best || []);
+            renderSmallGrid("newGrid", DATA.new || []);
+        }
+
+        document.addEventListener("DOMContentLoaded", loadData);
+
+        function goBack() {
+            if (document.referrer && document.referrer !== location.href) window.history.back();
+            else window.location.href = "/category.html";
+        }
+        function goNext() { window.history.forward(); }
+    </script>
 </body>
+
 </html>
