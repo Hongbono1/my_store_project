@@ -12,48 +12,31 @@ import {
   upsertSlot,
   deleteSlot,
   searchStore,
-  makeMulterStorage,
-  fileFilter,
+  fileFilter, // 기존 필터 그대로 사용
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
 
-// ✅ 최후 폴백 저장 경로 (서버.js에서 /uploads -> /data/uploads 서빙 중)
-const FALLBACK_DIR = "/data/uploads";
-if (!fs.existsSync(FALLBACK_DIR)) fs.mkdirSync(FALLBACK_DIR, { recursive: true });
+// ✅ indexmanager 광고 업로드는 무조건 여기로 저장
+const MANAGER_AD_DIR = "/data/uploads/manager_ad";
+if (!fs.existsSync(MANAGER_AD_DIR)) fs.mkdirSync(MANAGER_AD_DIR, { recursive: true });
 
-const fallbackStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, FALLBACK_DIR),
+// ✅ multer “엔진”을 라우터에서 확정
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, MANAGER_AD_DIR),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     cb(null, `${randomUUID()}${ext}`);
   },
 });
 
-// ✅ makeMulterStorage()가 뭘 주든 “엔진”으로 통일
-const candidate = makeMulterStorage?.();
-let storage = fallbackStorage;
-
-// 1) 이미 엔진이면 그대로 사용
-if (candidate && typeof candidate._handleFile === "function") {
-  storage = candidate;
-}
-// 2) { destination, filename } 옵션이면 diskStorage로 엔진 생성
-else if (
-  candidate &&
-  typeof candidate === "object" &&
-  (candidate.destination || candidate.filename)
-) {
-  storage = multer.diskStorage(candidate);
-}
-
 const upload = multer({
-  storage, // ✅ 여기 반드시 '엔진'이 들어가야 함
+  storage,
   fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
-// ✅ 파일 필드 이름 여러개 허용
+// ✅ 파일 필드 이름 여러개 허용 (기존 그대로)
 const uploadFields = upload.fields([
   { name: "image", maxCount: 1 },
   { name: "slotImage", maxCount: 1 },
