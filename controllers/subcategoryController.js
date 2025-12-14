@@ -4,44 +4,49 @@ import pool from "../db.js";
 /** ======================== 음식점 전용 ======================== */
 // ✅ GET /api/subcategory/food?category=한식&sub=밥
 export async function getFoodStoresByCategory(req, res) {
-  const { category, sub = "" } = req.query;
+  const category = String(req.query.category || "").trim();
+  const subRaw = String(req.query.sub || "").trim();
 
   if (!category) {
     return res.status(400).json({ ok: false, error: "no_category" });
   }
 
+  // 디버그용
+  console.log("[getFoodStoresByCategory] category:", category, "sub:", subRaw);
+
   try {
     const params = [category];
     let where = `WHERE s.business_category = $1`;
 
-    // ✅ sub가 있으면 detail_category로 분리 (값은 무엇이든 그대로 필터)
-    const subVal = String(sub || "").trim();
-    if (subVal) {
-      // "기타" 계열이면: NULL/빈값도 기타로 묶을 수 있게 처리
-      if (subVal.startsWith("기타")) {
-        where += ` AND (s.detail_category IS NULL OR s.detail_category = '' OR s.detail_category ILIKE $2)`;
-        params.push(`${subVal}%`);
+    // ✅ sub가 있으면 detail_category로 분기
+    if (subRaw) {
+      if (subRaw === "All" || subRaw === "전체") {
+        // 필터 없음
+      } else if (subRaw === "기타한식" || subRaw.startsWith("기타")) {
+        // 기타: NULL/빈값/기타한식
+        where += ` AND (s.detail_category IS NULL OR btrim(s.detail_category) = '' OR btrim(s.detail_category) ILIKE $2)`;
+        params.push(`${subRaw}%`);
       } else {
-        where += ` AND s.detail_category = $2`;
-        params.push(subVal);
+        params.push(subRaw);
+        where += ` AND btrim(COALESCE(s.detail_category,'')) = $2`;
       }
     }
 
     const result = await pool.query(
       `
-      SELECT s.id,
-             s.business_name,
-             s.business_category AS category,
-             s.detail_category,
-             '음식점' AS business_type,
-             COALESCE(
-               (SELECT url
-                  FROM store_images
-                 WHERE store_id = s.id
-                 ORDER BY sort_order, id
-                 LIMIT 1),
-               ''
-             ) AS image
+      SELECT
+        s.id,
+        s.business_name,
+        s.business_type,
+        s.business_category AS category,
+        s.detail_category,
+        COALESCE((
+          SELECT url
+          FROM store_images
+          WHERE store_id = s.id
+          ORDER BY sort_order, id
+          LIMIT 1
+        ), '') AS image
       FROM store_info s
       ${where}
       ORDER BY s.created_at DESC
@@ -54,8 +59,8 @@ export async function getFoodStoresByCategory(req, res) {
       name: r.business_name,
       category: r.category,
       detail_category: r.detail_category || null,
-      business_type: r.business_type,
-      image: r.image && String(r.image).trim() !== "" ? r.image : "/uploads/no-image.png",
+      image: r.image && r.image.trim() !== "" ? r.image : "/uploads/no-image.png",
+      business_type: r.business_type && String(r.business_type).trim() !== "" ? r.business_type : "음식점",
     }));
 
     return res.json({ ok: true, stores });
@@ -68,7 +73,9 @@ export async function getFoodStoresByCategory(req, res) {
 /** ======================== 통합/뷰티 ======================== */
 export async function getCombinedStoresByCategory(req, res) {
   const { category } = req.query;
-  if (!category) return res.status(400).json({ ok: false, error: "category가 필요합니다." });
+  if (!category) {
+    return res.status(400).json({ ok: false, error: "category가 필요합니다." });
+  }
 
   try {
     const result = await pool.query(
@@ -110,7 +117,7 @@ export async function getBestFoodStores(req, res) {
              s.business_name,
              s.business_category AS category,
              s.detail_category,
-             '음식점' AS business_type,
+             s.business_type,
              COALESCE((SELECT url FROM store_images WHERE store_id = s.id ORDER BY sort_order, id LIMIT 1), '') AS image
       FROM store_info s
       ORDER BY s.view_count DESC NULLS LAST, s.created_at DESC
@@ -123,8 +130,8 @@ export async function getBestFoodStores(req, res) {
       name: r.business_name,
       category: r.category,
       detail_category: r.detail_category || null,
-      business_type: r.business_type,
       image: r.image || "/uploads/no-image.png",
+      business_type: r.business_type || "음식점",
     }));
 
     return res.json({ ok: true, stores });
@@ -142,7 +149,7 @@ export async function getNewFoodStores(req, res) {
              s.business_name,
              s.business_category AS category,
              s.detail_category,
-             '음식점' AS business_type,
+             s.business_type,
              COALESCE((SELECT url FROM store_images WHERE store_id = s.id ORDER BY sort_order, id LIMIT 1), '') AS image
       FROM store_info s
       WHERE s.created_at >= NOW() - INTERVAL '7 days'
@@ -156,8 +163,8 @@ export async function getNewFoodStores(req, res) {
       name: r.business_name,
       category: r.category,
       detail_category: r.detail_category || null,
-      business_type: r.business_type,
       image: r.image || "/uploads/no-image.png",
+      business_type: r.business_type || "음식점",
     }));
 
     return res.json({ ok: true, stores });
@@ -186,8 +193,8 @@ export async function getBestCombinedStores(req, res) {
       id: r.id,
       name: r.business_name,
       category: r.category,
-      business_type: r.business_type,
       image: r.image || "/uploads/no-image.png",
+      business_type: r.business_type,
     }));
 
     return res.json({ ok: true, stores });
@@ -217,8 +224,8 @@ export async function getNewCombinedStores(req, res) {
       id: r.id,
       name: r.business_name,
       category: r.category,
-      business_type: r.business_type,
       image: r.image || "/uploads/no-image.png",
+      business_type: r.business_type,
     }));
 
     return res.json({ ok: true, stores });
