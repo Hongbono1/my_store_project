@@ -343,7 +343,8 @@ export async function searchStore(req, res) {
     id::text AS id,
     regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
     business_name,
-    business_category AS category
+    business_category AS category,
+    image_url
   FROM public.combined_store_info
   WHERE 1=1
 `;

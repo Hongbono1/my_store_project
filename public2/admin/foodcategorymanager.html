@@ -1363,15 +1363,15 @@
         }
 
         /* =========================
-   슬롯 렌더
-   - 상단 왼쪽 상호 배지: 항상 숨김
-   - 상단 오른쪽 배지: HTML 기본 텍스트 유지 (Banner / Card / Hero 등)
-   - 하단 info 박스: 상호 옆에 업종 작게 표시
-========================== */
+           슬롯 렌더
+           - 상단 왼쪽 상호 배지: 항상 숨김
+           - 상단 오른쪽 배지: HTML에 있는 기본 텍스트 그대로 유지 (Banner / Card 등)
+           - 하단 info 박스: 상호 + 업종(있으면) 한 줄에 표시
+        ========================== */
         function renderSlot(el, slot) {
             const position = el?.dataset?.position || "";
 
-            // 사이드바 링크 슬롯
+            // 사이드바 링크 슬롯은 별도 처리
             if (position === "food_sidebar_links") {
                 renderSidebarLinks(el, slot?.text_content || "");
                 return;
@@ -1405,6 +1405,7 @@
             }
             if (textLayer) textLayer.style.display = "none";
             if (empty) empty.style.display = "flex";
+
             if (infoBox) {
                 infoBox.classList.add("hidden");
                 if (titleEl) titleEl.textContent = "";
@@ -1440,13 +1441,21 @@
                 if (empty) empty.style.display = "none";
             }
 
-            // 🔹 하단 info 박스: 상호명 + 업종(작게)
-            if (infoBox && uiMode === "store" && clean(slot?.business_name)) {
-                const bizType = pickBizType(slot);
+            // 🔹 하단 info 박스: 상호 + 업종(작게)
+            const bizType = pickBizType(slot);  // badge_label, category, store.category 등에서 최대한 뽑음
 
+            if (infoBox && clean(slot?.business_name)) {
                 infoBox.classList.remove("hidden");
-                if (titleEl) titleEl.textContent = slot.business_name;
-                if (subEl) subEl.textContent = bizType || "";
+
+                if (titleEl) {
+                    // 상호명
+                    titleEl.textContent = slot.business_name;
+                }
+
+                if (subEl) {
+                    // 업종이 있을 때만 작게 붙여서 표시
+                    subEl.textContent = bizType ? bizType : "";
+                }
             }
         }
 
@@ -1794,7 +1803,8 @@
             <div class="result-item"
                  data-id="${escapeHtml(s.id)}"
                  data-biz="${escapeHtml(s.business_no)}"
-                 data-name="${escapeHtml(s.business_name)}">
+                 data-name="${escapeHtml(s.business_name)}"
+                 data-image="${escapeHtml(s.image_url || '')}">
               <div class="font-extrabold text-slate-900">${escapeHtml(s.business_name)}</div>
               <div class="text-xs font-bold text-slate-600 mt-1">
                 id: ${escapeHtml(s.id)} / biz: ${escapeHtml(s.business_no)}
@@ -1807,6 +1817,11 @@
                                 if (fieldStoreId) fieldStoreId.value = item.dataset.id || "";
                                 if (fieldBizNo) fieldBizNo.value = item.dataset.biz || "";
                                 if (fieldBizName) fieldBizName.value = item.dataset.name || "";
+
+                                // ✅ 가게 이미지 URL을 currentSlotData에 저장
+                                const imageUrl = item.dataset.image || "";
+                                if (!currentSlotData) currentSlotData = {};
+                                currentSlotData.image_url = imageUrl;
 
                                 setUiMode("store");
                                 applySlotMode("store");
@@ -1899,6 +1914,11 @@
                     if (storeId) fd.append("storeId", storeId);
                     if (businessNo) fd.append("businessNo", businessNo);
                     if (businessName) fd.append("businessName", businessName);
+
+                    // ✅ 가게 이미지 URL 전송
+                    if (currentSlotData?.image_url) {
+                        fd.append("imageUrl", currentSlotData.image_url);
+                    }
 
                     if (!linkUrl && storeId) fd.append("linkUrl", `/ndetail.html?id=${storeId}&type=store`);
                 }
