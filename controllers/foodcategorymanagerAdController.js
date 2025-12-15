@@ -24,23 +24,25 @@ function digitsOnly(v) {
 async function fetchSlot({ page, position, priority }) {
     const baseSelect = `
     SELECT
-      id,
-      page,
-      position,
-      priority,
-      image_url,
-      link_url,
-      slot_type,
-      slot_mode,
-      text_content,
-      store_id::text AS store_id,
-      business_no,
-      business_name,
-      no_end,
-      to_char(start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
-      to_char(end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
-    FROM public.admin_ad_slots
-    WHERE page = $1 AND position = $2
+      s.id,
+      s.page,
+      s.position,
+      s.priority,
+      s.image_url,
+      s.link_url,
+      s.slot_type,
+      s.slot_mode,
+      s.text_content,
+      s.store_id::text AS store_id,
+      s.business_no,
+      s.business_name,
+      s.no_end,
+      c.business_category AS category,
+      to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
+      to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
+    FROM public.admin_ad_slots s
+    LEFT JOIN public.combined_store_info c ON s.store_id::text = c.id::text
+    WHERE s.page = $1 AND s.position = $2
   `;
 
     let sql = baseSelect;
