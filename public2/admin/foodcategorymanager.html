@@ -1257,6 +1257,24 @@
             return "banner";
         }
 
+        // ✅ (추가) 파워 광고 배지(우측 상단)에 넣을 “업종/카테고리” 텍스트 우선순위
+        function pickPowerBadgeLabel(slot) {
+            const candidates = [
+                slot?.sub, slot?.sub_category, slot?.subcategory,
+                slot?.food_sub, slot?.food_sub_category,
+                slot?.store_sub, slot?.store_subcategory,
+                slot?.category,
+                slot?.business_type,
+                slot?.store_category,
+                slot?.type_name
+            ];
+            for (const v of candidates) {
+                const t = clean(v);
+                if (t) return t;
+            }
+            return "";
+        }
+
         /* =========================
           ✅ 슬롯 렌더
         ========================== */
@@ -1275,6 +1293,7 @@
             const textBody = el.querySelector(".slot-text-body");
             const hint = el.querySelector(".slot-hint");
             const storeBadge = el.querySelector(".slot-store-badge");
+            const badge = el.querySelector(".slot-badge"); // ✅ 우측 상단 배지
             const infoBox = el.querySelector(".slot-info");
             const titleEl = infoBox ? infoBox.querySelector(".slot-title") : null;
             const subEl = infoBox ? infoBox.querySelector(".slot-sub") : null;
@@ -1283,15 +1302,30 @@
             const hasImg = !!clean(slot?.image_url);
             const txt = clean(slot?.text_content);
 
+            const isPower = position.startsWith("food_power_"); // ✅ 파워 광고 슬롯만 대상
+
             if (img) img.style.display = "none";
             if (textLayer) textLayer.style.display = "none";
             if (infoBox) infoBox.classList.add("hidden");
             if (storeBadge) storeBadge.style.display = "none";
 
-            // store badge
-            if (storeBadge && uiMode === "store" && clean(slot?.business_name)) {
+            // ✅ 배지 기본 텍스트 기억(처음 한 번)
+            if (badge) {
+                if (!badge.dataset.defaultText) badge.dataset.defaultText = clean(badge.textContent) || "Banner";
+                // 기본으로 되돌려 놓고, 아래에서 조건에 맞으면 교체
+                badge.textContent = badge.dataset.defaultText;
+            }
+
+            // ✅ store badge(좌측 상단): 파워 광고는 무조건 숨김, 그 외는 기존 동작 유지
+            if (!isPower && storeBadge && uiMode === "store" && clean(slot?.business_name)) {
                 storeBadge.style.display = "inline-flex";
                 storeBadge.textContent = slot.business_name;
+            }
+
+            // ✅ (핵심) 파워 광고(store 모드)일 때: 우측 배지에 업종/카테고리 표시
+            if (badge && isPower && uiMode === "store") {
+                const label = pickPowerBadgeLabel(slot);
+                badge.textContent = label || badge.dataset.defaultText;
             }
 
             // text mode
@@ -1314,7 +1348,7 @@
                 if (empty) empty.style.display = "flex";
             }
 
-            // store info box
+            // store info box(하단): 그대로 유지
             if (infoBox && uiMode === "store" && clean(slot?.business_name)) {
                 infoBox.classList.remove("hidden");
                 if (titleEl) titleEl.textContent = slot.business_name;
@@ -1773,7 +1807,7 @@
                 // ✅ 텍스트 저장
                 if (uiMode === "text") fd.append("textContent", textContent);
 
-                // ✅ 링크 저장(텍스트 전용 슬롯은 링크 숨김이니 원칙상 안 넣음)
+                // ✅ 링크 저장
                 if (position !== "food_sidebar_links" && linkUrl && uiMode !== "text") fd.append("linkUrl", linkUrl);
                 if (position !== "food_sidebar_links" && linkUrl && uiMode === "text") fd.append("linkUrl", linkUrl);
 
@@ -1813,7 +1847,7 @@
 
                     currentSlotData = resp.slot || null;
 
-                    // 화면 반영(현재 노출은 서버 조건/기간/우선순위에 따라 달라질 수 있음)
+                    // 화면 반영
                     await hydrateAllSlots();
                     await refreshCandidateList(page, position);
                     updateModalPreview();
