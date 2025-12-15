@@ -1167,8 +1167,8 @@
         function goNext() { window.history.forward(); }
 
         /* =========================
-           공통 helper
-        ========================== */
+   공통 helper
+========================== */
         const $ = (id) => document.getElementById(id);
         const clean = (v) => (v === undefined || v === null) ? "" : String(v).trim();
 
@@ -1199,6 +1199,70 @@
             const s = clean(t).toLowerCase();
             return (s === "banner" || s === "배너");
         }
+
+        /* =========================
+           ✅ 광고 슬롯 API (foodcategory 공통)
+        ========================== */
+        const API = {
+            // 슬롯 조회
+            async getSlot(page, position, priority) {
+                const params = new URLSearchParams();
+                if (page) params.append("page", page);
+                if (position) params.append("position", position);
+                if (priority != null && String(priority).trim() !== "") {
+                    params.append("priority", String(priority).trim());
+                }
+
+                const res = await fetch(`/manager/ad/slot?${params.toString()}`);
+                if (!res.ok) {
+                    throw new Error(`getSlot 실패: ${res.status}`);
+                }
+                return res.json();
+            },
+
+            // 슬롯 저장
+            async saveSlot(formData) {
+                const res = await fetch("/manager/ad/slot", {
+                    method: "POST",
+                    body: formData,
+                });
+                if (!res.ok) {
+                    throw new Error(`saveSlot 실패: ${res.status}`);
+                }
+                return res.json();
+            },
+
+            // 슬롯 삭제 (우선순위별)
+            async deleteSlot(page, position, priority) {
+                const params = new URLSearchParams();
+                if (page) params.append("page", page);
+                if (position) params.append("position", position);
+                if (priority != null && String(priority).trim() !== "") {
+                    params.append("priority", String(priority).trim());
+                }
+
+                const res = await fetch(`/manager/ad/slot?${params.toString()}`, {
+                    method: "DELETE",
+                });
+                if (!res.ok) {
+                    throw new Error(`deleteSlot 실패: ${res.status}`);
+                }
+                return res.json();
+            },
+
+            // 가게 검색
+            async searchStore({ bizNo, q }) {
+                const params = new URLSearchParams();
+                if (bizNo) params.append("bizNo", bizNo);
+                if (q) params.append("q", q);
+
+                const res = await fetch(`/manager/ad/store/search?${params.toString()}`);
+                if (!res.ok) {
+                    throw new Error(`searchStore 실패: ${res.status}`);
+                }
+                return res.json();
+            },
+        };
 
         /* =========================
            업종 추출 helper
@@ -1236,39 +1300,6 @@
             }
             return "";
         }
-
-        /* =========================
-           API (✅ 여기 때문에 더 이상 "API is not defined" 안 남)
-        ========================== */
-        const API = {
-            async getSlot(page, position, priority) {
-                const qs = new URLSearchParams({ page, position });
-                if (priority !== undefined && priority !== null && String(priority).trim() !== "") {
-                    qs.set("priority", String(priority));
-                }
-                const r = await fetch(`/manager/ad/slot?${qs.toString()}`);
-                return await r.json();
-            },
-            async saveSlot(formData) {
-                const r = await fetch(`/manager/ad/slot`, { method: "POST", body: formData });
-                return await r.json();
-            },
-            async deleteSlot(page, position, priority) {
-                const qs = new URLSearchParams({ page, position });
-                if (priority !== undefined && priority !== null && String(priority).trim() !== "") {
-                    qs.set("priority", String(priority));
-                }
-                const r = await fetch(`/manager/ad/slot?${qs.toString()}`, { method: "DELETE" });
-                return await r.json();
-            },
-            async searchStore({ bizNo, q }) {
-                const qs = new URLSearchParams();
-                if (bizNo) qs.set("bizNo", bizNo);
-                if (q) qs.set("q", q);
-                const r = await fetch(`/manager/ad/store/search?${qs.toString()}`);
-                return await r.json();
-            }
-        };
 
         /* =========================
            Sidebar Links 렌더
