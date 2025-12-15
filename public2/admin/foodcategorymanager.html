@@ -1103,22 +1103,19 @@
         </div>
     </div>
 
-    <!-- =========================
-       ✅ JS (indexmanager 동일 동작)
-  ========================== -->
     <script>
         // ✅ header/footer 동적 포함 (원본 방식 유지)
         fetch("/components/header.html")
             .then(r => r.text())
-            .then(d => document.getElementById("header-placeholder").innerHTML = d);
+            .then(d => { const el = document.getElementById("header-placeholder"); if (el) el.innerHTML = d; });
 
         fetch("/components/footer.html")
             .then(r => r.text())
-            .then(d => document.getElementById("footer-placeholder").innerHTML = d);
+            .then(d => { const el = document.getElementById("footer-placeholder"); if (el) el.innerHTML = d; });
 
         // ✅ 서브카테고리 토글
         function toggleSub(btn) {
-            const ul = btn.nextElementSibling;
+            const ul = btn?.nextElementSibling;
             if (!ul) return;
             ul.classList.toggle("hidden");
         }
@@ -1136,7 +1133,7 @@
         const API = {
             async getSlot(page, position, priority) {
                 const qs = new URLSearchParams({ page, position });
-                if (priority) qs.set("priority", String(priority));
+                if (priority !== undefined && priority !== null && String(priority).trim() !== "") qs.set("priority", String(priority));
                 const r = await fetch(`/manager/ad/slot?${qs.toString()}`);
                 return await r.json();
             },
@@ -1146,7 +1143,7 @@
             },
             async deleteSlot(page, position, priority) {
                 const qs = new URLSearchParams({ page, position });
-                if (priority) qs.set("priority", String(priority));
+                if (priority !== undefined && priority !== null && String(priority).trim() !== "") qs.set("priority", String(priority));
                 const r = await fetch(`/manager/ad/slot?${qs.toString()}`, { method: "DELETE" });
                 return await r.json();
             },
@@ -1160,97 +1157,93 @@
         };
 
         /* =========================
-          ✅ DOM
+          ✅ helpers
         ========================== */
-        const modalBackdrop = document.getElementById("modalBackdrop");
-        const btnCloseModal = document.getElementById("btnCloseModal");
-        const modalSlotInfo = document.getElementById("modalSlotInfo");
-
-        const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
-        const tabBanner = document.getElementById("tab_banner");
-        const tabStore = document.getElementById("tab_store");
-        const tabText = document.getElementById("tab_text");
-
-        const f_page = document.getElementById("f_page");
-        const f_position = document.getElementById("f_position");
-        const f_priority = document.getElementById("f_priority");
-
-        const f_slotType = document.getElementById("f_slotType");
-        const f_slotMode = document.getElementById("f_slotMode");
-
-        const f_keepImage = document.getElementById("f_keepImage");
-        const f_clearImage = document.getElementById("f_clearImage");
-
-        const f_linkUrl_banner = document.getElementById("f_linkUrl_banner");
-        const f_image = document.getElementById("f_image");
-
-        const f_storeBizNo = document.getElementById("f_storeBizNo");
-        const f_storeQuery = document.getElementById("f_storeQuery");
-        const btnStoreSearch = document.getElementById("btnStoreSearch");
-        const btnStoreClear = document.getElementById("btnStoreClear");
-        const storeResults = document.getElementById("storeResults");
-        const f_storeId = document.getElementById("f_storeId");
-        const f_businessNo = document.getElementById("f_businessNo");
-        const f_businessName = document.getElementById("f_businessName");
-        const f_linkUrl_store = document.getElementById("f_linkUrl_store");
-
-        const f_textContent = document.getElementById("f_textContent");
-
-        const f_startAt = document.getElementById("f_startAt");
-        const f_endAt = document.getElementById("f_endAt");
-        const f_noEnd = document.getElementById("f_noEnd");
-        const endWrap = document.getElementById("endWrap");
-
-        const btnSave = document.getElementById("btnSave");
-        const btnDelete = document.getElementById("btnDelete");
-
-        const previewImg = document.getElementById("previewImg");
-        const previewMode = document.getElementById("previewMode");
-        const previewLink = document.getElementById("previewLink");
-        const previewText = document.getElementById("previewText");
-
-        let currentSlotEl = null;
-        let currentSlotData = null;
-
-        function clean(v) {
-            if (v === undefined || v === null) return "";
-            return String(v).trim();
+        const $ = (id) => document.getElementById(id);
+        const clean = (v) => (v === undefined || v === null) ? "" : String(v).trim();
+        function escapeHtml(str) {
+            return String(str || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
-        function setActiveTab(tab) {
-            tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-            tabBanner.classList.toggle("hidden", tab !== "banner");
-            tabStore.classList.toggle("hidden", tab !== "store");
-            tabText.classList.toggle("hidden", tab !== "text");
-        }
+        /* =========================
+          ✅ Sidebar Links 렌더
+        ========================== */
+        function renderSidebarLinks(slotEl, text) {
+            const ul = slotEl?.querySelector('[data-role="sidebar-links"]');
+            const empty = slotEl?.querySelector(".slot-empty");
+            if (!ul) return;
 
-        function syncNoEndUI() {
-            endWrap.classList.toggle("hidden", f_noEnd.checked);
-            if (f_noEnd.checked) f_endAt.value = "";
-        }
+            const t = String(text || "").replace(/\r/g, "").trim();
+            ul.innerHTML = "";
 
-        function updatePreview() {
-            const mode = clean(f_slotMode.value).toLowerCase();
-            let link = "";
-            let text = "";
-            if (mode === "banner") link = clean(f_linkUrl_banner.value);
-            if (mode === "store") link = clean(f_linkUrl_store.value);
-            if (mode === "text") text = clean(f_textContent.value);
-
-            previewMode.textContent = mode || "-";
-            previewLink.textContent = link || "-";
-            previewText.textContent = text ? (text.length > 120 ? text.slice(0, 120) + "..." : text) : "-";
-
-            const file = f_image.files && f_image.files[0];
-            if (file) {
-                previewImg.src = URL.createObjectURL(file);
+            if (!t) {
+                if (empty) empty.style.display = "flex";
                 return;
             }
-            if (currentSlotData && currentSlotData.image_url) previewImg.src = currentSlotData.image_url;
-            else previewImg.src = "";
+            if (empty) empty.style.display = "none";
+
+            const lines = t.split("\n").filter(l => l.trim());
+            const items = lines.map(line => {
+                const m = line.match(/^(\s*)(.*)$/);
+                const lead = m ? m[1] : "";
+                const rest = m ? m[2] : line;
+
+                const indent = Math.min(3, Math.floor(lead.replace(/\t/g, "  ").length / 2));
+                const parts = rest.split("|");
+
+                const label = (parts[0] || "").trim();
+                const href = (parts.slice(1).join("|") || "").trim();
+
+                if (!label) return null;
+                return { label, href: href || "#", indent };
+            }).filter(Boolean);
+
+            ul.innerHTML = items.map(it => {
+                const ml = it.indent === 0 ? "" : (it.indent === 1 ? "ml-4" : it.indent === 2 ? "ml-8" : "ml-12");
+                return `
+        <li class="${ml}">
+          <div class="neo-card px-3 py-2 flex items-center justify-between gap-2">
+            <span class="font-bold text-slate-800 truncate">${escapeHtml(it.label)}</span>
+            <span class="text-[11px] font-bold text-slate-500 truncate max-w-[140px]">${escapeHtml(it.href)}</span>
+          </div>
+        </li>
+      `;
+            }).join("");
         }
 
+        function slotModeToUiMode(slotMode) {
+            const m = clean(slotMode).toLowerCase();
+            if (m === "store") return "store";
+            if (m === "text") return "text";
+            // banner / image / 기타 => image UI로
+            return "image";
+        }
+
+        function uiModeToSlotMode(uiMode) {
+            const m = clean(uiMode).toLowerCase();
+            if (m === "store") return "store";
+            if (m === "text") return "text";
+            // image UI => 서버 slot_mode는 banner로 저장(기존 indexmanager 호환)
+            return "banner";
+        }
+
+        /* =========================
+          ✅ 슬롯 렌더
+        ========================== */
         function renderSlot(el, slot) {
+            const position = el?.dataset?.position || "";
+
+            // ✅ 사이드바 링크 슬롯
+            if (position === "food_sidebar_links") {
+                renderSidebarLinks(el, slot?.text_content || "");
+                return;
+            }
+
             const img = el.querySelector(".slot-img");
             const empty = el.querySelector(".slot-empty");
             const textLayer = el.querySelector(".slot-text-layer");
@@ -1261,24 +1254,23 @@
             const titleEl = infoBox ? infoBox.querySelector(".slot-title") : null;
             const subEl = infoBox ? infoBox.querySelector(".slot-sub") : null;
 
-            const mode = clean(slot?.slot_mode).toLowerCase();
+            const uiMode = slotModeToUiMode(slot?.slot_mode);
             const hasImg = !!clean(slot?.image_url);
             const txt = clean(slot?.text_content);
 
-            // 초기 숨김
             if (img) img.style.display = "none";
             if (textLayer) textLayer.style.display = "none";
             if (infoBox) infoBox.classList.add("hidden");
             if (storeBadge) storeBadge.style.display = "none";
 
             // store badge
-            if (storeBadge && mode === "store" && clean(slot?.business_name)) {
+            if (storeBadge && uiMode === "store" && clean(slot?.business_name)) {
                 storeBadge.style.display = "inline-flex";
                 storeBadge.textContent = slot.business_name;
             }
 
             // text mode
-            if (mode === "text") {
+            if (uiMode === "text") {
                 if (textLayer) textLayer.style.display = "block";
                 if (textBody) textBody.textContent = txt;
                 if (hint) hint.classList.toggle("hidden", !!txt);
@@ -1286,7 +1278,7 @@
                 return;
             }
 
-            // image
+            // image/banner mode
             if (hasImg) {
                 if (img) {
                     img.src = slot.image_url;
@@ -1297,18 +1289,12 @@
                 if (empty) empty.style.display = "flex";
             }
 
-            // store info box(원본 형태 유지)
-            if (infoBox) {
-                if (mode === "store" && clean(slot?.business_name)) {
-                    infoBox.classList.remove("hidden");
-                    if (titleEl) titleEl.textContent = slot.business_name;
-                    const sub = slot?.category || slot?.business_type || "";
-                    if (subEl) subEl.textContent = sub ? `업종: ${sub}` : "";
-                } else if (mode === "banner") {
-                    // 배너도 원하면 보여줄 수 있음 (기본은 숨김 유지)
-                    // infoBox.classList.remove("hidden");
-                    // if (titleEl) titleEl.textContent = "배너";
-                }
+            // store info box
+            if (infoBox && uiMode === "store" && clean(slot?.business_name)) {
+                infoBox.classList.remove("hidden");
+                if (titleEl) titleEl.textContent = slot.business_name;
+                const sub = slot?.category || slot?.business_type || "";
+                if (subEl) subEl.textContent = sub ? `업종: ${sub}` : "";
             }
         }
 
@@ -1327,312 +1313,515 @@
             }
         }
 
-        function openModalForSlot(el) {
-            currentSlotEl = el;
-            const page = el.dataset.page || "foodcategory";
-            const position = el.dataset.position;
-            const label = el.dataset.label || position;
-            const size = el.dataset.size || "";
+        /* =========================
+          ✅ 모달
+        ========================== */
+        const modalRoot = $("modalRoot");
+        const modalBackdrop = modalRoot ? modalRoot.querySelector(".modal-backdrop") : null;
 
-            currentSlotData = null;
-            f_image.value = "";
-            storeResults.innerHTML = "";
+        const modalTitle = $("modalTitle");
+        const modalPositionText = $("modalPositionText");
+        const btnCloseModal = $("btnCloseModal");
 
-            f_page.value = page;
-            f_position.value = position;
-            f_priority.value = "";
+        const adHelpBtn = $("adHelpBtn");
+        const adHelpPopover = $("adHelpPopover");
+        const adHelpCloseBtn = $("adHelpCloseBtn");
 
-            f_slotType.value = "banner";
-            f_slotMode.value = "banner";
+        const textOnlyHint = $("textOnlyHint");
+        const modeBlock = $("modeBlock");
+        const linkBlock = $("linkBlock");
+        const dividerAfterLink = $("dividerAfterLink");
 
-            f_linkUrl_banner.value = "";
-            f_linkUrl_store.value = "";
+        const imageBlock = $("imageBlock");
+        const storeBlock = $("storeBlock");
+        const textBlock = $("textBlock");
 
-            f_storeBizNo.value = "";
-            f_storeQuery.value = "";
-            f_storeId.value = "";
-            f_businessNo.value = "";
-            f_businessName.value = "";
+        const fieldTextContent = $("fieldTextContent");
+        const fieldLinkUrl = $("fieldLinkUrl");
 
-            f_textContent.value = "";
+        const fieldImageFile = $("fieldImageFile");
+        const currentPreviewImg = $("currentPreviewImg");
+        const currentPreviewEmpty = $("currentPreviewEmpty");
 
-            f_keepImage.checked = false;
-            f_clearImage.checked = false;
+        const fieldBizNo = $("fieldBizNo");
+        const fieldBizName = $("fieldBizName");
+        const btnSearchStore = $("btnSearchStore");
+        const storeResultsBody = $("storeResultsBody");
+        const fieldStoreId = $("fieldStoreId");
 
-            f_startAt.value = "";
-            f_endAt.value = "";
-            f_noEnd.checked = false;
-            syncNoEndUI();
+        const adPriority = $("adPriority");
+        const btnLoadPriority = $("btnLoadPriority");
+        const btnDeletePriority = $("btnDeletePriority");
+        const candidateList = $("candidateList");
+        const prioritySupportHint = $("prioritySupportHint");
 
-            modalSlotInfo.textContent = `${label} / position=${position} / ${size}`;
+        const fieldNoEnd = $("fieldNoEnd");
+        const fieldStartAt = $("fieldStartAt");
+        const fieldEndAt = $("fieldEndAt");
 
-            // ✅ 사이드바 링크 슬롯은 기본을 텍스트 모드로
-            if ((position || "") === "food_sidebar_links") {
-                f_slotType.value = "text";
-                f_slotMode.value = "text";
-                setActiveTab("text");
-            }
+        const textSelectedImage = $("textSelectedImage");
+        const textSelectedStore = $("textSelectedStore");
 
-            setActiveTab("banner");
-            modalBackdrop.style.display = "flex";
-            updatePreview();
+        const btnResetModal = $("btnResetModal");
+        const btnSaveSlot = $("btnSaveSlot");
 
-            loadSlotIntoModal(page, position);
+        function getUiMode() {
+            return document.querySelector('input[name="slotMode"]:checked')?.value || "image";
+        }
+        function setUiMode(mode) {
+            const r = document.querySelector(`input[name="slotMode"][value="${mode}"]`);
+            if (r) r.checked = true;
         }
 
-        async function loadSlotIntoModal(page, position) {
-            try {
-                const pri = clean(f_priority.value);
-                const priority = pri ? Number(pri) : null;
+        function applySlotMode(mode) {
+            if (imageBlock) imageBlock.classList.toggle("hidden", mode !== "image");
+            if (storeBlock) storeBlock.classList.toggle("hidden", mode !== "store");
+            if (textBlock) textBlock.classList.toggle("hidden", mode !== "text");
+            if (dividerAfterLink) dividerAfterLink.classList.toggle("hidden", mode === "text");
+        }
 
+        function setTextOnlyMode(isTextOnly) {
+            if (textOnlyHint) textOnlyHint.classList.toggle("hidden", !isTextOnly);
+            if (modeBlock) modeBlock.classList.toggle("hidden", isTextOnly);
+            if (linkBlock) linkBlock.classList.toggle("hidden", isTextOnly);
+            if (dividerAfterLink) dividerAfterLink.classList.toggle("hidden", isTextOnly);
+
+            if (isTextOnly) {
+                setUiMode("text");
+                applySlotMode("text");
+            } else {
+                applySlotMode(getUiMode());
+            }
+        }
+
+        let currentSlotEl = null;
+        let currentSlotData = null;
+
+        function openModal() {
+            if (!modalRoot) return;
+            modalRoot.classList.remove("hidden");
+        }
+        function closeModal() {
+            if (!modalRoot) return;
+            modalRoot.classList.add("hidden");
+            currentSlotEl = null;
+            currentSlotData = null;
+            if (fieldImageFile) fieldImageFile.value = "";
+            if (adHelpPopover) adHelpPopover.classList.add("hidden");
+        }
+
+        function syncNoEndUI() {
+            const noEnd = !!fieldNoEnd?.checked;
+            if (fieldEndAt) {
+                fieldEndAt.disabled = noEnd;
+                if (noEnd) fieldEndAt.value = "";
+            }
+        }
+
+        function resetModalFields() {
+            if (fieldLinkUrl) fieldLinkUrl.value = "";
+            if (fieldImageFile) fieldImageFile.value = "";
+
+            if (fieldBizNo) fieldBizNo.value = "";
+            if (fieldBizName) fieldBizName.value = "";
+            if (fieldStoreId) fieldStoreId.value = "";
+
+            if (fieldTextContent) fieldTextContent.value = "";
+
+            if (adPriority) adPriority.value = "1";
+
+            if (fieldStartAt) fieldStartAt.value = "";
+            if (fieldEndAt) fieldEndAt.value = "";
+            if (fieldNoEnd) fieldNoEnd.checked = false;
+            syncNoEndUI();
+
+            if (storeResultsBody) storeResultsBody.innerHTML = `검색어를 입력하고 “가게 검색”을 눌러주세요.`;
+
+            currentSlotData = null;
+        }
+
+        function updateModalPreview() {
+            const uiMode = getUiMode();
+
+            // 이미지 미리보기
+            const file = fieldImageFile?.files?.[0];
+            if ((uiMode === "image") && file && currentPreviewImg) {
+                currentPreviewImg.src = URL.createObjectURL(file);
+                currentPreviewImg.classList.remove("hidden");
+                if (currentPreviewEmpty) currentPreviewEmpty.classList.add("hidden");
+            } else if (uiMode !== "text" && currentSlotData?.image_url && currentPreviewImg) {
+                currentPreviewImg.src = currentSlotData.image_url;
+                currentPreviewImg.classList.remove("hidden");
+                if (currentPreviewEmpty) currentPreviewEmpty.classList.add("hidden");
+            } else {
+                if (currentPreviewImg) {
+                    currentPreviewImg.src = "";
+                    currentPreviewImg.classList.add("hidden");
+                }
+                if (currentPreviewEmpty) currentPreviewEmpty.classList.remove("hidden");
+            }
+
+            // 요약
+            if (textSelectedImage) {
+                const hasImage = (uiMode !== "text") && (!!file || !!clean(currentSlotData?.image_url));
+                textSelectedImage.textContent = hasImage ? "있음" : "없음";
+            }
+            if (textSelectedStore) {
+                textSelectedStore.textContent =
+                    (uiMode === "store" && clean(fieldBizName?.value)) ? clean(fieldBizName.value) : "없음";
+            }
+        }
+
+        async function loadSlotIntoModal(page, position, priority) {
+            try {
                 const data = await API.getSlot(page, position, priority);
                 if (!data || !data.success || !data.slot) {
                     currentSlotData = null;
-                    updatePreview();
+                    updateModalPreview();
                     return;
                 }
+
                 const slot = data.slot;
                 currentSlotData = slot;
 
-                f_slotType.value = clean(slot.slot_type) || "banner";
-                f_slotMode.value = clean(slot.slot_mode) || "banner";
+                // 모드 적용
+                const uiMode = slotModeToUiMode(slot.slot_mode);
+                setUiMode(uiMode);
+                applySlotMode(uiMode);
 
-                f_linkUrl_banner.value = clean(slot.link_url);
-                f_linkUrl_store.value = clean(slot.link_url);
+                // 값 채우기
+                if (fieldLinkUrl) fieldLinkUrl.value = clean(slot.link_url);
+                if (fieldTextContent) fieldTextContent.value = clean(slot.text_content);
 
-                f_textContent.value = clean(slot.text_content);
+                if (fieldStoreId) fieldStoreId.value = clean(slot.store_id);
+                if (fieldBizNo) fieldBizNo.value = clean(slot.business_no);
+                if (fieldBizName) fieldBizName.value = clean(slot.business_name);
 
-                f_storeId.value = clean(slot.store_id);
-                f_businessNo.value = clean(slot.business_no);
-                f_businessName.value = clean(slot.business_name);
-
-                if (slot.start_at_local) f_startAt.value = slot.start_at_local;
-                if (slot.end_at_local) f_endAt.value = slot.end_at_local;
-                f_noEnd.checked = !!slot.no_end;
+                if (fieldStartAt && slot.start_at_local) fieldStartAt.value = slot.start_at_local;
+                if (fieldEndAt && slot.end_at_local) fieldEndAt.value = slot.end_at_local;
+                if (fieldNoEnd) fieldNoEnd.checked = !!slot.no_end;
                 syncNoEndUI();
 
-                const mode = clean(slot.slot_mode).toLowerCase();
-                if (mode === "store") setActiveTab("store");
-                else if (mode === "text") setActiveTab("text");
-                else setActiveTab("banner");
-
-                updatePreview();
+                updateModalPreview();
             } catch (e) {
-                console.error("loadSlotIntoModal error:", e);
+                console.error(e);
+                currentSlotData = null;
+                updateModalPreview();
             }
         }
 
-        function closeModal() {
-            modalBackdrop.style.display = "none";
-            currentSlotEl = null;
-            currentSlotData = null;
-            f_image.value = "";
+        async function refreshCandidateList(page, position) {
+            if (!candidateList) return;
+            candidateList.innerHTML = "";
+
+            const max = 6; // 1~6만 확인
+            const rows = [];
+
+            for (let p = 1; p <= max; p++) {
+                try {
+                    const data = await API.getSlot(page, position, p);
+                    if (data?.success && data?.slot) {
+                        const s = data.slot;
+                        const uiMode = slotModeToUiMode(s.slot_mode);
+                        rows.push(`
+            <div class="result-item" data-pri="${p}">
+              <div class="font-extrabold text-slate-900">우선순위 ${p}</div>
+              <div class="text-xs font-bold text-slate-600 mt-1">
+                mode: ${escapeHtml(uiMode)} / img: ${s.image_url ? "Y" : "N"} / store: ${s.business_name ? "Y" : "N"}
+              </div>
+            </div>
+          `);
+                    }
+                } catch { }
+            }
+
+            candidateList.innerHTML = rows.length
+                ? rows.join("")
+                : `<div class="text-xs text-slate-500 font-bold">등록된 후보가 없습니다.</div>`;
+
+            candidateList.querySelectorAll(".result-item").forEach(it => {
+                it.addEventListener("click", async () => {
+                    const p = Number(it.dataset.pri);
+                    if (adPriority) adPriority.value = String(p);
+                    await loadSlotIntoModal(page, position, p);
+                });
+            });
+
+            if (prioritySupportHint) {
+                prioritySupportHint.textContent = "후보 목록은 우선순위 1~6 범위에서 조회합니다.";
+            }
         }
 
-        btnCloseModal.addEventListener("click", closeModal);
-        modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
+        function openModalForSlot(el) {
+            currentSlotEl = el;
 
-        tabBtns.forEach(btn => {
-            btn.addEventListener("click", () => {
-                setActiveTab(btn.dataset.tab);
-                if (btn.dataset.tab === "banner") f_slotMode.value = "banner";
-                if (btn.dataset.tab === "store") f_slotMode.value = "store";
-                if (btn.dataset.tab === "text") f_slotMode.value = "text";
-                updatePreview();
+            const page = el.dataset.page || "foodcategory";
+            const position = el.dataset.position || "";
+            const label = el.dataset.label || position;
+
+            if (modalRoot) {
+                modalRoot.dataset.page = page;
+                modalRoot.dataset.position = position;
+            }
+            if (modalTitle) modalTitle.textContent = `슬롯 수정: ${label}`;
+            if (modalPositionText) modalPositionText.textContent = position;
+
+            resetModalFields();
+
+            // ✅ 사이드바 링크 슬롯은 텍스트 전용
+            if (position === "food_sidebar_links") {
+                setTextOnlyMode(true);
+            } else {
+                setTextOnlyMode(false);
+                setUiMode("image");
+                applySlotMode("image");
+            }
+
+            openModal();
+
+            const pri = Number(clean(adPriority?.value) || "1");
+            loadSlotIntoModal(page, position, pri);
+            refreshCandidateList(page, position);
+            updateModalPreview();
+        }
+
+        /* =========================
+          ✅ 이벤트 바인딩 (null-safe)
+        ========================== */
+        if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
+
+        // ✅ 핵심: modalBackdrop는 id가 아니라 modalRoot 안의 .modal-backdrop
+        if (modalBackdrop) {
+            modalBackdrop.addEventListener("click", (e) => {
+                if (e.target === modalBackdrop) closeModal();
             });
+        }
+
+        // ESC 닫기
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && modalRoot && !modalRoot.classList.contains("hidden")) closeModal();
         });
 
-        f_noEnd.addEventListener("change", () => { syncNoEndUI(); updatePreview(); });
+        // help popover
+        if (adHelpBtn && adHelpPopover) {
+            adHelpBtn.addEventListener("click", () => adHelpPopover.classList.toggle("hidden"));
+        }
+        if (adHelpCloseBtn && adHelpPopover) {
+            adHelpCloseBtn.addEventListener("click", () => adHelpPopover.classList.add("hidden"));
+        }
 
-        [
-            f_slotType, f_slotMode, f_linkUrl_banner, f_linkUrl_store,
-            f_storeId, f_businessNo, f_businessName, f_textContent,
-            f_startAt, f_endAt, f_keepImage, f_clearImage
-        ].forEach(el => {
-            el.addEventListener("input", updatePreview);
-            el.addEventListener("change", updatePreview);
+        // 라디오 변경
+        document.addEventListener("change", (e) => {
+            const t = e.target;
+            if (t && t.name === "slotMode") {
+                applySlotMode(t.value);
+                updateModalPreview();
+            }
         });
-        f_image.addEventListener("change", updatePreview);
+
+        // 입력 변경 → 미리보기 갱신
+        [fieldLinkUrl, fieldTextContent, fieldBizNo, fieldBizName, fieldStartAt, fieldEndAt].forEach(el => {
+            if (!el) return;
+            el.addEventListener("input", updateModalPreview);
+            el.addEventListener("change", updateModalPreview);
+        });
+        if (fieldImageFile) fieldImageFile.addEventListener("change", updateModalPreview);
+        if (fieldNoEnd) fieldNoEnd.addEventListener("change", () => { syncNoEndUI(); updateModalPreview(); });
 
         // store search
-        btnStoreSearch.addEventListener("click", async () => {
-            const bizNo = clean(f_storeBizNo.value);
-            const q = clean(f_storeQuery.value);
-            storeResults.innerHTML = "";
+        if (btnSearchStore) {
+            btnSearchStore.addEventListener("click", async () => {
+                const bizNo = clean(fieldBizNo?.value);
+                const q = clean(fieldBizName?.value);
 
-            try {
-                const data = await API.searchStore({ bizNo, q });
-                if (!data || !data.ok) {
-                    storeResults.innerHTML = `<div class="text-sm font-extrabold text-rose-600">검색 실패</div>`;
-                    return;
+                if (storeResultsBody) storeResultsBody.innerHTML = "";
+
+                try {
+                    const data = await API.searchStore({ bizNo, q });
+                    if (!data || !data.ok) {
+                        if (storeResultsBody) storeResultsBody.innerHTML = `<div class="text-sm font-extrabold text-rose-600">검색 실패</div>`;
+                        return;
+                    }
+                    const list = data.stores || [];
+                    if (!list.length) {
+                        if (storeResultsBody) storeResultsBody.innerHTML = `<div class="text-sm font-extrabold text-slate-500">검색 결과 없음</div>`;
+                        return;
+                    }
+
+                    if (storeResultsBody) {
+                        storeResultsBody.innerHTML = list.map(s => `
+            <div class="result-item" data-id="${escapeHtml(s.id)}" data-biz="${escapeHtml(s.business_no)}" data-name="${escapeHtml(s.business_name)}">
+              <div class="font-extrabold text-slate-900">${escapeHtml(s.business_name)}</div>
+              <div class="text-xs font-bold text-slate-600 mt-1">id: ${escapeHtml(s.id)} / biz: ${escapeHtml(s.business_no)}</div>
+            </div>
+          `).join("");
+
+                        storeResultsBody.querySelectorAll(".result-item").forEach(item => {
+                            item.addEventListener("click", () => {
+                                if (fieldStoreId) fieldStoreId.value = item.dataset.id || "";
+                                if (fieldBizNo) fieldBizNo.value = item.dataset.biz || "";
+                                if (fieldBizName) fieldBizName.value = item.dataset.name || "";
+
+                                setUiMode("store");
+                                applySlotMode("store");
+                                updateModalPreview();
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.error(e);
+                    if (storeResultsBody) storeResultsBody.innerHTML = `<div class="text-sm font-extrabold text-rose-600">검색 오류</div>`;
+                }
+            });
+        }
+
+        // reset
+        if (btnResetModal) {
+            btnResetModal.addEventListener("click", () => {
+                const position = modalRoot?.dataset?.position || "";
+                resetModalFields();
+
+                if (position === "food_sidebar_links") setTextOnlyMode(true);
+                else { setTextOnlyMode(false); setUiMode("image"); applySlotMode("image"); }
+
+                updateModalPreview();
+            });
+        }
+
+        // priority load/delete
+        if (btnLoadPriority) {
+            btnLoadPriority.addEventListener("click", async () => {
+                const page = modalRoot?.dataset?.page || "foodcategory";
+                const position = modalRoot?.dataset?.position || "";
+                const p = Number(clean(adPriority?.value) || "1");
+                await loadSlotIntoModal(page, position, p);
+            });
+        }
+
+        if (btnDeletePriority) {
+            btnDeletePriority.addEventListener("click", async () => {
+                const page = modalRoot?.dataset?.page || "foodcategory";
+                const position = modalRoot?.dataset?.position || "";
+                const p = Number(clean(adPriority?.value) || "1");
+                if (!confirm(`우선순위 ${p}를 삭제할까요?`)) return;
+
+                try {
+                    const resp = await API.deleteSlot(page, position, p);
+                    if (!resp || !resp.success) {
+                        alert(`삭제 실패: ${resp?.error || "unknown"}`);
+                        return;
+                    }
+                    alert("삭제 완료!");
+
+                    await hydrateAllSlots();
+                    await refreshCandidateList(page, position);
+                    await loadSlotIntoModal(page, position, p);
+                } catch (e) {
+                    console.error(e);
+                    alert("삭제 중 오류");
+                }
+            });
+        }
+
+        // save
+        if (btnSaveSlot) {
+            btnSaveSlot.addEventListener("click", async () => {
+                const page = modalRoot?.dataset?.page || "foodcategory";
+                const position = modalRoot?.dataset?.position || "";
+                const priority = clean(adPriority?.value) || "1";
+
+                const uiMode = getUiMode();
+                const slotMode = uiModeToSlotMode(uiMode);
+
+                const fd = new FormData();
+                fd.append("page", page);
+                fd.append("position", position);
+                fd.append("priority", priority);
+
+                // 서버 호환 키
+                fd.append("slotType", "banner");
+                fd.append("slotMode", slotMode);
+
+                const linkUrl = clean(fieldLinkUrl?.value);
+                const textContent = clean(fieldTextContent?.value);
+
+                // ✅ 텍스트 저장
+                if (uiMode === "text") fd.append("textContent", textContent);
+
+                // ✅ 링크 저장(텍스트 전용 슬롯은 링크 숨김이니 원칙상 안 넣음)
+                if (position !== "food_sidebar_links" && linkUrl && uiMode !== "text") fd.append("linkUrl", linkUrl);
+                if (position !== "food_sidebar_links" && linkUrl && uiMode === "text") fd.append("linkUrl", linkUrl);
+
+                // ✅ store 연결
+                if (uiMode === "store") {
+                    const storeId = clean(fieldStoreId?.value);
+                    const businessNo = clean(fieldBizNo?.value);
+                    const businessName = clean(fieldBizName?.value);
+
+                    if (storeId) fd.append("storeId", storeId);
+                    if (businessNo) fd.append("businessNo", businessNo);
+                    if (businessName) fd.append("businessName", businessName);
+
+                    // store 모드 기본 링크 자동
+                    if (!linkUrl && storeId) fd.append("linkUrl", `/ndetail.html?id=${storeId}&type=store`);
                 }
 
-                const list = data.stores || [];
-                if (!list.length) {
-                    storeResults.innerHTML = `<div class="text-sm font-extrabold text-slate-500">검색 결과 없음</div>`;
-                    return;
+                // ✅ 기간
+                const startAt = clean(fieldStartAt?.value);
+                const endAt = clean(fieldEndAt?.value);
+                const noEnd = !!fieldNoEnd?.checked;
+
+                if (startAt) fd.append("startAt", startAt);
+                if (!noEnd && endAt) fd.append("endAt", endAt);
+                fd.append("noEnd", noEnd ? "true" : "false");
+
+                // ✅ 이미지 파일(필드명: image)
+                const file = fieldImageFile?.files?.[0];
+                if (uiMode === "image" && file) fd.append("image", file);
+
+                try {
+                    const resp = await API.saveSlot(fd);
+                    if (!resp || !resp.success) {
+                        alert(`저장 실패: ${resp?.error || "unknown"}`);
+                        return;
+                    }
+
+                    currentSlotData = resp.slot || null;
+
+                    // 화면 반영(현재 노출은 서버 조건/기간/우선순위에 따라 달라질 수 있음)
+                    await hydrateAllSlots();
+                    await refreshCandidateList(page, position);
+                    updateModalPreview();
+
+                    alert("저장 완료!");
+                } catch (e) {
+                    console.error(e);
+                    alert("저장 중 오류");
                 }
+            });
+        }
 
-                storeResults.innerHTML = list.map(s => `
-          <div class="result-item" data-id="${s.id}" data-biz="${s.business_no}" data-name="${s.business_name}">
-            <div class="font-extrabold text-slate-900">${s.business_name}</div>
-            <div class="text-xs font-bold text-slate-600 mt-1">id: ${s.id} / biz: ${s.business_no}</div>
-          </div>
-        `).join("");
-
-                storeResults.querySelectorAll(".result-item").forEach(item => {
-                    item.addEventListener("click", () => {
-                        const id = item.dataset.id;
-                        const biz = item.dataset.biz;
-                        const name = item.dataset.name;
-
-                        f_storeId.value = id || "";
-                        f_businessNo.value = biz || "";
-                        f_businessName.value = name || "";
-
-                        f_linkUrl_store.value = id ? `/ndetail.html?id=${id}&type=store` : "";
-                        f_slotMode.value = "store";
-                        f_slotType.value = "banner";
-                        setActiveTab("store");
-                        updatePreview();
-                    });
-                });
-
-            } catch (e) {
-                console.error(e);
-                storeResults.innerHTML = `<div class="text-sm font-extrabold text-rose-600">검색 오류</div>`;
-            }
-        });
-
-        btnStoreClear.addEventListener("click", () => {
-            f_storeId.value = "";
-            f_businessNo.value = "";
-            f_businessName.value = "";
-            f_linkUrl_store.value = "";
-            storeResults.innerHTML = "";
-            updatePreview();
-        });
-
-        // 저장
-        btnSave.addEventListener("click", async () => {
-            const page = clean(f_page.value);
-            const position = clean(f_position.value);
-
-            const mode = clean(f_slotMode.value).toLowerCase();
-            const slotType = clean(f_slotType.value) || "banner";
-
-            let linkUrl = "";
-            let textContent = "";
-
-            if (mode === "banner") linkUrl = clean(f_linkUrl_banner.value);
-            if (mode === "store") linkUrl = clean(f_linkUrl_store.value);
-            if (mode === "text") textContent = clean(f_textContent.value);
-
-            const fd = new FormData();
-            fd.append("page", page);
-            fd.append("position", position);
-
-            const pri = clean(f_priority.value);
-            if (pri) fd.append("priority", pri);
-
-            fd.append("slotType", slotType);
-            fd.append("slotMode", mode);
-
-            if (linkUrl) fd.append("linkUrl", linkUrl);
-            if (textContent) fd.append("textContent", textContent);
-
-            const storeId = clean(f_storeId.value);
-            const businessNo = clean(f_businessNo.value);
-            const businessName = clean(f_businessName.value);
-            if (storeId) fd.append("storeId", storeId);
-            if (businessNo) fd.append("businessNo", businessNo);
-            if (businessName) fd.append("businessName", businessName);
-
-            const startAt = clean(f_startAt.value);
-            const endAt = clean(f_endAt.value);
-            const noEnd = !!f_noEnd.checked;
-            if (startAt) fd.append("startAt", startAt);
-            if (!noEnd && endAt) fd.append("endAt", endAt);
-            fd.append("noEnd", noEnd ? "true" : "false");
-
-            fd.append("keepImage", f_keepImage.checked ? "true" : "false");
-            fd.append("clearImage", f_clearImage.checked ? "true" : "false");
-
-            // ✅ 중요: 파일 필드명은 image
-            const file = f_image.files && f_image.files[0];
-            if (file) fd.append("image", file);
-
-            try {
-                const resp = await API.saveSlot(fd);
-                if (!resp || !resp.success) {
-                    console.error("save fail:", resp);
-                    alert(`저장 실패: ${resp?.error || "unknown"}`);
-                    return;
-                }
-
-                const saved = resp.slot;
-                currentSlotData = saved;
-                if (currentSlotEl) renderSlot(currentSlotEl, saved);
-
-                updatePreview();
-                alert("저장 완료!");
-            } catch (e) {
-                console.error(e);
-                alert("저장 중 오류");
-            }
-        });
-
-        // 삭제
-        btnDelete.addEventListener("click", async () => {
-            const page = clean(f_page.value);
-            const position = clean(f_position.value);
-            const pri = clean(f_priority.value);
-            const priority = pri ? Number(pri) : null;
-
-            if (!confirm("정말 삭제할까요?")) return;
-
-            try {
-                const resp = await API.deleteSlot(page, position, priority);
-                if (!resp || !resp.success) {
-                    alert(`삭제 실패: ${resp?.error || "unknown"}`);
-                    return;
-                }
-
-                // 삭제 후 재조회 → 비어있으면 기본 표시
-                if (currentSlotEl) {
-                    const data = await API.getSlot(page, position, null);
-                    if (data && data.success && data.slot) renderSlot(currentSlotEl, data.slot);
-                    else renderSlot(currentSlotEl, null);
-                }
-
-                alert("삭제 완료!");
-                closeModal();
-            } catch (e) {
-                console.error(e);
-                alert("삭제 중 오류");
-            }
-        });
-
-        // 슬롯 클릭 바인딩
+        // ✅ 슬롯 클릭 바인딩 + 초기 로딩
         document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll(".slot[data-position]").forEach(el => {
                 el.addEventListener("click", (e) => {
-                    // 슬롯 안의 링크/버튼/입력요소 클릭은 모달 오픈 제외(겹침 방지)
                     if (e.target.closest("a, button, input, textarea, select, label")) return;
                     openModalForSlot(el);
                 });
             });
 
-
             hydrateAllSlots();
+            applySlotMode(getUiMode());
+            syncNoEndUI();
         });
 
         /* =========================
-          ✅ 파워 광고 슬라이더 (원본 유지)
+          ✅ 파워 광고 슬라이더 (원본 유지, null-safe)
         ========================== */
         document.addEventListener("DOMContentLoaded", () => {
             const viewport = document.getElementById("powerViewport");
             const track = document.getElementById("powerAdTrack");
+            if (!viewport || !track) return;
 
             let groups = track.querySelectorAll(".power-group").length;
             let index = 0;
@@ -1669,119 +1858,8 @@
             updateSlider();
             startAuto();
         });
-
-        function escapeHtml(str) {
-            return String(str || "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        function renderSidebarLinks(slotEl, text) {
-            const ul = slotEl.querySelector('[data-role="sidebar-links"]');
-            const empty = slotEl.querySelector(".slot-empty");
-            if (!ul) return;
-
-            const t = String(text || "").replace(/\r/g, "").trim();
-            ul.innerHTML = "";
-
-            if (!t) {
-                if (empty) empty.style.display = "flex";
-                return;
-            }
-            if (empty) empty.style.display = "none";
-
-            const lines = t.split("\n").filter(l => l.trim());
-
-            const items = lines.map(line => {
-                const m = line.match(/^(\s*)(.*)$/);
-                const lead = m ? m[1] : "";
-                const rest = m ? m[2] : line;
-
-                const indent = Math.min(3, Math.floor(lead.replace(/\t/g, "  ").length / 2));
-                const parts = rest.split("|");
-
-                const label = (parts[0] || "").trim();
-                const href = (parts.slice(1).join("|") || "").trim();
-
-                if (!label) return null;
-                return { label, href: href || "#", indent };
-            }).filter(Boolean);
-
-            ul.innerHTML = items.map(it => {
-                const ml = it.indent === 0 ? "" : (it.indent === 1 ? "ml-4" : it.indent === 2 ? "ml-8" : "ml-12");
-                return `
-      <li class="${ml}">
-        <div class="neo-card px-3 py-2 flex items-center justify-between gap-2">
-          <span class="font-bold text-slate-800 truncate">${escapeHtml(it.label)}</span>
-          <span class="text-[11px] font-bold text-slate-500 truncate max-w-[140px]">${escapeHtml(it.href)}</span>
-        </div>
-      </li>
-    `;
-            }).join("");
-        }
-
-        (function () {
-            function q(id) { return document.getElementById(id); }
-
-            function applySlotMode(mode) {
-                const imageBlock = q("imageBlock");
-                const storeBlock = q("storeBlock");
-                const textBlock = q("textBlock");
-                const dividerAfterLink = q("dividerAfterLink");
-
-                if (!imageBlock || !storeBlock || !textBlock) return;
-
-                imageBlock.classList.toggle("hidden", mode !== "image");
-                storeBlock.classList.toggle("hidden", mode !== "store");
-                textBlock.classList.toggle("hidden", mode !== "text");
-
-                // 링크 아래 divider는 이미지/가게 모드에서만 보여주고, 텍스트 모드에서는 숨김(깔끔하게)
-                if (dividerAfterLink) dividerAfterLink.classList.toggle("hidden", mode === "text");
-            }
-
-            // ✅ 텍스트 전용 슬롯용(필요할 때 openModal에서 호출)
-            function setTextOnlyMode(isTextOnly) {
-                const textOnlyHint = q("textOnlyHint");
-                const modeBlock = q("modeBlock");
-                const linkBlock = q("linkBlock");
-                const dividerAfterLink = q("dividerAfterLink");
-                const imageBlock = q("imageBlock");
-                const storeBlock = q("storeBlock");
-                const textBlock = q("textBlock");
-
-                if (textOnlyHint) textOnlyHint.classList.toggle("hidden", !isTextOnly);
-                if (modeBlock) modeBlock.classList.toggle("hidden", isTextOnly);
-                if (linkBlock) linkBlock.classList.toggle("hidden", isTextOnly);
-                if (dividerAfterLink) dividerAfterLink.classList.toggle("hidden", isTextOnly);
-
-                if (isTextOnly) {
-                    if (imageBlock) imageBlock.classList.add("hidden");
-                    if (storeBlock) storeBlock.classList.add("hidden");
-                    if (textBlock) textBlock.classList.remove("hidden");
-                } else {
-                    const checked = document.querySelector('input[name="slotMode"]:checked');
-                    applySlotMode(checked ? checked.value : "image");
-                }
-            }
-
-            // 라디오 변경 연결
-            document.addEventListener("change", (e) => {
-                const t = e.target;
-                if (t && t.name === "slotMode") applySlotMode(t.value);
-            });
-
-            // 초기 1회 적용
-            const checked = document.querySelector('input[name="slotMode"]:checked');
-            applySlotMode(checked ? checked.value : "image");
-
-            // 외부에서 쓰려고 전역 노출 (openModal에서 호출 가능)
-            window.applySlotMode = applySlotMode;
-            window.setTextOnlyMode = setTextOnlyMode;
-        })();
     </script>
+
 </body>
 
 </html>
