@@ -484,42 +484,83 @@
         const nameEl = slot.querySelector(".slot-name");
         const categoryEl = slot.querySelector(".slot-category");
 
-        if (nameEl) nameEl.textContent = "";
+        if (nameEl) {
+          nameEl.textContent = "";
+          nameEl.classList.remove("inline");
+        }
+
         if (categoryEl) {
           categoryEl.textContent = "";
-          categoryEl.classList.add("hidden"); // 기본은 업종 숨김
+          categoryEl.classList.add("hidden");       // 기본은 업종 숨김
+          categoryEl.classList.remove("inline", "ml-1");
         }
-        if (info) info.classList.add("hidden"); // 기본은 오버레이 숨김
 
+        if (info) info.classList.add("hidden");    // 기본은 오버레이 숨김
         slot.onclick = null;
         slot.style.cursor = "";
 
         try {
-          const res = await fetch(`/manager/ad/slot?page=foodcategory&position=${position}`);
+          const res = await fetch(`/manager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}`, {
+            cache: "no-store",
+          });
           if (!res.ok) continue;
 
           const data = await res.json();
           const slotData = data.slot || data.data || null;
           if (!slotData) continue;
 
-          // ✅ 상호/업종 키 혼용 대응
-          const storeName = (slotData.business_name || slotData.businessName || "").toString().trim();
+          // ✅ store_id / id 키 혼용 대응
+          const storeId =
+            slotData.store_id ||
+            slotData.storeId ||
+            slotData.id ||
+            (slotData.store && (slotData.store.id || slotData.store.store_id)) ||
+            null;
+
+          // ✅ 상호/업종 키 혼용 대응 (업종은 business_type 우선)
+          const storeName = (
+            slotData.business_name ||
+            slotData.businessName ||
+            slotData.store_name ||
+            slotData.storeName ||
+            slotData.name ||
+            (slotData.store && (slotData.store.business_name || slotData.store.store_name)) ||
+            ""
+          ).toString().trim();
+
           const storeCategory = (
+            slotData.business_type ||
+            slotData.businessType ||
+            slotData.business_subcategory ||
+            slotData.businessSubcategory ||
             slotData.business_category ||
             slotData.businessCategory ||
             slotData.store_category ||
             slotData.storeCategory ||
             slotData.category ||
+            (slotData.store &&
+              (slotData.store.business_type ||
+                slotData.store.business_subcategory ||
+                slotData.store.business_category ||
+                slotData.store.category)) ||
             ""
           ).toString().trim();
 
           // ✅ 이미지 업데이트 (없으면 HTML 기본 no-image 유지)
-          if (img && slotData.image_url) {
-            img.src = slotData.image_url;
+          const imageUrl =
+            slotData.image_url ||
+            slotData.imageUrl ||
+            slotData.image_path ||
+            slotData.imagePath ||
+            (slotData.store && (slotData.store.main_image_url || slotData.store.image_url)) ||
+            "";
+
+          if (img && imageUrl) {
+            img.src = imageUrl;
             img.alt = storeName || "가게 이미지";
           }
 
-          // ✅ 상호가 있으면 오버레이 표시 + 같은 줄 처리
+          // ✅ 상호가 있으면 오버레이 표시 + "상호 (업종)" 같은 줄
           if (storeName) {
             if (info) info.classList.remove("hidden");
 
@@ -528,12 +569,10 @@
               nameEl.classList.add("inline"); // 같은 줄
             }
 
-            // ✅ 업종은 "상호가 있을 때만" 괄호로 표시 (한 단계 작은 글씨)
             if (storeCategory && categoryEl) {
-              categoryEl.textContent = `(${storeCategory})`;      // ✅ "업종:" 제거 + 괄호
+              categoryEl.textContent = `(${storeCategory})`;  // ✅ 괄호 표시
               categoryEl.classList.remove("hidden");
-              categoryEl.classList.add("inline", "ml-1");         // ✅ 같은 줄 + 간격
-              // HTML에 categoryEl은 text-sm라서 자동으로 "한 단계 작게" 됨
+              categoryEl.classList.add("inline", "ml-1");     // ✅ 같은 줄 + 간격
             } else if (categoryEl) {
               categoryEl.textContent = "";
               categoryEl.classList.add("hidden");
@@ -547,11 +586,11 @@
           }
 
           // ✅ 클릭 이벤트
-          if (slotData.store_id) {
+          if (storeId) {
             slot.style.cursor = "pointer";
             slot.onclick = (e) => {
               e.preventDefault();
-              window.location.href = `/detail.html?id=${slotData.store_id}`;
+              window.location.href = `/detail.html?id=${storeId}`;
             };
           }
 
@@ -570,85 +609,62 @@
       ul.classList.toggle("hidden");
     }
 
-          // ✅ 파워 광고 슬라이더
-          document.addEventListener("DOMContentLoaded", () => {
-            const viewport = document.getElementById("powerViewport");
-            const track = document.getElementById("powerAdTrack");
-            if (!viewport || !track) return;
+    // ✅ 파워 광고 슬라이더
+    document.addEventListener("DOMContentLoaded", () => {
+      const viewport = document.getElementById("powerViewport");
+      const track = document.getElementById("powerAdTrack");
+      if (!viewport || !track) return;
 
-            let groups = track.querySelectorAll(".power-group").length;
-            let index = 0;
+      let groups = track.querySelectorAll(".power-group").length;
+      let index = 0;
 
-            function updateSlider() {
-              const slideWidth = viewport.clientWidth;
-              track.style.transform = `translateX(${-index * slideWidth}px)`;
-            }
+      function updateSlider() {
+        const slideWidth = viewport.clientWidth;
+        track.style.transform = `translateX(${-index * slideWidth}px)`;
+      }
 
-            function next() {
-              index = (index + 1) % groups;
-              updateSlider();
-            }
+      function next() { index = (index + 1) % groups; updateSlider(); }
+      function prev() { index = (index - 1 + groups) % groups; updateSlider(); }
 
-            function prev() {
-              index = (index - 1 + groups) % groups;
-              updateSlider();
-            }
+      const nextBtn = document.getElementById("nextBtn");
+      const prevBtn = document.getElementById("prevBtn");
+      if (nextBtn && prevBtn) {
+        nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
+        prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
+      }
 
-            const nextBtn = document.getElementById("nextBtn");
-            const prevBtn = document.getElementById("prevBtn");
-            if (nextBtn && prevBtn) {
-              nextBtn.addEventListener("click", () => {
-                stopAuto();
-                next();
-                startAuto();
-              });
-              prevBtn.addEventListener("click", () => {
-                stopAuto();
-                prev();
-                startAuto();
-              });
-            }
+      window.addEventListener("resize", updateSlider);
 
-            window.addEventListener("resize", updateSlider);
+      const INTERVAL = 7000;
+      let timer = null;
 
-            const INTERVAL = 7000;
-            let timer = null;
+      function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
+      function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
 
-            function startAuto() {
-              if (!timer) timer = setInterval(next, INTERVAL);
-            }
+      document.addEventListener("visibilitychange", () => {
+        document.hidden ? stopAuto() : startAuto();
+      });
 
-            function stopAuto() {
-              if (timer) {
-                clearInterval(timer);
-                timer = null;
-              }
-            }
+      viewport.addEventListener("mouseenter", stopAuto);
+      viewport.addEventListener("mouseleave", startAuto);
 
-            document.addEventListener("visibilitychange", () => {
-              document.hidden ? stopAuto() : startAuto();
-            });
+      updateSlider();
+      startAuto();
+    });
 
-            viewport.addEventListener("mouseenter", stopAuto);
-            viewport.addEventListener("mouseleave", startAuto);
-
-            updateSlider();
-            startAuto();
-          });
-
-          // ✅ 우측 하단 네비
-          function goBack() {
-            if (document.referrer && document.referrer !== location.href) {
-              window.history.back();
-            } else {
-              window.location.href = "/index.html";
-            }
-          }
-
-          function goNext() {
-            window.history.forward();
-          }
+    // ✅ 우측 하단 네비
+    function goBack() {
+      if (document.referrer && document.referrer !== location.href) {
+        window.history.back();
+      } else {
+        window.location.href = "/index.html";
+      }
+    }
+    function goNext() {
+      window.history.forward();
+    }
   </script>
+
 
 </body>
 
