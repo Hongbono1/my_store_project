@@ -179,8 +179,19 @@
             pointer-events: none;
         }
 
+        /* 하단 정보 박스: 상호 + 업종 한 줄 표시 */
         .slot .slot-title {
             font-weight: 900;
+            display: inline-block;
+        }
+
+        .slot .slot-sub {
+            display: inline-block;
+            margin-left: 0.35rem;
+            font-size: 0.8rem;
+            /* 업종은 조금 작게 */
+            font-weight: 700;
+            color: #64748b;
         }
 
         /* ✅ (추가) 하단 info 박스 배경 더 밝게 */
@@ -1352,10 +1363,11 @@
         }
 
         /* =========================
-           슬롯 렌더
-           - 상단 왼쪽 상호 배지: 항상 숨김
-           - 상단 오른쪽 배지: store 모드일 때 업종 표시
-        ========================== */
+   슬롯 렌더
+   - 상단 왼쪽 상호 배지: 항상 숨김
+   - 상단 오른쪽 배지: HTML 기본 텍스트 유지 (Banner / Card / Hero 등)
+   - 하단 info 박스: 상호 옆에 업종 작게 표시
+========================== */
         function renderSlot(el, slot) {
             const position = el?.dataset?.position || "";
 
@@ -1382,33 +1394,38 @@
             const hasImg = !!clean(slot?.image_url);
             const txt = clean(slot?.text_content);
 
-            // 초기화
-            if (img) img.style.display = "none";
+            // 🔹 기본 초기화
+            if (img) {
+                img.style.display = "none";
+                if (hasImg) {
+                    img.src = slot.image_url;
+                } else {
+                    img.removeAttribute("src");
+                }
+            }
             if (textLayer) textLayer.style.display = "none";
-            if (infoBox) infoBox.classList.add("hidden");
+            if (empty) empty.style.display = "flex";
+            if (infoBox) {
+                infoBox.classList.add("hidden");
+                if (titleEl) titleEl.textContent = "";
+                if (subEl) subEl.textContent = "";
+            }
 
-            // ✅ 왼쪽 상단 상호 배지: 항상 숨김
+            // 🔹 왼쪽 상단 상호 배지: 항상 숨김
             if (storeBadge) {
                 storeBadge.style.display = "none";
                 storeBadge.textContent = "";
             }
 
-            // ✅ 오른쪽 배지 기본 텍스트 저장
+            // 🔹 오른쪽 상단 배지: 원래 써 있던 텍스트 유지
             if (badge) {
                 if (!badge.dataset.defaultText) {
                     badge.dataset.defaultText = clean(badge.textContent) || "Banner";
                 }
-                const defaultText = badge.dataset.defaultText;
-
-                if (uiMode === "store") {
-                    const bizType = pickBizType(slot);
-                    badge.textContent = bizType || defaultText;
-                } else {
-                    badge.textContent = defaultText;
-                }
+                badge.textContent = badge.dataset.defaultText;
             }
 
-            // 텍스트 모드
+            // 🔹 텍스트 모드
             if (uiMode === "text") {
                 if (textLayer) textLayer.style.display = "block";
                 if (textBody) textBody.textContent = txt;
@@ -1417,24 +1434,19 @@
                 return;
             }
 
-            // 이미지 모드
-            if (hasImg) {
-                if (img) {
-                    img.src = slot.image_url;
-                    img.style.display = "block";
-                }
+            // 🔹 이미지 / 스토어 모드 → 이미지 처리
+            if (hasImg && img) {
+                img.style.display = "block";
                 if (empty) empty.style.display = "none";
-            } else {
-                if (empty) empty.style.display = "flex";
             }
 
-            // 하단 정보 박스: 상호명 + 업종
+            // 🔹 하단 info 박스: 상호명 + 업종(작게)
             if (infoBox && uiMode === "store" && clean(slot?.business_name)) {
+                const bizType = pickBizType(slot);
+
                 infoBox.classList.remove("hidden");
                 if (titleEl) titleEl.textContent = slot.business_name;
-
-                const bizType = pickBizType(slot);
-                if (subEl) subEl.textContent = bizType ? `업종: ${bizType}` : "";
+                if (subEl) subEl.textContent = bizType || "";
             }
         }
 
