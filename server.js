@@ -49,7 +49,6 @@ import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
 
-
 import pool from "./db.js";
 
 // ------------------------------------------------------------
@@ -133,7 +132,7 @@ const uploadDirs = [
   path.join(UPLOAD_ROOT, "inquiry"),
   path.join(UPLOAD_ROOT, "traditionalmarket"),
   path.join(UPLOAD_ROOT, "performingart"),
-  path.join(UPLOAD_ROOT, "manager_ad"), // ✅ indexmanager 광고 업로드 폴더(추가)
+  path.join(UPLOAD_ROOT, "manager_ad"), // ✅ indexmanager 광고 업로드 폴더
 ];
 
 uploadDirs.forEach((dir) => {
@@ -143,14 +142,6 @@ uploadDirs.forEach((dir) => {
   } else {
     console.log("📁 폴더 존재:", dir);
   }
-
-  const uploadDirs = [
-    UPLOAD_ROOT,
-    path.join(UPLOAD_ROOT, "inquiry"),
-    path.join(UPLOAD_ROOT, "traditionalmarket"),
-    path.join(UPLOAD_ROOT, "performingart"),
-    path.join(UPLOAD_ROOT, "manager_ad"), // ✅ 추가
-  ];
 });
 
 // ------------------------------------------------------------
@@ -167,7 +158,9 @@ app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - started;
-    console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
+    console.log(
+      `[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`
+    );
   });
   next();
 });
@@ -211,8 +204,9 @@ app.post("/verify-biz", async (req, res) => {
 
     const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
 
-    const API_URL =
-      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(
+      serviceKey
+    )}`;
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -236,7 +230,6 @@ app.post("/verify-biz", async (req, res) => {
       ok: true,
       data: data.data,
     });
-
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
     return res.status(500).json({
@@ -259,39 +252,49 @@ app.use("/owner", ownerRouter);
 app.use("/api/suggest", suggestRouter);
 app.use("/api/storeprideregister", makeStorePrideRegisterRouter(pool));
 app.use("/storepride", storeprideRouter);
+
 app.use("/api/market", traditionalmarketregisterRouter);
 app.use("/api/market", traditionalmarketdetailRouter);
+
 app.use("/api/performingart", performingartRouter);
 app.use("/api/performingart", performingartregisterRouter);
 app.use("/api/performingart", performingartdetailRouter);
+
 app.use("/api/events", eventregisterRouter);
 app.use("/api/localboard", localboardRouter);
 app.use("/api/oneword", onewordRouter);
+
 app.use("/shopping/register", shoppingRegisterRouter);
 app.use("/api/shopping", shoppingDetailRouter);
+
 app.use("/api/best-pick", bestpickRouter);
+
 app.use("/api/open/register", openregisterRouter);
 app.use("/api/open", openRouter);
 app.use("/api/open", opendetailRouter);
+
 app.use("/open", openRouter);
 app.use("/open/register", openregisterRouter);
 app.use("/open", opendetailRouter);
+
 app.use("/upload", uploadRouter);
 
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
+
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-app.use("/manager/ad", foodcategorymanagerAdRouter);
-
 
 // ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
 
-// ✅ 인덱스 광고 관리자 API
+// ✅ 인덱스 광고 관리자 API (기존 유지)
 app.use("/manager/ad", indexmanagerAdRouter);
+
+// ✅ FOOD CATEGORY 관리자 API (새 경로로 분리)
+app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
