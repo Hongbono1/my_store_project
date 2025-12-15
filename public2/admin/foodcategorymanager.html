@@ -1193,67 +1193,108 @@
             return (s === "banner" || s === "배너");
         }
 
+        /* =========================
+  ✅ helpers
+========================== */
+
+        // 업종 후보를 하나로 뽑아주는 함수 (이미 있던 로직 그대로 사용)
         function pickBizType(slot) {
-            // ✅ 업종 후보 키 최대한 넓게 수집 (서버 키가 다를 수 있어서)
-            const candidates = [
-                slot?.category,
-                slot?.business_type,
-                slot?.store_category,
-                slot?.type_name,
-                slot?.sub_category,
-                slot?.subcategory,
-                slot?.sub,
-
-                // 혹시 store 객체로 내려오는 경우 대비
-                slot?.store?.category,
-                slot?.store?.business_type,
-                slot?.store?.store_category,
-                slot?.store?.type_name,
-                slot?.store?.sub_category,
-                slot?.store?.subcategory,
-                slot?.store?.sub,
-
-                // 기타 흔한 키
-                slot?.biz_type,
-                slot?.bizType,
-                slot?.industry,
-                slot?.industry_name,
-            ];
-            for (const v of candidates) {
-                const t = clean(v);
-                if (t) return t;
-            }
-            return "";
+            const v = clean(
+                slot?.badge_label ||          // 나중에 테이블에 직접 저장할 수도 있음
+                slot?.category ||
+                slot?.business_type ||
+                slot?.store_category ||
+                slot?.type_name ||
+                slot?.sub_category ||
+                slot?.subcategory ||
+                slot?.sub
+            );
+            return v;
         }
 
-        /* =========================
-          ✅ API
-        ========================== */
-        const API = {
-            async getSlot(page, position, priority) {
-                const qs = new URLSearchParams({ page, position });
-                if (priority !== undefined && priority !== null && String(priority).trim() !== "") qs.set("priority", String(priority));
-                const r = await fetch(`/manager/ad/slot?${qs.toString()}`);
-                return await r.json();
-            },
-            async saveSlot(formData) {
-                const r = await fetch(`/manager/ad/slot`, { method: "POST", body: formData });
-                return await r.json();
-            },
-            async deleteSlot(page, position, priority) {
-                const qs = new URLSearchParams({ page, position });
-                if (priority !== undefined && priority !== null && String(priority).trim() !== "") qs.set("priority", String(priority));
-                const r = await fetch(`/manager/ad/slot?${qs.toString()}`, { method: "DELETE" });
-                return await r.json();
-            },
-            async searchStore({ bizNo, q }) {
-                const qs = new URLSearchParams();
-                if (bizNo) qs.set("bizNo", bizNo);
-                if (q) qs.set("q", q);
-                const r = await fetch(`/manager/ad/store/search?${qs.toString()}`);
-                return await r.json();
+        // 슬롯 렌더링 (왼쪽 상호 배지 제거 + 오른쪽 배지에 업종 표시)
+        function renderSlot(el, slot) {
+            const position = el?.dataset?.position || "";
+
+            // ✅ 사이드바 링크 슬롯
+            if (position === "food_sidebar_links") {
+                renderSidebarLinks(el, slot?.text_content || "");
+                return;
             }
-        };
+
+            const img = el.querySelector(".slot-img");
+            const empty = el.querySelector(".slot-empty");
+            const textLayer = el.querySelector(".slot-text-layer");
+            const textBody = el.querySelector(".slot-text-body");
+            const hint = el.querySelector(".slot-hint");
+            const storeBadge = el.querySelector(".slot-store-badge");
+            const badge = el.querySelector(".slot-badge");   // 오른쪽 상단 배지
+            const infoBox = el.querySelector(".slot-info");
+            const titleEl = infoBox ? infoBox.querySelector(".slot-title") : null;
+            const subEl = infoBox ? infoBox.querySelector(".slot-sub") : null;
+
+            const uiMode = slotModeToUiMode(slot?.slot_mode);
+            const hasImg = !!clean(slot?.image_url);
+            const txt = clean(slot?.text_content);
+
+            // 초기화
+            if (img) img.style.display = "none";
+            if (textLayer) textLayer.style.display = "none";
+            if (infoBox) infoBox.classList.add("hidden");
+
+            // ✅ 1. 왼쪽 상호명 배지 완전히 숨기기
+            if (storeBadge) {
+                storeBadge.style.display = "none";
+                storeBadge.textContent = "";
+            }
+
+            // ✅ 2. 오른쪽 배지에 업종 표시 (store 모드일 때만)
+            if (badge) {
+                if (!badge.dataset.defaultText) {
+                    // 원래 쓰던 "Banner / Card / Hero" 텍스트 기억
+                    badge.dataset.defaultText = clean(badge.textContent) || "Banner";
+                }
+                const defaultText = badge.dataset.defaultText;
+
+                if (uiMode === "store") {
+                    const bizType = pickBizType(slot);   // 업종 뽑기
+                    badge.textContent = bizType || defaultText;
+                } else {
+                    // 이미지/텍스트 모드는 원래 라벨 유지
+                    badge.textContent = defaultText;
+                }
+            }
+
+            // text mode
+            if (uiMode === "text") {
+                if (textLayer) textLayer.style.display = "block";
+                if (textBody) textBody.textContent = txt;
+                if (hint) hint.classList.toggle("hidden", !!txt);
+                if (empty) empty.style.display = "none";
+                return;
+            }
+
+            // image/banner mode
+            if (hasImg) {
+                if (img) {
+                    img.src = slot.image_url;
+                    img.style.display = "block";
+                }
+                if (empty) empty.style.display = "none";
+            } else {
+                if (empty) empty.style.display = "flex";
+            }
+
+            // 하단 정보 박스: 상호명 + (옵션) 업종
+            if (infoBox && uiMode === "store" && clean(slot?.business_name)) {
+                infoBox.classList.remove("hidden");
+                if (titleEl) titleEl.textContent = slot.business_name;
+
+                const sub = pickBizType(slot);
+                if (subEl) subEl.textContent = sub ? `업종: ${sub}` : "";
+            }
+        }
+
 
         /* =========================
           ✅ Sidebar Links 렌더
