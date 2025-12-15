@@ -144,6 +144,18 @@ uploadDirs.forEach((dir) => {
   }
 });
 
+// ✅ no-image.png 자동 복사 (프로덕션 배포 시 필수)
+const noImageSource = path.join(__dirname, "public2/uploads/no-image.png");
+const noImageDest = path.join(UPLOAD_ROOT, "no-image.png");
+if (fs.existsSync(noImageSource) && !fs.existsSync(noImageDest)) {
+  try {
+    fs.copyFileSync(noImageSource, noImageDest);
+    console.log("✅ no-image.png copied to /data/uploads/");
+  } catch (err) {
+    console.error("❌ Failed to copy no-image.png:", err);
+  }
+}
+
 // ------------------------------------------------------------
 // 3. Express 설정
 // ------------------------------------------------------------
