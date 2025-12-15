@@ -478,6 +478,19 @@
         const position = slot.dataset.position;
         if (!position) continue;
 
+        // ✅ 무조건 먼저 초기화 (fetch 실패해도 기존 업종/텍스트 안 남게)
+        const img = slot.querySelector('.slot-img');
+        const info = slot.querySelector('.slot-info');
+        const nameEl = slot.querySelector('.slot-name');
+        const categoryEl = slot.querySelector('.slot-category');
+
+        if (nameEl) nameEl.textContent = "";
+        if (categoryEl) {
+          categoryEl.textContent = "";
+          categoryEl.classList.add("hidden");
+        }
+        if (info) info.classList.add("hidden");
+
         try {
           const res = await fetch(`/manager/ad/slot?page=foodcategory&position=${position}`);
           if (!res.ok) continue;
@@ -486,31 +499,20 @@
           const slotData = data.slot || data.data || null;
           if (!slotData) continue;
 
-          // 이미지 업데이트
-          const img = slot.querySelector('.slot-img');
-          const info = slot.querySelector('.slot-info');
-          const nameEl = slot.querySelector('.slot-name');
-          const categoryEl = slot.querySelector('.slot-category');
+          const storeName = (slotData.business_name || slotData.businessName || "").toString().trim();
+          const storeCategory = (
+            slotData.business_category ||
+            slotData.businessCategory ||
+            slotData.store_category ||
+            slotData.storeCategory ||
+            slotData.category ||
+            ""
+          ).toString().trim();
 
-          if (nameEl) nameEl.textContent = "";
-          if (categoryEl) {
-            categoryEl.textContent = "";
-            categoryEl.classList.add("hidden");
+          if (img && slotData.image_url) {
+            img.src = slotData.image_url;
+            img.alt = storeName || '가게 이미지';
           }
-          if (info) info.classList.add("hidden"); // 빈 슬롯은 info 숨김
-
-          // 가게 정보 업데이트
-          // ✅ 가게 정보 업데이트
-          const storeName =
-            (slotData.business_name || slotData.businessName || "").toString().trim();
-
-          const storeCategory =
-            (slotData.business_category ||
-              slotData.businessCategory ||
-              slotData.store_category ||
-              slotData.storeCategory ||
-              slotData.category ||
-              "").toString().trim();
 
           if (storeName) {
             if (info) info.classList.remove("hidden");
@@ -524,13 +526,16 @@
             }
           }
 
-          // 클릭 이벤트: 가게 상세 페이지로 이동
+          // ✅ (추천) 중복 클릭리스너 방지: addEventListener 대신 onclick 덮어쓰기
           if (slotData.store_id) {
-            slot.style.cursor = 'pointer';
-            slot.addEventListener('click', function (e) {
+            slot.style.cursor = "pointer";
+            slot.onclick = (e) => {
               e.preventDefault();
               window.location.href = `/detail.html?id=${slotData.store_id}`;
-            });
+            };
+          } else {
+            slot.onclick = null;
+            slot.style.cursor = "";
           }
 
         } catch (err) {
@@ -542,74 +547,74 @@
     // 페이지 로드 시 슬롯 로딩
     document.addEventListener("DOMContentLoaded", loadAdSlots);
 
-    // ✅ 서브카테고리 토글 (간단한 토글 구조)
-    function toggleSub(btn) {
-      const ul = btn.nextElementSibling;
-      if (!ul) return;
-      ul.classList.toggle("hidden");
-    }
+          // ✅ 서브카테고리 토글 (간단한 토글 구조)
+          function toggleSub(btn) {
+            const ul = btn.nextElementSibling;
+            if (!ul) return;
+            ul.classList.toggle("hidden");
+          }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const viewport = document.getElementById("powerViewport");
-      const track = document.getElementById("powerAdTrack");
+          document.addEventListener("DOMContentLoaded", () => {
+            const viewport = document.getElementById("powerViewport");
+            const track = document.getElementById("powerAdTrack");
 
-      // DOM에 이미 있는 그룹 개수 사용
-      let groups = track.querySelectorAll(".power-group").length;
-      let index = 0;
+            // DOM에 이미 있는 그룹 개수 사용
+            let groups = track.querySelectorAll(".power-group").length;
+            let index = 0;
 
-      function updateSlider() {
-        const slideWidth = viewport.clientWidth; // 보이는 영역 실제 폭(px)
-        track.style.transform = `translateX(${-index * slideWidth}px)`;
-      }
+            function updateSlider() {
+              const slideWidth = viewport.clientWidth; // 보이는 영역 실제 폭(px)
+              track.style.transform = `translateX(${-index * slideWidth}px)`;
+            }
 
-      function next() { index = (index + 1) % groups; updateSlider(); }
-      function prev() { index = (index - 1 + groups) % groups; updateSlider(); }
+            function next() { index = (index + 1) % groups; updateSlider(); }
+            function prev() { index = (index - 1 + groups) % groups; updateSlider(); }
 
-      // 버튼
-      const nextBtn = document.getElementById("nextBtn");
-      const prevBtn = document.getElementById("prevBtn");
-      if (nextBtn && prevBtn) {
-        nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
-        prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
-      }
+            // 버튼
+            const nextBtn = document.getElementById("nextBtn");
+            const prevBtn = document.getElementById("prevBtn");
+            if (nextBtn && prevBtn) {
+              nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
+              prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
+            }
 
-      // 반응형 (그룹 수가 동적으로 바뀌진 않지만 혹시 몰라 재계산 가능)
-      window.addEventListener("resize", updateSlider);
+            // 반응형 (그룹 수가 동적으로 바뀌진 않지만 혹시 몰라 재계산 가능)
+            window.addEventListener("resize", updateSlider);
 
-      // 7초 자동 슬라이드
-      const INTERVAL = 7000;
-      let timer = null;
-      function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
-      function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+            // 7초 자동 슬라이드
+            const INTERVAL = 7000;
+            let timer = null;
+            function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
+            function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
 
-      // 탭 비활성화 시 일시정지/복귀
-      document.addEventListener("visibilitychange", () => {
-        document.hidden ? stopAuto() : startAuto();
-      });
+            // 탭 비활성화 시 일시정지/복귀
+            document.addEventListener("visibilitychange", () => {
+              document.hidden ? stopAuto() : startAuto();
+            });
 
-      // 마우스 올리면 일시정지(선택)
-      viewport.addEventListener("mouseenter", stopAuto);
-      viewport.addEventListener("mouseleave", startAuto);
+            // 마우스 올리면 일시정지(선택)
+            viewport.addEventListener("mouseenter", stopAuto);
+            viewport.addEventListener("mouseleave", startAuto);
 
-      updateSlider();
-      startAuto();
-    });
+            updateSlider();
+            startAuto();
+          });
 
   </script>
 
   <script>
-    function goBack() {
-      if (document.referrer && document.referrer !== location.href) {
-        window.history.back();
-      } else {
-        // 뒤로 갈 페이지가 없으면 상위 카테고리(예: index 또는 전체 카테고리)로
-        window.location.href = "/index.html";
-      }
-    }
+          function goBack() {
+            if (document.referrer && document.referrer !== location.href) {
+              window.history.back();
+            } else {
+              // 뒤로 갈 페이지가 없으면 상위 카테고리(예: index 또는 전체 카테고리)로
+              window.location.href = "/index.html";
+            }
+          }
 
-    function goNext() {
-      window.history.forward();
-    }
+          function goNext() {
+            window.history.forward();
+          }
   </script>
 </body>
 
