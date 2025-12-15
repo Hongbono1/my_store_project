@@ -556,15 +556,12 @@
       window.__foodcategory_slots_once = true;
 
       async function loadAdSlots() {
-        console.log("[foodcategory] loadAdSlots 시작");
         const slots = document.querySelectorAll("[data-slot][data-position]");
-        console.log(`[foodcategory] 총 ${slots.length}개 슬롯 발견`);
         const ts = Date.now(); // 캐시 무시용
 
         for (const slot of slots) {
           const position = slot.dataset.position;
           if (!position) continue;
-          console.log(`[foodcategory] 처리 중: ${position}`);
 
           // ✅ 초기화
           const img = slot.querySelector(".slot-img");
@@ -591,23 +588,11 @@
               `/foodcategorymanager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}&t=${ts}`,
               { cache: "no-store" }
             );
-
-            console.log(`[foodcategory] ${position} API 응답 status: ${res.status}`);
-            if (!res.ok) {
-              console.warn(`[foodcategory] ${position} API 실패: ${res.status}`);
-              continue;
-            }
+            if (!res.ok) continue;
 
             const data = await res.json();
-            console.log(`[foodcategory] ${position} data:`, data);
-
             const slotData = data.slot || data.data || null;
-            if (!slotData) {
-              console.log(`[foodcategory] ${position} slotData 없음`);
-              continue;
-            }
-
-            console.log(`[foodcategory] ${position} slotData:`, slotData);
+            if (!slotData) continue;
 
             // ✅ store_id만 "가게 id"로 인정 (slotData.id는 슬롯 id라서 쓰면 꼬임)
             const storeId = (slotData.store_id || slotData.storeId || "").toString().trim() || null;
@@ -636,7 +621,7 @@
               ""
             ).toString().trim();
 
-            // ✅ 광고 이미지(슬롯 이미지)
+            // slot 이미지(광고 이미지)
             let imageUrl = (
               slotData.image_url ||
               slotData.imageUrl ||
@@ -651,7 +636,8 @@
               if (meta) {
                 if (!storeName && meta.name) storeName = meta.name;
                 if (!storeCategory && meta.category) storeCategory = meta.category;
-                if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl; // 슬롯 이미지 없으면 대표 이미지로 대체
+                // slot 이미지가 없으면 가게 대표 이미지로 대체
+                if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl;
               }
             }
 
@@ -690,7 +676,6 @@
 
       document.addEventListener("DOMContentLoaded", loadAdSlots, { once: true });
     }
-
 
     // ✅ 서브카테고리 토글 (inline onclick용 전역)
     window.toggleSub = function (btn) {
