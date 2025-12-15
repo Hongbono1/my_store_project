@@ -470,6 +470,24 @@
       .then(r => r.text())
       .then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
+    // ✅ 유틸
+    function normalizeUrl(u) {
+      if (!u) return "";
+      const s = String(u).trim();
+      if (!s) return "";
+      if (s.startsWith("http://") || s.startsWith("https://")) return s;
+      return s.startsWith("/") ? s : `/${s}`;
+    }
+
+    function setImgSafe(imgEl, url, alt) {
+      if (!imgEl) return;
+      const next = normalizeUrl(url);
+      if (!next) return; // 없으면 HTML 기본 no-image 유지
+      imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = "/uploads/no-image.png"; };
+      imgEl.src = next;
+      if (alt) imgEl.alt = alt;
+    }
+
     // ✅ store 상세에서 상호/업종/대표이미지 보강 (slotData에 없을 때)
     async function fetchStoreMeta(storeId) {
       try {
@@ -479,22 +497,24 @@
 
         // 서버 응답 형태 혼용 대응
         const s = j.store || j.data || j || {};
+
         const name = (
           s.business_name ||
           s.businessName ||
           s.store_name ||
           s.storeName ||
+          s.business_name_kor ||
           s.name ||
           ""
         ).toString().trim();
 
         const category = (
+          s.business_category ||
+          s.businessCategory ||
           s.business_type ||
           s.businessType ||
           s.business_subcategory ||
           s.businessSubcategory ||
-          s.business_category ||
-          s.businessCategory ||
           s.store_category ||
           s.storeCategory ||
           s.category ||
@@ -504,6 +524,7 @@
         const imageUrl = (
           s.main_image_url ||
           s.mainImageUrl ||
+          s.main_image ||
           s.image_url ||
           s.imageUrl ||
           s.image_path ||
@@ -521,162 +542,172 @@
     function renderNameWithCategory(nameEl, categoryEl, storeName, storeCategory) {
       if (!nameEl) return;
 
-      // 기존 내용 제거
+      // slot-name에 "상호 (업종)"을 같이 넣고,
+      // slot-category는 아예 숨겨서(빈 슬롯에서 튀어나오는 것 방지)
       nameEl.innerHTML = "";
-
-      // 상호
       nameEl.appendChild(document.createTextNode(storeName));
 
-      // 업종은 상호 있을 때만 (괄호 + 작은 글씨)
       if (storeCategory) {
         const span = document.createElement("span");
-        span.className = "text-sm text-slate-600 font-normal ml-1";
+        revealedStyle(span);
         span.textContent = `(${storeCategory})`;
         nameEl.appendChild(span);
       }
 
-      // ✅ slot-category 칸은 아예 안 쓰고 숨김(혹시 기본값 남는 것 방지)
       if (categoryEl) {
         categoryEl.textContent = "";
         categoryEl.classList.add("hidden");
       }
-    }
 
-    // ✅ 광고 슬롯 로딩 (foodcategorymanager에서 설정한 내용 표시)
-    async function loadAdSlots() {
-      const slots = document.querySelectorAll("[data-slot][data-position]");
-
-      for (const slot of slots) {
-        const position = slot.dataset.position;
-        if (!position) continue;
-
-        // ✅ 먼저 초기화(이전 텍스트/업종/클릭이 남지 않게)
-        const img = slot.querySelector(".slot-img");
-        const info = slot.querySelector(".slot-info");
-        const nameEl = slot.querySelector(".slot-name");
-        const categoryEl = slot.querySelector(".slot-category");
-
-        if (nameEl) nameEl.textContent = "";
-        if (categoryEl) {
-          categoryEl.textContent = "";
-          categoryEl.classList.add("hidden");
-        }
-        if (info) info.classList.add("hidden");
-
-        slot.onclick = null;
-        slot.style.cursor = "";
-
-        try {
-          const res = await fetch(
-            `/manager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}`,
-            { cache: "no-store" }
-          );
-          if (!res.ok) continue;
-
-          const data = await res.json();
-          const slotData = data.slot || data.data || null;
-          if (!slotData) continue;
-
-          // ✅ store_id / id 키 혼용 대응
-          const storeId =
-            slotData.store_id ||
-            slotData.storeId ||
-            slotData.id ||
-            (slotData.store && (slotData.store.id || slotData.store.store_id)) ||
-            null;
-
-          // ✅ 1차: slotData에서 상호/업종/이미지 추출
-          let storeName = (
-            slotData.business_name ||
-            slotData.businessName ||
-            slotData.store_name ||
-            slotData.storeName ||
-            slotData.name ||
-            (slotData.store && (slotData.store.business_name || slotData.store.store_name)) ||
-            ""
-          ).toString().trim();
-
-          let storeCategory = (
-            slotData.business_type ||
-            slotData.businessType ||
-            slotData.business_subcategory ||
-            slotData.businessSubcategory ||
-            slotData.business_category ||
-            slotData.businessCategory ||
-            slotData.store_category ||
-            slotData.storeCategory ||
-            slotData.category ||
-            (slotData.store &&
-              (slotData.store.business_type ||
-                slotData.store.business_subcategory ||
-                slotData.store.business_category ||
-                slotData.store.category)) ||
-            ""
-          ).toString().trim();
-
-          let imageUrl = (
-            slotData.image_url ||
-            slotData.imageUrl ||
-            slotData.image_path ||
-            slotData.imagePath ||
-            (slotData.store && (slotData.store.main_image_url || slotData.store.image_url)) ||
-            ""
-          ).toString().trim();
-
-          // ✅ 2차: 업종이 비어있으면 store API로 보강
-          if (storeId && (!storeName || !storeCategory || !imageUrl)) {
-            const meta = await fetchStoreMeta(storeId);
-            if (meta) {
-              if (!storeName && meta.name) storeName = meta.name;
-              if (!storeCategory && meta.category) storeCategory = meta.category;
-              if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl;
-            }
-          }
-
-          // ✅ 이미지 업데이트 (없으면 HTML 기본 no-image 유지)
-          if (img && imageUrl) {
-            img.src = imageUrl;
-            img.alt = storeName || "가게 이미지";
-          }
-
-          // ✅ 상호가 있을 때만 오버레이 표시 + "상호 (업종)"
-          if (storeName) {
-            if (info) info.classList.remove("hidden");
-            renderNameWithCategory(nameEl, categoryEl, storeName, storeCategory);
-          } else {
-            // 빈 슬롯이면 업종도 절대 표시 X
-            if (categoryEl) {
-              categoryEl.textContent = "";
-              categoryEl.classList.add("hidden");
-            }
-          }
-
-          // ✅ 클릭 이벤트 (가게 정보가 있을 때만)
-          if (storeId) {
-            slot.style.cursor = "pointer";
-            slot.onclick = (e) => {
-              e.preventDefault();
-              window.location.href = `/ndetail.html?id=${storeId}`;
-            };
-          } else {
-            // 가게 정보 없으면 클릭 불가
-            slot.style.cursor = "default";
-            slot.onclick = null;
-          }
-        } catch (err) {
-          console.error(`[foodcategory] 슬롯 로딩 실패 (${position}):`, err);
-        }
+      function revealedStyle(span) {
+        span.className = "text-sm text-slate-600 font-normal ml-1";
       }
     }
 
-    document.addEventListener("DOMContentLoaded", loadAdSlots);
+    // ✅ 광고 슬롯 로딩 (중복 실행 방지)
+    if (!window.__foodcategory_slots_once) {
+      window.__foodcategory_slots_once = true;
 
-    // ✅ 서브카테고리 토글
-    function toggleSub(btn) {
-      const ul = btn.nextElementSibling;
+      async function loadAdSlots() {
+        const slots = document.querySelectorAll("[data-slot][data-position]");
+        const ts = Date.now(); // 캐시 무시용
+
+        for (const slot of slots) {
+          const position = slot.dataset.position;
+          if (!position) continue;
+
+          // ✅ 먼저 초기화(이전 텍스트/업종/클릭이 남지 않게)
+          const img = slot.querySelector(".slot-img");
+          const info = slot.querySelector(".slot-info");
+          const nameEl = slot.querySelector(".slot-name");
+          const categoryEl = slot.querySelector(".slot-category");
+
+          if (nameEl) nameEl.textContent = "";
+          if (categoryEl) {
+            categoryEl.textContent = "";
+            categoryEl.classList.add("hidden");
+          }
+          if (info) {
+            info.classList.add("hidden");
+            info.style.zIndex = ""; // 초기화
+          }
+
+          slot.onclick = null;
+          slot.style.cursor = "";
+
+          try {
+            const res = await fetch(
+              `/manager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}&t=${ts}`,
+              { cache: "no-store" }
+            );
+            if (!res.ok) continue;
+
+            const data = await res.json();
+            const slotData = data.slot || data.data || null;
+            if (!slotData) continue;
+
+            // ✅ store_id / id 키 혼용 대응
+            const storeId =
+              slotData.store_id ||
+              slotData.storeId ||
+              slotData.id ||
+              (slotData.store && (slotData.store.id || slotData.store.store_id)) ||
+              null;
+
+            // ✅ 1차: slotData에서 상호/업종/이미지 추출
+            let storeName = (
+              slotData.business_name ||
+              slotData.businessName ||
+              slotData.store_name ||
+              slotData.storeName ||
+              slotData.name ||
+              (slotData.store && (slotData.store.business_name || slotData.store.store_name)) ||
+              ""
+            ).toString().trim();
+
+            let storeCategory = (
+              slotData.business_category ||
+              slotData.businessCategory ||
+              slotData.business_type ||
+              slotData.businessType ||
+              slotData.business_subcategory ||
+              slotData.businessSubcategory ||
+              slotData.store_category ||
+              slotData.storeCategory ||
+              slotData.category ||
+              (slotData.store &&
+                (slotData.store.business_category ||
+                  slotData.store.business_type ||
+                  slotData.store.business_subcategory ||
+                  slotData.store.category)) ||
+              ""
+            ).toString().trim();
+
+            let imageUrl = (
+              slotData.image_url ||
+              slotData.imageUrl ||
+              slotData.image_path ||
+              slotData.imagePath ||
+              (slotData.store &&
+                (slotData.store.main_image_url ||
+                  slotData.store.mainImageUrl ||
+                  slotData.store.image_url ||
+                  slotData.store.imageUrl)) ||
+              ""
+            ).toString().trim();
+
+            // ✅ 2차: 부족하면 store API로 보강
+            if (storeId && (!storeName || !storeCategory || !imageUrl)) {
+              const meta = await fetchStoreMeta(storeId);
+              if (meta) {
+                if (!storeName && meta.name) storeName = meta.name;
+                if (!storeCategory && meta.category) storeCategory = meta.category;
+                if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl;
+              }
+            }
+
+            // ✅ 이미지 업데이트 (없으면 HTML 기본 no-image 유지)
+            setImgSafe(img, imageUrl, storeName || "가게 이미지");
+
+            // ✅ 상호가 있을 때만 오버레이 표시 + "상호 (업종)"
+            if (storeName) {
+              if (info) {
+                info.classList.remove("hidden");
+                info.style.zIndex = "20"; // 이미지 위로
+              }
+              renderNameWithCategory(nameEl, categoryEl, storeName, storeCategory);
+            } else {
+              if (info) info.classList.add("hidden");
+              if (categoryEl) categoryEl.classList.add("hidden");
+            }
+
+            // ✅ 클릭 이벤트 (가게 정보가 있을 때만)
+            if (storeId) {
+              slot.style.cursor = "pointer";
+              slot.onclick = (e) => {
+                e.preventDefault();
+                // 필요하면 detail.html로 바꿔도 됨
+                window.location.href = `/ndetail.html?id=${storeId}`;
+              };
+            } else {
+              slot.style.cursor = "default";
+              slot.onclick = null;
+            }
+          } catch (err) {
+            console.error(`[foodcategory] 슬롯 로딩 실패 (${position}):`, err);
+          }
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", loadAdSlots, { once: true });
+    }
+
+    // ✅ 서브카테고리 토글 (inline onclick용 전역)
+    window.toggleSub = function (btn) {
+      const ul = btn?.nextElementSibling;
       if (!ul) return;
       ul.classList.toggle("hidden");
-    }
+    };
 
     // ✅ 파워 광고 슬라이더
     document.addEventListener("DOMContentLoaded", () => {
@@ -684,7 +715,7 @@
       const track = document.getElementById("powerAdTrack");
       if (!viewport || !track) return;
 
-      let groups = track.querySelectorAll(".power-group").length;
+      const groups = track.querySelectorAll(".power-group").length;
       let index = 0;
 
       function updateSlider() {
@@ -697,23 +728,19 @@
 
       const nextBtn = document.getElementById("nextBtn");
       const prevBtn = document.getElementById("prevBtn");
+
+      const INTERVAL = 7000;
+      let timer = null;
+      function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
+      function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+
       if (nextBtn && prevBtn) {
         nextBtn.addEventListener("click", () => { stopAuto(); next(); startAuto(); });
         prevBtn.addEventListener("click", () => { stopAuto(); prev(); startAuto(); });
       }
 
       window.addEventListener("resize", updateSlider);
-
-      const INTERVAL = 7000;
-      let timer = null;
-
-      function startAuto() { if (!timer) timer = setInterval(next, INTERVAL); }
-      function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
-
-      document.addEventListener("visibilitychange", () => {
-        document.hidden ? stopAuto() : startAuto();
-      });
-
+      document.addEventListener("visibilitychange", () => (document.hidden ? stopAuto() : startAuto()));
       viewport.addEventListener("mouseenter", stopAuto);
       viewport.addEventListener("mouseleave", startAuto);
 
@@ -721,17 +748,14 @@
       startAuto();
     });
 
-    // ✅ 우측 하단 네비
-    function goBack() {
-      if (document.referrer && document.referrer !== location.href) {
-        window.history.back();
-      } else {
-        window.location.href = "/index.html";
-      }
-    }
-    function goNext() {
+    // ✅ 우측 하단 네비 (inline onclick용 전역)
+    window.goBack = function () {
+      if (document.referrer && document.referrer !== location.href) window.history.back();
+      else window.location.href = "/index.html";
+    };
+    window.goNext = function () {
       window.history.forward();
-    }
+    };
   </script>
 
 </body>
