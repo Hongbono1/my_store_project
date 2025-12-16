@@ -255,8 +255,12 @@ export async function saveSlot(req, res) {
     return res.json({ success: true, slot });
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch { }
-    console.error("saveSlot error:", e);
-    return res.status(500).json({ success: false, error: "server error" });
+    console.error("❌ saveSlot error:", e);
+    console.error("❌ Error message:", e.message);
+    console.error("❌ Error stack:", e.stack);
+    if (e.code) console.error("❌ PG Error code:", e.code);
+    if (e.detail) console.error("❌ PG Error detail:", e.detail);
+    return res.status(500).json({ success: false, error: e.message || "server error" });
   } finally {
     client.release();
   }
