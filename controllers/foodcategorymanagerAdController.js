@@ -341,13 +341,7 @@ export async function searchStore(req, res) {
         s.id::text AS id,
         regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         s.business_name,
-
-        -- ✅ detail_category 제거 (없으면 여기서도 500 남)
-        COALESCE(
-          NULLIF(s.business_category, ''),
-          NULLIF(s.business_subcategory, '')
-        ) AS category,
-
+        COALESCE(s.business_category, '') AS category,
         img.url AS image_url
       FROM public.store_info s
       LEFT JOIN LATERAL (
@@ -376,7 +370,11 @@ export async function searchStore(req, res) {
     const { rows } = await pool.query(sql, params);
     return res.json({ ok: true, stores: rows || [] });
   } catch (e) {
-    console.error("searchStore error:", e);
-    return res.status(500).json({ ok: false, error: "server error" });
+    console.error("❌ searchStore error:", e);
+    console.error("❌ searchStore message:", e.message);
+    console.error("❌ searchStore stack:", e.stack);
+    if (e.code) console.error("❌ PG Error code:", e.code);
+    if (e.detail) console.error("❌ PG Error detail:", e.detail);
+    return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
