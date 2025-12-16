@@ -73,7 +73,6 @@ async function fetchSlot({ page, position, priority }) {
   return rows[0] || null;
 }
 
-
 function safeUnlinkByPublicUrl(publicUrl) {
   try {
     const u = clean(publicUrl);
@@ -187,7 +186,7 @@ export async function saveSlot(req, res) {
     }
 
     if (existing) {
-      // ✅ UPDATE: 파라미터/타입 추론 안정화 (항상 같은 SQL 형태)
+      // ✅ UPDATE
       const params = [
         slotType,            // $1
         slotMode,            // $2
@@ -262,7 +261,7 @@ export async function saveSlot(req, res) {
 
     await client.query("COMMIT");
 
-    // ✅ 저장 후 다시 불러오기 (여기서 컬럼 없으면 500나던 문제 해결됨)
+    // ✅ 저장 후 다시 불러오기
     const slot = await fetchSlot({ page, position, priority });
     return res.json({ success: true, slot });
   } catch (e) {
@@ -351,41 +350,52 @@ export async function searchStore(req, res) {
     const q = clean(req.query.q);
 
     const params = [];
-    let cond = ` WHERE 1=1 `;
+
+    // ✅ combined_store_info 기준 + store_info 보조
+    let whereCombined = ` WHERE 1=1 `;
+    let whereStore = ` WHERE 1=1 `;
 
     if (bizNo) {
       params.push(bizNo);
-      cond += ` AND regexp_replace(COALESCE(t.business_number::text,''), '[^0-9]', '', 'g') = $${params.length} `;
+      const idx = params.length;
+      const condBiz = ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $${idx} `;
+      whereCombined += condBiz;
+      whereStore += condBiz;
     }
+
     if (q) {
       params.push(`%${q}%`);
-      cond += ` AND t.business_name ILIKE $${params.length} `;
+      const idx = params.length;
+      const condName = ` AND business_name ILIKE $${idx} `;
+      whereCombined += condName;
+      whereStore += condName;
     }
 
     const sql = `
       WITH candidates AS (
         SELECT
-          s.id::text AS id,
-          regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-          s.business_name,
-          COALESCE(s.business_category, '') AS category
-        FROM public.store_info s
-        CROSS JOIN LATERAL (SELECT s.business_number, s.business_name, s.business_category) t
-        ${cond.replaceAll("t.", "s.")}
+          id::text AS id,
+          regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          business_name,
+          COALESCE(business_category, '') AS category
+        FROM public.combined_store_info
+        ${whereCombined}
 
         UNION ALL
 
         SELECT
-          c.id::text AS id,
-          regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-          c.business_name,
-          COALESCE(c.business_category, '') AS category
-        FROM public.combined_store_info c
-        CROSS JOIN LATERAL (SELECT c.business_number, c.business_name, c.business_category) t
-        ${cond.replaceAll("t.", "c.")}
+          id::text AS id,
+          regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          business_name,
+          COALESCE(business_category, '') AS category
+        FROM public.store_info
+        ${whereStore}
       )
       SELECT DISTINCT ON (id)
-        id, business_no, business_name, category,
+        id,
+        business_no,
+        business_name,
+        category,
         img.url AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
@@ -403,7 +413,10 @@ export async function searchStore(req, res) {
     return res.json({ ok: true, stores: rows || [] });
   } catch (e) {
     console.error("❌ searchStore error:", e);
+    console.error("❌ Error message:", e.message);
+    console.error("❌ Error stack:", e.stack);
+    if (e.code) console.error("❌ PG Error code:", e.code);
+    if (e.detail) console.error("❌ PG Error detail:", e.detail);
     return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
-
