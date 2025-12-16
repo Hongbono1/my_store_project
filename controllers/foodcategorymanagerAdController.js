@@ -22,12 +22,20 @@ function digitsOnly(v) {
   return clean(v).replace(/[^\d]/g, "");
 }
 
+// ⚠️ 주의: 광고 슬롯의 image_url이 "가게 공용 이미지"를 가리킬 수 있어서,
+//      여기서 파일을 지워버리면 다른 슬롯/가게에서도 이미지가 깨질 수 있음.
+//      그래서 슬롯 reset/delete에서는 unlink 하지 않도록 아래 로직에서 사용을 제한함.
 function safeUnlinkByPublicUrl(publicUrl) {
   try {
     const u = clean(publicUrl);
     if (!u.startsWith("/uploads/")) return;
+
     const filename = u.replace("/uploads/", "");
-    const abs = path.join(UPLOAD_DIR, filename);
+    const normalized = path.posix.normalize(filename).replace(/^(\.\.(\/|\\|$))+/, "");
+    const abs = path.resolve(UPLOAD_DIR, normalized);
+    const base = path.resolve(UPLOAD_DIR) + path.sep;
+
+    if (!abs.startsWith(base)) return;
     if (fs.existsSync(abs)) fs.unlinkSync(abs);
   } catch {
     // ignore
@@ -83,11 +91,9 @@ async function fetchSlot({ page, position, priority }) {
 
     FROM public.admin_ad_slots s
 
-    -- ✅ 가게 메타(상호/업종/대표이미지 후보)
     LEFT JOIN public.combined_store_info c
       ON s.store_id::text = c.id::text
 
-    -- ✅ store_images 대표 1장
     LEFT JOIN LATERAL (
       SELECT url
       FROM public.store_images
@@ -121,9 +127,7 @@ export async function getSlot(req, res) {
     const priRaw = clean(req.query.priority);
 
     if (!page || !position) {
-      return res
-        .status(400)
-        .json({ success: false, error: "page/position required" });
+      return res.status(400).json({ success: false, error: "page/position required" });
     }
 
     const priority = priRaw ? Number(priRaw) : null;
@@ -132,13 +136,7 @@ export async function getSlot(req, res) {
     return res.json({ success: true, slot });
   } catch (e) {
     console.error("❌ getSlot error:", e);
-    console.error("❌ getSlot message:", e.message);
-    console.error("❌ getSlot stack:", e.stack);
-    if (e.code) console.error("❌ PG Error code:", e.code);
-    if (e.detail) console.error("❌ PG Error detail:", e.detail);
-    return res
-      .status(500)
-      .json({ success: false, error: e.message || "server error" });
+    return res.status(500).json({ success: false, error: e.message || "server error" });
   }
 }
 
@@ -151,30 +149,24 @@ export async function saveSlot(req, res) {
     const page = clean(b.page);
     const position = clean(b.position);
     if (!page || !position) {
-      return res
-        .status(400)
-        .json({ success: false, error: "page/position required" });
+      return res.status(400).json({ success: false, error: "page/position required" });
     }
 
     const priority = clean(b.priority) ? Number(b.priority) : null;
 
-    const slotType = clean(b.slotType || b.slot_type) || "banner";
-    const slotMode = clean(b.slotMode || b.slot_mode) || "banner";
+    let slotType = clean(b.slotType || b.slot_type) || "banner";
+    let slotMode = clean(b.slotMode || b.slot_mode) || "banner";
 
-    const linkUrl =
-      clean(b.linkUrl || b.link_url || b.link) || null;
-    const textContent =
-      clean(b.textContent || b.text_content || b.content) || null;
+    let linkUrl = clean(b.linkUrl || b.link_url || b.link) || null;
+    let textContent = clean(b.textContent || b.text_content || b.content) || null;
 
-    const storeId = clean(b.storeId || b.store_id) || null;
-    const businessNo =
-      clean(b.businessNo || b.business_no) || null;
-    const businessName =
-      clean(b.businessName || b.business_name) || null;
+    let storeId = clean(b.storeId || b.store_id) || null;
+    let businessNo = clean(b.businessNo || b.business_no) || null;
+    let businessName = clean(b.businessName || b.business_name) || null;
 
-    const startAtLocal = clean(b.startAt || b.start_at) || "";
-    const endAtLocal = clean(b.endAt || b.end_at) || "";
-    const noEnd = toBool(b.noEnd || b.no_end);
+    let startAtLocal = clean(b.startAt || b.start_at) || "";
+    let endAtLocal = clean(b.endAt || b.end_at) || "";
+    let noEnd = toBool(b.noEnd || b.no_end);
 
     const keepImage = toBool(b.keepImage);
     const clearImage = toBool(b.clearImage);
@@ -213,21 +205,34 @@ export async function saveSlot(req, res) {
       existing = rows[0] || null;
     }
 
-    // ✅ 최종 이미지 결정
+    // ✅ "입력초기화" 동작: clearImage=true가 오면
+    //    - 해당 슬롯의 store/link/text/date/image 전부 비움
+    //    - 파일은 삭제하지 않음(공유 이미지 깨짐 방지)
+    if (clearImage && !uploaded && !overrideImageUrl) {
+      slotType = "banner";
+      slotMode = "banner";
+
+      linkUrl = null;
+      textContent = null;
+
+      storeId = null;
+      businessNo = null;
+      businessName = null;
+
+      startAtLocal = "";
+      endAtLocal = "";
+      noEnd = false;
+    }
+
+    // ✅ 최종 이미지 결정 (파일 삭제 X)
     let finalImageUrl = existing?.image_url || null;
 
     if (clearImage) {
-      if (finalImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = null;
     } else if (uploaded) {
-      if (finalImageUrl && finalImageUrl !== newImageUrl) {
-        safeUnlinkByPublicUrl(finalImageUrl);
-      }
+      // 교체 시에도 기존 파일 unlink는 하지 않음(안전)
       finalImageUrl = newImageUrl;
     } else if (overrideImageUrl) {
-      if (finalImageUrl && finalImageUrl !== overrideImageUrl) {
-        safeUnlinkByPublicUrl(finalImageUrl);
-      }
       finalImageUrl = overrideImageUrl;
     } else {
       if (!existing?.image_url && !keepImage) {
@@ -238,37 +243,37 @@ export async function saveSlot(req, res) {
     if (existing) {
       // ✅ UPDATE
       const params = [
-        slotType, // $1
-        slotMode, // $2
-        linkUrl, // $3
-        textContent, // $4
-        storeId, // $5
-        businessNo, // $6
-        businessName, // $7
+        slotType,      // $1
+        slotMode,      // $2
+        linkUrl,       // $3
+        textContent,   // $4
+        storeId,       // $5
+        businessNo,    // $6
+        businessName,  // $7
         finalImageUrl, // $8
-        startAtLocal, // $9
-        endAtLocal, // $10
-        noEnd, // $11
-        page, // $12
-        position, // $13
-        priority, // $14
+        startAtLocal,  // $9
+        endAtLocal,    // $10
+        noEnd,         // $11
+        page,          // $12
+        position,      // $13
+        priority,      // $14
       ];
 
       const updateSql = `
         UPDATE public.admin_ad_slots
         SET
-          slot_type   = $1,
-          slot_mode   = $2,
-          link_url    = $3,
-          text_content= $4,
-          store_id    = $5,
-          business_no = $6,
+          slot_type     = $1,
+          slot_mode     = $2,
+          link_url      = $3,
+          text_content  = $4,
+          store_id      = $5,
+          business_no   = $6,
           business_name = $7,
-          image_url   = $8,
-          start_at    = NULLIF($9,  '')::timestamp AT TIME ZONE '${TZ}',
-          end_at      = NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}',
-          no_end      = $11,
-          updated_at  = NOW()
+          image_url     = $8,
+          start_at      = NULLIF($9,  '')::timestamp AT TIME ZONE '${TZ}',
+          end_at        = NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}',
+          no_end        = $11,
+          updated_at    = NOW()
         WHERE page = $12
           AND position = $13
           AND (
@@ -298,40 +303,22 @@ export async function saveSlot(req, res) {
       `;
 
       await client.query(insertSql, [
-        page, // $1
-        position, // $2
-        priority, // $3
-        finalImageUrl, // $4
-        linkUrl, // $5
-        slotType, // $6
-        slotMode, // $7
-        textContent, // $8
-        storeId, // $9
-        businessNo, // $10
-        businessName, // $11
-        startAtLocal, // $12
-        endAtLocal, // $13
-        noEnd, // $14
+        page, position, priority,
+        finalImageUrl, linkUrl,
+        slotType, slotMode, textContent,
+        storeId, businessNo, businessName,
+        startAtLocal, endAtLocal, noEnd,
       ]);
     }
 
     await client.query("COMMIT");
 
-    // ✅ 저장 후 다시 불러오기
     const slot = await fetchSlot({ page, position, priority });
     return res.json({ success: true, slot });
   } catch (e) {
-    try {
-      await client.query("ROLLBACK");
-    } catch { }
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("❌ saveSlot error:", e);
-    console.error("❌ Error message:", e.message);
-    console.error("❌ Error stack:", e.stack);
-    if (e.code) console.error("❌ PG Error code:", e.code);
-    if (e.detail) console.error("❌ PG Error detail:", e.detail);
-    return res
-      .status(500)
-      .json({ success: false, error: e.message || "server error" });
+    return res.status(500).json({ success: false, error: e.message || "server error" });
   } finally {
     client.release();
   }
@@ -346,9 +333,7 @@ export async function deleteSlot(req, res) {
     const priRaw = clean(req.query.priority);
 
     if (!page || !position) {
-      return res
-        .status(400)
-        .json({ success: false, error: "page/position required" });
+      return res.status(400).json({ success: false, error: "page/position required" });
     }
 
     const priority = priRaw ? Number(priRaw) : null;
@@ -387,24 +372,15 @@ export async function deleteSlot(req, res) {
       return res.json({ success: true, deleted: 0 });
     }
 
-    if (existing.image_url) {
-      safeUnlinkByPublicUrl(existing.image_url);
-    }
-
+    // ✅ 삭제 시에도 파일 unlink 하지 않음(공유 이미지 깨짐 방지)
     if (priority === null) {
       await client.query(
-        `
-        DELETE FROM public.admin_ad_slots
-        WHERE page=$1 AND position=$2 AND priority IS NULL
-        `,
+        `DELETE FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority IS NULL`,
         [page, position]
       );
     } else {
       await client.query(
-        `
-        DELETE FROM public.admin_ad_slots
-        WHERE page=$1 AND position=$2 AND priority=$3
-        `,
+        `DELETE FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority=$3`,
         [page, position, priority]
       );
     }
@@ -412,61 +388,40 @@ export async function deleteSlot(req, res) {
     await client.query("COMMIT");
     return res.json({ success: true, deleted: 1 });
   } catch (e) {
-    try {
-      await client.query("ROLLBACK");
-    } catch { }
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("❌ deleteSlot error:", e);
-    return res
-      .status(500)
-      .json({ success: false, error: "server error" });
+    return res.status(500).json({ success: false, error: "server error" });
   } finally {
     client.release();
   }
 }
 
 // -------------------- GET /foodcategorymanager/ad/store/search --------------------
-/**
- * 응답: { ok:true, stores:[{id,business_no,business_name,category,image_url}] }
- */
-
-/**
- * GET /foodcategorymanager/ad/slot/store/search?bizNo=...&q=...
- * 응답: { ok:true, stores:[{id,business_no,business_name,category,image_url}] }
- */
 export async function searchStore(req, res) {
   try {
     const bizNo = digitsOnly(req.query.bizNo);
     const q = clean(req.query.q);
 
     const params = [];
-    const condS = []; // store_info용
-    const condC = []; // combined_store_info용
-    const condF = []; // food_stores용
+    const condS = [];
+    const condC = [];
+    const condF = [];
 
-    // ✅ 사업자번호 조건
     if (bizNo) {
       params.push(bizNo);
       const idx = params.length;
 
-      condS.push(
-        `regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
-      );
-      condC.push(
-        `regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
-      );
-      condF.push(
-        `regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
-      );
+      condS.push(`regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`);
+      condC.push(`regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`);
+      condF.push(`regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`);
     }
 
-    // ✅ 상호 검색어 조건
     if (q) {
       params.push(`%${q}%`);
       const idx = params.length;
 
       condS.push(`s.business_name ILIKE $${idx}`);
       condC.push(`c.business_name ILIKE $${idx}`);
-      // ⬇ food_stores에 컬럼명이 다르면 여기만 고쳐줘
       condF.push(`f.business_name ILIKE $${idx}`);
     }
 
@@ -476,8 +431,6 @@ export async function searchStore(req, res) {
 
     const sql = `
       WITH candidates AS (
-
-        -- 1) store_info (기본 통합 테이블)
         SELECT
           s.id::text AS id,
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
@@ -489,7 +442,6 @@ export async function searchStore(req, res) {
 
         UNION ALL
 
-        -- 2) combined_store_info (뷰/통합 테이블)
         SELECT
           c.id::text AS id,
           regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
@@ -501,7 +453,6 @@ export async function searchStore(req, res) {
 
         UNION ALL
 
-        -- 3) food_stores (푸드 레지스터 테이블)
         SELECT
           f.id::text AS id,
           regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
@@ -533,8 +484,6 @@ export async function searchStore(req, res) {
     return res.json({ ok: true, stores: rows || [] });
   } catch (e) {
     console.error("❌ searchStore error:", e);
-    console.error("❌ message:", e.message);
-    if (e.code) console.error("❌ PG code:", e.code, e.detail || "");
     return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }

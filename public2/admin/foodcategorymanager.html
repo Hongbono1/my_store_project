@@ -1849,15 +1849,16 @@
 
         if (btnResetModal) {
             btnResetModal.addEventListener("click", async () => {
-                const page = modalRoot?.dataset?.page || "foodcategory";
-                const position = modalRoot?.dataset?.position || "";
-                const p = Number(clean(adPriority?.value) || "1"); // ✅ 현재 우선순위 기억
+                // ✅ 어떤 슬롯을 눌러서 모달이 열렸는지(그 슬롯만 삭제)
+                if (!currentSlotEl) return;
 
-                // 1) UI는 즉시 초기화
+                const page = currentSlotEl.dataset.page || "foodcategory";
+                const position = currentSlotEl.dataset.position || "";
+                const p = Number(clean(adPriority?.value) || "1");
+
+                // 1) 모달 입력값만 즉시 초기화 (저장 없이 바로)
                 resetModalFields();
-                if (adPriority) adPriority.value = String(p); // ✅ 우선순위는 유지
-                bizNameTouched = false;
-
+                if (adPriority) adPriority.value = String(p); // 우선순위는 유지
                 if (position === "food_sidebar_links") {
                     setTextOnlyMode(true);
                 } else {
@@ -1867,16 +1868,20 @@
                 }
                 updateModalPreview();
 
-                // 2) DB도 바로 초기화 = 해당 우선순위 후보 삭제
+                // 2) ✅ 서버에서 "이 슬롯(position) + 이 우선순위(p)"만 삭제
+                if (!position) return;
+
                 try {
                     await API.deleteSlot(page, position, p);
                 } catch (e) {
-                    // 후보가 원래 없으면 에러날 수도 있으니, 초기화 목적상 그냥 무시
-                    console.warn("reset deleteSlot ignored:", e);
+                    console.warn("reset deleteSlot error:", e);
+                    // 삭제 실패해도 UI는 일단 비우고 진행
                 }
 
-                // 3) 화면 갱신
-                await hydrateAllSlots();
+                // 3) ✅ 화면도 '그 슬롯만' 완전 비우기 (이름/업종/이미지 다 사라짐)
+                renderSlot(currentSlotEl, null);
+
+                // 4) 후보 목록/모달 내용 갱신
                 await refreshCandidateList(page, position);
                 await loadSlotIntoModal(page, position, p);
             });
