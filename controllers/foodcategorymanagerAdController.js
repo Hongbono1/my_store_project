@@ -204,11 +204,8 @@ export async function saveSlot(req, res) {
           business_no=$6,
           business_name=$7,
           image_url=$8,
-
-          -- ✅ 빈문자열/NULL 안전 처리
           start_at = (NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}'),
           end_at   = CASE WHEN $11 THEN NULL ELSE (NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}') END,
-
           no_end=$11,
           updated_at=NOW()
         WHERE page=$12
@@ -219,7 +216,6 @@ export async function saveSlot(req, res) {
 
       await client.query(updateSql, params);
     } else {
-      // ✅ INSERT: start/end도 항상 placeholder 사용 (타입 안정화)
       const insertSql = `
         INSERT INTO public.admin_ad_slots
           (page, position, priority, image_url, link_url, slot_type, slot_mode, text_content,
