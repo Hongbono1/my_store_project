@@ -36,12 +36,11 @@ async function fetchSlot({ page, position, priority }) {
       s.business_name,
       s.no_end,
 
-      -- ✅ 업종(업종/세부업종) 컬럼명 불일치 대비: detail_category 제거
       COALESCE(
-        NULLIF(f.business_category, ''),
+        NULLIF(c.business_subcategory, ''),
         NULLIF(c.business_category, ''),
         NULLIF(f.business_subcategory, ''),
-        NULLIF(c.business_subcategory, '')
+        NULLIF(f.business_category, '')
       ) AS category,
 
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
@@ -96,8 +95,12 @@ export async function getSlot(req, res) {
 
     return res.json({ success: true, slot });
   } catch (e) {
-    console.error("getSlot error:", e);
-    return res.status(500).json({ success: false, error: "server error" });
+    console.error("❌ getSlot error:", e);
+    console.error("❌ getSlot message:", e.message);
+    console.error("❌ getSlot stack:", e.stack);
+    if (e.code) console.error("❌ PG Error code:", e.code);
+    if (e.detail) console.error("❌ PG Error detail:", e.detail);
+    return res.status(500).json({ success: false, error: e.message || "server error" });
   }
 }
 
