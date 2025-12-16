@@ -26,7 +26,10 @@ async function fetchSlot({ page, position, priority }) {
       s.page,
       s.position,
       s.priority,
-      s.image_url,
+
+      -- ✅ 슬롯 이미지 없으면 가게 대표 이미지로 대체
+      COALESCE(NULLIF(s.image_url, ''), img.url) AS image_url,
+
       s.link_url,
       s.slot_type,
       s.slot_mode,
@@ -43,6 +46,16 @@ async function fetchSlot({ page, position, priority }) {
     FROM public.admin_ad_slots s
     LEFT JOIN public.store_info f ON s.store_id::text = f.id::text
     LEFT JOIN public.combined_store_info c ON s.store_id::text = c.id::text
+
+    -- ✅ store_images 대표 1장
+    LEFT JOIN LATERAL (
+      SELECT url
+      FROM public.store_images
+      WHERE store_id::text = s.store_id::text
+      ORDER BY sort_order, id
+      LIMIT 1
+    ) img ON TRUE
+
     WHERE s.page = $1 AND s.position = $2
   `;
 
@@ -59,6 +72,7 @@ async function fetchSlot({ page, position, priority }) {
   const { rows } = await pool.query(sql, params);
   return rows[0] || null;
 }
+
 
 function safeUnlinkByPublicUrl(publicUrl) {
   try {
