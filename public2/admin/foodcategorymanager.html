@@ -1771,12 +1771,53 @@
         if (fieldImageFile) fieldImageFile.addEventListener("change", updateModalPreview);
         if (fieldNoEnd) fieldNoEnd.addEventListener("change", () => { syncNoEndUI(); updateModalPreview(); });
 
+        // ===== 매장 검색 결과 렌더링 =====
+        function renderStoreSearchResults(stores) {
+            if (!storeResultsBody) return;
+
+            if (!stores || !stores.length) {
+                storeResultsBody.innerHTML = `<div class="text-sm font-extrabold text-slate-500">검색 결과 없음</div>`;
+                return;
+            }
+
+            storeResultsBody.innerHTML = stores.map(store => `
+                <button type="button" 
+                        class="result-item w-full text-left p-3 rounded-lg hover:bg-blue-50 transition cursor-pointer border border-transparent hover:border-blue-200"
+                        data-id="${escapeHtml(store.id)}"
+                        data-biz="${escapeHtml(store.business_no)}"
+                        data-name="${escapeHtml(store.business_name)}"
+                        data-image="${escapeHtml(store.image_url || '')}"
+                        data-category="${escapeHtml(store.category || '')}">
+                    <div class="font-extrabold text-slate-900">${escapeHtml(store.business_name)}</div>
+                    <div class="text-xs text-slate-600 mt-1">
+                        ${escapeHtml(store.business_no)} ${store.category ? `· ${escapeHtml(store.category)}` : ''}
+                    </div>
+                    ${store.image_url ? `<div class="text-[10px] text-blue-500 mt-1">✓ 이미지 있음</div>` : ''}
+                </button>
+            `).join("");
+
+            // 클릭 이벤트
+            storeResultsBody.querySelectorAll(".result-item").forEach(item => {
+                item.addEventListener("click", () => {
+                    if (fieldStoreId) fieldStoreId.value = item.dataset.id || "";
+                    if (fieldBizNo) fieldBizNo.value = item.dataset.biz || "";
+                    if (fieldBizName) fieldBizName.value = item.dataset.name || "";
+
+                    currentStoreImageUrl = item.dataset.image || "";
+
+                    setUiMode("store");
+                    applySlotMode("store");
+                    updateModalPreview();
+                });
+            });
+        }
+
         if (btnSearchStore) {
             btnSearchStore.addEventListener("click", async () => {
                 const bizNo = clean(fieldBizNo?.value);
                 const q = clean(fieldBizName?.value);
 
-                if (storeResultsBody) storeResultsBody.innerHTML = "";
+                if (storeResultsBody) storeResultsBody.innerHTML = "검색 중...";
 
                 try {
                     const data = await API.searchStore({ bizNo, q });
@@ -1785,47 +1826,11 @@
                             `<div class="text-sm font-extrabold text-rose-600">검색 실패</div>`;
                         return;
                     }
-                    const list = data.stores || [];
-                    if (!list.length) {
-                        if (storeResultsBody) storeResultsBody.innerHTML =
-                            `<div class="text-sm font-extrabold text-slate-500">검색 결과 없음</div>`;
-                        return;
-                    }
-
-                    if (storeResultsBody) {
-                        storeResultsBody.innerHTML = list.map(s => `
-              <div class="result-item"
-                   data-id="${escapeHtml(s.id)}"
-                   data-biz="${escapeHtml(s.business_no)}"
-                   data-name="${escapeHtml(s.business_name)}"
-                   data-image="${escapeHtml(s.image_url || '')}"
-                   data-category="${escapeHtml(s.category || '')}">
-                <div class="font-extrabold text-slate-900">${escapeHtml(s.business_name)}</div>
-                <div class="text-xs font-bold text-slate-600 mt-1">
-                  id: ${escapeHtml(s.id)} / biz: ${escapeHtml(s.business_no)}
-                </div>
-                ${s.category ? `<div class="mt-1 text-[11px] text-slate-500">업종: ${escapeHtml(s.category)}</div>` : ""}
-              </div>
-            `).join("");
-
-                        storeResultsBody.querySelectorAll(".result-item").forEach(item => {
-                            item.addEventListener("click", () => {
-                                if (fieldStoreId) fieldStoreId.value = item.dataset.id || "";
-                                if (fieldBizNo) fieldBizNo.value = item.dataset.biz || "";
-                                if (fieldBizName) fieldBizName.value = item.dataset.name || "";
-
-                                currentStoreImageUrl = item.dataset.image || "";
-
-                                setUiMode("store");
-                                applySlotMode("store");
-                                updateModalPreview();
-                            });
-                        });
-                    }
+                    renderStoreSearchResults(data.stores || []);
                 } catch (e) {
                     console.error("searchStore error:", e);
                     if (storeResultsBody) storeResultsBody.innerHTML =
-                        `<div class="text-sm font-extrabold text-rose-600">검색 오류</div>`;
+                        `<div class="text-sm font-extrabold text-rose-600">검색 오류: ${e.message}</div>`;
                 }
             });
         }

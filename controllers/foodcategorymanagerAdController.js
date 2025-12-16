@@ -416,60 +416,93 @@ export async function deleteSlot(req, res) {
 /**
  * 응답: { ok:true, stores:[{id,business_no,business_name,category,image_url}] }
  */
+
+/**
+ * GET /foodcategorymanager/ad/slot/store/search?bizNo=...&q=...
+ * 응답: { ok:true, stores:[{id,business_no,business_name,category,image_url}] }
+ */
 export async function searchStore(req, res) {
   try {
     const bizNo = digitsOnly(req.query.bizNo);
     const q = clean(req.query.q);
 
     const params = [];
-    let whereFood = " WHERE 1=1 ";
-    let whereCombined = " WHERE 1=1 ";
+    const condS = []; // store_info용
+    const condC = []; // combined_store_info용
+    const condF = []; // food_stores용
 
+    // ✅ 사업자번호 조건
     if (bizNo) {
       params.push(bizNo);
       const idx = params.length;
-      const cond = ` AND regexp_replace(COALESCE(%s.business_number::text,''), '[^0-9]', '', 'g') = $${idx} `;
-      whereFood += cond.replace("%s", "s");
-      whereCombined += cond.replace("%s", "c");
+
+      condS.push(
+        `regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
+      );
+      condC.push(
+        `regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
+      );
+      condF.push(
+        `regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`
+      );
     }
 
+    // ✅ 상호 검색어 조건
     if (q) {
       params.push(`%${q}%`);
       const idx = params.length;
-      whereFood += ` AND s.business_name ILIKE $${idx} `;
-      whereCombined += ` AND c.business_name ILIKE $${idx} `;
+
+      condS.push(`s.business_name ILIKE $${idx}`);
+      condC.push(`c.business_name ILIKE $${idx}`);
+      // ⬇ food_stores에 컬럼명이 다르면 여기만 고쳐줘
+      condF.push(`f.business_name ILIKE $${idx}`);
     }
+
+    const whereS = condS.length ? `WHERE ${condS.join(" AND ")}` : "";
+    const whereC = condC.length ? `WHERE ${condC.join(" AND ")}` : "";
+    const whereF = condF.length ? `WHERE ${condF.join(" AND ")}` : "";
 
     const sql = `
       WITH candidates AS (
-        -- 🍚 음식점 (store_info)
+
+        -- 1) store_info (기본 통합 테이블)
         SELECT
           s.id::text AS id,
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           s.business_name,
-          COALESCE(s.business_category, '') AS category,
-          ''::text AS main_image_url
+          COALESCE(s.business_category, '') AS category
         FROM public.store_info s
-        ${whereFood}
+        ${whereS}
 
         UNION ALL
 
-        -- 💇‍♀️ 미용실/기타 (combined_store_info)
+        -- 2) combined_store_info (뷰/통합 테이블)
         SELECT
           c.id::text AS id,
           regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           c.business_name,
-          COALESCE(c.business_category, '') AS category,
-          COALESCE(c.main_image_url, '') AS main_image_url
+          COALESCE(c.business_category, '') AS category
         FROM public.combined_store_info c
-        ${whereCombined}
+        ${whereC}
+
+        UNION ALL
+
+        -- 3) food_stores (푸드 레지스터 테이블)
+        SELECT
+          f.id::text AS id,
+          regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          -- ⬇ 여기 business_name / business_category 컬럼명 네온에서 확인 후 맞게 수정
+          f.business_name,
+          COALESCE(f.business_category, '') AS category
+        FROM public.food_stores f
+        ${whereF}
       )
       SELECT DISTINCT ON (id)
         id,
         business_no,
         business_name,
         category,
-        COALESCE(img.url, candidates.main_image_url, '') AS image_url
+        img.url AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
         SELECT url
@@ -479,15 +512,15 @@ export async function searchStore(req, res) {
         LIMIT 1
       ) img ON TRUE
       ORDER BY id, business_name
-      LIMIT 50
+      LIMIT 50;
     `;
 
     const { rows } = await pool.query(sql, params);
     return res.json({ ok: true, stores: rows || [] });
   } catch (e) {
     console.error("❌ searchStore error:", e);
-    return res
-      .status(500)
-      .json({ ok: false, error: e.message || "server error" });
+    console.error("❌ message:", e.message);
+    if (e.code) console.error("❌ PG code:", e.code, e.detail || "");
+    return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
