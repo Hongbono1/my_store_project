@@ -51,11 +51,10 @@ async function fetchSlot({ page, position, priority }) {
     LEFT JOIN public.store_info f ON s.store_id::text = f.id::text
     LEFT JOIN public.combined_store_info c ON s.store_id::text = c.id::text
 
-    -- ✅ store_images 대표 1장
     LEFT JOIN LATERAL (
       SELECT url
       FROM public.store_images
-      WHERE store_id::text = s.store_id::text
+      WHERE store_id = s.store_id
       ORDER BY sort_order, id
       LIMIT 1
     ) img ON TRUE
