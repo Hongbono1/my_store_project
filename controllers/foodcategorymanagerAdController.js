@@ -43,11 +43,27 @@ async function fetchSlot({ page, position, priority }) {
       s.position,
       s.priority,
 
-      -- ✅ 우선순위: 슬롯 직접 이미지 > store_images > combined_store_info.main_image_url
+      -- ✅ URL 정규화: /data/uploads/... -> /uploads/... , 상대경로면 / 붙임
       COALESCE(
         NULLIF(s.image_url, ''),
-        img.url,
-        c.main_image_url
+        NULLIF(
+          CASE
+            WHEN img.url IS NULL OR img.url = '' THEN NULL
+            WHEN img.url LIKE 'http%' THEN img.url
+            WHEN img.url LIKE '/data/uploads/%' THEN regexp_replace(img.url, '^/data/uploads/', '/uploads/')
+            WHEN left(img.url, 1) = '/' THEN img.url
+            ELSE '/' || img.url
+          END
+        , ''),
+        NULLIF(
+          CASE
+            WHEN c.main_image_url IS NULL OR c.main_image_url = '' THEN NULL
+            WHEN c.main_image_url LIKE 'http%' THEN c.main_image_url
+            WHEN c.main_image_url LIKE '/data/uploads/%' THEN regexp_replace(c.main_image_url, '^/data/uploads/', '/uploads/')
+            WHEN left(c.main_image_url, 1) = '/' THEN c.main_image_url
+            ELSE '/' || c.main_image_url
+          END
+        , '')
       ) AS image_url,
 
       s.link_url,
@@ -56,22 +72,22 @@ async function fetchSlot({ page, position, priority }) {
       s.text_content,
       s.store_id::text AS store_id,
       s.business_no,
-      s.business_name,
+
+      -- ✅ 슬롯에 저장된 값이 없으면 combined_store_info에서 보강
+      COALESCE(NULLIF(s.business_name, ''), c.business_name, '') AS business_name,
+      COALESCE(c.business_category, '') AS category,
+
       s.no_end,
-
-      COALESCE(c.business_category, f.business_category, '') AS category,
-
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
+
     FROM public.admin_ad_slots s
-    -- 음식점(기존 store_info)
-    LEFT JOIN public.store_info f
-      ON s.store_id::text = f.id::text
-    -- 통합 뷰(미례헤어 같은 비식당 포함)
+
+    -- ✅ 가게 메타(상호/업종/대표이미지 후보)
     LEFT JOIN public.combined_store_info c
       ON s.store_id::text = c.id::text
 
-    -- ✅ 공통 store_images (있으면 사용)
+    -- ✅ store_images 대표 1장
     LEFT JOIN LATERAL (
       SELECT url
       FROM public.store_images
