@@ -500,11 +500,11 @@ export async function searchStore(req, res) {
         ${whereF}
       )
       SELECT DISTINCT ON (id)
-        id,
-        business_no,
-        business_name,
-        category,
-        COALESCE(img.url, table_image) AS image_url
+        candidates.id,
+        candidates.business_no,
+        candidates.business_name,
+        candidates.category,
+        COALESCE(img.url, candidates.table_image) AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
         SELECT url
@@ -513,7 +513,7 @@ export async function searchStore(req, res) {
         ORDER BY sort_order, id
         LIMIT 1
       ) img ON TRUE
-      ORDER BY id, business_name
+      ORDER BY candidates.id, candidates.business_name
       LIMIT 50;
     `;
 
