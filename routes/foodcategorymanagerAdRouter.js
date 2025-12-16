@@ -30,7 +30,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-// ✅ image / slotImage 둘 다 허용 + 기존 saveSlot(req.file) 호환
+// image / slotImage 두 필드 다 허용 → req.file 로 통일
 const uploadSlot = upload.fields([
   { name: "image", maxCount: 1 },
   { name: "slotImage", maxCount: 1 },
