@@ -35,8 +35,15 @@ async function fetchSlot({ page, position, priority }) {
       s.business_no,
       s.business_name,
       s.no_end,
-      -- ✅ 업종: store_info → 없으면 combined_store_info
-      COALESCE(f.detail_category, f.business_category, c.business_category) AS category,
+
+      -- ✅ 업종(업종/세부업종) 컬럼명 불일치 대비: detail_category 제거
+      COALESCE(
+        NULLIF(f.business_category, ''),
+        NULLIF(c.business_category, ''),
+        NULLIF(f.business_subcategory, ''),
+        NULLIF(c.business_subcategory, '')
+      ) AS category,
+
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
     FROM public.admin_ad_slots s
@@ -49,10 +56,10 @@ async function fetchSlot({ page, position, priority }) {
   const params = [page, position];
 
   if (priority !== null && priority !== undefined) {
-    sql += ` AND priority = $3 LIMIT 1`;
+    sql += ` AND s.priority = $3 LIMIT 1`;
     params.push(priority);
   } else {
-    sql += ` ORDER BY (priority IS NULL) DESC, priority ASC NULLS LAST, id DESC LIMIT 1`;
+    sql += ` ORDER BY (s.priority IS NULL) DESC, s.priority ASC NULLS LAST, s.id DESC LIMIT 1`;
   }
 
   const { rows } = await pool.query(sql, params);
@@ -96,8 +103,7 @@ export async function getSlot(req, res) {
 
 /**
  * POST /foodcategorymanager/ad/slot (multipart/form-data)
- * - file field: image (or slotImage)
- * - body: imageUrl 이 있으면 업로드 파일이 없을 때 그 URL을 사용
+ * - file field: image (or slotImage)  ※ router multer 설정과 일치해야 req.file 잡힘
  */
 export async function saveSlot(req, res) {
   const client = await pool.connect();
@@ -115,21 +121,21 @@ export async function saveSlot(req, res) {
     const slotType = clean(b.slotType || b.slot_type) || "banner";
     const slotMode = clean(b.slotMode || b.slot_mode) || "banner";
 
-    const linkUrl = clean(b.linkUrl || b.link_url || b.link);
-    const textContent = clean(b.textContent || b.text_content || b.content);
+    const linkUrl = clean(b.linkUrl || b.link_url || b.link) || null;
+    const textContent = clean(b.textContent || b.text_content || b.content) || null;
 
-    const storeId = clean(b.storeId || b.store_id);
-    const businessNo = clean(b.businessNo || b.business_no);
-    const businessName = clean(b.businessName || b.business_name);
+    const storeId = clean(b.storeId || b.store_id) || null;
+    const businessNo = clean(b.businessNo || b.business_no) || null;
+    const businessName = clean(b.businessName || b.business_name) || null;
 
-    const startAtLocal = clean(b.startAt) || null;
-    const endAtLocal = clean(b.endAt) || null;
-    const noEnd = toBool(b.noEnd);
+    // ✅ 프론트가 빈값("")으로 보내도 OK: NULLIF로 처리
+    const startAtLocal = clean(b.startAt || b.start_at) || "";
+    const endAtLocal = clean(b.endAt || b.end_at) || "";
+    const noEnd = toBool(b.noEnd || b.no_end);
 
     const keepImage = toBool(b.keepImage);
     const clearImage = toBool(b.clearImage);
 
-    // ✅ 가게 검색에서 넘어온 대표 이미지 URL (ex: /uploads/xxx.jpg 또는 절대경로)
     const overrideImageUrl = clean(b.imageUrl || b.image_url);
 
     const uploaded = req.file;
@@ -162,42 +168,30 @@ export async function saveSlot(req, res) {
       if (finalImageUrl && finalImageUrl !== newImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = newImageUrl;
     } else if (overrideImageUrl) {
-      // 가게 대표 이미지로 교체할 때, 기존 /uploads/ 이미지가 있으면 정리
-      if (finalImageUrl && finalImageUrl !== overrideImageUrl) {
-        safeUnlinkByPublicUrl(finalImageUrl);
-      }
+      if (finalImageUrl && finalImageUrl !== overrideImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = overrideImageUrl;
     } else {
-      if (!existing?.image_url && !keepImage) {
-        finalImageUrl = null;
-      }
+      if (!existing?.image_url && !keepImage) finalImageUrl = null;
     }
 
-    const startAtExpr = startAtLocal ? `NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL";
-    const endAtExpr = !noEnd && endAtLocal ? `NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL";
-
     if (existing) {
+      // ✅ UPDATE: 파라미터/타입 추론 안정화 (항상 같은 SQL 형태)
       const params = [
         slotType,            // $1
         slotMode,            // $2
-        linkUrl || null,     // $3
-        textContent || null, // $4
-        storeId || null,     // $5
-        businessNo || null,  // $6
-        businessName || null,// $7
+        linkUrl,             // $3
+        textContent,         // $4
+        storeId,             // $5
+        businessNo,          // $6
+        businessName,        // $7
         finalImageUrl,       // $8
-        startAtLocal || null,// $9
-        endAtLocal || null,  // $10
+        startAtLocal,        // $9
+        endAtLocal,          // $10
         noEnd,               // $11
         page,                // $12
         position,            // $13
         priority,            // $14
       ];
-
-      const whereClause =
-        priority === null
-          ? `WHERE page=$12 AND position=$13 AND priority IS NULL`
-          : `WHERE page=$12 AND position=$13 AND priority=$14`;
 
       const updateSql = `
         UPDATE public.admin_ad_slots
@@ -210,16 +204,22 @@ export async function saveSlot(req, res) {
           business_no=$6,
           business_name=$7,
           image_url=$8,
-          start_at=${startAtExpr},
-          end_at=${endAtExpr},
+
+          -- ✅ 빈문자열/NULL 안전 처리
+          start_at = (NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}'),
+          end_at   = CASE WHEN $11 THEN NULL ELSE (NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}') END,
+
           no_end=$11,
           updated_at=NOW()
-        ${whereClause}
+        WHERE page=$12
+          AND position=$13
+          AND ( ($14::int IS NULL AND priority IS NULL) OR priority=$14::int )
         RETURNING id
       `;
 
       await client.query(updateSql, params);
     } else {
+      // ✅ INSERT: start/end도 항상 placeholder 사용 (타입 안정화)
       const insertSql = `
         INSERT INTO public.admin_ad_slots
           (page, position, priority, image_url, link_url, slot_type, slot_mode, text_content,
@@ -228,34 +228,35 @@ export async function saveSlot(req, res) {
         VALUES
           ($1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11,
-           ${startAtLocal ? `NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
-           ${!noEnd && endAtLocal ? `NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
+           (NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}'),
+           CASE WHEN $14 THEN NULL ELSE (NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}') END,
            $14, NOW(), NOW())
         RETURNING id
       `;
 
       await client.query(insertSql, [
-        page,
-        position,
-        priority,
-        finalImageUrl,
-        linkUrl || null,
-        slotType,
-        slotMode,
-        textContent || null,
-        storeId || null,
-        businessNo || null,
-        businessName || null,
-        startAtLocal || null,
-        endAtLocal || null,
-        noEnd,
+        page,              // $1
+        position,          // $2
+        priority,          // $3
+        finalImageUrl,     // $4
+        linkUrl,           // $5
+        slotType,          // $6
+        slotMode,          // $7
+        textContent,       // $8
+        storeId,           // $9
+        businessNo,        // $10
+        businessName,      // $11
+        startAtLocal,      // $12
+        endAtLocal,        // $13
+        noEnd,             // $14
       ]);
     }
 
     await client.query("COMMIT");
 
+    // ✅ 저장 후 다시 불러오기 (여기서 컬럼 없으면 500나던 문제 해결됨)
     const slot = await fetchSlot({ page, position, priority });
-    return res.json({ success: true, slot, debug: { keepImage, clearImage, overrideImageUrl } });
+    return res.json({ success: true, slot });
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch { }
     console.error("saveSlot error:", e);
@@ -342,7 +343,13 @@ export async function searchStore(req, res) {
         s.id::text AS id,
         regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         s.business_name,
-        COALESCE(s.detail_category, s.business_category) AS category,
+
+        -- ✅ detail_category 제거 (없으면 여기서도 500 남)
+        COALESCE(
+          NULLIF(s.business_category, ''),
+          NULLIF(s.business_subcategory, '')
+        ) AS category,
+
         img.url AS image_url
       FROM public.store_info s
       LEFT JOIN LATERAL (
