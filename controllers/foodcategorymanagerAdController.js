@@ -154,21 +154,20 @@ export async function saveSlot(req, res) {
     let finalImageUrl = existing?.image_url || null;
 
     if (clearImage) {
-      // 명시적으로 "이미지 제거" 요청이 온 경우
+      // ❌ 이미지 지우기
       if (finalImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = null;
     } else if (uploaded) {
-      // 새 파일 업로드가 있으면 → 기존 슬롯 이미지 교체
+      // 📁 새 파일 업로드된 경우 → 그걸로 교체
       if (finalImageUrl && finalImageUrl !== newImageUrl) {
         safeUnlinkByPublicUrl(finalImageUrl);
       }
       finalImageUrl = newImageUrl;
-    } else if (imageUrlFromBody) {
-      // ⬅⬅⬅ 가게 연결 모드에서 넘어온 이미지 URL 우선 사용
-      // (store_info/store_images 에 있는 대표 이미지)
+    } else if (slotMode.toLowerCase() === "store" && imageUrlFromBody) {
+      // 🏪 가게 연결 모드이고, 프론트에서 imageUrl을 넘긴 경우 → 그걸 사용
       finalImageUrl = imageUrlFromBody;
     } else {
-      // 아무 것도 없고, 기존에도 없으면 null
+      // 둘 다 없으면 null 유지
       if (!existing?.image_url) finalImageUrl = null;
     }
 
