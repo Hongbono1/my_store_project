@@ -470,7 +470,8 @@ export async function searchStore(req, res) {
           s.id::text AS id,
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           s.business_name,
-          COALESCE(s.business_category, '') AS category
+          COALESCE(s.business_category, '') AS category,
+          s.image_url AS table_image
         FROM public.store_info s
         ${whereS}
 
@@ -481,7 +482,8 @@ export async function searchStore(req, res) {
           c.id::text AS id,
           regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           c.business_name,
-          COALESCE(c.business_category, '') AS category
+          COALESCE(c.business_category, '') AS category,
+          c.main_image_url AS table_image
         FROM public.combined_store_info c
         ${whereC}
 
@@ -491,9 +493,9 @@ export async function searchStore(req, res) {
         SELECT
           f.id::text AS id,
           regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-          -- ⬇ 여기 business_name / business_category 컬럼명 네온에서 확인 후 맞게 수정
           f.business_name,
-          COALESCE(f.business_category, '') AS category
+          COALESCE(f.business_category, '') AS category,
+          f.image_url AS table_image
         FROM public.food_stores f
         ${whereF}
       )
@@ -502,7 +504,7 @@ export async function searchStore(req, res) {
         business_no,
         business_name,
         category,
-        img.url AS image_url
+        COALESCE(img.url, table_image) AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
         SELECT url
