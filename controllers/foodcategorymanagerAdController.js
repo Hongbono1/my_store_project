@@ -122,8 +122,8 @@ export async function saveSlot(req, res) {
     const businessNo = clean(b.businessNo || b.business_no);
     const businessName = clean(b.businessName || b.business_name);
 
-    const startAtLocal = clean(b.startAt);
-    const endAtLocal = clean(b.endAt);
+    const startAtLocal = clean(b.startAt) || null;
+    const endAtLocal = clean(b.endAt) || null;
     const noEnd = toBool(b.noEnd);
 
     const keepImage = toBool(b.keepImage);
@@ -173,8 +173,8 @@ export async function saveSlot(req, res) {
       }
     }
 
-    const startAtExpr = startAtLocal ? `($9)::timestamp AT TIME ZONE '${TZ}'` : "NULL";
-    const endAtExpr = !noEnd && endAtLocal ? `($10)::timestamp AT TIME ZONE '${TZ}'` : "NULL";
+    const startAtExpr = startAtLocal ? `NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL";
+    const endAtExpr = !noEnd && endAtLocal ? `NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL";
 
     if (existing) {
       const params = [
@@ -228,8 +228,8 @@ export async function saveSlot(req, res) {
         VALUES
           ($1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11,
-           ${startAtLocal ? `($12)::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
-           ${!noEnd && endAtLocal ? `($13)::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
+           ${startAtLocal ? `NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
+           ${!noEnd && endAtLocal ? `NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}'` : "NULL"},
            $14, NOW(), NOW())
         RETURNING id
       `;
