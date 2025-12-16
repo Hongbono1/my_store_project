@@ -24,62 +24,7 @@ function digitsOnly(v) {
 /**
  * 광고 슬롯 1개 조회 (페이지/포지션/우선순위)
  */
-async function fetchSlot({ page, position, priority }) {
-  const baseSelect = `
-    SELECT
-      s.id,
-      s.page,
-      s.position,
-      s.priority,
 
-      -- ✅ 슬롯 이미지 > store_images 대표 1장 순으로 사용
-      COALESCE(
-        NULLIF(s.image_url, ''),
-        img.url
-      ) AS image_url,
-
-      s.link_url,
-      s.slot_type,
-      s.slot_mode,
-      s.text_content,
-      s.store_id::text AS store_id,
-      s.business_no,
-      s.business_name,
-      s.no_end,
-
-      COALESCE(c.business_category, f.business_category, '') AS category,
-
-      to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
-      to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
-    FROM public.admin_ad_slots s
-    LEFT JOIN public.store_info f ON s.store_id::text = f.id::text
-    LEFT JOIN public.combined_store_info c ON s.store_id::text = c.id::text
-
-    -- ✅ store_images 대표 1장
-    LEFT JOIN LATERAL (
-      SELECT url
-      FROM public.store_images
-      WHERE store_id::text = s.store_id::text
-      ORDER BY sort_order, id
-      LIMIT 1
-    ) img ON TRUE
-
-    WHERE s.page = $1 AND s.position = $2
-  `;
-
-  let sql = baseSelect;
-  const params = [page, position];
-
-  if (priority !== null && priority !== undefined) {
-    sql += ` AND s.priority = $3 LIMIT 1`;
-    params.push(priority);
-  } else {
-    sql += ` ORDER BY (s.priority IS NULL) DESC, s.priority ASC NULLS LAST, s.id DESC LIMIT 1`;
-  }
-
-  const { rows } = await pool.query(sql, params);
-  return rows[0] || null;
-}
 
 /**
  * /uploads/... 형태 public URL을 실제 파일 경로로 지우기
@@ -410,7 +355,8 @@ export async function searchStore(req, res) {
           s.id::text AS id,
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           s.business_name,
-          COALESCE(s.business_category, '') AS category
+          COALESCE(s.business_category, '') AS category,
+          NULL::text AS main_image_url
         FROM public.store_info s
         CROSS JOIN LATERAL (SELECT s.business_number, s.business_name, s.business_category) t
         ${cond.replaceAll("t.", "s.")}
@@ -421,14 +367,21 @@ export async function searchStore(req, res) {
           c.id::text AS id,
           regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           c.business_name,
-          COALESCE(c.business_category, '') AS category
+          COALESCE(c.business_category, '') AS category,
+          c.main_image_url AS main_image_url
         FROM public.combined_store_info c
         CROSS JOIN LATERAL (SELECT c.business_number, c.business_name, c.business_category) t
         ${cond.replaceAll("t.", "c.")}
       )
       SELECT DISTINCT ON (id)
-        id, business_no, business_name, category,
-        img.url AS image_url
+        id,
+        business_no,
+        business_name,
+        category,
+        COALESCE(
+          img.url,
+          candidates.main_image_url
+        ) AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
         SELECT url
@@ -450,3 +403,4 @@ export async function searchStore(req, res) {
       .json({ ok: false, error: e.message || "server error" });
   }
 }
+
