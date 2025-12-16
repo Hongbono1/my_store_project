@@ -471,7 +471,7 @@ export async function searchStore(req, res) {
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           s.business_name,
           COALESCE(s.business_category, '') AS category,
-          s.image_url AS table_image
+          NULL::text AS table_image
         FROM public.store_info s
         ${whereS}
 
