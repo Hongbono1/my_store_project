@@ -36,12 +36,7 @@ async function fetchSlot({ page, position, priority }) {
       s.business_name,
       s.no_end,
 
-      COALESCE(
-        NULLIF(c.business_subcategory, ''),
-        NULLIF(c.business_category, ''),
-        NULLIF(f.business_subcategory, ''),
-        NULLIF(f.business_category, '')
-      ) AS category,
+      COALESCE(c.business_category, f.business_category, '') AS category,
 
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
