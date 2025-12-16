@@ -73,7 +73,7 @@ async function fetchSlot({ page, position, priority }) {
     LEFT JOIN LATERAL (
       SELECT url
       FROM public.store_images
-      WHERE store_id::text = s.store_id::text
+      WHERE CAST(store_id AS text) = CAST(s.store_id AS text)
       ORDER BY sort_order, id
       LIMIT 1
     ) img ON TRUE
@@ -507,7 +507,7 @@ export async function searchStore(req, res) {
       LEFT JOIN LATERAL (
         SELECT url
         FROM public.store_images
-        WHERE store_id::text = candidates.id
+        WHERE CAST(store_id AS text) = candidates.id
         ORDER BY sort_order, id
         LIMIT 1
       ) img ON TRUE
