@@ -27,11 +27,10 @@ async function fetchSlot({ page, position, priority }) {
       s.position,
       s.priority,
 
-      -- ✅ 슬롯 이미지 > store_images > combined/store_info 메인 이미지 순으로 사용
+      -- ✅ 슬롯 이미지 > store_images > store_info 메인 이미지 순으로 사용
       COALESCE(
         NULLIF(s.image_url, ''),
         img.url,
-        c.main_image_url,
         f.main_image_url
       ) AS image_url,
 
@@ -77,6 +76,7 @@ async function fetchSlot({ page, position, priority }) {
   const { rows } = await pool.query(sql, params);
   return rows[0] || null;
 }
+
 
 function safeUnlinkByPublicUrl(publicUrl) {
   try {
