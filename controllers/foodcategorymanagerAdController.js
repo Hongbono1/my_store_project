@@ -35,42 +35,24 @@ async function fetchSlot({ page, position, priority }) {
       s.business_no,
       s.business_name,
       s.no_end,
-      -- 업종: store_info / combined_store_info 에서 최대한 가져오기
-      COALESCE(
-        si.detail_category,
-        si.business_type,
-        si.business_category,
-        si.business_subcategory,
-        c.detail_category,
-        c.business_type,
-        c.business_category,
-        c.business_subcategory
-      ) AS category,
+      -- ✅ 업종: store_info → 없으면 combined_store_info
+      COALESCE(f.detail_category, f.business_category, c.business_category) AS category,
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
     FROM public.admin_ad_slots s
-    LEFT JOIN public.store_info si
-      ON s.store_id::text = si.id::text
-    LEFT JOIN public.combined_store_info c
-      ON s.store_id::text = c.id::text
-    WHERE s.page = $1
-      AND s.position = $2
+    LEFT JOIN public.store_info f ON s.store_id::text = f.id::text
+    LEFT JOIN public.combined_store_info c ON s.store_id::text = c.id::text
+    WHERE s.page = $1 AND s.position = $2
   `;
 
   let sql = baseSelect;
   const params = [page, position];
 
   if (priority !== null && priority !== undefined) {
-    sql += ` AND s.priority = $3 LIMIT 1`;
+    sql += ` AND priority = $3 LIMIT 1`;
     params.push(priority);
   } else {
-    sql += `
-      ORDER BY
-        (s.priority IS NULL) DESC,
-        s.priority ASC NULLS LAST,
-        s.id DESC
-      LIMIT 1
-    `;
+    sql += ` ORDER BY (priority IS NULL) DESC, priority ASC NULLS LAST, id DESC LIMIT 1`;
   }
 
   const { rows } = await pool.query(sql, params);
@@ -114,8 +96,8 @@ export async function getSlot(req, res) {
 
 /**
  * POST /foodcategorymanager/ad/slot (multipart/form-data)
- * - file field: image (또는 slotImage)
- * - body에서 imageUrl 이 오면 (가게 이미지)로 사용
+ * - file field: image (or slotImage)
+ * - body: imageUrl 이 있으면 업로드 파일이 없을 때 그 URL을 사용
  */
 export async function saveSlot(req, res) {
   const client = await pool.connect();
@@ -147,47 +129,48 @@ export async function saveSlot(req, res) {
     const keepImage = toBool(b.keepImage);
     const clearImage = toBool(b.clearImage);
 
-    const uploaded = req.file; // multer 에서 보정
-    const newUploadUrl = uploaded ? `/uploads/${uploaded.filename}` : "";
-    const bodyImageUrl = clean(b.imageUrl || b.image_url); // 가게 썸네일 등
+    // ✅ 가게 검색에서 넘어온 대표 이미지 URL (ex: /uploads/xxx.jpg 또는 절대경로)
+    const overrideImageUrl = clean(b.imageUrl || b.image_url);
+
+    const uploaded = req.file;
+    const newImageUrl = uploaded ? `/uploads/${uploaded.filename}` : "";
 
     await client.query("BEGIN");
 
     let existing = null;
     if (priority === null) {
       const { rows } = await client.query(
-        `SELECT * FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority IS NULL
-         LIMIT 1 FOR UPDATE`,
+        `SELECT * FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority IS NULL LIMIT 1 FOR UPDATE`,
         [page, position]
       );
       existing = rows[0] || null;
     } else {
       const { rows } = await client.query(
-        `SELECT * FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority=$3
-         LIMIT 1 FOR UPDATE`,
+        `SELECT * FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority=$3 LIMIT 1 FOR UPDATE`,
         [page, position, priority]
       );
       existing = rows[0] || null;
     }
 
-    // 이미지 결정
+    // ✅ 최종 이미지 결정
     let finalImageUrl = existing?.image_url || null;
 
     if (clearImage) {
       if (finalImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = null;
     } else if (uploaded) {
-      if (finalImageUrl && finalImageUrl !== newUploadUrl) {
+      if (finalImageUrl && finalImageUrl !== newImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
+      finalImageUrl = newImageUrl;
+    } else if (overrideImageUrl) {
+      // 가게 대표 이미지로 교체할 때, 기존 /uploads/ 이미지가 있으면 정리
+      if (finalImageUrl && finalImageUrl !== overrideImageUrl) {
         safeUnlinkByPublicUrl(finalImageUrl);
       }
-      finalImageUrl = newUploadUrl;
-    } else if (bodyImageUrl) {
-      // 가게 썸네일 등: 파일 삭제는 하지 않고 URL만 교체
-      finalImageUrl = bodyImageUrl;
-    } else if (!existing?.image_url && !keepImage) {
-      finalImageUrl = null;
+      finalImageUrl = overrideImageUrl;
+    } else {
+      if (!existing?.image_url && !keepImage) {
+        finalImageUrl = null;
+      }
     }
 
     const startAtExpr = startAtLocal ? `($9)::timestamp AT TIME ZONE '${TZ}'` : "NULL";
@@ -195,20 +178,20 @@ export async function saveSlot(req, res) {
 
     if (existing) {
       const params = [
-        slotType,             // $1
-        slotMode,             // $2
-        linkUrl || null,      // $3
-        textContent || null,  // $4
-        storeId || null,      // $5
-        businessNo || null,   // $6
-        businessName || null, // $7
-        finalImageUrl,        // $8
-        startAtLocal || null, // $9
-        endAtLocal || null,   // $10
-        noEnd,                // $11
-        page,                 // $12
-        position,             // $13
-        priority,             // $14
+        slotType,            // $1
+        slotMode,            // $2
+        linkUrl || null,     // $3
+        textContent || null, // $4
+        storeId || null,     // $5
+        businessNo || null,  // $6
+        businessName || null,// $7
+        finalImageUrl,       // $8
+        startAtLocal || null,// $9
+        endAtLocal || null,  // $10
+        noEnd,               // $11
+        page,                // $12
+        position,            // $13
+        priority,            // $14
       ];
 
       const whereClause =
@@ -219,18 +202,18 @@ export async function saveSlot(req, res) {
       const updateSql = `
         UPDATE public.admin_ad_slots
         SET
-          slot_type   = $1,
-          slot_mode   = $2,
-          link_url    = $3,
-          text_content= $4,
-          store_id    = $5,
-          business_no = $6,
-          business_name = $7,
-          image_url   = $8,
-          start_at    = ${startAtExpr},
-          end_at      = ${endAtExpr},
-          no_end      = $11,
-          updated_at  = NOW()
+          slot_type=$1,
+          slot_mode=$2,
+          link_url=$3,
+          text_content=$4,
+          store_id=$5,
+          business_no=$6,
+          business_name=$7,
+          image_url=$8,
+          start_at=${startAtExpr},
+          end_at=${endAtExpr},
+          no_end=$11,
+          updated_at=NOW()
         ${whereClause}
         RETURNING id
       `;
@@ -252,31 +235,29 @@ export async function saveSlot(req, res) {
       `;
 
       await client.query(insertSql, [
-        page,                   // $1
-        position,               // $2
-        priority,               // $3
-        finalImageUrl,          // $4
-        linkUrl || null,        // $5
-        slotType,               // $6
-        slotMode,               // $7
-        textContent || null,    // $8
-        storeId || null,        // $9
-        businessNo || null,     // $10
-        businessName || null,   // $11
-        startAtLocal || null,   // $12
-        endAtLocal || null,     // $13
-        noEnd,                  // $14
+        page,
+        position,
+        priority,
+        finalImageUrl,
+        linkUrl || null,
+        slotType,
+        slotMode,
+        textContent || null,
+        storeId || null,
+        businessNo || null,
+        businessName || null,
+        startAtLocal || null,
+        endAtLocal || null,
+        noEnd,
       ]);
     }
 
     await client.query("COMMIT");
 
     const slot = await fetchSlot({ page, position, priority });
-    return res.json({ success: true, slot });
+    return res.json({ success: true, slot, debug: { keepImage, clearImage, overrideImageUrl } });
   } catch (e) {
-    try {
-      await client.query("ROLLBACK");
-    } catch { }
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("saveSlot error:", e);
     return res.status(500).json({ success: false, error: "server error" });
   } finally {
@@ -305,17 +286,13 @@ export async function deleteSlot(req, res) {
     let existing = null;
     if (priority === null) {
       const { rows } = await client.query(
-        `SELECT * FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority IS NULL
-         LIMIT 1 FOR UPDATE`,
+        `SELECT * FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority IS NULL LIMIT 1 FOR UPDATE`,
         [page, position]
       );
       existing = rows[0] || null;
     } else {
       const { rows } = await client.query(
-        `SELECT * FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority=$3
-         LIMIT 1 FOR UPDATE`,
+        `SELECT * FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority=$3 LIMIT 1 FOR UPDATE`,
         [page, position, priority]
       );
       existing = rows[0] || null;
@@ -330,14 +307,12 @@ export async function deleteSlot(req, res) {
 
     if (priority === null) {
       await client.query(
-        `DELETE FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority IS NULL`,
+        `DELETE FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority IS NULL`,
         [page, position]
       );
     } else {
       await client.query(
-        `DELETE FROM public.admin_ad_slots
-         WHERE page=$1 AND position=$2 AND priority=$3`,
+        `DELETE FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority=$3`,
         [page, position, priority]
       );
     }
@@ -345,9 +320,7 @@ export async function deleteSlot(req, res) {
     await client.query("COMMIT");
     return res.json({ success: true, deleted: 1 });
   } catch (e) {
-    try {
-      await client.query("ROLLBACK");
-    } catch { }
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("deleteSlot error:", e);
     return res.status(500).json({ success: false, error: "server error" });
   } finally {
@@ -369,12 +342,7 @@ export async function searchStore(req, res) {
         s.id::text AS id,
         regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         s.business_name,
-        COALESCE(
-          s.detail_category,
-          s.business_type,
-          s.business_category,
-          s.business_subcategory
-        ) AS category,
+        COALESCE(s.detail_category, s.business_category) AS category,
         img.url AS image_url
       FROM public.store_info s
       LEFT JOIN LATERAL (
