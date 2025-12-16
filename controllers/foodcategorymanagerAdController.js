@@ -27,8 +27,13 @@ async function fetchSlot({ page, position, priority }) {
       s.position,
       s.priority,
 
-      -- ✅ 슬롯 이미지 없으면 가게 대표 이미지로 대체
-      COALESCE(NULLIF(s.image_url, ''), img.url) AS image_url,
+      -- ✅ 슬롯 이미지 > store_images > combined/store_info 메인 이미지 순으로 사용
+      COALESCE(
+        NULLIF(s.image_url, ''),
+        img.url,
+        c.main_image_url,
+        f.main_image_url
+      ) AS image_url,
 
       s.link_url,
       s.slot_type,
@@ -186,7 +191,7 @@ export async function saveSlot(req, res) {
     }
 
     if (existing) {
-      // ✅ UPDATE
+      // ✅ UPDATE: 파라미터/타입 추론 안정화 (항상 같은 SQL 형태)
       const params = [
         slotType,            // $1
         slotMode,            // $2
@@ -351,7 +356,7 @@ export async function searchStore(req, res) {
 
     const params = [];
 
-    // ✅ combined_store_info 기준 + store_info 보조
+    // ✅ combined_store_info + store_info 모두 검색
     let whereCombined = ` WHERE 1=1 `;
     let whereStore = ` WHERE 1=1 `;
 
@@ -377,7 +382,8 @@ export async function searchStore(req, res) {
           id::text AS id,
           regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           business_name,
-          COALESCE(business_category, '') AS category
+          COALESCE(business_category, '') AS category,
+          main_image_url
         FROM public.combined_store_info
         ${whereCombined}
 
@@ -387,7 +393,8 @@ export async function searchStore(req, res) {
           id::text AS id,
           regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           business_name,
-          COALESCE(business_category, '') AS category
+          COALESCE(business_category, '') AS category,
+          main_image_url
         FROM public.store_info
         ${whereStore}
       )
@@ -396,14 +403,14 @@ export async function searchStore(req, res) {
         business_no,
         business_name,
         category,
-        img.url AS image_url
+        COALESCE(img.url, candidates.main_image_url) AS image_url
       FROM candidates
       LEFT JOIN LATERAL (
         SELECT url
-          FROM public.store_images
-         WHERE store_id::text = candidates.id
-         ORDER BY sort_order, id
-         LIMIT 1
+        FROM public.store_images
+        WHERE store_id::text = candidates.id
+        ORDER BY sort_order, id
+        LIMIT 1
       ) img ON TRUE
       ORDER BY id, business_name
       LIMIT 50
