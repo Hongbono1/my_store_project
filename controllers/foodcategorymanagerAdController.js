@@ -336,45 +336,60 @@ export async function searchStore(req, res) {
     const bizNo = digitsOnly(req.query.bizNo);
     const q = clean(req.query.q);
 
-    let sql = `
-      SELECT
-        s.id::text AS id,
-        regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-        s.business_name,
-        COALESCE(s.business_category, '') AS category,
-        img.url AS image_url
-      FROM public.store_info s
-      LEFT JOIN LATERAL (
-        SELECT url
-          FROM public.store_images
-         WHERE store_id = s.id
-         ORDER BY sort_order, id
-         LIMIT 1
-      ) img ON TRUE
-      WHERE 1=1
-    `;
-
     const params = [];
+    let cond = ` WHERE 1=1 `;
 
     if (bizNo) {
       params.push(bizNo);
-      sql += ` AND regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') = $${params.length}`;
+      cond += ` AND regexp_replace(COALESCE(t.business_number::text,''), '[^0-9]', '', 'g') = $${params.length} `;
     }
     if (q) {
       params.push(`%${q}%`);
-      sql += ` AND s.business_name ILIKE $${params.length}`;
+      cond += ` AND t.business_name ILIKE $${params.length} `;
     }
 
-    sql += ` ORDER BY s.id DESC LIMIT 30`;
+    const sql = `
+      WITH candidates AS (
+        SELECT
+          s.id::text AS id,
+          regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          s.business_name,
+          COALESCE(s.business_category, '') AS category
+        FROM public.store_info s
+        CROSS JOIN LATERAL (SELECT s.business_number, s.business_name, s.business_category) t
+        ${cond.replaceAll("t.", "s.")}
+
+        UNION ALL
+
+        SELECT
+          c.id::text AS id,
+          regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          c.business_name,
+          COALESCE(c.business_category, '') AS category
+        FROM public.combined_store_info c
+        CROSS JOIN LATERAL (SELECT c.business_number, c.business_name, c.business_category) t
+        ${cond.replaceAll("t.", "c.")}
+      )
+      SELECT DISTINCT ON (id)
+        id, business_no, business_name, category,
+        img.url AS image_url
+      FROM candidates
+      LEFT JOIN LATERAL (
+        SELECT url
+          FROM public.store_images
+         WHERE store_id::text = candidates.id
+         ORDER BY sort_order, id
+         LIMIT 1
+      ) img ON TRUE
+      ORDER BY id, business_name
+      LIMIT 50
+    `;
 
     const { rows } = await pool.query(sql, params);
     return res.json({ ok: true, stores: rows || [] });
   } catch (e) {
     console.error("❌ searchStore error:", e);
-    console.error("❌ searchStore message:", e.message);
-    console.error("❌ searchStore stack:", e.stack);
-    if (e.code) console.error("❌ PG Error code:", e.code);
-    if (e.detail) console.error("❌ PG Error detail:", e.detail);
     return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
+
