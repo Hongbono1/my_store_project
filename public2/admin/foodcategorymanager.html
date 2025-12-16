@@ -2023,6 +2023,225 @@
             updateSlider();
             startAuto();
         });
+
+        // ========== 새로운 슬롯 관리 시스템 (우선순위 지원) ==========
+        (() => {
+            const SLOT_ENDPOINT = "/foodcategorymanager/ad/slot";
+            const STORE_SEARCH_ENDPOINT = "/foodcategorymanager/ad/store/search";
+
+            // ===== 공통: 박스 → meta =====
+            function getMetaFromBox(boxEl) {
+                return {
+                    page: boxEl.dataset.page || "foodcategory",
+                    position: boxEl.dataset.position || "",
+                    priority: boxEl.dataset.priority !== undefined && boxEl.dataset.priority !== ""
+                        ? Number(boxEl.dataset.priority)
+                        : null,
+                };
+            }
+
+            // ===== API =====
+            async function apiGetSlot(meta) {
+                const qs = new URLSearchParams({ page: meta.page, position: meta.position });
+                if (meta.priority !== null && meta.priority !== undefined) qs.set("priority", String(meta.priority));
+
+                const r = await fetch(`${SLOT_ENDPOINT}?${qs.toString()}`);
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.success === false) throw new Error(data.error || `getSlot 실패: ${r.status}`);
+                return data.slot || null;
+            }
+
+            async function apiSaveSlot(meta, payload) {
+                const fd = new FormData();
+
+                fd.append("page", meta.page);
+                fd.append("position", meta.position);
+                if (meta.priority !== null && meta.priority !== undefined) fd.append("priority", String(meta.priority));
+
+                if (payload.slotType) fd.append("slotType", payload.slotType);
+                if (payload.slotMode) fd.append("slotMode", payload.slotMode);
+
+                if (payload.linkUrl !== undefined) fd.append("linkUrl", payload.linkUrl || "");
+                if (payload.textContent !== undefined) fd.append("textContent", payload.textContent || "");
+
+                if (payload.storeId) fd.append("storeId", payload.storeId);
+                if (payload.businessNo) fd.append("businessNo", payload.businessNo);
+                if (payload.businessName) fd.append("businessName", payload.businessName);
+
+                if (payload.imageUrl) fd.append("imageUrl", payload.imageUrl);
+                if (payload.keepImage) fd.append("keepImage", "true");
+                if (payload.clearImage) fd.append("clearImage", "true");
+
+                if (payload.file) fd.append("image", payload.file);
+
+                const r = await fetch(SLOT_ENDPOINT, { method: "POST", body: fd });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.success === false) throw new Error(data.error || `saveSlot 실패: ${r.status}`);
+                return data.slot || null;
+            }
+
+            async function apiDeleteSlot(meta) {
+                const qs = new URLSearchParams({ page: meta.page, position: meta.position });
+                if (meta.priority !== null && meta.priority !== undefined) qs.set("priority", String(meta.priority));
+
+                const r = await fetch(`${SLOT_ENDPOINT}?${qs.toString()}`, { method: "DELETE" });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.success === false) throw new Error(data.error || `deleteSlot 실패: ${r.status}`);
+                return true;
+            }
+
+            async function apiSearchStore({ bizNo, q }) {
+                const qs = new URLSearchParams();
+                if (bizNo) qs.set("bizNo", bizNo);
+                if (q) qs.set("q", q);
+
+                const r = await fetch(`${STORE_SEARCH_ENDPOINT}?${qs.toString()}`);
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.ok === false) throw new Error(data.error || `searchStore 실패: ${r.status}`);
+                return data.stores || [];
+            }
+
+            // ===== 렌더(박스에 표시) =====
+            function renderSlotBox(boxEl, slot) {
+                boxEl.classList.toggle("has-slot", !!slot);
+
+                const nameEl = boxEl.querySelector("[data-slot-name]") || boxEl.querySelector(".slot-name");
+                const catEl = boxEl.querySelector("[data-slot-category]") || boxEl.querySelector(".slot-category");
+                const imgEl = boxEl.querySelector("[data-slot-image]") || boxEl.querySelector("img");
+
+                if (!slot) {
+                    if (nameEl) nameEl.textContent = "";
+                    if (catEl) catEl.textContent = "";
+                    if (imgEl && imgEl.tagName === "IMG") imgEl.removeAttribute("src");
+                    return;
+                }
+
+                if (nameEl) nameEl.textContent = slot.business_name || "";
+                if (catEl) catEl.textContent = slot.category ? `(${slot.category})` : "";
+
+                if (imgEl && imgEl.tagName === "IMG") {
+                    if (slot.image_url) imgEl.src = slot.image_url;
+                } else if (slot.image_url) {
+                    boxEl.style.backgroundImage = `url('${slot.image_url}')`;
+                    boxEl.style.backgroundSize = "cover";
+                    boxEl.style.backgroundPosition = "center";
+                }
+            }
+
+            // ===== 전체 로딩: data-slot-box 전부 자동 로딩 =====
+            async function loadAllSlots() {
+                const boxes = Array.from(document.querySelectorAll("[data-slot-box]"));
+                for (const boxEl of boxes) {
+                    const meta = getMetaFromBox(boxEl);
+                    if (!meta.page || !meta.position) continue;
+
+                    try {
+                        const slot = await apiGetSlot(meta);
+                        renderSlotBox(boxEl, slot);
+                    } catch (e) {
+                        console.error("[slot] load 실패:", meta, e);
+                    }
+                }
+            }
+
+            // ===== 모달 핸들링 =====
+            const modalEl = document.getElementById("modalRoot");
+            const saveBtn = document.getElementById("btnSaveSlot");
+            const delBtn = document.getElementById("btnDeleteSlot");
+            const closeBtn = document.getElementById("btnCloseModal");
+
+            const imageInput = document.getElementById("fieldImageFile");
+            const linkInput = document.getElementById("fieldLinkUrl");
+            const textInput = document.getElementById("fieldTextContent");
+            const storeIdEl = document.getElementById("fieldStoreId");
+            const bizNoEl = document.getElementById("fieldBizNo");
+            const bizNameEl = document.getElementById("fieldBizName");
+
+            let currentBox = null;
+            let currentMeta = null;
+
+            async function openModalForBox(boxEl) {
+                currentBox = boxEl;
+                currentMeta = getMetaFromBox(boxEl);
+
+                try {
+                    const slot = await apiGetSlot(currentMeta);
+
+                    if (linkInput) linkInput.value = slot?.link_url || "";
+                    if (textInput) textInput.value = slot?.text_content || "";
+
+                    if (storeIdEl) storeIdEl.value = slot?.store_id || "";
+                    if (bizNoEl) bizNoEl.value = slot?.business_no || "";
+                    if (bizNameEl) bizNameEl.value = slot?.business_name || "";
+                } catch (e) {
+                    console.error("[slot] openModal getSlot 실패:", e);
+                }
+
+                if (modalEl) modalEl.classList.remove("hidden");
+            }
+
+            function closeModal() {
+                if (modalEl) modalEl.classList.add("hidden");
+                if (imageInput) imageInput.value = "";
+                currentBox = null;
+                currentMeta = null;
+            }
+
+            // 박스 클릭 → 모달 열기
+            document.addEventListener("click", (e) => {
+                const boxEl = e.target.closest("[data-slot-box]");
+                if (!boxEl) return;
+                openModalForBox(boxEl);
+            });
+
+            if (closeBtn) closeBtn.addEventListener("click", closeModal);
+
+            // 저장
+            if (saveBtn) {
+                saveBtn.addEventListener("click", async () => {
+                    if (!currentMeta || !currentBox) return;
+
+                    try {
+                        const payload = {
+                            linkUrl: linkInput ? linkInput.value : "",
+                            textContent: textInput ? textInput.value : "",
+                            storeId: storeIdEl ? storeIdEl.value : "",
+                            businessNo: bizNoEl ? bizNoEl.value : "",
+                            businessName: bizNameEl ? bizNameEl.value : "",
+                            file: imageInput && imageInput.files && imageInput.files[0] ? imageInput.files[0] : null,
+                        };
+
+                        const slot = await apiSaveSlot(currentMeta, payload);
+                        renderSlotBox(currentBox, slot);
+                        closeModal();
+                    } catch (e) {
+                        console.error("[slot] save 실패:", e);
+                        alert(e.message);
+                    }
+                });
+            }
+
+            // 삭제
+            if (delBtn) {
+                delBtn.addEventListener("click", async () => {
+                    if (!currentMeta || !currentBox) return;
+
+                    if (!confirm("이 슬롯을 삭제할까요?")) return;
+
+                    try {
+                        await apiDeleteSlot(currentMeta);
+                        renderSlotBox(currentBox, null);
+                        closeModal();
+                    } catch (e) {
+                        console.error("[slot] delete 실패:", e);
+                        alert(e.message);
+                    }
+                });
+            }
+
+            // ===== 초기 로딩 =====
+            window.addEventListener("DOMContentLoaded", loadAllSlots);
+        })();
     </script>
 </body>
 
