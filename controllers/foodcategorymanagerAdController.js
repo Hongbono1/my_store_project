@@ -43,7 +43,7 @@ async function fetchSlot({ page, position, priority }) {
       s.position,
       s.priority,
 
-      -- ✅ 슬롯 이미지 > store_images > combined_store_info.main_image_url 순으로 사용
+      -- ✅ 우선순위: 슬롯 직접 이미지 > store_images > combined_store_info.main_image_url
       COALESCE(
         NULLIF(s.image_url, ''),
         img.url,
@@ -64,16 +64,18 @@ async function fetchSlot({ page, position, priority }) {
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(s.end_at   AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local
     FROM public.admin_ad_slots s
+    -- 음식점(기존 store_info)
     LEFT JOIN public.store_info f
       ON s.store_id::text = f.id::text
+    -- 통합 뷰(미례헤어 같은 비식당 포함)
     LEFT JOIN public.combined_store_info c
       ON s.store_id::text = c.id::text
 
-    -- ✅ store_images에서 대표 1장
+    -- ✅ 공통 store_images (있으면 사용)
     LEFT JOIN LATERAL (
       SELECT url
       FROM public.store_images
-      WHERE CAST(store_id AS text) = CAST(s.store_id AS text)
+      WHERE store_id::text = s.store_id::text
       ORDER BY sort_order, id
       LIMIT 1
     ) img ON TRUE
@@ -81,20 +83,14 @@ async function fetchSlot({ page, position, priority }) {
     WHERE s.page = $1 AND s.position = $2
   `;
 
-  const params = [page, position];
   let sql = baseSelect;
+  const params = [page, position];
 
   if (priority !== null && priority !== undefined) {
     sql += ` AND s.priority = $3 LIMIT 1`;
     params.push(priority);
   } else {
-    sql += `
-      ORDER BY
-        (s.priority IS NULL) DESC,
-        s.priority ASC NULLS LAST,
-        s.id DESC
-      LIMIT 1
-    `;
+    sql += ` ORDER BY (s.priority IS NULL) DESC, s.priority ASC NULLS LAST, s.id DESC LIMIT 1`;
   }
 
   const { rows } = await pool.query(sql, params);
@@ -311,7 +307,7 @@ export async function saveSlot(req, res) {
   } catch (e) {
     try {
       await client.query("ROLLBACK");
-    } catch {}
+    } catch { }
     console.error("❌ saveSlot error:", e);
     console.error("❌ Error message:", e.message);
     console.error("❌ Error stack:", e.stack);
@@ -402,7 +398,7 @@ export async function deleteSlot(req, res) {
   } catch (e) {
     try {
       await client.query("ROLLBACK");
-    } catch {}
+    } catch { }
     console.error("❌ deleteSlot error:", e);
     return res
       .status(500)
