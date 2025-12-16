@@ -27,11 +27,9 @@ async function fetchSlot({ page, position, priority }) {
       s.position,
       s.priority,
 
-      -- ✅ 슬롯 이미지 > store_images > store_info 메인 이미지 순으로 사용
       COALESCE(
         NULLIF(s.image_url, ''),
-        img.url,
-        f.main_image_url
+        img.url
       ) AS image_url,
 
       s.link_url,
