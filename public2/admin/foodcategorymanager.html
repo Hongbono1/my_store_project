@@ -1279,30 +1279,37 @@
            업종 추출 helper
         ========================== */
         function pickBizType(slot) {
+            if (!slot) return "";
+
             const candidates = [
-                slot?.badge_label,
-                slot?.category,
-                slot?.business_type,
-                slot?.store_category,
-                slot?.type_name,
-                slot?.sub_category,
-                slot?.subcategory,
-                slot?.sub,
+                // 컨트롤러에서 내려주는 category
+                slot.category,
+                slot.business_category,
+                slot.detail_category,
+                slot.badge_label,
+                slot.business_type,
+                slot.store_category,
+                slot.type_name,
+                slot.sub_category,
+                slot.subcategory,
+                slot.sub,
 
                 // store 객체 안에 오는 경우
-                slot?.store?.category,
-                slot?.store?.business_type,
-                slot?.store?.store_category,
-                slot?.store?.type_name,
-                slot?.store?.sub_category,
-                slot?.store?.subcategory,
-                slot?.store?.sub,
+                slot.store?.category,
+                slot.store?.business_category,
+                slot.store?.detail_category,
+                slot.store?.business_type,
+                slot.store?.store_category,
+                slot.store?.type_name,
+                slot.store?.sub_category,
+                slot.store?.subcategory,
+                slot.store?.sub,
 
                 // 기타 키
-                slot?.biz_type,
-                slot?.bizType,
-                slot?.industry,
-                slot?.industry_name,
+                slot.biz_type,
+                slot.bizType,
+                slot.industry,
+                slot.industry_name,
             ];
 
             for (const v of candidates) {
@@ -1377,8 +1384,6 @@
                 return;
             }
 
-            slot = slot || {};
-
             const img = el.querySelector(".slot-img");
             const empty = el.querySelector(".slot-empty");
             const textLayer = el.querySelector(".slot-text-layer");
@@ -1390,40 +1395,40 @@
             const titleEl = infoBox ? infoBox.querySelector(".slot-title") : null;
             const subEl = infoBox ? infoBox.querySelector(".slot-sub") : null;
 
-            const uiMode = slotModeToUiMode(slot?.slot_mode);
-            const hasImg = !!clean(slot?.image_url);
-            const txt = clean(slot?.text_content);
-
-            // 🔹 기본 초기화
+            // ✅ 1) 기본 상태: 전부 숨기고, 텍스트 비우기
             if (img) {
                 img.style.display = "none";
-                if (hasImg) {
-                    img.src = slot.image_url;
-                } else {
-                    img.removeAttribute("src");
-                }
+                img.removeAttribute("src");
             }
             if (textLayer) textLayer.style.display = "none";
             if (empty) empty.style.display = "flex";
-
             if (infoBox) {
                 infoBox.classList.add("hidden");
                 if (titleEl) titleEl.textContent = "";
                 if (subEl) subEl.textContent = "";
             }
-
-            // 🔹 왼쪽 상단 상호 배지: 항상 숨김
             if (storeBadge) {
                 storeBadge.style.display = "none";
                 storeBadge.textContent = "";
             }
-
-            // 🔹 오른쪽 상단 배지: 원래 써 있던 텍스트 유지
             if (badge) {
                 if (!badge.dataset.defaultText) {
                     badge.dataset.defaultText = clean(badge.textContent) || "Banner";
                 }
                 badge.textContent = badge.dataset.defaultText;
+            }
+
+            // ✅ 2) DB에 슬롯이 아예 없으면 여기서 바로 종료
+            if (!slot) return;
+
+            slot = slot || {};
+            const uiMode = slotModeToUiMode(slot.slot_mode);
+            const hasImg = !!clean(slot.image_url);
+            const txt = clean(slot.text_content);
+
+            // 🔹 이미지 설정
+            if (img && hasImg) {
+                img.src = slot.image_url;
             }
 
             // 🔹 텍스트 모드
@@ -1441,21 +1446,20 @@
                 if (empty) empty.style.display = "none";
             }
 
-            // 🔹 하단 info 박스: 상호 + 업종(작게)
-            const bizType = pickBizType(slot);  // badge_label, category, store.category 등에서 최대한 뽑음
+            // ✅ 3) 실제 슬롯 데이터가 있을 때만 하단 정보 보이게
+            const bizType = pickBizType(slot);
+            const name = clean(slot.business_name || slot.title || slot.store_name || "");
 
-            if (infoBox && clean(slot?.business_name)) {
-                infoBox.classList.remove("hidden");
+            if (!name || !infoBox) return;
 
-                if (titleEl) {
-                    // 상호명
-                    titleEl.textContent = slot.business_name;
-                }
+            infoBox.classList.remove("hidden");
 
-                if (subEl) {
-                    // 업종이 있을 때만 작게 붙여서 표시
-                    subEl.textContent = bizType ? bizType : "";
-                }
+            if (titleEl) {
+                titleEl.textContent = name;
+            }
+
+            if (subEl) {
+                subEl.textContent = bizType || "";
             }
         }
 
