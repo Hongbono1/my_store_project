@@ -131,6 +131,8 @@ export async function saveSlot(req, res) {
     const uploaded = req.file; // multer single/fields 보정
     const newImageUrl = uploaded ? `/uploads/${uploaded.filename}` : "";
 
+    const imageUrlFromBody = clean(b.imageUrl || b.image_url);
+
     await client.query("BEGIN");
 
     let existing = null;
@@ -148,19 +150,28 @@ export async function saveSlot(req, res) {
       existing = rows[0] || null;
     }
 
-    // 이미지 결정: 기본은 유지
+    // 이미지 결정: 기본은 기존 값 유지
     let finalImageUrl = existing?.image_url || null;
 
     if (clearImage) {
+      // 명시적으로 "이미지 제거" 요청이 온 경우
       if (finalImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
       finalImageUrl = null;
     } else if (uploaded) {
-      if (finalImageUrl && finalImageUrl !== newImageUrl) safeUnlinkByPublicUrl(finalImageUrl);
+      // 새 파일 업로드가 있으면 → 기존 슬롯 이미지 교체
+      if (finalImageUrl && finalImageUrl !== newImageUrl) {
+        safeUnlinkByPublicUrl(finalImageUrl);
+      }
       finalImageUrl = newImageUrl;
+    } else if (imageUrlFromBody) {
+      // ⬅⬅⬅ 가게 연결 모드에서 넘어온 이미지 URL 우선 사용
+      // (store_info/store_images 에 있는 대표 이미지)
+      finalImageUrl = imageUrlFromBody;
     } else {
+      // 아무 것도 없고, 기존에도 없으면 null
       if (!existing?.image_url) finalImageUrl = null;
-      // keepImage 유무와 무관하게 유지
     }
+
 
     const startAtExpr = startAtLocal ? `($9)::timestamp AT TIME ZONE '${TZ}'` : "NULL";
     const endAtExpr = !noEnd && endAtLocal ? `($10)::timestamp AT TIME ZONE '${TZ}'` : "NULL";
@@ -246,7 +257,7 @@ export async function saveSlot(req, res) {
     const slot = await fetchSlot({ page, position, priority });
     return res.json({ success: true, slot, debug: { keepImage, clearImage } });
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("saveSlot error:", e);
     return res.status(500).json({ success: false, error: "server error" });
   } finally {
@@ -309,7 +320,7 @@ export async function deleteSlot(req, res) {
     await client.query("COMMIT");
     return res.json({ success: true, deleted: 1 });
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("deleteSlot error:", e);
     return res.status(500).json({ success: false, error: "server error" });
   } finally {
