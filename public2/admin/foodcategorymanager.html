@@ -1476,6 +1476,8 @@
         const btnResetModal = $("btnResetModal");
         const btnSaveSlot = $("btnSaveSlot");
 
+        let bizNameTouched = false;
+
         function getUiMode() {
             return document.querySelector('input[name="slotMode"]:checked')?.value || "image";
         }
@@ -1768,6 +1770,11 @@
             el.addEventListener("input", updateModalPreview);
             el.addEventListener("change", updateModalPreview);
         });
+        if (fieldBizName) {
+            fieldBizName.addEventListener("input", () => {
+                bizNameTouched = true; // 사용자가 직접 상호명을 건드렸을 때만 필터로 사용
+            });
+        }
         if (fieldImageFile) fieldImageFile.addEventListener("change", updateModalPreview);
         if (fieldNoEnd) fieldNoEnd.addEventListener("change", () => { syncNoEndUI(); updateModalPreview(); });
 
@@ -1805,6 +1812,8 @@
 
                     currentStoreImageUrl = item.dataset.image || "";
 
+                    bizNameTouched = false; // ✅ 선택으로 자동 입력된 상호명은 필터로 쓰지 않음
+
                     setUiMode("store");
                     applySlotMode("store");
                     updateModalPreview();
@@ -1815,7 +1824,10 @@
         if (btnSearchStore) {
             btnSearchStore.addEventListener("click", async () => {
                 const bizNo = clean(fieldBizNo?.value);
-                const q = clean(fieldBizName?.value);
+                const nameVal = clean(fieldBizName?.value);
+
+                // ✅ bizNo가 있으면: 상호명은 "사용자가 직접 수정했을 때만" q로 보냄
+                const q = bizNo ? (bizNameTouched ? nameVal : "") : nameVal;
 
                 if (storeResultsBody) storeResultsBody.innerHTML = "검색 중...";
 
@@ -1836,9 +1848,15 @@
         }
 
         if (btnResetModal) {
-            btnResetModal.addEventListener("click", () => {
+            btnResetModal.addEventListener("click", async () => {
+                const page = modalRoot?.dataset?.page || "foodcategory";
                 const position = modalRoot?.dataset?.position || "";
+                const p = Number(clean(adPriority?.value) || "1"); // ✅ 현재 우선순위 기억
+
+                // 1) UI는 즉시 초기화
                 resetModalFields();
+                if (adPriority) adPriority.value = String(p); // ✅ 우선순위는 유지
+                bizNameTouched = false;
 
                 if (position === "food_sidebar_links") {
                     setTextOnlyMode(true);
@@ -1847,8 +1865,20 @@
                     setUiMode("image");
                     applySlotMode("image");
                 }
-
                 updateModalPreview();
+
+                // 2) DB도 바로 초기화 = 해당 우선순위 후보 삭제
+                try {
+                    await API.deleteSlot(page, position, p);
+                } catch (e) {
+                    // 후보가 원래 없으면 에러날 수도 있으니, 초기화 목적상 그냥 무시
+                    console.warn("reset deleteSlot ignored:", e);
+                }
+
+                // 3) 화면 갱신
+                await hydrateAllSlots();
+                await refreshCandidateList(page, position);
+                await loadSlotIntoModal(page, position, p);
             });
         }
 
