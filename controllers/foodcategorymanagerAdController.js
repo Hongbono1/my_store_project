@@ -204,8 +204,8 @@ export async function saveSlot(req, res) {
           business_no=$6,
           business_name=$7,
           image_url=$8,
-          start_at = (NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}'),
-          end_at   = CASE WHEN $11 THEN NULL ELSE (NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}') END,
+          start_at = NULLIF($9, '')::timestamp AT TIME ZONE '${TZ}',
+          end_at   = NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}',
           no_end=$11,
           updated_at=NOW()
         WHERE page=$12
@@ -224,8 +224,8 @@ export async function saveSlot(req, res) {
         VALUES
           ($1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11,
-           (NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}'),
-           CASE WHEN $14 THEN NULL ELSE (NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}') END,
+           NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}',
+           NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}',
            $14, NOW(), NOW())
         RETURNING id
       `;
