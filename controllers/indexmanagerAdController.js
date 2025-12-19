@@ -1261,7 +1261,22 @@ export async function searchStore(req, res) {
       if (!uniq.has(key)) uniq.set(key, s);
     }
 
-    return res.json({ ok: true, stores: Array.from(uniq.values()) });
+    // ✅ 각 가게의 이미지를 자동 조회하여 추가
+    const stores = Array.from(uniq.values());
+    for (const store of stores) {
+      const img = await resolveStoreMainImage(client, {
+        storeType: store.store_type,
+        storeId: store.id,
+        businessNo: store.business_no,
+        businessName: store.business_name,
+      });
+      if (img) {
+        store.main_img = img;
+        store.image_url = img;
+      }
+    }
+
+    return res.json({ ok: true, stores });
   } catch (e) {
     console.error("❌ searchStore error:", e);
     return res.status(500).json({ ok: false, error: "서버 오류" });
