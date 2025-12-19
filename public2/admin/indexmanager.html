@@ -62,10 +62,12 @@
             justify-content: center;
             color: rgba(107, 114, 128, 0.9);
             font-size: 0.85rem;
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            background: linear-gradient(135deg, #f8fafc, #f1f 5f9);
         }
 
-        .slot-img.hidden { display: none !important; }
+        .slot-img.hidden {
+            display: none !important;
+        }
 
         /* =========================
        ✅ 관리자 오버레이 배지
@@ -905,15 +907,6 @@
             const PAGE = "index";
             const BEST_PICK_MAX = 18;
 
-            // ✅ 인덱스 상단 4개 텍스트 전용 슬롯
-            const TEXT_ONLY_POSITIONS = new Set([
-                "index_sub_keywords",
-                "index_sub_news",
-                "index_sub_events",
-                "index_sub_recommends",
-                "index_oneword",
-            ]);
-
             /* ============================================================
                ✅ 유틸
             ============================================================ */
@@ -1009,20 +1002,20 @@
                 for (let i = 1; i <= BEST_PICK_MAX; i++) {
                     const wrap = document.createElement("div");
                     wrap.innerHTML = `
-            <div id="slot_best_pick_${i}"
-              class="neo-card slot-banner best-circle aspect-square w-full flex items-center justify-center"
-              data-position="best_pick_${i}"
-              data-label="Best Pick ${i}"
-              data-size="권장 1:1">
-              <img class="slot-img hidden" alt="Best Pick ${i}">
-              <div class="slot-default flex-col">
-                <span class="font-bold text-sm">Best Pick ${i}</span>
-                <span class="text-[10px] text-gray-500 mt-1">클릭하여 설정</span>
-              </div>
-              <span class="slot-badge size">1:1</span>
-              <span class="slot-badge store hidden"></span>
+          <div id="slot_best_pick_${i}"
+            class="neo-card slot-banner best-circle aspect-square w-full flex items-center justify-center"
+            data-position="best_pick_${i}"
+            data-label="Best Pick ${i}"
+            data-size="권장 1:1">
+            <img class="slot-img hidden" alt="Best Pick ${i}">
+            <div class="slot-default flex-col">
+              <span class="font-bold text-sm">Best Pick ${i}</span>
+              <span class="text-[10px] text-gray-500 mt-1">클릭하여 설정</span>
             </div>
-          `.trim();
+            <span class="slot-badge size">1:1</span>
+            <span class="slot-badge store hidden"></span>
+          </div>
+        `.trim();
                     frag.appendChild(wrap.firstElementChild);
                 }
 
@@ -1040,11 +1033,14 @@
                     "slot_index_promo_1",
                     "slot_index_promo_2",
                     "slot_index_promo_3",
+
                     "slot_index_sub_keywords",
                     "slot_index_sub_news",
                     "slot_index_sub_events",
                     "slot_index_sub_recommends",
+
                     "slot_index_oneword",
+
                     "slot_index_food_delivery",
                     "slot_index_all_stores",
                     "slot_index_hot_place",
@@ -1058,11 +1054,9 @@
                     "slot_index_season",
                     "slot_index_join",
 
-                    // ✅ 여기 추가
                     "slot_index_d2c_banner",
                     "slot_index_d2c_shop",
 
-                    // ⬇ 기존 이어서
                     "slot_index_support_review",
                     "slot_index_support_empty",
                     "slot_index_support_inquiry",
@@ -1107,18 +1101,15 @@
                 const finalText = (previewLines.join("\n") + more) || "내용 없음";
 
                 defEl.innerHTML = `
-          <div class="w-full p-3 text-left">
-            <div class="text-[11px] font-extrabold text-slate-600 mb-1">텍스트</div>
-            <div class="text-[12px] leading-relaxed text-slate-900 whitespace-pre-line">
-              ${escapeHtml(finalText)}
-            </div>
+        <div class="w-full p-3 text-left">
+          <div class="text-[11px] font-extrabold text-slate-600 mb-1">텍스트</div>
+          <div class="text-[12px] leading-relaxed text-slate-900 whitespace-pre-line">
+            ${escapeHtml(finalText)}
           </div>
-        `;
+        </div>
+      `;
             }
 
-            /* ============================================================
-               ✅ 텍스트 박스 렌더링 (큰 글자로 표시)
-            ============================================================ */
             function renderTextBox(slotEl, text) {
                 const body = slotEl.querySelector(".slot-text-body");
                 const hint = slotEl.querySelector(".slot-hint");
@@ -1129,19 +1120,21 @@
             }
 
             /* ============================================================
-               ✅ 박스에 적용 (이미지/가게 + 텍스트 미리보기)
+               ✅ 박스에 적용 (모드별 미리보기)
+               - 이제 "텍스트 전용 슬롯" 개념 없음
+               - slot_type === "text" 인 경우만 텍스트 렌더
             ============================================================ */
             function applySlotToBox(box, slot) {
                 const img = qs(".slot-img", box);
                 const def = qs(".slot-default", box);
                 const storeBadge = qs(".slot-badge.store", box);
 
-                const position = box?.dataset?.position || "";
                 const slotType = slot?.slot_type || slot?.slotType || "";
                 const textContent = slot?.text_content || slot?.textContent || "";
 
-                const isTextSlot = (slotType === "text") || TEXT_ONLY_POSITIONS.has(position);
+                const isTextSlot = (slotType === "text");
 
+                // 텍스트 슬롯이면 텍스트만 렌더(이미지/가게 뱃지 숨김)
                 if (isTextSlot) {
                     if (img) {
                         img.classList.add("hidden");
@@ -1159,6 +1152,7 @@
                     return;
                 }
 
+                // 일반(이미지/가게) 슬롯
                 const imageUrl =
                     slot?.image_url ||
                     slot?.image ||
@@ -1167,7 +1161,7 @@
                     slot?.image_path ||
                     "";
 
-                const mode = slot?.slot_mode || slot?.slotMode || "";
+                const mode = slot?.slot_mode || slot?.slotMode || ""; // "image" | "store" | "custom"
                 const businessName = slot?.business_name || slot?.businessName || "";
                 const businessNo = slot?.business_no || slot?.businessNo || "";
 
@@ -1182,6 +1176,9 @@
                         storeBadge.textContent = "";
                     }
                 }
+
+                // 텍스트 박스(있는 슬롯만) 비워두기
+                renderTextBox(box, "");
             }
 
             async function loadAllSlotsPreview() {
@@ -1315,31 +1312,16 @@
                 setModeUI(mode);
             }
 
-            function setModalTypeForPosition(position) {
-                const isText = TEXT_ONLY_POSITIONS.has(position);
+            // ✅ 이제 전부 3모드 선택 가능 (텍스트 전용 없음)
+            function setModalTypeForPosition(_position) {
+                textOnlyHint?.classList.add("hidden");
 
-                if (isText) {
-                    textOnlyHint?.classList.remove("hidden");
+                modeBlock?.classList.remove("hidden");
+                linkBlock?.classList.remove("hidden");
+                dividerAfterLink?.classList.remove("hidden");
 
-                    modeBlock?.classList.add("hidden");
-                    imageBlock?.classList.add("hidden");
-                    storeBlock?.classList.add("hidden");
-
-                    textBlock?.classList.remove("hidden");
-
-                    // 텍스트 전용: 링크도 숨김
-                    linkBlock?.classList.add("hidden");
-                    dividerAfterLink?.classList.add("hidden");
-                } else {
-                    textOnlyHint?.classList.add("hidden");
-
-                    modeBlock?.classList.remove("hidden");
-                    linkBlock?.classList.remove("hidden");
-                    dividerAfterLink?.classList.remove("hidden");
-
-                    setModeUI(getSelectedMode());
-                }
-                return isText;
+                setModeUI(getSelectedMode());
+                return false;
             }
 
             function applyNoEndState() {
@@ -1349,10 +1331,9 @@
             }
 
             function updateSelectedSummary() {
-                const isTextOnly = TEXT_ONLY_POSITIONS.has(activePosition);
                 const mode = getSelectedMode();
 
-                if (isTextOnly || mode === "text") {
+                if (mode === "text") {
                     textSelectedImage.textContent = "텍스트";
                     textSelectedStore.textContent = "사용 안함";
                     return;
@@ -1421,20 +1402,15 @@
                 if (adPriority) adPriority.value = String(slot?.priority ?? adPriority.value ?? 1);
 
                 const slotType = slot?.slot_type || slot?.slotType || "";
-                const mode = slot?.slot_mode || slot?.slotMode || "image";
+                const modeFromServer = slot?.slot_mode || slot?.slotMode || "image";
 
-                // ✅ 텍스트 내용은 "텍스트 전용" 또는 "slot_type=text" 일 때 채움
-                if (fieldTextContent && (TEXT_ONLY_POSITIONS.has(activePosition) || slotType === "text")) {
+                // 텍스트는 항상 채워둠(모드 전환시 바로 보이게)
+                if (fieldTextContent) {
                     fieldTextContent.value = (slot?.text_content ?? slot?.textContent ?? slot?.content ?? "") || "";
                 }
 
-                if (!TEXT_ONLY_POSITIONS.has(activePosition)) {
-                    if (slotType === "text") {
-                        setSelectedMode("text");
-                    } else {
-                        setSelectedMode(mode === "store" ? "store" : "image");
-                    }
-                }
+                if (slotType === "text") setSelectedMode("text");
+                else setSelectedMode(modeFromServer === "store" ? "store" : "image");
 
                 const link = slot?.link_url || slot?.linkUrl || slot?.link || slot?.href || "";
                 if (fieldLinkUrl) fieldLinkUrl.value = link || "";
@@ -1465,7 +1441,7 @@
                     slot?.image_path ||
                     "";
 
-                if (!TEXT_ONLY_POSITIONS.has(activePosition) && imageUrl && currentPreviewImg) {
+                if (imageUrl && currentPreviewImg) {
                     safeSetImage(currentPreviewImg, imageUrl, currentPreviewEmpty);
                 } else {
                     currentPreviewImg?.classList.add("hidden");
@@ -1500,7 +1476,7 @@
                 candidateList.innerHTML = "";
                 for (const it of items) {
                     const pr = it.priority ?? "-";
-                    const isText = (it.slot_type === "text") || TEXT_ONLY_POSITIONS.has(activePosition);
+                    const isText = (it.slot_type === "text");
 
                     const imgHtml = it.image_url
                         ? `<img src="${escapeHtml(toAbs(it.image_url))}" class="w-12 h-12 rounded-lg object-cover border" />`
@@ -1521,13 +1497,13 @@
                     row.type = "button";
                     row.className = "w-full text-left p-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 flex gap-3 items-center";
                     row.innerHTML = `
-            ${isText ? `<div class="w-12 h-12 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">TXT</div>` : imgHtml}
-            <div class="flex-1">
-              <div class="text-sm font-semibold text-gray-800">우선순위 ${pr}</div>
-              <div class="text-xs text-gray-600">${escapeHtml(mainLine)}</div>
-              <div class="text-xs text-gray-500 mt-1">${escapeHtml(periodLine)}</div>
-            </div>
-          `;
+          ${isText ? `<div class="w-12 h-12 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">TXT</div>` : imgHtml}
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-800">우선순위 ${pr}</div>
+            <div class="text-xs text-gray-600">${escapeHtml(mainLine)}</div>
+            <div class="text-xs text-gray-500 mt-1">${escapeHtml(periodLine)}</div>
+          </div>
+        `;
                     row.addEventListener("click", async () => {
                         const p = it.priority ?? 1;
                         if (adPriority) adPriority.value = String(p);
@@ -1580,28 +1556,28 @@
 
                     if (storeResultsBody) {
                         storeResultsBody.innerHTML = `
-              <div class="space-y-2">
-                ${stores.map((s, idx) => {
+            <div class="space-y-2">
+              ${stores.map((s, idx) => {
                             const id = s.id ?? s.store_id ?? "";
                             const bn = s.business_name ?? s.name ?? s.store_name ?? "";
                             const bno = s.business_no ?? s.biz_no ?? s.bizNo ?? "";
                             const cat = s.business_category ?? s.category ?? s.store_category ?? "";
                             return `
-                    <button class="w-full text-left px-3 py-3 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition"
-                      data-store-idx="${idx}">
-                      <div class="flex items-center justify-between gap-2">
-                        <div class="font-semibold text-slate-800">${escapeHtml(bn || "(상호명 없음)")}</div>
-                        <div class="text-[10px] text-slate-500">ID: ${escapeHtml(id || "-")}</div>
-                      </div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        <span class="mr-2">사업자번호: <b>${escapeHtml(bno || "-")}</b></span>
-                        <span>업종: ${escapeHtml(cat || "-")}</span>
-                      </div>
-                    </button>
-                  `;
+                  <button class="w-full text-left px-3 py-3 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition"
+                    data-store-idx="${idx}">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="font-semibold text-slate-800">${escapeHtml(bn || "(상호명 없음)")}</div>
+                      <div class="text-[10px] text-slate-500">ID: ${escapeHtml(id || "-")}</div>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      <span class="mr-2">사업자번호: <b>${escapeHtml(bno || "-")}</b></span>
+                      <span>업종: ${escapeHtml(cat || "-")}</span>
+                    </div>
+                  </button>
+                `;
                         }).join("")}
-              </div>
-            `;
+            </div>
+          `;
 
                         qsa("button[data-store-idx]", storeResultsBody).forEach(btn => {
                             btn.addEventListener("click", () => {
@@ -1640,8 +1616,7 @@
             async function saveSlot() {
                 if (!activePosition) return;
 
-                const isTextOnly = TEXT_ONLY_POSITIONS.has(activePosition);
-                const mode = getSelectedMode();
+                const mode = getSelectedMode(); // image | store | text
 
                 const linkUrl = (fieldLinkUrl?.value || "").trim();
 
@@ -1659,8 +1634,9 @@
                 fd.append("position", activePosition);
                 fd.append("priority", String(priority));
 
-                if (isTextOnly) {
-                    const txt = (fieldTextContent?.value || "").trim();
+                const txt = (fieldTextContent?.value || "").trim();
+
+                if (mode === "text") {
                     fd.append("slotType", "text");
                     fd.append("slot_type", "text");
                     fd.append("slotMode", "custom");
@@ -1668,30 +1644,20 @@
                     fd.append("textContent", txt);
                     fd.append("text_content", txt);
                 } else {
-                    const txt = (fieldTextContent?.value || "").trim();
-
-                    if (mode === "text") {
-                        fd.append("slotType", "text");
-                        fd.append("slot_type", "text");
-                        fd.append("slotMode", "custom");
-                        fd.append("slot_mode", "custom");
-                        fd.append("textContent", txt);
-                        fd.append("text_content", txt);
-                    } else {
-                        fd.append("slotType", "banner");
-                        fd.append("slot_type", "banner");
-                        fd.append("slotMode", mode);
-                        fd.append("slot_mode", mode);
-                    }
+                    fd.append("slotType", "banner");
+                    fd.append("slot_type", "banner");
+                    fd.append("slotMode", mode);   // image | store
+                    fd.append("slot_mode", mode);
                 }
 
-                if (linkUrl && !isTextOnly) {
+                // ✅ 링크는 모든 모드에서 저장 허용(원치 않으면 여기 조건 바꿔)
+                if (linkUrl) {
                     fd.append("linkUrl", linkUrl);
                     fd.append("link_url", linkUrl);
                     fd.append("link", linkUrl);
                 }
 
-                if (!isTextOnly && mode === "store") {
+                if (mode === "store") {
                     if (storeId) { fd.append("storeId", storeId); fd.append("store_id", storeId); }
                     if (businessNo) {
                         fd.append("businessNo", businessNo);
@@ -1721,7 +1687,7 @@
                 fd.append("no_end", fieldNoEnd?.checked ? "1" : "0");
 
                 const file = fieldImageFile?.files?.[0];
-                if (!isTextOnly && mode === "image" && file) {
+                if (mode === "image" && file) {
                     fd.append("image", file);
                     fd.append("slotImage", file);
                     fd.append("imageFile", file);
@@ -1831,6 +1797,9 @@
             function bindAllBoxes() {
                 const boxes = getAllSlotElements();
                 boxes.forEach(box => {
+                    if (box.dataset.__bound === "1") return;
+                    box.dataset.__bound = "1";
+
                     bindHoverTooltip(box);
                     box.addEventListener("click", () => handleBoxClick(box));
                 });
@@ -1910,29 +1879,24 @@
                 window.__closeAdHelp = closeHelp;
             })();
 
-            async function initIndexManager() {
+            /* ============================================================
+               ✅ 초기화 (DOMContentLoaded 놓쳐도 실행되게)
+            ============================================================ */
+            async function init() {
                 buildBestPickGrid();
                 bindAllBoxes();
                 await loadAllSlotsPreview();
             }
 
             if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", initIndexManager);
+                document.addEventListener("DOMContentLoaded", init);
             } else {
-                initIndexManager();
+                init();
             }
-
-            document.addEventListener("click", (e) => {
-                const box = e.target.closest(".slot-banner");
-                if (!box) return;
-
-                // slot-banner 중에서 data-position 없는건 제외
-                if (!box.dataset?.position) return;
-
-                handleBoxClick(box);
-            });
         })();
     </script>
+
+
 </body>
 
 </html>
