@@ -182,10 +182,22 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ------------------------------------------------------------
-// 3-1. 표준화된 국세청 사업자번호 인증 API
+// 3-1. 표준화된 국세청 사업자번호 인증 API (mock 테스트 모드 지원)
 // ------------------------------------------------------------
 app.post("/verify-biz", async (req, res) => {
   try {
+    const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
+    const MODE = (process.env.BIZ_VERIFY_MODE || "real").toLowerCase(); // "mock" | "real"
+    const isProd = NODE_ENV === "production";
+
+    // ✅ 운영에서 mock 절대 금지 (실수 방지)
+    if (isProd && MODE === "mock") {
+      return res.status(500).json({
+        ok: false,
+        message: "BIZ_VERIFY_MODE=mock is not allowed in production",
+      });
+    }
+
     // 👉 두 형태 모두 지원: { bizNo } 또는 { b_no: ["1234567890"] }
     const { bizNo, b_no } = req.body || {};
 
@@ -205,6 +217,53 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
+    const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
+
+    // ============================================================
+    // ✅ MOCK 모드 (개발/스테이징에서만)
+    // - 프론트가 data.data[0] 형태로 쓰는 걸 고려해서
+    //   "ok: true, data: [ ... ]" 구조를 동일하게 맞춤
+    // ============================================================
+    if (!isProd && MODE === "mock") {
+      // 🔻 여기서 성공/실패 규칙을 네가 원하는대로 바꿀 수 있음
+      // 지금은: 마지막 자리가 0이면 실패, 그 외 성공(개발 편의용)
+      const last = cleanBizNo.slice(-1);
+      const isOk = last !== "0";
+
+      if (isOk) {
+        return res.json({
+          ok: true,
+          data: [
+            {
+              b_no: cleanBizNo,
+              b_stt_cd: "01",
+              b_stt: "계속사업자",
+              tax_type: "mock",
+              tax_type_cd: "00",
+            },
+          ],
+          mock: true,
+        });
+      } else {
+        return res.json({
+          ok: true,
+          data: [
+            {
+              b_no: cleanBizNo,
+              b_stt_cd: "02",
+              b_stt: "휴업자/폐업자/미등록(mock)",
+              tax_type: "mock",
+              tax_type_cd: "00",
+            },
+          ],
+          mock: true,
+        });
+      }
+    }
+
+    // ============================================================
+    // ✅ REAL 모드 (국세청/odcloud 실제 호출)
+    // ============================================================
     const serviceKey = process.env.BIZ_API_KEY;
     if (!serviceKey) {
       console.error("❌ BIZ_API_KEY 환경변수가 없습니다. (.env 확인 필요)");
@@ -213,8 +272,6 @@ app.post("/verify-biz", async (req, res) => {
         message: "서버 설정 오류(BIZ_API_KEY 미설정)",
       });
     }
-
-    const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
 
     const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(
       serviceKey
