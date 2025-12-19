@@ -435,25 +435,24 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
 async function attachAutoStoreImage(client, slotObj) {
   if (!slotObj) return slotObj;
 
-  const hasImage = !!cleanStr(slotObj.image_url);
   const mode = cleanStr(slotObj.slot_mode)?.toLowerCase();
   const type = cleanStr(slotObj.slot_type)?.toLowerCase();
 
   // ✅ text 슬롯은 이미지 자동대입 금지
   if (type === "text") return slotObj;
 
-  // store 모드 + 이미지 없음일 때만 자동 보정
-  if (hasImage) return slotObj;
-  if (mode !== "store") return slotObj;
+  // ✅ store 모드일 때는 항상 가게 이미지를 새로 가져옴 (사업자번호 우선)
+  if (mode === "store") {
+    const img = await resolveStoreMainImage(client, {
+      storeType: slotObj.store_type,
+      storeId: slotObj.store_id,
+      businessNo: slotObj.business_no,
+      businessName: slotObj.business_name,
+    });
 
-  const img = await resolveStoreMainImage(client, {
-    storeType: slotObj.store_type,
-    storeId: slotObj.store_id,
-    businessNo: slotObj.business_no,
-    businessName: slotObj.business_name,
-  });
+    if (img) slotObj.image_url = img;
+  }
 
-  if (img) slotObj.image_url = img;
   return slotObj;
 }
 
