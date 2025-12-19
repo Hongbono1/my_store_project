@@ -1850,10 +1850,54 @@
             btnCloseModal?.addEventListener("click", closeModal);
             qs(".modal-backdrop", modalRoot)?.addEventListener("click", closeModal);
 
-            btnResetModal?.addEventListener("click", () => {
+            btnResetModal?.addEventListener("click", async () => {
                 console.log("초기화 버튼 클릭됨");
-                resetModalFields(true);
-                alert("입력 필드가 초기화되었습니다.");
+                
+                if (!activePosition) {
+                    alert("슬롯이 선택되지 않았습니다.");
+                    return;
+                }
+
+                if (!confirm("이 슬롯의 모든 데이터를 삭제하시겠습니까?")) {
+                    return;
+                }
+
+                // 서버에서 슬롯 삭제
+                const p = Number(adPriority?.value || 1) || 1;
+                const url = `/manager/ad/slot?page=${encodeURIComponent(PAGE)}&position=${encodeURIComponent(activePosition)}&priority=${encodeURIComponent(p)}`;
+                
+                try {
+                    const { res, json } = await fetchJson(url, { method: "DELETE" });
+
+                    if (!res.ok || !json?.success) {
+                        alert(json?.error || "삭제 실패");
+                        return;
+                    }
+
+                    // 입력 필드 초기화
+                    resetModalFields(true);
+                    setModalTypeForPosition(activePosition);
+                    updateSelectedSummary();
+
+                    // 후보 목록 새로고침
+                    await refreshCandidates();
+
+                    // 슬롯 박스 업데이트
+                    const slotP1 = await fetchSlot(activePosition, 1);
+                    const slot = slotP1 || await fetchSlot(activePosition);
+                    if (slot && activeBox) {
+                        applySlotToBox(activeBox, slot);
+                    } else if (activeBox) {
+                        // 슬롯이 없으면 빈 상태로
+                        activeBox.innerHTML = "";
+                        activeBox.classList.remove("has-content");
+                    }
+
+                    alert("슬롯이 초기화되었습니다.");
+                } catch (err) {
+                    console.error("초기화 오류:", err);
+                    alert("초기화 중 오류가 발생했습니다.");
+                }
             });
             btnSaveSlot?.addEventListener("click", saveSlot);
 
