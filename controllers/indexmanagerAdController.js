@@ -398,13 +398,14 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
     const where = [];
     const params = [];
 
-    if (sid && idCol) {
-      params.push(sid);
-      where.push(`${idCol}::text = $${params.length}`);
-    }
+    // ✅ 사업자번호 우선 검색
     if (bizDigits && bizCol) {
       params.push(bizDigits);
       where.push(`regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') = $${params.length}`);
+    }
+    if (sid && idCol) {
+      params.push(sid);
+      where.push(`${idCol}::text = $${params.length}`);
     }
     if (bname && nameCol) {
       params.push(bname);
@@ -414,7 +415,13 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
     if (!where.length) continue;
 
     const coalesceExpr = imgCols.length >= 2 ? `COALESCE(${imgCols.join(", ")})` : `${imgCols[0]}`;
-    const orderExpr = updatedCol ? `${updatedCol} DESC` : idCol ? `${idCol} DESC` : "1";
+    
+    // ✅ 사업자번호로 매칭된 경우를 우선순위로 정렬
+    let orderExpr = "";
+    if (bizDigits && bizCol) {
+      orderExpr = `CASE WHEN regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') = $1 THEN 0 ELSE 1 END, `;
+    }
+    orderExpr += updatedCol ? `${updatedCol} DESC` : idCol ? `${idCol} DESC` : "1";
 
     const q = `
       SELECT ${coalesceExpr} AS img
