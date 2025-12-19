@@ -260,7 +260,7 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
   const sid = cleanStr(storeId);
   const bizDigits = digitsOnly(businessNo);
   const bname = cleanStr(businessName);
-  const st = normalizeStoreType(storeType);
+  let st = normalizeStoreType(storeType);
 
   console.log("🔍 [resolveStoreMainImage] 검색 파라미터:", {
     storeType: st,
@@ -268,6 +268,47 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
     businessNo: bizDigits,
     businessName: bname
   });
+
+  // ✅ store_type이 없지만 사업자번호가 있으면, 사업자번호로 store_type 추론
+  if (!st && bizDigits) {
+    console.log("🔍 [resolveStoreMainImage] store_type 없음 - 사업자번호로 추론 시도");
+    
+    // combined_store_info 확인
+    const combinedCheck = await client.query(
+      `SELECT 1 FROM combined_store_info 
+       WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1 
+       LIMIT 1`,
+      [bizDigits]
+    );
+    if (combinedCheck.rows.length > 0) {
+      st = "combined";
+      console.log("✅ [resolveStoreMainImage] store_type 추론: combined");
+    } else {
+      // store_info 확인
+      const storeCheck = await client.query(
+        `SELECT 1 FROM store_info 
+         WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1 
+         LIMIT 1`,
+        [bizDigits]
+      );
+      if (storeCheck.rows.length > 0) {
+        st = "store_info";
+        console.log("✅ [resolveStoreMainImage] store_type 추론: store_info");
+      } else {
+        // food_stores 확인
+        const foodCheck = await client.query(
+          `SELECT 1 FROM food_stores 
+           WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1 
+           LIMIT 1`,
+          [bizDigits]
+        );
+        if (foodCheck.rows.length > 0) {
+          st = "food";
+          console.log("✅ [resolveStoreMainImage] store_type 추론: food");
+        }
+      }
+    }
+  }
 
   // store_type 기반 우선순위
   const ordered = [];
