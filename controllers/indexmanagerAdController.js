@@ -271,8 +271,6 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
 
   // ✅ store_type이 없지만 사업자번호가 있으면, 사업자번호로 store_type 추론
   if (!st && bizDigits) {
-    console.log("🔍 [resolveStoreMainImage] store_type 없음 - 사업자번호로 추론 시도");
-    
     // combined_store_info 확인
     const combinedCheck = await client.query(
       `SELECT 1 FROM combined_store_info 
@@ -284,7 +282,7 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
       st = "combined";
       console.log("✅ [resolveStoreMainImage] store_type 추론: combined");
     } else {
-      // store_info 확인
+      // store_info 확인 → food_stores 확인
       const storeCheck = await client.query(
         `SELECT 1 FROM store_info 
          WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1 
