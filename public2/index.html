@@ -683,10 +683,37 @@
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
 
+            // ✅ 랜덤 셔플 (Fisher–Yates)
+            function shuffleArray(arr) {
+                const a = arr.slice();
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            // ✅ 슬롯 번호(1~18)를 유지한 채, 표시 순서만 랜덤
+            const numbered = slots.map((slot, idx) => ({
+                slotNo: idx + 1,
+                ...slot,
+            }));
+
+            // ✅ 내용 있는 것 먼저 랜덤, 비어있는 건 뒤로 (원하면 이 줄은 삭제해도 됨)
+            const filled = numbered.filter(s =>
+                (s.businessName && String(s.businessName).trim()) ||
+                (s.image && String(s.image).trim()) ||
+                (s.link && String(s.link).trim())
+            );
+            const empty = numbered.filter(s => !filled.includes(s));
+
+            const shuffled = shuffleArray(filled).concat(shuffleArray(empty));
+
+
             // 2) 카드 렌더 (트랙에 "직접" 추가)
             track.innerHTML = "";
-            slots.forEach((slot, idx) => {
-                const n = idx + 1;
+            shuffled.forEach((slot, idx) => {
+                const n = slot.slotNo; // ✅ 섞여도 원래 슬롯 번호는 유지
 
                 const originalImage = slot.image || "";
                 const hasOriginalImage = !!(originalImage && originalImage.trim());
