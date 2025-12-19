@@ -412,6 +412,75 @@ export async function getFoodRegisterFull(req, res) {
   }
 }
 
+/* ===================== 사업자번호로 조회(GET /biz/:businessNumber/full) ===================== */
+export async function getFoodStoreByBusinessNumber(req, res) {
+  try {
+    const bizNo = String(req.params.businessNumber || "").replace(/[^\d]/g, "");
+    if (!bizNo || bizNo.length !== 10) {
+      return res.status(400).json({ ok: false, error: "Invalid business number" });
+    }
+
+    // 1) 가게 (store_info) - 가장 최근 등록된 것
+    const { rows: s } = await pool.query(
+      `SELECT
+         id,
+         business_name,
+         address,
+         phone,
+         created_at,
+         business_type, business_category, detail_category, business_hours, delivery_option,
+         service_details, additional_desc,
+         homepage, instagram, facebook,
+         facilities, pets_allowed, parking,
+         business_number
+       FROM store_info
+       WHERE business_number = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [bizNo]
+    );
+    if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
+
+    const storeId = s[0].id;
+
+    // 2) 이미지
+    const { rows: images } = await pool.query(
+      `SELECT url
+         FROM store_images
+        WHERE store_id = $1
+        ORDER BY sort_order, id`,
+      [storeId]
+    );
+
+    // 3) 메뉴
+    const { rows: menus } = await pool.query(
+      `SELECT store_id, COALESCE(category,'기타') AS category,
+              name, price, image_url, description, theme
+         FROM store_menu
+        WHERE store_id = $1
+        ORDER BY id ASC`,
+      [storeId]
+    );
+
+    // 4) 이벤트
+    const { rows: ev } = await pool.query(
+      `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
+      [storeId]
+    );
+
+    return res.json({
+      ok: true,
+      store: s[0],
+      images,
+      menus,
+      events: ev.map((x) => x.content),
+    });
+  } catch (err) {
+    console.error("[getFoodStoreByBusinessNumber] error:", err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  }
+}
+
 /* ===================== 수정(PUT /:id) ===================== */
 export async function updateFoodStore(req, res) {
   const client = await pool.connect();

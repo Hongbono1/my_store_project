@@ -183,7 +183,9 @@ export async function createCombinedStore(req, res) {
 
     await client.query("COMMIT");
     console.log("[createCombinedStore] 성공:", storeId);
-    return res.json({ ok: true, id: storeId });
+    // ✅ 사업자번호도 반환 (리다이렉트용)
+    const businessNumber = s(raw.businessNumber);
+    return res.json({ ok: true, id: storeId, businessNumber });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[createCombinedStore] error:", err);
@@ -192,6 +194,114 @@ export async function createCombinedStore(req, res) {
       .json({ ok: false, error: "DB insert failed", message: err.message });
   } finally {
     client.release();
+  }
+}
+
+/* ----------------------
+ * 사업자번호로 조회
+ * ---------------------- */
+export async function getCombinedStoreByBusinessNumber(req, res) {
+  try {
+    const businessNumber = s(req.params.businessNumber);
+    if (!businessNumber) {
+      return res.status(400).json({ ok: false, error: "business_number_required" });
+    }
+
+    /* ────────────── 1) 기본 상점 정보 ────────────── */
+    const { rows: storeRows } = await pool.query({
+      text: `
+        SELECT *,
+               (COALESCE(road_address,'') || ' ' || COALESCE(detail_address,'')) AS address
+        FROM combined_store_info
+        WHERE business_number=$1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      values: [businessNumber],
+    });
+
+    if (!storeRows.length) {
+      return res.status(404).json({ ok: false, error: "not_found" });
+    }
+
+    const base = storeRows[0];
+    const storeId = base.id;
+    const store = {
+      id: base.id,
+      business_name: base.business_name ?? "-",
+      business_type: base.business_type ?? "-",
+      business_category: base.business_category ?? "-",
+      delivery_option: base.delivery_option ?? "-",
+      business_hours: base.business_hours ?? "-",
+      service_details: base.service_details ?? "-",
+      additional_desc: base.additional_desc ?? "-",
+      phone: base.phone ?? "",
+      homepage: base.homepage ?? "",
+      instagram: base.instagram ?? "",
+      facebook: base.facebook ?? "",
+      facilities: base.facilities ?? "-",
+      pets_allowed: base.pets_allowed ?? null,
+      parking: base.parking ?? "-",
+      address: base.address ?? "-",
+    };
+
+    /* ────────────── 2) 이미지 ────────────── */
+    const { rows: imageRows } = await pool.query({
+      text: `
+        SELECT url 
+        FROM combined_store_images 
+        WHERE store_id=$1 
+        ORDER BY sort_order, id
+      `,
+      values: [storeId],
+    });
+    const images = imageRows.map(r => ({ url: r.url }));
+
+    /* ────────────── 3) 메뉴 ────────────── */
+    const { rows: menuRows } = await pool.query({
+      text: `
+        SELECT category, name, price, image_url, description
+        FROM combined_menu_items
+        WHERE store_id=$1
+        ORDER BY category, name
+      `,
+      values: [storeId],
+    });
+    const menus = menuRows.map(r => ({
+      category: r.category ?? "기타",
+      name: r.name,
+      price: r.price ?? 0,
+      image_url: r.image_url,
+      description: r.description ?? ""
+    }));
+
+    /* ────────────── 4) 이벤트 ────────────── */
+    const { rows: evRows } = await pool.query({
+      text: `
+        SELECT content 
+        FROM combined_store_events 
+        WHERE store_id=$1 
+        ORDER BY ord
+      `,
+      values: [storeId],
+    });
+    const events = evRows.map(r => r.content).filter(Boolean);
+
+    /* ────────────── 최종 응답 ────────────── */
+    return res.json({
+      ok: true,
+      store,
+      images,
+      menus,
+      events,
+    });
+  } catch (err) {
+    console.error("[getCombinedStoreByBusinessNumber] error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "DB fetch failed",
+      message: err.message,
+    });
   }
 }
 

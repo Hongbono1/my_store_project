@@ -5,7 +5,11 @@ import fs from "fs";
 import path from "path";
 
 // ✅ "undefined handler" 방지: 필요한 것만 명시 import
-import { createFoodStore, getFoodRegisterFull } from "../controllers/foodregisterController.js";
+import { 
+  createFoodStore, 
+  getFoodRegisterFull,
+  getFoodStoreByBusinessNumber 
+} from "../controllers/foodregisterController.js";
 
 const router = Router();
 
@@ -87,5 +91,8 @@ router.post("/", uploadWithCatch, createFoodStore);
 
 // 상세 조회: /store/:id/full
 router.get("/:id/full", getFoodRegisterFull);
+
+// 사업자번호로 조회: /store/biz/:businessNumber/full
+router.get("/biz/:businessNumber/full", getFoodStoreByBusinessNumber);
 
 export default router;

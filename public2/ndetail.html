@@ -652,21 +652,43 @@
             try {
                 const q = new URLSearchParams(location.search);
                 const idRaw = q.get("id");
-                const id = Number(idRaw);
+                const bizRaw = q.get("biz"); // ✅ 사업자번호 파라미터 추가
                 const type = (q.get("type") || "food").toLowerCase();
 
-                if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
+                let apiUrl;
 
-                let apiUrl = type === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+                // ✅ 사업자번호가 있으면 우선 사용
+                if (bizRaw && bizRaw.trim()) {
+                    const biz = bizRaw.trim().replace(/[^\d]/g, ""); // 숫자만 추출
+                    if (biz.length === 10) {
+                        apiUrl = type === "combined" 
+                            ? `/combined/biz/${biz}/full` 
+                            : `/store/biz/${biz}/full`;
+                        console.log("[DETAIL] Using business number:", biz);
+                    } else {
+                        throw new Error("Invalid business number format");
+                    }
+                } else if (idRaw) {
+                    // ID 기반 조회 (기존 방식)
+                    const id = Number(idRaw);
+                    if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
+                    apiUrl = type === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+                } else {
+                    throw new Error("No id or business number provided");
+                }
 
                 // fetch + 한 번만 폴백
                 let res = await fetch(apiUrl);
-                if (!res.ok) {
-                    const alt = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
-                    const tryAlt = await fetch(alt);
-                    if (tryAlt.ok) {
-                        res = tryAlt;
-                        apiUrl = alt;
+                if (!res.ok && idRaw) {
+                    // 사업자번호로 실패하면 ID로 폴백 시도 (역호환성)
+                    const id = Number(idRaw);
+                    if (Number.isSafeInteger(id)) {
+                        const alt = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
+                        const tryAlt = await fetch(alt);
+                        if (tryAlt.ok) {
+                            res = tryAlt;
+                            apiUrl = alt;
+                        }
                     }
                 }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);

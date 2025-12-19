@@ -35,4 +35,7 @@ router.post(
 // [GET] /combined/:id/full
 router.get("/:id/full", ctrl.getCombinedStoreFull);
 
+// [GET] /combined/biz/:businessNumber/full - 사업자번호로 조회
+router.get("/biz/:businessNumber/full", ctrl.getCombinedStoreByBusinessNumber);
+
 export default router;
