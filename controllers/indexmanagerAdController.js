@@ -96,6 +96,15 @@ function normalizeImageUrl(p) {
   return `/uploads/${s}`;
 }
 
+function normalizeStoreType(v) {
+  const s = cleanStr(v);
+  if (!s) return null;
+  const t = s.toLowerCase();
+  // 네 프로젝트에서 쓰는 타입명만 여기서 통일
+  if (t === "food" || t === "combined" || t === "store_info") return t;
+  return t; // 기타도 그대로 보존
+}
+
 function pickBody(req) {
   const b = req?.body || {};
 
@@ -123,9 +132,11 @@ function pickBody(req) {
 
     // 가게 연결
     storeId: cleanStr(b.storeId ?? b.store_id),
-    // ✅ businessNo는 digitsOnly로 한번 정제해두는게 안전
     businessNo: digitsOnly(b.businessNo ?? b.business_no ?? b.bizNo ?? b.biz_no),
     businessName: cleanStr(b.businessName ?? b.business_name),
+
+    // ✅ store_type 추가
+    storeType: normalizeStoreType(b.storeType ?? b.store_type ?? b.detail_type),
 
     // 기간
     startAt: cleanStr(b.startAt ?? b.start_at),
@@ -151,7 +162,6 @@ function mapSlotRow(r) {
     position: r.position,
     priority: r.priority ?? null,
 
-    // ✅ 여기서 무조건 정규화
     image_url: normalizeImageUrl(r.image_url),
     link_url: r.link_url ?? null,
     text_content: r.text_content ?? null,
@@ -162,6 +172,9 @@ function mapSlotRow(r) {
 
     slot_type: r.slot_type ?? null,
     slot_mode: r.slot_mode ?? null,
+
+    // ✅ store_type 포함
+    store_type: r.store_type ?? null,
 
     no_end: r.no_end ?? false,
     start_at: r.start_at ?? null,
@@ -241,14 +254,21 @@ async function pickExistingColumns(client, fullTable, candidates) {
 
 /* -------------------------
  * ✅ store 모드일 때, 슬롯 이미지가 없으면 자동 대표이미지 찾기
+ * ✅ store_type 있으면 우선순위로 테이블 선택
  * ------------------------- */
-async function resolveStoreMainImage(client, { storeId, businessNo, businessName }) {
+async function resolveStoreMainImage(client, { storeType, storeId, businessNo, businessName }) {
   const sid = cleanStr(storeId);
   const bizDigits = digitsOnly(businessNo);
   const bname = cleanStr(businessName);
+  const st = normalizeStoreType(storeType);
 
-  const sources = [
-    {
+  // store_type 기반 우선순위
+  const ordered = [];
+  const push = (x) => ordered.push(x);
+
+  // 공통 소스 정의
+  const SRC = {
+    combined_info: {
       table: "public.combined_store_info",
       idCandidates: ["id", "store_id"],
       bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
@@ -264,39 +284,82 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
         "image3",
       ],
       updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
+      kind: "single",
     },
-    {
+    store_info: {
       table: "public.store_info",
       idCandidates: ["id", "store_id"],
       bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
       nameCandidates: ["business_name", "store_name", "name", "title"],
       imgCandidates: ["main_image_url", "main_img", "image_url", "image_path", "image1", "image2", "image3"],
       updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
+      kind: "single",
     },
-    {
-      table: "public.food_store_images",
-      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
-      imgCandidates: ["image_url", "image_path", "file_path", "url"],
-      updatedCandidates: ["updated_at", "created_at", "id"],
-      kind: "images",
+    food_stores: {
+      table: "public.food_stores",
+      idCandidates: ["id", "store_id"],
+      bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
+      nameCandidates: ["store_name", "business_name", "name", "title"],
+      imgCandidates: ["main_image_url", "main_img", "image_url", "image_path", "image1", "image2", "image3"],
+      updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
+      kind: "single",
     },
-    {
-      table: "public.store_images",
-      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
-      imgCandidates: ["image_url", "image_path", "file_path", "url"],
-      updatedCandidates: ["updated_at", "created_at", "id"],
-      kind: "images",
-    },
-    {
+    combined_images: {
       table: "public.combined_store_images",
-      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
+      storeIdColCandidates: ["store_id"],
       imgCandidates: ["image_url", "image_path", "file_path", "url"],
       updatedCandidates: ["updated_at", "created_at", "id"],
       kind: "images",
     },
-  ];
+    store_images: {
+      table: "public.store_images",
+      storeIdColCandidates: ["store_id"],
+      imgCandidates: ["image_url", "image_path", "file_path", "url"],
+      updatedCandidates: ["updated_at", "created_at", "id"],
+      kind: "images",
+    },
+    food_images: {
+      table: "public.food_store_images",
+      storeIdColCandidates: ["store_id"],
+      imgCandidates: ["image_url", "image_path", "file_path", "url"],
+      updatedCandidates: ["updated_at", "created_at", "id"],
+      kind: "images",
+    },
+  };
 
-  for (const s of sources) {
+  // ✅ store_type 우선 순서
+  if (st === "food") {
+    push(SRC.food_stores);
+    push(SRC.food_images);
+    push(SRC.combined_info);
+    push(SRC.combined_images);
+    push(SRC.store_info);
+    push(SRC.store_images);
+  } else if (st === "combined") {
+    push(SRC.combined_info);
+    push(SRC.combined_images);
+    push(SRC.store_info);
+    push(SRC.store_images);
+    push(SRC.food_stores);
+    push(SRC.food_images);
+  } else if (st === "store_info") {
+    push(SRC.store_info);
+    push(SRC.store_images);
+    push(SRC.combined_info);
+    push(SRC.combined_images);
+    push(SRC.food_stores);
+    push(SRC.food_images);
+  } else {
+    // 타입 모르면 기존처럼 넓게
+    push(SRC.combined_info);
+    push(SRC.store_info);
+    push(SRC.food_stores);
+    push(SRC.food_images);
+    push(SRC.store_images);
+    push(SRC.combined_images);
+  }
+
+  for (const s of ordered) {
     const ok = await tableExists(client, s.table);
     if (!ok) continue;
 
@@ -384,6 +447,7 @@ async function attachAutoStoreImage(client, slotObj) {
   if (mode !== "store") return slotObj;
 
   const img = await resolveStoreMainImage(client, {
+    storeType: slotObj.store_type,
     storeId: slotObj.store_id,
     businessNo: slotObj.business_no,
     businessName: slotObj.business_name,
@@ -399,9 +463,10 @@ async function getEffectiveSlotFromItems(client, page, position) {
     `
     SELECT
       page, position, priority,
-      image_url, link_url, text_content,
-      business_no, business_name, store_id,
       slot_type, slot_mode,
+      image_url, link_url, text_content,
+      store_type, store_id,
+      business_no, business_name,
       no_end, start_at, end_at,
       to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -419,13 +484,18 @@ async function getEffectiveSlotFromItems(client, page, position) {
 }
 
 async function getLegacySlot(client, page, position) {
+  // legacy에 store_type 컬럼이 없을 수도 있으니 안전하게 처리
+  const legacyStoreTypeCol = await pickExistingColumn(client, LEGACY_TABLE, ["store_type"]);
+  const storeTypeSel = legacyStoreTypeCol ? `${legacyStoreTypeCol} AS store_type` : `NULL::text AS store_type`;
+
   const { rows } = await client.query(
     `
     SELECT
       page, position,
-      image_url, link_url, text_content,
-      business_no, business_name, store_id,
       slot_type, slot_mode,
+      image_url, link_url, text_content,
+      store_id, business_no, business_name,
+      ${storeTypeSel},
       no_end, start_at, end_at,
       to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
       to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -463,9 +533,10 @@ export async function getSlot(req, res) {
         `
         SELECT
           page, position, priority,
-          image_url, link_url, text_content,
-          business_no, business_name, store_id,
           slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
           no_end, start_at, end_at,
           to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
           to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -529,9 +600,10 @@ export async function listSlots(req, res) {
         `
         SELECT DISTINCT ON (page, position)
           page, position, priority,
-          image_url, link_url, text_content,
-          business_no, business_name, store_id,
           slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
           no_end, start_at, end_at,
           to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
           to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -551,13 +623,17 @@ export async function listSlots(req, res) {
     }
 
     if (legacyOk) {
+      const legacyStoreTypeCol = await pickExistingColumn(client, LEGACY_TABLE, ["store_type"]);
+      const storeTypeSel = legacyStoreTypeCol ? `${legacyStoreTypeCol} AS store_type` : `NULL::text AS store_type`;
+
       const { rows } = await client.query(
         `
         SELECT
           page, position,
-          image_url, link_url, text_content,
-          business_no, business_name, store_id,
           slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_id, business_no, business_name,
+          ${storeTypeSel},
           no_end, start_at, end_at,
           to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
           to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -614,9 +690,10 @@ export async function listSlotItems(req, res) {
       `
       SELECT
         page, position, priority,
-        image_url, link_url, text_content,
-        business_no, business_name, store_id,
         slot_type, slot_mode,
+        image_url, link_url, text_content,
+        store_type, store_id,
+        business_no, business_name,
         no_end, start_at, end_at,
         to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
         to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -662,6 +739,7 @@ export async function upsertSlot(req, res) {
     storeId,
     businessNo,
     businessName,
+    storeType,
     startAt,
     endAt,
     noEnd,
@@ -682,8 +760,6 @@ export async function upsertSlot(req, res) {
 
     const modeLower = cleanStr(slotMode)?.toLowerCase();
     const typeLower = cleanStr(slotType)?.toLowerCase();
-
-    // ✅ text 슬롯이면 이미지 강제 제거 + 자동이미지 금지
     const isTextSlot = typeLower === "text";
 
     // ✅ 후보 저장 (priority 있으면 무조건 후보 테이블)
@@ -710,9 +786,9 @@ export async function upsertSlot(req, res) {
       } else if (keepImage) {
         nextImageUrl = prevImageUrl;
       } else {
-        // 이미지 없고 store 모드면 자동 대입(단, text 슬롯 제외)
         if (!isTextSlot && !cleanStr(nextImageUrl) && modeLower === "store") {
           const autoImg = await resolveStoreMainImage(client, {
+            storeType,
             storeId,
             businessNo,
             businessName,
@@ -721,7 +797,6 @@ export async function upsertSlot(req, res) {
         }
       }
 
-      // ✅ text 슬롯이면 최종 image_url은 null
       if (isTextSlot) nextImageUrl = null;
 
       const startAtTz = toKstTimestamptz(startAt);
@@ -731,39 +806,43 @@ export async function upsertSlot(req, res) {
         `
         INSERT INTO ${ITEMS_TABLE} (
           page, position, priority,
-          image_url, link_url, text_content,
-          business_no, business_name, store_id,
           slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
           start_at, end_at, no_end,
           created_at, updated_at
         )
         VALUES (
           $1,$2,$3,
-          $4,$5,$6,
-          $7,$8,$9,
-          $10,$11,
-          $12,$13,$14,
+          $4,$5,
+          $6,$7,$8,
+          $9,$10,
+          $11,$12,
+          $13,$14,$15,
           NOW(), NOW()
         )
         ON CONFLICT (page, position, priority)
         DO UPDATE SET
+          slot_type     = EXCLUDED.slot_type,
+          slot_mode     = EXCLUDED.slot_mode,
           image_url     = EXCLUDED.image_url,
           link_url      = EXCLUDED.link_url,
           text_content  = EXCLUDED.text_content,
+          store_type    = EXCLUDED.store_type,
+          store_id      = EXCLUDED.store_id,
           business_no   = EXCLUDED.business_no,
           business_name = EXCLUDED.business_name,
-          store_id      = EXCLUDED.store_id,
-          slot_type     = EXCLUDED.slot_type,
-          slot_mode     = EXCLUDED.slot_mode,
           start_at      = EXCLUDED.start_at,
           end_at        = EXCLUDED.end_at,
           no_end        = EXCLUDED.no_end,
           updated_at    = NOW()
         RETURNING
           page, position, priority,
-          image_url, link_url, text_content,
-          business_no, business_name, store_id,
           slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
           no_end, start_at, end_at,
           to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
           to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -773,14 +852,15 @@ export async function upsertSlot(req, res) {
           page,
           position,
           priority,
+          slotType,
+          slotMode,
           isTextSlot ? null : normalizeImageUrl(nextImageUrl),
           linkUrl,
           textContent,
+          storeType,
+          storeId,
           businessNo,
           businessName,
-          storeId,
-          slotType,
-          slotMode,
           startAtTz,
           endAtTz,
           noEnd,
@@ -816,6 +896,7 @@ export async function upsertSlot(req, res) {
     } else {
       if (!isTextSlot && !cleanStr(nextImageUrl) && modeLower === "store") {
         const autoImg = await resolveStoreMainImage(client, {
+          storeType,
           storeId,
           businessNo,
           businessName,
@@ -829,43 +910,116 @@ export async function upsertSlot(req, res) {
     const startAtTz = toKstTimestamptz(startAt);
     const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
 
+    // legacy에 store_type 컬럼이 없을 수 있으니 동적 처리
+    const legacyStoreTypeCol = await pickExistingColumn(client, LEGACY_TABLE, ["store_type"]);
+
+    if (legacyStoreTypeCol) {
+      const { rows } = await client.query(
+        `
+        INSERT INTO ${LEGACY_TABLE} (
+          page, position,
+          slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
+          start_at, end_at, no_end,
+          created_at, updated_at
+        )
+        VALUES (
+          $1,$2,
+          $3,$4,
+          $5,$6,$7,
+          $8,$9,
+          $10,$11,
+          $12,$13,$14,
+          NOW(), NOW()
+        )
+        ON CONFLICT (page, position)
+        DO UPDATE SET
+          slot_type     = EXCLUDED.slot_type,
+          slot_mode     = EXCLUDED.slot_mode,
+          image_url     = EXCLUDED.image_url,
+          link_url      = EXCLUDED.link_url,
+          text_content  = EXCLUDED.text_content,
+          store_type    = EXCLUDED.store_type,
+          store_id      = EXCLUDED.store_id,
+          business_no   = EXCLUDED.business_no,
+          business_name = EXCLUDED.business_name,
+          start_at      = EXCLUDED.start_at,
+          end_at        = EXCLUDED.end_at,
+          no_end        = EXCLUDED.no_end,
+          updated_at    = NOW()
+        RETURNING
+          page, position,
+          slot_type, slot_mode,
+          image_url, link_url, text_content,
+          store_type, store_id,
+          business_no, business_name,
+          no_end, start_at, end_at,
+          to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
+          to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
+          created_at, updated_at
+        `,
+        [
+          page,
+          position,
+          slotType,
+          slotMode,
+          isTextSlot ? null : normalizeImageUrl(nextImageUrl),
+          linkUrl,
+          textContent,
+          storeType,
+          storeId,
+          businessNo,
+          businessName,
+          startAtTz,
+          endAtTz,
+          noEnd,
+        ]
+      );
+
+      const mapped = mapSlotRow(rows[0]);
+      return res.json({ success: true, slot: mapped });
+    }
+
+    // legacy에 store_type 컬럼이 없으면 store_type 없이 저장
     const { rows } = await client.query(
       `
       INSERT INTO ${LEGACY_TABLE} (
         page, position,
-        image_url, link_url, text_content,
-        business_no, business_name, store_id,
         slot_type, slot_mode,
+        image_url, link_url, text_content,
+        store_id, business_no, business_name,
         start_at, end_at, no_end,
         created_at, updated_at
       )
       VALUES (
         $1,$2,
-        $3,$4,$5,
-        $6,$7,$8,
-        $9,$10,
+        $3,$4,
+        $5,$6,$7,
+        $8,$9,$10,
         $11,$12,$13,
         NOW(), NOW()
       )
       ON CONFLICT (page, position)
       DO UPDATE SET
+        slot_type     = EXCLUDED.slot_type,
+        slot_mode     = EXCLUDED.slot_mode,
         image_url     = EXCLUDED.image_url,
         link_url      = EXCLUDED.link_url,
         text_content  = EXCLUDED.text_content,
+        store_id      = EXCLUDED.store_id,
         business_no   = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-        store_id      = EXCLUDED.store_id,
-        slot_type     = EXCLUDED.slot_type,
-        slot_mode     = EXCLUDED.slot_mode,
         start_at      = EXCLUDED.start_at,
         end_at        = EXCLUDED.end_at,
         no_end        = EXCLUDED.no_end,
         updated_at    = NOW()
       RETURNING
         page, position,
-        image_url, link_url, text_content,
-        business_no, business_name, store_id,
         slot_type, slot_mode,
+        image_url, link_url, text_content,
+        store_id, business_no, business_name,
         no_end, start_at, end_at,
         to_char(start_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
         to_char(end_at   AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI') AS end_at_local,
@@ -874,21 +1028,21 @@ export async function upsertSlot(req, res) {
       [
         page,
         position,
+        slotType,
+        slotMode,
         isTextSlot ? null : normalizeImageUrl(nextImageUrl),
         linkUrl,
         textContent,
+        storeId,
         businessNo,
         businessName,
-        storeId,
-        slotType,
-        slotMode,
         startAtTz,
         endAtTz,
         noEnd,
       ]
     );
 
-    const mapped = mapSlotRow(rows[0]);
+    const mapped = mapSlotRow({ ...rows[0], store_type: null });
     return res.json({ success: true, slot: mapped });
   } catch (e) {
     console.error("❌ upsertSlot error:", e);
@@ -942,7 +1096,7 @@ export async function deleteSlot(req, res) {
 
 /* -------------------------
  *  GET /manager/ad/store/search?bizNo=... or ?q=...
- *  ✅ 사업자번호는 "숫자만 비교"로 매칭(하이픈/공백 입력도 OK)
+ *  ✅ 결과에 store_type도 넣어서 프론트가 그대로 저장 가능하게
  * ------------------------- */
 export async function searchStore(req, res) {
   const bizNoDigits = digitsOnly(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
@@ -961,18 +1115,21 @@ export async function searchStore(req, res) {
   try {
     const sources = [
       {
+        storeType: "combined",
         table: "public.combined_store_info",
         idCandidates: ["id", "store_id"],
         bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
         nameCandidates: ["business_name", "store_name", "name", "title"],
       },
       {
+        storeType: "store_info",
         table: "public.store_info",
         idCandidates: ["id", "store_id"],
         bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
         nameCandidates: ["business_name", "store_name", "name", "title"],
       },
       {
+        storeType: "food",
         table: "public.food_stores",
         idCandidates: ["id", "store_id"],
         bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
@@ -982,7 +1139,9 @@ export async function searchStore(req, res) {
 
     const found = [];
 
-    async function runSearch({ table, idCandidates, bizCandidates, nameCandidates }, mode, value) {
+    async function runSearch(src, mode, value) {
+      const { table, idCandidates, bizCandidates, nameCandidates, storeType } = src;
+
       const ok = await tableExists(client, table);
       if (!ok) return;
 
@@ -998,34 +1157,35 @@ export async function searchStore(req, res) {
           SELECT
             ${idCol}::text AS id,
             regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
-            ${nameCol} AS business_name
+            ${nameCol} AS business_name,
+            $2::text AS store_type
           FROM ${table}
           WHERE regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') = $1
           ORDER BY ${idCol} DESC
           LIMIT 30
           `,
-          [value]
+          [value, storeType]
         );
         found.push(...r.rows);
         return;
       }
 
       if (mode === "q") {
-        // q가 숫자면 사업자번호 digits 비교도 같이
         if (qDigits) {
           const r = await client.query(
             `
             SELECT
               ${idCol}::text AS id,
               regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
-              ${nameCol} AS business_name
+              ${nameCol} AS business_name,
+              $3::text AS store_type
             FROM ${table}
             WHERE ${nameCol} ILIKE '%' || $1 || '%'
                OR regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') ILIKE '%' || $2 || '%'
             ORDER BY ${idCol} DESC
             LIMIT 30
             `,
-            [value, qDigits]
+            [value, qDigits, storeType]
           );
           found.push(...r.rows);
         } else {
@@ -1034,14 +1194,15 @@ export async function searchStore(req, res) {
             SELECT
               ${idCol}::text AS id,
               regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
-              ${nameCol} AS business_name
+              ${nameCol} AS business_name,
+              $2::text AS store_type
             FROM ${table}
             WHERE ${nameCol} ILIKE '%' || $1 || '%'
                OR ${bizCol}::text ILIKE '%' || $1 || '%'
             ORDER BY ${idCol} DESC
             LIMIT 30
             `,
-            [value]
+            [value, storeType]
           );
           found.push(...r.rows);
         }
@@ -1058,7 +1219,7 @@ export async function searchStore(req, res) {
 
     const uniq = new Map();
     for (const s of found) {
-      const key = `${s.id}|${s.business_no}|${s.business_name}`;
+      const key = `${s.store_type}|${s.id}|${s.business_no}|${s.business_name}`;
       if (!uniq.has(key)) uniq.set(key, s);
     }
 
