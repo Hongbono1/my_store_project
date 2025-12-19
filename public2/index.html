@@ -160,52 +160,24 @@
 
     </section>
 
-
     <!-- ⑦ Best Pick -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <h2 class="text-2xl sm:text-3xl font-bold mb-6 text-center">Best Pick</h2>
+
         <div id="bestViewport" class="relative overflow-hidden">
-            <div id="bestTrack" class="flex transition-transform duration-500 ease-in-out will-change-transform">
-                <div class="flex justify-center gap-6 w-full">
-                    <!-- placeholder 6개 -->
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                    <div class="w-32 sm:w-40 text-center">
-                        <div class="neo-card w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mx-auto"></div>
-                        <p class="mt-2 font-bold text-base sm:text-lg text-gray-400">상호명</p>
-                        <p class="text-xs sm:text-sm text-gray-400">업종</p>
-                    </div>
-                </div>
+            <!-- ✅ 카드가 여기에 직접 쌓임 -->
+            <div id="bestTrack"
+                class="flex gap-6 px-12 transition-transform duration-[900ms] ease-in-out will-change-transform">
+                <!-- JS가 카드 생성 -->
             </div>
+
             <button id="bestPrev"
-                class="absolute left-0 top-1/2 -translate-y-1/2 bg-white shadow rounded-full px-3 py-2 z-10">‹</button>
+                class="absolute left-2 top-1/2 -translate-y-1/2 bg-white shadow rounded-full px-3 py-2 z-10">‹</button>
             <button id="bestNext"
-                class="absolute right-0 top-1/2 -translate-y-1/2 bg-white shadow rounded-full px-3 py-2 z-10">›</button>
+                class="absolute right-2 top-1/2 -translate-y-1/2 bg-white shadow rounded-full px-3 py-2 z-10">›</button>
         </div>
     </section>
+
 
     <!-- ⑧ 우리동네 한마디 -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -700,73 +672,148 @@
         }
 
         async function loadBestPick() {
+            const viewport = document.getElementById("bestViewport");
             const track = document.getElementById("bestTrack");
-            if (!track) return;
+            const btnPrev = document.getElementById("bestPrev");
+            const btnNext = document.getElementById("bestNext");
+            if (!viewport || !track) return;
 
+            // 1) 슬롯 로드
             const slots = await Promise.all(
                 Array.from({ length: BEST_PICK_MAX }, (_, i) => fetchBestPickSlot(i + 1))
             );
 
-            const groups = [];
-            for (let i = 0; i < slots.length; i += 6) groups.push(slots.slice(i, i + 6));
-
+            // 2) 카드 렌더 (트랙에 "직접" 추가)
             track.innerHTML = "";
+            slots.forEach((slot, idx) => {
+                const n = idx + 1;
 
-            groups.forEach((items, groupIndex) => {
-                const group = document.createElement("div");
-                group.className = "flex justify-center gap-6 basis-full shrink-0";
+                const originalImage = slot.image || "";
+                const hasOriginalImage = !!(originalImage && originalImage.trim());
+                const displayImage = hasOriginalImage ? normalizeImageUrl(originalImage) : "/assets/no-image.png";
 
-                items.forEach((slot, idx) => {
-                    const n = groupIndex * 6 + idx + 1;
+                const hasLink = !!(slot.link && slot.link.trim());
+                const hasName = !!(slot.businessName && slot.businessName.trim());
 
-                    const originalImage = slot.image || "";
-                    const hasOriginalImage = !!(originalImage && originalImage.trim());
-                    const displayImage = hasOriginalImage ? normalizeImageUrl(originalImage) : "/assets/no-image.png";
+                const card = document.createElement("a");
+                card.className = "block text-center w-28 sm:w-40 shrink-0";
 
-                    const hasLink = !!(slot.link && slot.link.trim());
-                    const hasName = !!(slot.businessName && slot.businessName.trim());
+                if (hasLink) {
+                    card.href = slot.link;
+                    card.target = "_blank";
+                } else {
+                    card.href = "javascript:void(0)";
+                    card.classList.add("opacity-60", "pointer-events-none", "cursor-not-allowed");
+                }
 
-                    const card = document.createElement("a");
-                    card.className = "block text-center w-28 sm:w-40";
+                const titleText = `Best Pick ${n}`;
+                const bottomTitle = hasName ? slot.businessName : `Best Pick ${n}`;
 
-                    if (hasLink) {
-                        card.href = slot.link;
-                        card.target = "_blank";
-                    } else {
-                        card.href = "javascript:void(0)";
-                        card.classList.add("opacity-60", "pointer-events-none", "cursor-not-allowed");
-                    }
+                card.innerHTML = `
+      <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
+        <img class="w-full h-full object-cover ${hasOriginalImage ? "" : "opacity-40"}" alt="${titleText}">
+      </div>
+      <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? "text-gray-800" : "text-gray-400"}">${bottomTitle}</p>
+    `;
 
-                    const titleText = `Best Pick ${n}`;
-                    const bottomTitle = hasName ? slot.businessName : `Best Pick ${n}`;
+                const img = card.querySelector("img");
+                safeImageLoader(img, displayImage, "/assets/no-image.png");
 
-                    card.innerHTML = `
-                    <div class="neo-card w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden mx-auto">
-                        <img class="w-full h-full object-cover ${hasOriginalImage ? "" : "opacity-40"}" alt="${titleText}">
-                    </div>
-                    <p class="mt-2 font-bold text-base sm:text-lg ${hasName ? 'text-gray-800' : 'text-gray-400'}">${bottomTitle}</p>
-                `;
-
-                    const img = card.querySelector("img");
-                    safeImageLoader(img, displayImage, "/assets/no-image.png");
-
-                    group.appendChild(card);
-                });
-
-                track.appendChild(group);
+                track.appendChild(card);
             });
 
-            let currentIndex = 0;
-            function updatePosition() {
-                track.style.transform = `translateX(${-currentIndex * 100}%)`;
+            // ====== 슬라이더 로직 (2개씩, 느리게, 끝에서 방향 반전) ======
+            const state = {
+                offset: 0,      // px
+                dir: 1,         // 1: 앞으로, -1: 뒤로
+                step: 0,        // px (카드 2개)
+                max: 0,         // px
+                timer: null
+            };
+
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+            function calcStepPx() {
+                const first = track.querySelector("a");
+                if (!first) return 0;
+
+                const cardW = first.getBoundingClientRect().width;
+
+                // flex gap 읽기
+                const cs = getComputedStyle(track);
+                const gapStr = cs.gap || cs.columnGap || "0px";
+                const gap = parseFloat(gapStr) || 0;
+
+                // ✅ 2개씩 이동
+                return (cardW + gap) * 2;
             }
 
-            setInterval(() => {
-                currentIndex = (currentIndex + 1) % groups.length;
-                updatePosition();
-            }, 4000);
+            function recalc() {
+                state.step = calcStepPx();
+                state.max = Math.max(0, track.scrollWidth - viewport.clientWidth);
+                state.offset = clamp(state.offset, 0, state.max);
 
-            updatePosition();
+                // 내용이 적으면 버튼 숨김
+                const show = state.max > 0;
+                if (btnPrev) btnPrev.style.display = show ? "" : "none";
+                if (btnNext) btnNext.style.display = show ? "" : "none";
+
+                apply();
+            }
+
+            function apply() {
+                track.style.transform = `translate3d(${-state.offset}px, 0, 0)`;
+            }
+
+            // ✅ 끝까지 가면 방향 반전해서 "뒤로 계속" (왕복)
+            function move(dirOverride = null) {
+                if (state.max <= 0 || state.step <= 0) return;
+
+                if (dirOverride === 1 || dirOverride === -1) state.dir = dirOverride;
+
+                let next = state.offset + state.dir * state.step;
+
+                // 끝에 닿으면 방향 반전
+                if (next > state.max) {
+                    state.dir = -1;
+                    next = state.offset + state.dir * state.step;
+                }
+                if (next < 0) {
+                    state.dir = 1;
+                    next = state.offset + state.dir * state.step;
+                }
+
+                state.offset = clamp(next, 0, state.max);
+                apply();
+            }
+
+            // 버튼: 한 번 누르면 2개씩
+            if (btnNext) {
+                btnNext.onclick = () => {
+                    move(1);
+                    restartAuto();
+                };
+            }
+            if (btnPrev) {
+                btnPrev.onclick = () => {
+                    move(-1);
+                    restartAuto();
+                };
+            }
+
+            // 자동: 2개씩 + 느리게
+            function restartAuto() {
+                if (state.timer) clearInterval(state.timer);
+                state.timer = setInterval(() => move(), 6000); // ✅ 자동 이동 템포 느리게
+            }
+
+            // 리사이즈 대응
+            window.addEventListener("resize", () => {
+                recalc();
+            });
+
+            recalc();
+            restartAuto();
         }
 
         // ============================================================
