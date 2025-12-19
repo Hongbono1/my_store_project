@@ -262,6 +262,13 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
   const bname = cleanStr(businessName);
   const st = normalizeStoreType(storeType);
 
+  console.log("🔍 [resolveStoreMainImage] 검색 파라미터:", {
+    storeType: st,
+    storeId: sid,
+    businessNo: bizDigits,
+    businessName: bname
+  });
+
   // store_type 기반 우선순위
   const ordered = [];
   const push = (x) => ordered.push(x);
@@ -433,9 +440,13 @@ async function resolveStoreMainImage(client, { storeType, storeId, businessNo, b
 
     const r = await client.query(q, params);
     const img = normalizeImageUrl(r.rows?.[0]?.img);
-    if (img) return img;
+    if (img) {
+      console.log(`✅ [resolveStoreMainImage] ${s.table}에서 이미지 발견:`, img);
+      return img;
+    }
   }
 
+  console.log("⚠️ [resolveStoreMainImage] 모든 테이블 검색 완료 - 이미지 없음");
   return null;
 }
 
@@ -445,11 +456,25 @@ async function attachAutoStoreImage(client, slotObj) {
   const mode = cleanStr(slotObj.slot_mode)?.toLowerCase();
   const type = cleanStr(slotObj.slot_type)?.toLowerCase();
 
+  console.log("🔍 [attachAutoStoreImage] 시작:", {
+    mode,
+    type,
+    position: slotObj.position,
+    businessNo: slotObj.business_no,
+    storeId: slotObj.store_id,
+    businessName: slotObj.business_name,
+    currentImageUrl: slotObj.image_url
+  });
+
   // ✅ text 슬롯은 이미지 자동대입 금지
-  if (type === "text") return slotObj;
+  if (type === "text") {
+    console.log("⏭️ [attachAutoStoreImage] text 타입이라 스킵");
+    return slotObj;
+  }
 
   // ✅ store 모드일 때는 항상 가게 이미지를 새로 가져옴 (사업자번호 우선)
   if (mode === "store") {
+    console.log("🔎 [attachAutoStoreImage] store 모드 - 이미지 검색 시작");
     const img = await resolveStoreMainImage(client, {
       storeType: slotObj.store_type,
       storeId: slotObj.store_id,
@@ -457,7 +482,16 @@ async function attachAutoStoreImage(client, slotObj) {
       businessName: slotObj.business_name,
     });
 
-    if (img) slotObj.image_url = img;
+    console.log("📸 [attachAutoStoreImage] 검색 결과:", img);
+
+    if (img) {
+      slotObj.image_url = img;
+      console.log("✅ [attachAutoStoreImage] 이미지 교체 완료:", img);
+    } else {
+      console.log("⚠️ [attachAutoStoreImage] 검색된 이미지 없음");
+    }
+  } else {
+    console.log("⏭️ [attachAutoStoreImage] store 모드 아님 - 스킵");
   }
 
   return slotObj;
