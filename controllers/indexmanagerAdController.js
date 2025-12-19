@@ -98,6 +98,14 @@ function normalizeImageUrl(p) {
 
 function pickBody(req) {
   const b = req?.body || {};
+
+  const rawSlotType = cleanStr(b.slotType ?? b.slot_type);
+  const rawSlotMode = cleanStr(b.slotMode ?? b.slot_mode);
+
+  // ✅ 기본값 강제(프론트 누락/오타 대비)
+  const slotType = (rawSlotType || "banner").toLowerCase();
+  const slotMode = (rawSlotMode || "image").toLowerCase();
+
   return {
     page: cleanStr(b.page),
     position: cleanStr(b.position),
@@ -106,8 +114,8 @@ function pickBody(req) {
     priority: toInt(b.priority),
 
     // 타입/모드
-    slotType: cleanStr(b.slotType ?? b.slot_type),
-    slotMode: cleanStr(b.slotMode ?? b.slot_mode),
+    slotType,
+    slotMode,
 
     // 링크/텍스트
     linkUrl: cleanStr(b.linkUrl ?? b.link_url ?? b.link),
@@ -115,7 +123,8 @@ function pickBody(req) {
 
     // 가게 연결
     storeId: cleanStr(b.storeId ?? b.store_id),
-    businessNo: cleanStr(b.businessNo ?? b.business_no ?? b.bizNo ?? b.biz_no),
+    // ✅ businessNo는 digitsOnly로 한번 정제해두는게 안전
+    businessNo: digitsOnly(b.businessNo ?? b.business_no ?? b.bizNo ?? b.biz_no),
     businessName: cleanStr(b.businessName ?? b.business_name),
 
     // 기간
@@ -136,30 +145,32 @@ async function tableExists(client, tableName) {
 
 function mapSlotRow(r) {
   if (!r) return null;
+
   return {
     page: r.page,
     position: r.position,
     priority: r.priority ?? null,
 
-    image_url: r.image_url,
-    link_url: r.link_url,
-    text_content: r.text_content,
+    // ✅ 여기서 무조건 정규화
+    image_url: normalizeImageUrl(r.image_url),
+    link_url: r.link_url ?? null,
+    text_content: r.text_content ?? null,
 
-    business_no: r.business_no,
-    business_name: r.business_name,
-    store_id: r.store_id,
+    business_no: r.business_no ?? null,
+    business_name: r.business_name ?? null,
+    store_id: r.store_id ?? null,
 
-    slot_type: r.slot_type,
-    slot_mode: r.slot_mode,
+    slot_type: r.slot_type ?? null,
+    slot_mode: r.slot_mode ?? null,
 
-    no_end: r.no_end,
-    start_at: r.start_at,
-    end_at: r.end_at,
+    no_end: r.no_end ?? false,
+    start_at: r.start_at ?? null,
+    end_at: r.end_at ?? null,
     start_at_local: r.start_at_local ?? null,
     end_at_local: r.end_at_local ?? null,
 
-    created_at: r.created_at,
-    updated_at: r.updated_at,
+    created_at: r.created_at ?? null,
+    updated_at: r.updated_at ?? null,
   };
 }
 
@@ -242,7 +253,16 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
       idCandidates: ["id", "store_id"],
       bizCandidates: ["business_number", "business_no", "biz_no", "bizno", "b_no", "bno"],
       nameCandidates: ["business_name", "store_name", "name", "title"],
-      imgCandidates: ["main_image_url", "main_img", "image_url", "cover_image", "image_path", "image1", "image2", "image3"],
+      imgCandidates: [
+        "main_image_url",
+        "main_img",
+        "image_url",
+        "cover_image",
+        "image_path",
+        "image1",
+        "image2",
+        "image3",
+      ],
       updatedCandidates: ["updated_at", "modified_at", "created_at", "id"],
     },
     {
@@ -255,21 +275,21 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
     },
     {
       table: "public.food_store_images",
-      storeIdColCandidates: ["store_id", "id"],
+      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
       imgCandidates: ["image_url", "image_path", "file_path", "url"],
       updatedCandidates: ["updated_at", "created_at", "id"],
       kind: "images",
     },
     {
       table: "public.store_images",
-      storeIdColCandidates: ["store_id", "id"],
+      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
       imgCandidates: ["image_url", "image_path", "file_path", "url"],
       updatedCandidates: ["updated_at", "created_at", "id"],
       kind: "images",
     },
     {
       table: "public.combined_store_images",
-      storeIdColCandidates: ["store_id", "id"],
+      storeIdColCandidates: ["store_id"], // ✅ id 후보 제거(잘못 매칭 방지)
       imgCandidates: ["image_url", "image_path", "file_path", "url"],
       updatedCandidates: ["updated_at", "created_at", "id"],
       kind: "images",
@@ -331,7 +351,7 @@ async function resolveStoreMainImage(client, { storeId, businessNo, businessName
     if (!where.length) continue;
 
     const coalesceExpr = imgCols.length >= 2 ? `COALESCE(${imgCols.join(", ")})` : `${imgCols[0]}`;
-    const orderExpr = updatedCol ? `${updatedCol} DESC` : (idCol ? `${idCol} DESC` : "1");
+    const orderExpr = updatedCol ? `${updatedCol} DESC` : idCol ? `${idCol} DESC` : "1";
 
     const q = `
       SELECT ${coalesceExpr} AS img
@@ -354,6 +374,10 @@ async function attachAutoStoreImage(client, slotObj) {
 
   const hasImage = !!cleanStr(slotObj.image_url);
   const mode = cleanStr(slotObj.slot_mode)?.toLowerCase();
+  const type = cleanStr(slotObj.slot_type)?.toLowerCase();
+
+  // ✅ text 슬롯은 이미지 자동대입 금지
+  if (type === "text") return slotObj;
 
   // store 모드 + 이미지 없음일 때만 자동 보정
   if (hasImage) return slotObj;
@@ -657,6 +681,10 @@ export async function upsertSlot(req, res) {
     const legacyOk = await tableExists(client, LEGACY_TABLE);
 
     const modeLower = cleanStr(slotMode)?.toLowerCase();
+    const typeLower = cleanStr(slotType)?.toLowerCase();
+
+    // ✅ text 슬롯이면 이미지 강제 제거 + 자동이미지 금지
+    const isTextSlot = typeLower === "text";
 
     // ✅ 후보 저장 (priority 있으면 무조건 후보 테이블)
     if (priority) {
@@ -671,7 +699,7 @@ export async function upsertSlot(req, res) {
         `SELECT image_url FROM ${ITEMS_TABLE} WHERE page=$1 AND position=$2 AND priority=$3 LIMIT 1`,
         [page, position, priority]
       );
-      const prevImageUrl = prev.rows?.[0]?.image_url ?? null;
+      const prevImageUrl = normalizeImageUrl(prev.rows?.[0]?.image_url ?? null);
 
       let nextImageUrl = prevImageUrl;
 
@@ -682,8 +710,8 @@ export async function upsertSlot(req, res) {
       } else if (keepImage) {
         nextImageUrl = prevImageUrl;
       } else {
-        // 이미지 없고 store 모드면 자동 대입
-        if (!cleanStr(nextImageUrl) && modeLower === "store") {
+        // 이미지 없고 store 모드면 자동 대입(단, text 슬롯 제외)
+        if (!isTextSlot && !cleanStr(nextImageUrl) && modeLower === "store") {
           const autoImg = await resolveStoreMainImage(client, {
             storeId,
             businessNo,
@@ -692,6 +720,9 @@ export async function upsertSlot(req, res) {
           if (autoImg) nextImageUrl = autoImg;
         }
       }
+
+      // ✅ text 슬롯이면 최종 image_url은 null
+      if (isTextSlot) nextImageUrl = null;
 
       const startAtTz = toKstTimestamptz(startAt);
       const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
@@ -742,7 +773,7 @@ export async function upsertSlot(req, res) {
           page,
           position,
           priority,
-          nextImageUrl,
+          isTextSlot ? null : normalizeImageUrl(nextImageUrl),
           linkUrl,
           textContent,
           businessNo,
@@ -772,7 +803,7 @@ export async function upsertSlot(req, res) {
       `SELECT image_url FROM ${LEGACY_TABLE} WHERE page=$1 AND position=$2 LIMIT 1`,
       [page, position]
     );
-    const prevImageUrl = prev.rows?.[0]?.image_url ?? null;
+    const prevImageUrl = normalizeImageUrl(prev.rows?.[0]?.image_url ?? null);
 
     let nextImageUrl = prevImageUrl;
 
@@ -783,7 +814,7 @@ export async function upsertSlot(req, res) {
     } else if (keepImage) {
       nextImageUrl = prevImageUrl;
     } else {
-      if (!cleanStr(nextImageUrl) && modeLower === "store") {
+      if (!isTextSlot && !cleanStr(nextImageUrl) && modeLower === "store") {
         const autoImg = await resolveStoreMainImage(client, {
           storeId,
           businessNo,
@@ -792,6 +823,8 @@ export async function upsertSlot(req, res) {
         if (autoImg) nextImageUrl = autoImg;
       }
     }
+
+    if (isTextSlot) nextImageUrl = null;
 
     const startAtTz = toKstTimestamptz(startAt);
     const endAtTz = noEnd ? null : toKstTimestamptz(endAt);
@@ -841,7 +874,7 @@ export async function upsertSlot(req, res) {
       [
         page,
         position,
-        nextImageUrl,
+        isTextSlot ? null : normalizeImageUrl(nextImageUrl),
         linkUrl,
         textContent,
         businessNo,
@@ -909,9 +942,10 @@ export async function deleteSlot(req, res) {
 
 /* -------------------------
  *  GET /manager/ad/store/search?bizNo=... or ?q=...
+ *  ✅ 사업자번호는 "숫자만 비교"로 매칭(하이픈/공백 입력도 OK)
  * ------------------------- */
 export async function searchStore(req, res) {
-  const bizNo = cleanStr(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
+  const bizNoDigits = digitsOnly(req.query.bizNo ?? req.query.businessNo ?? req.query.business_no);
 
   const q = cleanStr(
     req.query.q ??
@@ -920,6 +954,8 @@ export async function searchStore(req, res) {
       req.query.businessName ??
       req.query.business_name
   );
+
+  const qDigits = digitsOnly(q);
 
   const client = await pool.connect();
   try {
@@ -956,15 +992,15 @@ export async function searchStore(req, res) {
 
       if (!idCol || !nameCol || !bizCol) return;
 
-      if (mode === "biz") {
+      if (mode === "bizDigits") {
         const r = await client.query(
           `
           SELECT
-            ${idCol}::text  AS id,
-            ${bizCol}::text AS business_no,
-            ${nameCol}      AS business_name
+            ${idCol}::text AS id,
+            regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
+            ${nameCol} AS business_name
           FROM ${table}
-          WHERE ${bizCol}::text = $1
+          WHERE regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') = $1
           ORDER BY ${idCol} DESC
           LIMIT 30
           `,
@@ -975,26 +1011,45 @@ export async function searchStore(req, res) {
       }
 
       if (mode === "q") {
-        const r = await client.query(
-          `
-          SELECT
-            ${idCol}::text  AS id,
-            ${bizCol}::text AS business_no,
-            ${nameCol}      AS business_name
-          FROM ${table}
-          WHERE ${nameCol} ILIKE '%' || $1 || '%'
-             OR ${bizCol}::text ILIKE '%' || $1 || '%'
-          ORDER BY ${idCol} DESC
-          LIMIT 30
-          `,
-          [value]
-        );
-        found.push(...r.rows);
+        // q가 숫자면 사업자번호 digits 비교도 같이
+        if (qDigits) {
+          const r = await client.query(
+            `
+            SELECT
+              ${idCol}::text AS id,
+              regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
+              ${nameCol} AS business_name
+            FROM ${table}
+            WHERE ${nameCol} ILIKE '%' || $1 || '%'
+               OR regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') ILIKE '%' || $2 || '%'
+            ORDER BY ${idCol} DESC
+            LIMIT 30
+            `,
+            [value, qDigits]
+          );
+          found.push(...r.rows);
+        } else {
+          const r = await client.query(
+            `
+            SELECT
+              ${idCol}::text AS id,
+              regexp_replace(COALESCE(${bizCol}::text,''), '[^0-9]', '', 'g') AS business_no,
+              ${nameCol} AS business_name
+            FROM ${table}
+            WHERE ${nameCol} ILIKE '%' || $1 || '%'
+               OR ${bizCol}::text ILIKE '%' || $1 || '%'
+            ORDER BY ${idCol} DESC
+            LIMIT 30
+            `,
+            [value]
+          );
+          found.push(...r.rows);
+        }
       }
     }
 
-    if (bizNo) {
-      for (const s of sources) await runSearch(s, "biz", bizNo);
+    if (bizNoDigits) {
+      for (const s of sources) await runSearch(s, "bizDigits", bizNoDigits);
     }
 
     if (!found.length && q) {
