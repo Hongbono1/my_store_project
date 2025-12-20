@@ -193,11 +193,23 @@
         <section class="rounded-2xl p-5 bg-white/90 mb-5 shadow-inner">
           <div class="section-label">기본 정보</div>
 
-          <!-- ✅ 가게 이미지 업로드 추가 -->
-          <div class="flex flex-col md:flex-row items-center gap-2 mb-3">
-            <label class="w-32 font-medium" for="storeImages">가게 이미지</label>
-            <input type="file" id="storeImages" name="storeImages" accept="image/*" multiple
-              class="flex-1 input-neo px-3 py-2">
+          <!-- ✅ 가게 이미지 업로드 (최대 3장 + 메인 선택) -->
+          <div class="flex flex-col gap-2 mb-3">
+            <div class="flex flex-col md:flex-row items-center gap-2">
+              <label class="w-32 font-medium" for="storeImages">가게 이미지</label>
+              <input type="file" id="storeImages" name="storeImages" accept="image/*" multiple
+                class="flex-1 input-neo px-3 py-2">
+            </div>
+
+            <!-- 메인 이미지 인덱스(0~2) 서버로 전송 -->
+            <input type="hidden" id="mainImageIndex" name="mainImageIndex" value="0">
+
+            <!-- 미리보기 + 메인 선택 -->
+            <div id="storeImagePreview" class="grid grid-cols-3 gap-3 mt-2"></div>
+
+            <p class="text-xs text-gray-500 ml-1">
+              * 가게 이미지는 최대 3장까지 업로드 가능합니다. (메인 이미지는 아래에서 선택)
+            </p>
           </div>
 
           <!-- 상호 -->
@@ -744,36 +756,82 @@
 
 
     // --- 5. 폼 제출 (함수 외부에 있어야 함) ---
-    document.getElementById('businessForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    // ✅ 가게 이미지: 최대 3장 제한 + 메인 이미지 선택 UI
+    (function initStoreImagePicker() {
+      const input = document.getElementById("storeImages");
+      const preview = document.getElementById("storeImagePreview");
+      const mainIdxHidden = document.getElementById("mainImageIndex");
 
-      updateMenuCounts();    // ✅ 개수 정합성
-      stampMenuCategories(); // ✅ 행별 카테고리 확정
+      if (!input || !preview || !mainIdxHidden) return;
 
-      // ✅ 사업자번호 합치기 
-      const n1 = document.getElementById('bizNumber1').value.trim();
-      const n2 = document.getElementById('bizNumber2').value.trim();
-      const n3 = document.getElementById('bizNumber3').value.trim();
-      const bizNo = n1 + n2 + n3;
-
-      document.getElementById('businessNumber').value = bizNo;
-
-      // 값이 비었을 때 예외 처리
-      if (!/^\d{10}$/.test(bizNo)) {
-        alert("사업자번호 10자리를 입력하세요.");
-        return;
+      function setFilesToInput(fileList) {
+        // input.files는 직접 대입 불가 → DataTransfer로 재구성
+        const dt = new DataTransfer();
+        Array.from(fileList).forEach(f => dt.items.add(f));
+        input.files = dt.files;
       }
 
-      try {
-        const required = ["ownerName", "birthDate", "ownerEmail", "ownerPhone", "mainCategory", "subCategory", "businessName"];
-        for (const k of required) {
-          const v = document.getElementsByName(k)[0]?.value?.trim();
-          if (!v) {
-            alert("필수 정보를 모두 입력하세요!");
-            return;
-          }
+      function render() {
+        preview.innerHTML = "";
+        const files = Array.from(input.files || []);
+
+        // 파일 없으면 초기화
+        if (files.length === 0) {
+          mainIdxHidden.value = "0";
+          return;
         }
 
+        files.forEach((file, idx) => {
+          const url = URL.createObjectURL(file);
+
+          const card = document.createElement("label");
+          card.className =
+            "relative rounded-xl overflow-hidden border bg-white shadow-sm cursor-pointer group";
+
+          card.innerHTML = `
+          <img src="${url}" alt="preview-${idx}" class="w-full h-28 object-cover">
+          <div class="absolute inset-x-0 bottom-0 bg-black/45 text-white text-xs px-2 py-1 flex items-center justify-between">
+            <span class="truncate">${file.name}</span>
+            <span class="ml-2 shrink-0">메인</span>
+          </div>
+          <input type="radio" name="mainImagePick" value="${idx}" class="absolute top-2 left-2 w-4 h-4 accent-blue-600">
+          <div class="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-white/90 hidden group-hover:block">
+            ${idx + 1}번
+          </div>
+        `;
+
+          // radio 기본 체크: hidden값 우선, 없으면 0
+          const radio = card.querySelector('input[type="radio"]');
+          const current = Number(mainIdxHidden.value || 0);
+          radio.checked = (idx === current);
+
+          radio.addEventListener("change", () => {
+            mainIdxHidden.value = String(idx);
+          });
+
+          preview.appendChild(card);
+        });
+      }
+
+      input.addEventListener("change", () => {
+        const files = Array.from(input.files || []);
+
+        if (files.length > 3) {
+          alert("가게 이미지는 최대 3장까지만 업로드할 수 있습니다.\n처음 3장만 적용합니다.");
+          setFilesToInput(files.slice(0, 3));
+        }
+
+        // 새로 고르면 메인은 기본 0으로 리셋
+        mainIdxHidden.value = "0";
+        render();
+      });
+    })();
+
+    // --- 폼 제출 핸들러 ---
+    document.getElementById('businessForm')?.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      try {
         // ★ 제출 직전 값 보정
         const main = document.getElementById('mainCategory')?.value?.trim() || '';
         const sub = document.getElementById('subCategory')?.value?.trim() || '';
@@ -813,49 +871,48 @@
         if (!res.ok) throw new Error('서버 에러');
         const data = await res.json();
 
-      if (data.ok) {
-        // ✅ 사업자번호 우선 사용, 없으면 ID로 폴백
-        const bizNum = data.businessNumber || document.getElementById('businessNumber').value.trim();
-        const newId = data.id || data.store_id || data.storeId;
+        if (data.ok) {
+          // ✅ 사업자번호 우선 사용, 없으면 ID로 폴백
+          const bizNum = data.businessNumber || document.getElementById('businessNumber').value.trim();
+          const newId = data.id || data.store_id || data.storeId;
 
-        if (confirm('등록이 완료되었습니다!\n상세 페이지로 이동할까요?')) {
-          // ✅ 사업자번호가 있으면 사업자번호로, 없으면 ID로 이동
-          if (bizNum && bizNum.length === 10) {
-            window.location.href = `/ndetail.html?biz=${bizNum}&type=combined`;
-          } else if (newId) {
-            window.location.href = `/ndetail.html?id=${newId}&type=combined`;
-          } else {
-            alert('등록은 완료되었으나 정보를 찾을 수 없습니다.');
+          if (confirm('등록이 완료되었습니다!\n상세 페이지로 이동할까요?')) {
+            // ✅ 사업자번호가 있으면 사업자번호로, 없으면 ID로 이동
+            if (bizNum && bizNum.length === 10) {
+              window.location.href = `/ndetail.html?biz=${bizNum}&type=combined`;
+            } else if (newId) {
+              window.location.href = `/ndetail.html?id=${newId}&type=combined`;
+            } else {
+              alert('등록은 완료되었으나 정보를 찾을 수 없습니다.');
+            }
           }
+        } else {
+          alert('등록에 실패했습니다.');
         }
-      } else {
-        alert('등록에 실패했습니다.');
+      } catch (err) {
+        alert('에러: ' + err.message);
       }
+    });
 
-    } catch (err) {
-      alert('에러: ' + err.message);
+    // --- 네비게이션 함수들 ---
+    function goBack() {
+      history.back();
     }
-  });
 
-  // --- 네비게이션 함수들 ---
-  function goBack() {
-    history.back();
-  }
-
-  function goHome() {
-    window.location.href = "/";
-  }
-
-  function goNext() {
-    // 다음 등록 페이지로 이동
-    if (window.location.pathname.includes("foodregister")) {
-      window.location.href = "/public2/ncombinedregister.html";
-    } else if (window.location.pathname.includes("ncombinedregister")) {
-      window.location.href = "/public2/hotblogregister.html";
-    } else {
-      window.location.href = "/public2/foodregister.html";
+    function goHome() {
+      window.location.href = "/";
     }
-  }
+
+    function goNext() {
+      // 다음 등록 페이지로 이동
+      if (window.location.pathname.includes("foodregister")) {
+        window.location.href = "/public2/ncombinedregister.html";
+      } else if (window.location.pathname.includes("ncombinedregister")) {
+        window.location.href = "/public2/hotblogregister.html";
+      } else {
+        window.location.href = "/public2/foodregister.html";
+      }
+    }
   </script>
 </body>
 
