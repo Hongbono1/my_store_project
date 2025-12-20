@@ -217,6 +217,14 @@ export async function createFoodStore(req, res) {
       detailCategory
     );
 
+    // ✅ 통합과 동일: 사업자번호 없으면 등록 막기 (빈값 저장 방지)
+    if (!businessNumber) {
+      return res.status(200).json({
+        ok: false,
+        error: "business_number_required",
+      });
+    }
+
     await client.query("BEGIN");
 
     // 1) 가게 (store_info)
@@ -258,7 +266,7 @@ export async function createFoodStore(req, res) {
       facilities || null,
       petsAllowed,
       parking || null,
-      businessNumber || null,
+      businessNumber, // ✅ digits-only 강제 저장(필수)
     ]);
 
     const storeId = rows[0].id;
@@ -328,19 +336,25 @@ export async function createFoodStore(req, res) {
 
     await client.query("COMMIT");
 
-    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
+    const toSafeInt = (v) =>
+      Number.isSafeInteger(v) ? v : Number.parseInt(v, 10);
+
     return res.status(200).json({
       ok: true,
       id: toSafeInt(storeId) || Date.now(),
-      business_number: businessNumber || null,
+      business_number: businessNumber,
       detail_category: detailCategory || null,
     });
   } catch (err) {
-    try { if (client) await client.query("ROLLBACK"); } catch {}
+    try {
+      if (client) await client.query("ROLLBACK");
+    } catch {}
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { if (client) client.release(); } catch {}
+    try {
+      if (client) client.release();
+    } catch {}
   }
 }
 
@@ -438,7 +452,9 @@ export async function getFoodRegisterFull(req, res) {
 export async function getFoodStoreByBusinessNumber(req, res) {
   try {
     const bizNo = String(req.params.businessNumber || "").replace(/[^\d]/g, "");
-    if (!bizNo || bizNo.length !== 10) {
+
+    // ✅ 10~11 자리 허용 (테스트/실사업자 혼용 대응)
+    if (!bizNo || bizNo.length < 10 || bizNo.length > 11) {
       return res.status(400).json({ ok: false, error: "Invalid business number" });
     }
 
@@ -555,11 +571,15 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch {}
+    try {
+      client.release();
+    } catch {}
   }
 }
 
