@@ -22,6 +22,37 @@ const toWeb = (file) =>
 /** 배열화 유틸 */
 const arr = (v) => (Array.isArray(v) ? v : v != null ? [v] : []);
 
+/** ✅ 사업자번호: 어떤 키로 와도 잡고, digits-only로 반환 */
+function pickBusinessNumber(body) {
+  const candidates = [
+    body?.businessNumber,
+    body?.business_number,
+    body?.bizNumber,
+    body?.bizNo,
+    body?.biz_number,
+    body?.businessNo,
+    body?.business_no,
+    body?.bno,
+    body?.b_no,
+  ];
+
+  for (const raw of candidates) {
+    const digits = String(raw ?? "").replace(/[^\d]/g, "");
+    if (digits) return digits;
+  }
+
+  // 키가 애매하게 오는 경우도 방어
+  for (const [k, v] of Object.entries(body || {})) {
+    const key = String(k || "").toLowerCase();
+    if (!/(biz|business)/.test(key)) continue;
+    if (!/(no|number)/.test(key)) continue;
+    const digits = String(v ?? "").replace(/[^\d]/g, "");
+    if (digits) return digits;
+  }
+
+  return "";
+}
+
 /* ----------------------
  * 저장 (등록 처리)
  * ---------------------- */
@@ -33,75 +64,87 @@ export async function createCombinedStore(req, res) {
       ? req.files
       : Object.values(req.files || {}).flat();
 
-    console.log("==== [createCombinedStore] incoming body ====");
+    const businessNumberDigits = pickBusinessNumber(raw); // ✅ digits-only
+    console.log("==== [createCombinedStore] incoming ====");
+    console.log("businessNumberDigits:", businessNumberDigits);
     console.log("menuName[]:", raw["menuName[]"]);
     console.log("menuPrice[]:", raw["menuPrice[]"]);
     console.log("menuCategory[]:", raw["menuCategory[]"]);
+
+    // ✅ 사업자번호 없으면 등록 자체를 막아야 "빈값 저장"이 안 생김
+    if (!businessNumberDigits) {
+      return res.status(200).json({
+        ok: false,
+        error: "business_number_required",
+      });
+    }
 
     await client.query("BEGIN");
 
     // ✅ combined_store_info 저장
     const storeSql = `
-  INSERT INTO combined_store_info (
-    business_number, business_name, business_type, 
-    business_category, business_subcategory,
-    business_hours, delivery_option, service_details,
-    event1, event2, facilities, pets_allowed, parking,
-    phone, homepage, instagram, facebook,
-    additional_desc, postal_code, road_address, detail_address,
-    owner_name, birth_date, owner_email, owner_address, owner_phone,
-    business_cert_path, created_at
-  ) VALUES (
-    $1,$2,$3,
-    $4,$5,
-    $6,$7,$8,
-    $9,$10,$11,$12,$13,
-    $14,$15,$16,$17,
-    $18,$19,$20,$21,
-    $22,$23,$24,$25,$26,
-    $27,NOW()
-  )
-  RETURNING id
-`;
+      INSERT INTO combined_store_info (
+        business_number, business_name, business_type, 
+        business_category, business_subcategory,
+        business_hours, delivery_option, service_details,
+        event1, event2, facilities, pets_allowed, parking,
+        phone, homepage, instagram, facebook,
+        additional_desc, postal_code, road_address, detail_address,
+        owner_name, birth_date, owner_email, owner_address, owner_phone,
+        business_cert_path, created_at
+      ) VALUES (
+        $1,$2,$3,
+        $4,$5,
+        $6,$7,$8,
+        $9,$10,$11,$12,$13,
+        $14,$15,$16,$17,
+        $18,$19,$20,$21,
+        $22,$23,$24,$25,$26,
+        $27,NOW()
+      )
+      RETURNING id
+    `;
 
-    const certFile = allFiles.find(f => f.fieldname === "businessCertImage");
+    const certFile = allFiles.find((f) => f.fieldname === "businessCertImage");
     const certPath = certFile ? toWeb(certFile) : null;
 
     const storeVals = [
-      s(raw.businessNumber),                   // $1
-      s(raw.businessName),                     // $2
-      s(raw.businessType),                     // $3
-      s(raw.mainCategory),                     // $4
-      s(raw.subCategory),                      // $5
-      s(raw.businessHours),                    // $6
-      s(raw.deliveryOption),                   // $7
-      s(raw.serviceDetails),                   // $8
-      s(raw.event1),                           // $9
-      s(raw.event2),                           // $10
-      s(raw.facilities),                       // $11
-      b(raw.petsAllowed),                      // $12
-      s(raw.parking),                          // $13
-      s(raw.phone ?? raw.phoneNumber),         // $14
-      s(raw.homepage),                         // $15
-      s(raw.instagram),                        // $16
-      s(raw.facebook),                         // $17
-      s(raw.additionalDesc),                   // $18
-      s(raw.postalCode),                       // $19
-      s(raw.roadAddress),                      // $20
-      s(raw.detailAddress),                    // $21
-      s(raw.ownerName),                        // $22
+      businessNumberDigits,                 // $1 ✅ digits-only 강제 저장
+      s(raw.businessName),                  // $2
+      s(raw.businessType),                  // $3
+      s(raw.mainCategory),                  // $4
+      s(raw.subCategory),                   // $5
+      s(raw.businessHours),                 // $6
+      s(raw.deliveryOption),                // $7
+      s(raw.serviceDetails),                // $8
+      s(raw.event1),                        // $9
+      s(raw.event2),                        // $10
+      s(raw.facilities),                    // $11
+      b(raw.petsAllowed),                   // $12
+      s(raw.parking),                       // $13
+      s(raw.phone ?? raw.phoneNumber),      // $14
+      s(raw.homepage),                      // $15
+      s(raw.instagram),                     // $16
+      s(raw.facebook),                      // $17
+      s(raw.additionalDesc),                // $18
+      s(raw.postalCode),                    // $19
+      s(raw.roadAddress),                   // $20
+      s(raw.detailAddress),                 // $21
+      s(raw.ownerName),                     // $22
       raw.birthDate ? new Date(raw.birthDate) : null, // $23
-      s(raw.ownerEmail),                       // $24
-      [s(raw.ownerAddress), s(raw.ownerAddressDetail)].filter(Boolean).join(' '), // $25
-      s(raw.ownerPhone),                       // $26
-      certPath                                 // $27
+      s(raw.ownerEmail),                    // $24
+      [s(raw.ownerAddress), s(raw.ownerAddressDetail)].filter(Boolean).join(" "), // $25
+      s(raw.ownerPhone),                    // $26
+      certPath                              // $27
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
     const storeId = storeResult.rows[0].id;
 
-    // ✅ 대표/갤러리 이미지 저장
-    const storeImageFiles = allFiles.filter((f) => f.fieldname === "storeImages");
+    // ✅ 대표/갤러리 이미지 저장 (storeImages / storeImages[] 둘 다)
+    const storeImageFiles = allFiles.filter(
+      (f) => f.fieldname === "storeImages" || f.fieldname === "storeImages[]"
+    );
     for (const f of storeImageFiles) {
       const url = toWeb(f);
       if (!url) continue;
@@ -163,15 +206,15 @@ export async function createCombinedStore(req, res) {
     for (const m of menus) {
       await client.query(
         `
-    INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
-    VALUES ($1,$2,$3,$4,$5,$6)
-    `,
+          INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
+          VALUES ($1,$2,$3,$4,$5,$6)
+        `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
       );
     }
 
-    // ✅ 이벤트 저장 (클라이언트에서 events[]로 전송됨)
-    const eventsArr = arr(raw['events[]'] ?? raw.events);
+    // ✅ 이벤트 저장 (events[]/events[] 형태 모두)
+    const eventsArr = arr(raw["events[]"] ?? raw.events);
     for (let i = 0; i < eventsArr.length; i++) {
       const content = s(eventsArr[i]);
       if (!content) continue;
@@ -182,12 +225,12 @@ export async function createCombinedStore(req, res) {
     }
 
     await client.query("COMMIT");
-    console.log("[createCombinedStore] 성공:", storeId);
-    // ✅ 사업자번호도 반환 (리다이렉트용)
-    const businessNumber = s(raw.businessNumber);
-    return res.json({ ok: true, id: storeId, businessNumber });
+    console.log("[createCombinedStore] 성공:", storeId, "biz:", businessNumberDigits);
+
+    // ✅ digits-only 사업자번호 반환
+    return res.json({ ok: true, id: storeId, businessNumber: businessNumberDigits });
   } catch (err) {
-    await client.query("ROLLBACK");
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("[createCombinedStore] error:", err);
     return res
       .status(500)
@@ -202,7 +245,7 @@ export async function createCombinedStore(req, res) {
  * ---------------------- */
 export async function getCombinedStoreByBusinessNumber(req, res) {
   try {
-    const businessNumber = s(req.params.businessNumber);
+    const businessNumber = String(req.params.businessNumber ?? "").replace(/[^\d]/g, "");
     if (!businessNumber) {
       return res.status(400).json({ ok: false, error: "business_number_required" });
     }
@@ -213,7 +256,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
         SELECT *,
                (COALESCE(road_address,'') || ' ' || COALESCE(detail_address,'')) AS address
         FROM combined_store_info
-        WHERE business_number=$1
+        WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1
         ORDER BY created_at DESC
         LIMIT 1
       `,
@@ -255,7 +298,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       `,
       values: [storeId],
     });
-    const images = imageRows.map(r => ({ url: r.url }));
+    const images = imageRows.map((r) => ({ url: r.url }));
 
     /* ────────────── 3) 메뉴 ────────────── */
     const { rows: menuRows } = await pool.query({
@@ -267,12 +310,12 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       `,
       values: [storeId],
     });
-    const menus = menuRows.map(r => ({
+    const menus = menuRows.map((r) => ({
       category: r.category ?? "기타",
       name: r.name,
       price: r.price ?? 0,
       image_url: r.image_url,
-      description: r.description ?? ""
+      description: r.description ?? "",
     }));
 
     /* ────────────── 4) 이벤트 ────────────── */
@@ -285,16 +328,9 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       `,
       values: [storeId],
     });
-    const events = evRows.map(r => r.content).filter(Boolean);
+    const events = evRows.map((r) => r.content).filter(Boolean);
 
-    /* ────────────── 최종 응답 ────────────── */
-    return res.json({
-      ok: true,
-      store,
-      images,
-      menus,
-      events,
-    });
+    return res.json({ ok: true, store, images, menus, events });
   } catch (err) {
     console.error("[getCombinedStoreByBusinessNumber] error:", err);
     return res.status(500).json({
@@ -315,7 +351,6 @@ export async function getCombinedStoreFull(req, res) {
       return res.status(400).json({ ok: false, error: "invalid_id" });
     }
 
-    /* ────────────── 1) 기본 상점 정보 ────────────── */
     const { rows: storeRows } = await pool.query({
       text: `
         SELECT *,
@@ -350,7 +385,6 @@ export async function getCombinedStoreFull(req, res) {
       address: base.address ?? "-",
     };
 
-    /* ────────────── 2) 이미지 ────────────── */
     const { rows: imageRows } = await pool.query({
       text: `
         SELECT url 
@@ -360,9 +394,8 @@ export async function getCombinedStoreFull(req, res) {
       `,
       values: [storeId],
     });
-    const images = imageRows.map(r => ({ url: r.url }));
+    const images = imageRows.map((r) => ({ url: r.url }));
 
-    /* ────────────── 3) 메뉴 ────────────── */
     const { rows: menuRows } = await pool.query({
       text: `
         SELECT category, name, price, image_url, description
@@ -372,15 +405,14 @@ export async function getCombinedStoreFull(req, res) {
       `,
       values: [storeId],
     });
-    const menus = menuRows.map(r => ({
+    const menus = menuRows.map((r) => ({
       category: r.category ?? "기타",
       name: r.name,
       price: r.price ?? 0,
       image_url: r.image_url,
-      description: r.description ?? ""
+      description: r.description ?? "",
     }));
 
-    /* ────────────── 4) 이벤트 ────────────── */
     const { rows: evRows } = await pool.query({
       text: `
         SELECT content 
@@ -390,16 +422,9 @@ export async function getCombinedStoreFull(req, res) {
       `,
       values: [storeId],
     });
-    const events = evRows.map(r => r.content).filter(Boolean);
+    const events = evRows.map((r) => r.content).filter(Boolean);
 
-    /* ────────────── 최종 응답 ────────────── */
-    return res.json({
-      ok: true,
-      store,
-      images,
-      menus,
-      events,
-    });
+    return res.json({ ok: true, store, images, menus, events });
   } catch (err) {
     console.error("[getCombinedStoreFull] error:", err);
     return res.status(500).json({
@@ -409,5 +434,3 @@ export async function getCombinedStoreFull(req, res) {
     });
   }
 }
-
-
