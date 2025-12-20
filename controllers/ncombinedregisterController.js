@@ -4,25 +4,28 @@ import path from "path";
 
 /** 문자열 보정 */
 const s = (v) => (v == null ? "" : String(v).trim());
-/** 숫자 보정 */
+
+/** 숫자 보정 (가격용) */
 const n = (v) => {
   const num = Number(String(v ?? "").replace(/[^\d]/g, ""));
   if (!Number.isFinite(num)) return 0;
   // ✅ PostgreSQL integer 최대치 제한 (2147483647)
   return Math.min(num, 2147483647);
 };
+
 /** boolean 보정 */
 const b = (v) => {
   const t = String(v ?? "").trim();
   return ["가능", "true", "1", "yes", "on"].includes(t.toLowerCase());
 };
+
 /** 업로드 파일 → 웹경로 */
-const toWeb = (file) =>
-  file?.path ? `/uploads/${path.basename(file.path)}` : null;
+const toWeb = (file) => (file?.path ? `/uploads/${path.basename(file.path)}` : null);
+
 /** 배열화 유틸 */
 const arr = (v) => (Array.isArray(v) ? v : v != null ? [v] : []);
 
-/** ✅ 사업자번호: 어떤 키로 와도 잡고, digits-only로 반환 */
+/** ✅ 사업자번호 digits-only 뽑기 */
 function pickBusinessNumber(body) {
   const candidates = [
     body?.businessNumber,
@@ -50,7 +53,13 @@ function pickBusinessNumber(body) {
     if (digits) return digits;
   }
 
-  return "";
+  return null;
+}
+
+/** ✅ 사업자번호 길이: 10~11 허용 */
+function isBizLenOk(digits) {
+  const len = String(digits || "").length;
+  return len >= 10 && len <= 11;
 }
 
 /* ----------------------
@@ -71,11 +80,15 @@ export async function createCombinedStore(req, res) {
     console.log("menuPrice[]:", raw["menuPrice[]"]);
     console.log("menuCategory[]:", raw["menuCategory[]"]);
 
-    // ✅ 사업자번호 없으면 등록 자체를 막아야 "빈값 저장"이 안 생김
+    // ✅ 사업자번호 없거나 길이 이상하면 등록 막기 (빈값 저장 방지)
     if (!businessNumberDigits) {
+      return res.status(200).json({ ok: false, error: "business_number_required" });
+    }
+    if (!isBizLenOk(businessNumberDigits)) {
       return res.status(200).json({
         ok: false,
-        error: "business_number_required",
+        error: "invalid_business_number",
+        message: "business_number must be 10~11 digits",
       });
     }
 
@@ -84,7 +97,7 @@ export async function createCombinedStore(req, res) {
     // ✅ combined_store_info 저장
     const storeSql = `
       INSERT INTO combined_store_info (
-        business_number, business_name, business_type, 
+        business_number, business_name, business_type,
         business_category, business_subcategory,
         business_hours, delivery_option, service_details,
         event1, event2, facilities, pets_allowed, parking,
@@ -109,7 +122,7 @@ export async function createCombinedStore(req, res) {
     const certPath = certFile ? toWeb(certFile) : null;
 
     const storeVals = [
-      businessNumberDigits,                 // $1 ✅ digits-only 강제 저장
+      businessNumberDigits,                 // $1 ✅ digits-only 강제 저장 (필수)
       s(raw.businessName),                  // $2
       s(raw.businessType),                  // $3
       s(raw.mainCategory),                  // $4
@@ -157,9 +170,7 @@ export async function createCombinedStore(req, res) {
     // ✅ 메뉴 저장
     const names = arr(raw["menuName[]"] ?? raw.menuName);
     const prices = arr(raw["menuPrice[]"] ?? raw.menuPrice).map((p) => n(p));
-    const catsByRow = Array.isArray(raw["menuCategory[]"])
-      ? raw["menuCategory[]"]
-      : null;
+    const catsByRow = Array.isArray(raw["menuCategory[]"]) ? raw["menuCategory[]"] : null;
 
     const menuImageFiles = allFiles.filter(
       (f) => f.fieldname === "menuImage[]" || f.fieldname === "menuImage"
@@ -213,7 +224,7 @@ export async function createCombinedStore(req, res) {
       );
     }
 
-    // ✅ 이벤트 저장 (events[]/events[] 형태 모두)
+    // ✅ 이벤트 저장 (events[]/events 형태 모두)
     const eventsArr = arr(raw["events[]"] ?? raw.events);
     for (let i = 0; i < eventsArr.length; i++) {
       const content = s(eventsArr[i]);
@@ -227,10 +238,11 @@ export async function createCombinedStore(req, res) {
     await client.query("COMMIT");
     console.log("[createCombinedStore] 성공:", storeId, "biz:", businessNumberDigits);
 
-    // ✅ digits-only 사업자번호 반환
     return res.json({ ok: true, id: storeId, businessNumber: businessNumberDigits });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
     console.error("[createCombinedStore] error:", err);
     return res
       .status(500)
@@ -249,8 +261,10 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
     if (!businessNumber) {
       return res.status(400).json({ ok: false, error: "business_number_required" });
     }
+    if (!isBizLenOk(businessNumber)) {
+      return res.status(400).json({ ok: false, error: "invalid_business_number" });
+    }
 
-    /* ────────────── 1) 기본 상점 정보 ────────────── */
     const { rows: storeRows } = await pool.query({
       text: `
         SELECT *,
@@ -269,6 +283,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
 
     const base = storeRows[0];
     const storeId = base.id;
+
     const store = {
       id: base.id,
       business_name: base.business_name ?? "-",
@@ -288,19 +303,17 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       address: base.address ?? "-",
     };
 
-    /* ────────────── 2) 이미지 ────────────── */
     const { rows: imageRows } = await pool.query({
       text: `
-        SELECT url 
-        FROM combined_store_images 
-        WHERE store_id=$1 
+        SELECT url
+        FROM combined_store_images
+        WHERE store_id=$1
         ORDER BY sort_order, id
       `,
       values: [storeId],
     });
     const images = imageRows.map((r) => ({ url: r.url }));
 
-    /* ────────────── 3) 메뉴 ────────────── */
     const { rows: menuRows } = await pool.query({
       text: `
         SELECT category, name, price, image_url, description
@@ -318,12 +331,11 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       description: r.description ?? "",
     }));
 
-    /* ────────────── 4) 이벤트 ────────────── */
     const { rows: evRows } = await pool.query({
       text: `
-        SELECT content 
-        FROM combined_store_events 
-        WHERE store_id=$1 
+        SELECT content
+        FROM combined_store_events
+        WHERE store_id=$1
         ORDER BY ord
       `,
       values: [storeId],
@@ -387,9 +399,9 @@ export async function getCombinedStoreFull(req, res) {
 
     const { rows: imageRows } = await pool.query({
       text: `
-        SELECT url 
-        FROM combined_store_images 
-        WHERE store_id=$1 
+        SELECT url
+        FROM combined_store_images
+        WHERE store_id=$1
         ORDER BY sort_order, id
       `,
       values: [storeId],
@@ -415,9 +427,9 @@ export async function getCombinedStoreFull(req, res) {
 
     const { rows: evRows } = await pool.query({
       text: `
-        SELECT content 
-        FROM combined_store_events 
-        WHERE store_id=$1 
+        SELECT content
+        FROM combined_store_events
+        WHERE store_id=$1
         ORDER BY ord
       `,
       values: [storeId],
