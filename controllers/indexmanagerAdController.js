@@ -1346,3 +1346,50 @@ export function fileFilter(_req, file, cb) {
   if (allowed.includes(file.mimetype)) return cb(null, true);
   return cb(new Error("이미지 파일만 업로드 가능(png/jpg/webp/gif)"), false);
 }
+
+// ✅ 추가: 텍스트 슬롯 1개 가져오기 (index_oneword 등)
+export async function getTextSlot(req, res) {
+  try {
+    const page = String(req.query.page || "").trim();
+    let position = String(req.query.position || "").trim();
+    let priority = req.query.priority;
+
+    // ✅ position에 ":1" 같이 붙어오면 분리해서 처리
+    if (!priority && position.includes(":")) {
+      const parts = position.split(":");
+      position = parts[0]?.trim() || position;
+      priority = parts[1]?.trim();
+    }
+
+    const pr = Number(priority || 1);
+
+    if (!page || !position || !Number.isFinite(pr)) {
+      return res.status(400).json({ success: false, error: "invalid query" });
+    }
+
+    const sql = `
+      SELECT
+        id, page, position, priority,
+        text_content, start_at, end_at, no_end, updated_at
+      FROM public.admin_ad_slot_items
+      WHERE page = $1
+        AND position = $2
+        AND priority = $3
+        AND (start_at IS NULL OR start_at <= NOW())
+        AND (
+          COALESCE(no_end,false) = true
+          OR end_at IS NULL
+          OR end_at >= NOW()
+        )
+      ORDER BY updated_at DESC, id DESC
+      LIMIT 1
+    `;
+
+    const { rows } = await pool.query(sql, [page, position, pr]);
+    const item = rows[0] || null;
+
+    return res.json({ success: true, item });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e?.message || "server error" });
+  }
+}

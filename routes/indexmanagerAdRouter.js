@@ -11,6 +11,7 @@ import {
   searchStore,
   makeMulterStorage,
   fileFilter,
+  getTextSlot,
 } from "../controllers/indexmanagerAdController.js";
 
 const router = express.Router();
@@ -45,5 +46,6 @@ router.delete("/slot", deleteSlot);
 
 // 가게 검색 (모달 “가게 연결”)
 router.get("/store/search", searchStore);
-
+// ✅ 추가: 우리동네 한마디 같은 텍스트 전용 조회
+router.get("/text/get", getTextSlot);
 export default router;
