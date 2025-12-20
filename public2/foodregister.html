@@ -518,6 +518,7 @@
                 <!-- ⑪ 이미지 (최대 3장) -->
                 <section class="neo-section p-5">
                     <h3 class="text-xl font-bold text-blue-900 mb-4">⑪ 이미지 (최대 3장)</h3>
+                    <input type="hidden" id="mainImageIndex" name="mainImageIndex" value="0">
                     <input type="file" id="imagesInput" name="storeImages" multiple accept="image/*"
                         class="neo-input block w-full mb-3 px-3 py-2 file:mr-4 file:py-2 file:px-4 file:rounded file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" />
                     <div id="imagesPreview" class="flex gap-3"></div>
@@ -937,16 +938,98 @@
         function initImagePreview() {
             const input = qs("#imagesInput");
             const preview = qs("#imagesPreview");
-            input?.addEventListener("change", () => {
-                if (!preview) return;
+            const mainIdxHidden = qs("#mainImageIndex");
+
+            if (!input || !preview || !mainIdxHidden) return;
+
+            // 메인 선택 상태
+            let selectedMain = 0;
+
+            function render(files) {
                 preview.innerHTML = "";
-                const files = Array.from(input.files || []).slice(0, 3);
-                files.forEach(file => {
+
+                files.forEach((file, idx) => {
                     const url = URL.createObjectURL(file);
+
+                    const wrap = document.createElement("label");
+                    wrap.className =
+                        "relative w-24 h-24 rounded-lg border overflow-hidden cursor-pointer neo-section flex items-center justify-center";
+
                     const img = document.createElement("img");
-                    img.src = url; img.className = "w-24 h-24 object-cover rounded-lg border";
-                    preview.appendChild(img);
+                    img.src = url;
+                    img.className = "w-full h-full object-cover";
+
+                    // 라디오(메인 선택)
+                    const radio = document.createElement("input");
+                    radio.type = "radio";
+                    radio.name = "mainImagePick";
+                    radio.value = String(idx);
+                    radio.checked = idx === selectedMain;
+                    radio.className = "absolute top-2 left-2 w-4 h-4 accent-blue-600";
+
+                    // 메인 배지
+                    const badge = document.createElement("div");
+                    badge.textContent = "메인";
+                    badge.className =
+                        "absolute bottom-2 left-2 px-2 py-0.5 text-xs font-bold rounded bg-blue-600 text-white";
+                    badge.style.display = idx === selectedMain ? "block" : "none";
+
+                    // 선택 이벤트
+                    const selectMain = () => {
+                        selectedMain = idx;
+                        mainIdxHidden.value = String(selectedMain);
+
+                        // UI 갱신
+                        preview.querySelectorAll('input[name="mainImagePick"]').forEach((r) => {
+                            r.checked = (r.value === String(selectedMain));
+                        });
+                        preview.querySelectorAll(".main-badge").forEach((el) => el.remove());
+                        // 배지 다시 찍기
+                        preview.querySelectorAll("label").forEach((lb, i) => {
+                            const b = lb.querySelector(".main-badge");
+                            if (b) b.remove();
+                            const newBadge = document.createElement("div");
+                            newBadge.textContent = "메인";
+                            newBadge.className =
+                                "main-badge absolute bottom-2 left-2 px-2 py-0.5 text-xs font-bold rounded bg-blue-600 text-white";
+                            newBadge.style.display = i === selectedMain ? "block" : "none";
+                            lb.appendChild(newBadge);
+                        });
+                    };
+
+                    radio.addEventListener("change", selectMain);
+                    wrap.addEventListener("click", (e) => {
+                        // 클릭이 라디오 자체가 아니어도 선택되게
+                        if (e.target !== radio) {
+                            radio.checked = true;
+                            selectMain();
+                        }
+                    });
+
+                    // 최초 배지 클래스 지정
+                    badge.classList.add("main-badge");
+
+                    wrap.appendChild(img);
+                    wrap.appendChild(radio);
+                    wrap.appendChild(badge);
+                    preview.appendChild(wrap);
                 });
+            }
+
+            input.addEventListener("change", () => {
+                // 최대 3장 제한
+                const files = Array.from(input.files || []);
+                const limited = files.slice(0, 3);
+
+                if (files.length > 3) {
+                    alert("이미지는 최대 3장까지만 업로드할 수 있습니다. (앞의 3장만 적용됩니다)");
+                }
+
+                // 메인 기본값은 0으로 리셋
+                selectedMain = 0;
+                mainIdxHidden.value = "0";
+
+                render(limited);
             });
         }
 
@@ -1264,6 +1347,23 @@
 
             // ✅ FormData 생성
             const fd = new FormData(formEl);
+
+            // ✅ 메인 이미지 선택 반영: storeImages 순서를 "메인 → 나머지"로 재정렬
+            const imgInput = qs("#imagesInput");
+            if (imgInput && imgInput.files && imgInput.files.length) {
+                const files = Array.from(imgInput.files).slice(0, 3);
+                let mainIdx = parseInt(qs("#mainImageIndex")?.value || "0", 10);
+                if (Number.isNaN(mainIdx)) mainIdx = 0;
+                if (mainIdx < 0) mainIdx = 0;
+                if (mainIdx >= files.length) mainIdx = 0;
+
+                const ordered = [files[mainIdx], ...files.filter((_, i) => i !== mainIdx)];
+
+                // 기존 storeImages 제거 후 재추가 (서버가 첫 번째를 메인으로 쓰게 됨)
+                fd.delete("storeImages");
+                ordered.forEach(f => fd.append("storeImages", f));
+            }
+
 
             // ✅ 서버가 어떤 키를 기대하든 무조건 잡히게 "동일값"을 여러 키로 주입
             // (서버가 bizNumber를 안 읽고 business_number나 bizNo를 읽는 경우를 대비)
