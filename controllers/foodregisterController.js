@@ -19,12 +19,33 @@ function filesByField(files, ...fieldnames) {
   return files.filter((f) => set.has(f.fieldname));
 }
 
+/**
+ * ✅ 업로드 절대경로가 /data/uploads/... 일 때
+ * ✅ 외부 접근은 /uploads/... 로 매핑된다고 가정 (nginx alias)
+ */
+const DATA_UPLOAD_ROOT = "/data/uploads";
+
 function toWebPath(f) {
-  return f?.path
-    ? `/uploads/${path.basename(f.path)}`
-    : f?.filename
-      ? `/uploads/${f.filename}`
-      : null;
+  if (!f) return null;
+
+  // multer가 절대경로를 주는 경우
+  if (f.path) {
+    const abs = String(f.path).replace(/\\/g, "/");
+
+    // /data/uploads/food/store/aaa.jpg  ->  /uploads/food/store/aaa.jpg
+    if (abs.startsWith(DATA_UPLOAD_ROOT)) {
+      const rel = abs.slice(DATA_UPLOAD_ROOT.length); // "/food/store/aaa.jpg"
+      return `/uploads${rel.startsWith("/") ? rel : `/${rel}`}`;
+    }
+
+    // fallback: 경로 패턴이 다르면 최소한 파일명으로라도 반환
+    return `/uploads/${path.basename(abs)}`;
+  }
+
+  // multer가 filename만 주는 경우
+  if (f.filename) return `/uploads/${f.filename}`;
+
+  return null;
 }
 
 // "12,000원" → 12000
@@ -51,8 +72,10 @@ function pickDetailCategory(body) {
   const raw =
     body?.detailCategory ??
     body?.detail_category ??
-    body?.sub ??               // subcategory 페이지/요청에서 넘어올 수 있음
+    body?.sub ?? // subcategory 페이지/요청에서 넘어올 수 있음
     body?.subCategory ??
+    body?.businessSubcategory ?? // ✅ 추가: 프론트 hidden name="businessSubcategory"
+    body?.business_subcategory ?? // ✅ 추가: snake_case도 대응
     "";
   const v = String(raw || "").trim();
   return v ? v : null;
@@ -182,7 +205,7 @@ export async function createFoodStore(req, res) {
     const businessNumber = pickBusinessNumber(req.body);
     const bizVerified = String(req.body.bizVerified || "").trim();
 
-    // ✅ 디테일(소)카테고리 (밥/찌개탕/고기구이/국밥/기타한식 등)
+    // ✅ 디테일(소)카테고리
     const detailCategory = pickDetailCategory(req.body);
 
     console.log(
@@ -197,7 +220,6 @@ export async function createFoodStore(req, res) {
     await client.query("BEGIN");
 
     // 1) 가게 (store_info)
-    // ✅ detail_category 컬럼 포함
     const insertStoreQ = `
       INSERT INTO store_info (
         business_name, owner_name, phone, email, address,
@@ -311,7 +333,7 @@ export async function createFoodStore(req, res) {
       ok: true,
       id: toSafeInt(storeId) || Date.now(),
       business_number: businessNumber || null,
-      detail_category: detailCategory || null, // ✅ 확인용(원하면 제거 가능)
+      detail_category: detailCategory || null,
     });
   } catch (err) {
     try { if (client) await client.query("ROLLBACK"); } catch {}
@@ -498,7 +520,7 @@ export async function updateFoodStore(req, res) {
       phone: raw.phone?.trim(),
       business_type: raw.businessType?.trim(),
       business_category: raw.businessCategory?.trim(),
-      detail_category: pickDetailCategory(raw), // ✅ 수정에도 반영
+      detail_category: pickDetailCategory(raw),
       business_hours: raw.businessHours?.trim(),
       delivery_option: raw.deliveryOption?.trim(),
       service_details: raw.serviceDetails?.trim(),
