@@ -335,7 +335,7 @@
                             class="neo-input flex-1 px-3 py-2 bg-gray-100 cursor-pointer">
                         <button type="button" id="subcategoryToggle" class="neo-btn px-3 py-2 shrink-0">▼</button>
                         <ul id="subcategoryList" class="absolute left-36 top-full mt-1 w-60 neo-section hidden z-10">
-                            <li data-value="밥류" class="px-3 py-2 hover:bg-blue-50 cursor-pointer rounded">밥 (비빔밥/덮밥/백반)
+                            <li data-value="밥" class="px-3 py-2 hover:bg-blue-50 cursor-pointer rounded">밥 (비빔밥/덮밥/백반)
                             </li>
                             <li data-value="찌개/탕" class="px-3 py-2 hover:bg-blue-50 cursor-pointer rounded">찌개/탕</li>
                             <li data-value="고기/구이" class="px-3 py-2 hover:bg-blue-50 cursor-pointer rounded">고기/구이
@@ -812,67 +812,80 @@
             const hidden = qs("#businessCategory");
             const btn = qs("#categoryToggle");
 
-            // ▼ 버튼 토글
-            btn?.addEventListener("click", () => list.classList.toggle("hidden"));
-            // ✅ 입력창 클릭도 토글
-            display?.addEventListener("click", () => list.classList.toggle("hidden"));
-
-            // 항목 선택
-            list?.querySelectorAll("li").forEach(li => {
-                li.addEventListener("click", () => {
-                    hidden.value = li.dataset.value;
-                    display.value = li.dataset.value;
-                    list.classList.add("hidden");
-
-                    const subWrap = qs("#subcatRow");
-                    if (li.dataset.value === "한식") subWrap?.classList.remove("hidden");
-                    else {
-                        subWrap?.classList.add("hidden");
-                        qs("#subcategoryDisplay") && (qs("#subcategoryDisplay").value = "");
-                        qs("#businessSubcategory") && (qs("#businessSubcategory").value = "");
-                    }
-                });
-                // 서브카테고리 토글/선택
-                const subDisplay = qs("#subcategoryDisplay");
-                const subList = qs("#subcategoryList");
-                const subHidden = qs("#businessSubcategory");
-                const subBtn = qs("#subcategoryToggle");
-
-                subBtn?.addEventListener("click", () => subList.classList.toggle("hidden"));
-                subDisplay?.addEventListener("click", () => subList.classList.toggle("hidden"));
-
-                /* ✅ 여기 추가: 서브카테고리 항목 클릭 시 값 세팅 */
-                subList?.addEventListener("click", (e) => {
-                    const li = e.target.closest("li[data-value]");
-                    if (!li) return;
-                    subHidden.value = li.dataset.value;                 // 폼 전송용 hidden
-                    subDisplay.value = li.textContent.trim();           // 화면 표시
-                    subList.classList.add("hidden");
-                });
-
-                /* 바깥 클릭 시 닫기 */
-                document.addEventListener("click", (e) => {
-                    if (list && !list.contains(e.target) && e.target !== btn && e.target !== display) list.classList.add("hidden");
-                    if (subList && !subList.contains(e.target) && e.target !== subBtn && e.target !== subDisplay) subList.classList.add("hidden");
-                });
-            });
-
-            // 서브카테고리 토글/선택
+            const subWrap = qs("#subcatRow");
             const subDisplay = qs("#subcategoryDisplay");
             const subList = qs("#subcategoryList");
             const subHidden = qs("#businessSubcategory");
             const subBtn = qs("#subcategoryToggle");
 
-            subBtn?.addEventListener("click", () => subList.classList.toggle("hidden"));
-            subDisplay?.addEventListener("click", () => subList.classList.toggle("hidden"));
+            const closeAll = () => {
+                list?.classList.add("hidden");
+                subList?.classList.add("hidden");
+            };
 
-            // 바깥 클릭 시 닫기
-            document.addEventListener("click", (e) => {
-                if (list && !list.contains(e.target) && e.target !== btn && e.target !== display) list.classList.add("hidden");
-                if (subList && !subList.contains(e.target) && e.target !== subBtn && e.target !== subDisplay) subList.classList.add("hidden");
+            // 메인 카테고리 토글
+            btn?.addEventListener("click", (e) => { e.stopPropagation(); list.classList.toggle("hidden"); });
+            display?.addEventListener("click", (e) => { e.stopPropagation(); list.classList.toggle("hidden"); });
+
+            // 메인 카테고리 선택
+            list?.querySelectorAll("li[data-value]").forEach((li) => {
+                li.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const v = li.dataset.value || "";
+
+                    hidden.value = v;
+                    display.value = v;
+                    list.classList.add("hidden");
+
+                    // 한식이면 서브카테고리 오픈 준비
+                    if (v === "한식") {
+                        subWrap?.classList.remove("hidden");
+                        // 선택 초기화(원하면 유지로 바꿔도 됨)
+                        subHidden.value = "";
+                        subDisplay.value = "";
+                    } else {
+                        subWrap?.classList.add("hidden");
+                        subHidden.value = "";
+                        subDisplay.value = "";
+                        subList?.classList.add("hidden");
+                    }
+                });
             });
 
+            // 서브카테고리 토글
+            subBtn?.addEventListener("click", (e) => { e.stopPropagation(); subList.classList.toggle("hidden"); });
+            subDisplay?.addEventListener("click", (e) => { e.stopPropagation(); subList.classList.toggle("hidden"); });
+
+            // 서브카테고리 선택
+            subList?.addEventListener("click", (e) => {
+                const li = e.target.closest("li[data-value]");
+                if (!li) return;
+                e.stopPropagation();
+
+                const v = li.dataset.value || "";
+                subHidden.value = v;          // ✅ 서버로 전송되는 값(“밥”)
+                subDisplay.value = v;         // ✅ 화면 표시도 “밥”으로
+                subList.classList.add("hidden");
+            });
+
+            // 바깥 클릭 시 닫기
+            document.addEventListener("click", closeAll);
         }
+
+        // 서브카테고리 토글/선택
+        const subDisplay = qs("#subcategoryDisplay");
+        const subList = qs("#subcategoryList");
+        const subHidden = qs("#businessSubcategory");
+        const subBtn = qs("#subcategoryToggle");
+
+        subBtn?.addEventListener("click", () => subList.classList.toggle("hidden"));
+        subDisplay?.addEventListener("click", () => subList.classList.toggle("hidden"));
+
+        // 바깥 클릭 시 닫기
+        document.addEventListener("click", (e) => {
+            if (list && !list.contains(e.target) && e.target !== btn && e.target !== display) list.classList.add("hidden");
+            if (subList && !subList.contains(e.target) && e.target !== subBtn && e.target !== subDisplay) subList.classList.add("hidden");
+        });
 
         /* =========================================================
            우편번호/카카오 지도
@@ -1332,7 +1345,7 @@
                 // 성공 처리
                 const modal = qs("#successModal");
                 const okBtn = qs("#successOk");
-                
+
                 // ✅ 사업자번호 우선 사용, 없으면 ID로 폴백
                 const bizNum = data.business_number || qs("#bizNumber")?.value?.replace(/[^\d]/g, "");
                 const goDetail = () => {
