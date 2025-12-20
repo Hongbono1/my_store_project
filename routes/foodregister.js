@@ -5,10 +5,10 @@ import fs from "fs";
 import path from "path";
 
 // ✅ "undefined handler" 방지: 필요한 것만 명시 import
-import { 
-  createFoodStore, 
+import {
+  createFoodStore,
   getFoodRegisterFull,
-  getFoodStoreByBusinessNumber 
+  getFoodStoreByBusinessNumber,
 } from "../controllers/foodregisterController.js";
 
 const router = Router();
@@ -86,13 +86,14 @@ const uploadWithCatch = (req, res, next) => {
  * server.js 에서 /store 로 마운트되므로 여기서는 "/" 기준
  * ------------------------------------------------------------------ */
 
+// ✅ 고정 prefix 라우트는 항상 파라미터 라우트보다 위에!
+/** 사업자번호로 조회: /store/biz/:businessNumber/full */
+router.get("/biz/:businessNumber/full", getFoodStoreByBusinessNumber);
+
 // 등록
 router.post("/", uploadWithCatch, createFoodStore);
 
 // 상세 조회: /store/:id/full
 router.get("/:id/full", getFoodRegisterFull);
-
-// 사업자번호로 조회: /store/biz/:businessNumber/full
-router.get("/biz/:businessNumber/full", getFoodStoreByBusinessNumber);
 
 export default router;
