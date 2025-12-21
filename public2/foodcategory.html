@@ -704,20 +704,34 @@
         }
       }
 
-      // ✅ /store/:id API로 메타(상호/업종/이미지) 가져오기
-      async function fetchStoreMeta(storeId) {
+      // ✅ /store/:id/full 또는 /combined/:id/full API로 메타(상호/업종/이미지) 가져오기
+      async function fetchStoreMeta(storeId, sourceType) {
+        // sourceType이 'store_info' 또는 'food'면 /store/:id/full, 아니면 /combined/:id/full
+        const baseUrl = (sourceType === 'store_info' || sourceType === 'food') 
+          ? `/store/${encodeURIComponent(storeId)}/full` 
+          : `/combined/${encodeURIComponent(storeId)}/full`;
+        
         try {
-          const r = await fetch(`/store/${encodeURIComponent(storeId)}`, { cache: "no-store" });
+          const r = await fetch(baseUrl, { cache: "no-store" });
           if (!r.ok) return null;
           const j = await r.json();
           const s = j.store || j.data || j || {};
 
-          const name = (s.business_name || s.businessName || s.store_name || s.storeName || s.name || "").toString().trim();
-          const category = (s.business_category || s.businessCategory || s.business_type || s.businessType || "").toString().trim();
-          const imageUrl = (s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || "").toString().trim();
+          const name = (
+            s.business_name || s.businessName || s.store_name || s.storeName || s.name || ""
+          ).toString().trim();
+          
+          const category = (
+            s.business_type || s.businessType || s.business_subcategory || s.businessSubcategory || 
+            s.business_category || s.businessCategory || s.store_category || s.storeCategory || s.category || ""
+          ).toString().trim();
+          
+          const imageUrl = (
+            s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || s.image_path || s.imagePath || ""
+          ).toString().trim();
 
           return { name, category, imageUrl };
-        } catch {
+        } catch (e) {
           return null;
         }
       }
@@ -789,9 +803,9 @@
           .toString()
           .trim();
 
-        // ✅ 보강 (/store/:id API로만 호출)
+        // ✅ 보강 (storeType에 따라 /store/:id/full 또는 /combined/:id/full 호출)
         if (storeId && (!storeName || !storeCategory || !imageUrl)) {
-          const meta = await fetchStoreMeta(storeId);
+          const meta = await fetchStoreMeta(storeId, storeType);
           if (meta) {
             if (!storeName && meta.name) storeName = meta.name;
             if (!storeCategory && meta.category) storeCategory = meta.category;
