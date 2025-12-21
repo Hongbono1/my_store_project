@@ -704,38 +704,6 @@
         }
       }
 
-      // ✅ /store/:id/full 또는 /combined/:id/full API로 메타(상호/업종/이미지) 가져오기
-      async function fetchStoreMeta(storeId, sourceType) {
-        // sourceType이 'store_info' 또는 'food'면 /store/:id/full, 아니면 /combined/:id/full
-        const baseUrl = (sourceType === 'store_info' || sourceType === 'food') 
-          ? `/store/${encodeURIComponent(storeId)}/full` 
-          : `/combined/${encodeURIComponent(storeId)}/full`;
-        
-        try {
-          const r = await fetch(baseUrl, { cache: "no-store" });
-          if (!r.ok) return null;
-          const j = await r.json();
-          const s = j.store || j.data || j || {};
-
-          const name = (
-            s.business_name || s.businessName || s.store_name || s.storeName || s.name || ""
-          ).toString().trim();
-          
-          const category = (
-            s.business_type || s.businessType || s.business_subcategory || s.businessSubcategory || 
-            s.business_category || s.businessCategory || s.store_category || s.storeCategory || s.category || ""
-          ).toString().trim();
-          
-          const imageUrl = (
-            s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || s.image_path || s.imagePath || ""
-          ).toString().trim();
-
-          return { name, category, imageUrl };
-        } catch (e) {
-          return null;
-        }
-      }
-
       async function applySlotData(slot, slotData) {
         if (!slot || !slotData) return;
 
@@ -760,58 +728,10 @@
           (slotData.store && (slotData.store.store_type || slotData.store.detail_type)) ||
           (tableSource === 'store_info' ? 'store_info' : 'combined');
 
-        let storeName = (
-          slotData.business_name ||
-          slotData.businessName ||
-          slotData.store_name ||
-          slotData.storeName ||
-          slotData.name ||
-          (slotData.store && (slotData.store.business_name || slotData.store.store_name)) ||
-          ""
-        )
-          .toString()
-          .trim();
-
-        let storeCategory = (
-          slotData.business_type ||
-          slotData.businessType ||
-          slotData.business_subcategory ||
-          slotData.businessSubcategory ||
-          slotData.business_category ||
-          slotData.businessCategory ||
-          slotData.store_category ||
-          slotData.storeCategory ||
-          slotData.category ||
-          (slotData.store &&
-            (slotData.store.business_type ||
-              slotData.store.business_subcategory ||
-              slotData.store.business_category ||
-              slotData.store.category)) ||
-          ""
-        )
-          .toString()
-          .trim();
-
-        let imageUrl = (
-          slotData.image_url ||
-          slotData.imageUrl ||
-          slotData.image_path ||
-          slotData.imagePath ||
-          (slotData.store && (slotData.store.main_image_url || slotData.store.image_url)) ||
-          ""
-        )
-          .toString()
-          .trim();
-
-        // ✅ 보강 (storeType에 따라 /store/:id/full 또는 /combined/:id/full 호출)
-        if (storeId && (!storeName || !storeCategory || !imageUrl)) {
-          const meta = await fetchStoreMeta(storeId, storeType);
-          if (meta) {
-            if (!storeName && meta.name) storeName = meta.name;
-            if (!storeCategory && meta.category) storeCategory = meta.category;
-            if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl;
-          }
-        }
+        // ✅ 슬롯에 저장된 데이터만 사용 (보강 없음)
+        let storeName = (slotData.business_name || slotData.businessName || "").toString().trim();
+        let storeCategory = (slotData.category || slotData.business_category || "").toString().trim();
+        let imageUrl = (slotData.image_url || slotData.imageUrl || "").toString().trim();
 
         // ✅ 이미지
         if (img) {
@@ -826,16 +746,27 @@
           renderNameWithCategory(nameEl, categoryEl, storeName, storeCategory);
         }
 
-        // ✅ 클릭 (메인 배너는 클릭 비활성화 - 이미지만 표시)
+        // ✅ 클릭 이벤트 (link_url 우선, 없으면 store_id로 이동)
         const position = slot.dataset.position;
-        if (storeId && position !== 'food_main_banner') {
+        
+        // slotData에 링크가 있으면 그걸 1순위로 사용
+        const link = (slotData.link_url || slotData.linkUrl || slotData.link || "").toString().trim();
+        
+        if (link) {
           slot.style.cursor = "pointer";
-          
           slot.onclick = (e) => {
             e.preventDefault();
-            // ✅ type 파라미터로 올바른 API 호출하도록 전달
-            const t = storeType || "combined";
-            window.location.href = `/ndetail.html?id=${storeId}&type=${encodeURIComponent(t)}`;
+            window.location.href = link;
+          };
+          return;
+        }
+        
+        // 링크가 없으면 store_id로 이동 (메인 배너는 제외)
+        if (storeId && position !== 'food_main_banner') {
+          slot.style.cursor = "pointer";
+          slot.onclick = (e) => {
+            e.preventDefault();
+            window.location.href = `/ndetail.html?id=${storeId}`;
           };
         }
       }
