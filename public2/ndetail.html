@@ -654,7 +654,8 @@
                 const idRaw = q.get("id");
                 const bizRaw = q.get("biz"); // ✅ 사업자번호 파라미터 추가
                 const sourceRaw = q.get("source"); // ✅ table_source 파라미터 (store_info, combined_store_info, food_stores)
-                const type = (q.get("type") || "food").toLowerCase();
+                const typeRaw = q.get("type"); // ✅ store_type 파라미터 (store_info, combined)
+                const type = typeRaw || sourceRaw || "combined"; // type 우선, source 폴백, 기본값 combined
 
                 let apiUrl;
 
@@ -662,28 +663,31 @@
                 if (bizRaw && bizRaw.trim()) {
                     const biz = bizRaw.trim().replace(/[^\d]/g, ""); // 숫자만 추출
                     if (biz.length === 10) {
-                        apiUrl = type === "combined" 
-                            ? `/combined/biz/${biz}/full` 
-                            : `/store/biz/${biz}/full`;
-                        console.log("[DETAIL] Using business number:", biz);
+                        // type에 따라 API 결정
+                        if (type === "store_info" || type === "food") {
+                            apiUrl = `/store/biz/${biz}/full`;
+                        } else {
+                            apiUrl = `/combined/biz/${biz}/full`;
+                        }
+                        console.log("[DETAIL] Using business number:", biz, "type:", type);
                     } else {
                         throw new Error("Invalid business number format");
                     }
                 } else if (idRaw) {
-                    // ID 기반 조회 (source 파라미터로 테이블 구분)
+                    // ID 기반 조회 (type 파라미터로 테이블 구분)
                     const id = Number(idRaw);
                     if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
                     
-                    // ✅ source 파라미터로 API 엔드포인트 결정
-                    if (sourceRaw === 'store_info') {
+                    // ✅ type 파라미터로 API 엔드포인트 결정
+                    if (type === 'store_info' || type === 'food') {
                         apiUrl = `/store/${id}/full`; // 푸드 등록 (store_info 테이블)
-                    } else if (sourceRaw === 'food_stores') {
+                    } else if (type === 'food_stores') {
                         apiUrl = `/food-stores/${id}/full`; // 푸드 스토어 테이블
                     } else {
-                        // combined_store_info 또는 기본값
+                        // combined, combined_store_info 또는 기본값
                         apiUrl = `/combined/${id}/full`;
                     }
-                    console.log("[DETAIL] Using source:", sourceRaw || 'combined_store_info (default)');
+                    console.log("[DETAIL] Using type:", type, "API:", apiUrl);
                 } else {
                     throw new Error("No id or business number provided");
                 }
