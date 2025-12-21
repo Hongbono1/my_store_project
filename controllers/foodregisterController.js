@@ -28,7 +28,6 @@ const DATA_UPLOAD_ROOT = "/data/uploads";
 function toWebPath(f) {
   if (!f) return null;
 
-  // multer가 절대경로를 주는 경우
   if (f.path) {
     const abs = String(f.path).replace(/\\/g, "/");
 
@@ -38,11 +37,9 @@ function toWebPath(f) {
       return `/uploads${rel.startsWith("/") ? rel : `/${rel}`}`;
     }
 
-    // fallback: 경로 패턴이 다르면 최소한 파일명으로라도 반환
     return `/uploads/${path.basename(abs)}`;
   }
 
-  // multer가 filename만 주는 경우
   if (f.filename) return `/uploads/${f.filename}`;
 
   return null;
@@ -55,27 +52,51 @@ function toInt(v) {
   return n ? parseInt(n, 10) : 0;
 }
 
-// ✅ 사업자번호 digits 추출 (프론트에서 어떤 키로 보내도 잡히게)
+/**
+ * ✅ 사업자번호 digits-only 추출 (어떤 키로 와도 잡히게)
+ * - 통합 컨트롤러와 동일하게 폭넓게 대응
+ */
 function pickBusinessNumber(body) {
-  const raw =
-    body?.bizNumber ??
-    body?.bizNo ??
-    body?.businessNumber ??
-    body?.business_number ??
-    "";
-  const digits = String(raw).replace(/[^\d]/g, "");
-  return digits ? digits : null;
+  const candidates = [
+    body?.businessNumber,
+    body?.business_number,
+    body?.bizNumber,
+    body?.bizNo,
+    body?.biz_number,
+    body?.businessNo,
+    body?.business_no,
+    body?.bno,
+    body?.b_no,
+  ];
+
+  for (const raw of candidates) {
+    const digits = String(raw ?? "").replace(/[^\d]/g, "");
+    if (digits) return digits;
+  }
+
+  // 키가 애매하게 오는 경우도 방어
+  for (const [k, v] of Object.entries(body || {})) {
+    const key = String(k || "").toLowerCase();
+    if (!/(biz|business)/.test(key)) continue;
+    if (!/(no|number)/.test(key)) continue;
+    const digits = String(v ?? "").replace(/[^\d]/g, "");
+    if (digits) return digits;
+  }
+
+  return "";
 }
 
-// ✅ 디테일(소)카테고리 추출 (밥/찌개탕/고기구이/국밥/기타한식 등)
+/**
+ * ✅ 디테일(소)카테고리 추출 (밥/찌개탕/고기구이/국밥/기타한식 등)
+ */
 function pickDetailCategory(body) {
   const raw =
     body?.detailCategory ??
     body?.detail_category ??
-    body?.sub ?? // subcategory 페이지/요청에서 넘어올 수 있음
+    body?.sub ??
     body?.subCategory ??
-    body?.businessSubcategory ?? // ✅ 추가: 프론트 hidden name="businessSubcategory"
-    body?.business_subcategory ?? // ✅ 추가: snake_case도 대응
+    body?.businessSubcategory ??
+    body?.business_subcategory ??
     "";
   const v = String(raw || "").trim();
   return v ? v : null;
@@ -95,6 +116,7 @@ function extractMenusFromBody(body) {
       category: (m.category ?? "").trim() || null,
       description: (m.description ?? "").trim() || null,
       image_url: (m.image_url ?? "").trim() || null,
+      theme: (m.theme ?? "").trim() || null,
     });
   };
 
@@ -112,7 +134,7 @@ function extractMenusFromBody(body) {
   const buckets = {};
   for (const [k, v] of Object.entries(body || {})) {
     const m = k.match(
-      /^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url)\]$/
+      /^storeMenus\[(\d+)\]\[(\d+)\]\[(category|name|price|description|image_url|theme)\]$/
     );
     if (!m) continue;
     const idx = `${m[1]}:${m[2]}`;
@@ -122,6 +144,7 @@ function extractMenusFromBody(body) {
       price: 0,
       description: "",
       image_url: null,
+      theme: null,
     });
     const val = String(v ?? "").trim();
     if (m[3] === "price") buckets[idx].price = toInt(val);
@@ -149,12 +172,12 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
     const price = toInt(prices[i]);
     const category = (cats[i] || "").trim() || null;
     const description = (descs[i] || "").trim() || null;
+    const theme = (themes[i] || "").trim() || null;
 
     // 파일 인덱스 매칭
     const img = menuFiles[i] ? toWebPath(menuFiles[i]) : null;
 
     if (name && price > 0) {
-      const theme = (themes[i] || "").trim() || null;
       rows.push({ name, price, category, description, image_url: img, theme });
     }
   }
@@ -163,14 +186,13 @@ function extractLegacyMenusFromBody(body, menuFiles = []) {
 
 /* ===================== 등록(POST) ===================== */
 export async function createFoodStore(req, res) {
-  console.log("BODY >>>", req.body);
-  console.log("FILES >>>", req.files);
-
   const client = await pool.connect();
   try {
-    const businessName = (req.body.businessName || "").trim();
-    const roadAddress = (req.body.roadAddress || "").trim();
-    const phone = (req.body.phone || "").trim();
+    const body = req.body || {};
+
+    const businessName = (body.businessName || "").trim();
+    const roadAddress = (body.roadAddress || "").trim();
+    const phone = (body.phone || "").trim();
 
     if (!businessName || !roadAddress) {
       return res.status(200).json({
@@ -180,50 +202,41 @@ export async function createFoodStore(req, res) {
       });
     }
 
-    const businessType = (req.body.businessType || "").trim();
-    const businessCategory = (req.body.businessCategory || "").trim();
-    const businessHours = (req.body.businessHours || "").trim();
-    const deliveryOption = (req.body.deliveryOption || "").trim();
+    // ✅ 사업자번호 digits-only (필수)
+    const businessNumberDigits = pickBusinessNumber(body);
 
-    const serviceDetails = (req.body.serviceDetails || "").trim();
-    const additionalDesc = (req.body.additionalDesc || "").trim();
-
-    const homepage = (req.body.homepage || "").trim();
-    const instagram = (req.body.instagram || "").trim();
-    const facebook = (req.body.facebook || "").trim();
-
-    const facilities = (req.body.facilities || "").trim();
-    const petsAllowed =
-      req.body.petsAllowed === "true"
-        ? true
-        : req.body.petsAllowed === "false"
-          ? false
-          : null;
-    const parking = (req.body.parking || "").trim();
-
-    // ✅ 사업자번호(숫자만)
-    const businessNumber = pickBusinessNumber(req.body);
-    const bizVerified = String(req.body.bizVerified || "").trim();
-
-    // ✅ 디테일(소)카테고리
-    const detailCategory = pickDetailCategory(req.body);
-
-    console.log(
-      "[createFoodStore] bizVerified:",
-      bizVerified,
-      "businessNumber:",
-      businessNumber,
-      "detailCategory:",
-      detailCategory
-    );
-
-    // ✅ 통합과 동일: 사업자번호 없으면 등록 막기 (빈값 저장 방지)
-    if (!businessNumber) {
+    // ✅ 10자리(사업자등록번호) or 11자리(사업장관리번호 등) 허용하고 싶으면 아래처럼
+    //    "사업자등록번호만"으로 엄격히 가려면 (businessNumberDigits.length !== 10) 만 남기면 됨.
+    if (!businessNumberDigits || ![10, 11].includes(businessNumberDigits.length)) {
       return res.status(200).json({
         ok: false,
         error: "business_number_required",
+        message: "business number must be 10 or 11 digits (digits-only).",
       });
     }
+
+    const businessType = (body.businessType || "").trim();
+    const businessCategory = (body.businessCategory || "").trim();
+    const businessHours = (body.businessHours || "").trim();
+    const deliveryOption = (body.deliveryOption || "").trim();
+
+    const serviceDetails = (body.serviceDetails || "").trim();
+    const additionalDesc = (body.additionalDesc || "").trim();
+
+    const homepage = (body.homepage || "").trim();
+    const instagram = (body.instagram || "").trim();
+    const facebook = (body.facebook || "").trim();
+
+    const facilities = (body.facilities || "").trim();
+    const petsAllowed =
+      body.petsAllowed === "true"
+        ? true
+        : body.petsAllowed === "false"
+          ? false
+          : null;
+    const parking = (body.parking || "").trim();
+
+    const detailCategory = pickDetailCategory(body);
 
     await client.query("BEGIN");
 
@@ -249,13 +262,13 @@ export async function createFoodStore(req, res) {
 
     const { rows } = await client.query(insertStoreQ, [
       businessName,
-      req.body.ownerName || null,
+      body.ownerName || null,
       phone || null,
-      req.body.ownerEmail || req.body.email || null,
-      roadAddress, // address 매핑
+      body.ownerEmail || body.email || null,
+      roadAddress,
       businessType || null,
       businessCategory || null,
-      detailCategory || null, // ✅ 저장
+      detailCategory || null,
       businessHours || null,
       deliveryOption || null,
       serviceDetails || null,
@@ -266,7 +279,7 @@ export async function createFoodStore(req, res) {
       facilities || null,
       petsAllowed,
       parking || null,
-      businessNumber, // ✅ digits-only 강제 저장(필수)
+      businessNumberDigits, // ✅ digits-only 강제 저장
     ]);
 
     const storeId = rows[0].id;
@@ -289,8 +302,8 @@ export async function createFoodStore(req, res) {
     }
 
     // 3) 메뉴 저장
-    const menusA = extractMenusFromBody(req.body);
-    const menusB = extractLegacyMenusFromBody(req.body, menuImgFiles);
+    const menusA = extractMenusFromBody(body);
+    const menusB = extractLegacyMenusFromBody(body, menuImgFiles);
     const menus = [...menusA, ...menusB];
 
     // 저장 전 기존 것 정리
@@ -321,7 +334,7 @@ export async function createFoodStore(req, res) {
     }
 
     // 4) 이벤트 저장
-    const events = Object.entries(req.body)
+    const events = Object.entries(body)
       .filter(([k]) => /^event\d+$/i.test(k))
       .map(([, v]) => String(v || "").trim())
       .filter(Boolean);
@@ -336,25 +349,19 @@ export async function createFoodStore(req, res) {
 
     await client.query("COMMIT");
 
-    const toSafeInt = (v) =>
-      Number.isSafeInteger(v) ? v : Number.parseInt(v, 10);
-
+    const toSafeInt = (v) => (Number.isSafeInteger(v) ? v : Number.parseInt(v, 10));
     return res.status(200).json({
       ok: true,
       id: toSafeInt(storeId) || Date.now(),
-      business_number: businessNumber,
+      business_number: businessNumberDigits, // ✅ 반드시 값 있음
       detail_category: detailCategory || null,
     });
   } catch (err) {
-    try {
-      if (client) await client.query("ROLLBACK");
-    } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[createFoodStore] error:", err);
-    return res.status(500).json({ ok: false, error: "server_error" });
+    return res.status(500).json({ ok: false, error: "server_error", message: err?.message });
   } finally {
-    try {
-      if (client) client.release();
-    } catch {}
+    try { client.release(); } catch { }
   }
 }
 
@@ -372,7 +379,8 @@ export async function getFoodStoreById(req, res) {
         phone,
         created_at AS "createdAt",
         business_category AS "businessCategory",
-        detail_category AS "detailCategory"
+        detail_category AS "detailCategory",
+        business_number AS "businessNumber"
       FROM store_info
       WHERE id = $1
     `;
@@ -391,7 +399,6 @@ export async function getFoodRegisterFull(req, res) {
     const storeId = parseId(req.params.id);
     if (!storeId) return res.status(400).json({ ok: false, error: "Invalid id" });
 
-    // 1) 가게 (store_info)
     const { rows: s } = await pool.query(
       `SELECT
          id,
@@ -410,7 +417,6 @@ export async function getFoodRegisterFull(req, res) {
     );
     if (!s.length) return res.status(404).json({ ok: false, error: "not_found" });
 
-    // 2) 이미지
     const { rows: images } = await pool.query(
       `SELECT url
          FROM store_images
@@ -419,7 +425,6 @@ export async function getFoodRegisterFull(req, res) {
       [storeId]
     );
 
-    // 3) 메뉴
     const { rows: menus } = await pool.query(
       `SELECT store_id, COALESCE(category,'기타') AS category,
               name, price, image_url, description, theme
@@ -429,7 +434,6 @@ export async function getFoodRegisterFull(req, res) {
       [storeId]
     );
 
-    // 4) 이벤트
     const { rows: ev } = await pool.query(
       `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
       [storeId]
@@ -453,12 +457,11 @@ export async function getFoodStoreByBusinessNumber(req, res) {
   try {
     const bizNo = String(req.params.businessNumber || "").replace(/[^\d]/g, "");
 
-    // ✅ 10~11 자리 허용 (테스트/실사업자 혼용 대응)
-    if (!bizNo || bizNo.length < 10 || bizNo.length > 11) {
+    // ✅ 10/11 자리 모두 허용 (원하면 10만 남겨도 됨)
+    if (!bizNo || ![10, 11].includes(bizNo.length)) {
       return res.status(400).json({ ok: false, error: "Invalid business number" });
     }
 
-    // 1) 가게 (store_info) - 가장 최근 등록된 것
     const { rows: s } = await pool.query(
       `SELECT
          id,
@@ -472,7 +475,7 @@ export async function getFoodStoreByBusinessNumber(req, res) {
          facilities, pets_allowed, parking,
          business_number
        FROM store_info
-       WHERE business_number = $1
+       WHERE regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') = $1
        ORDER BY created_at DESC
        LIMIT 1`,
       [bizNo]
@@ -481,7 +484,6 @@ export async function getFoodStoreByBusinessNumber(req, res) {
 
     const storeId = s[0].id;
 
-    // 2) 이미지
     const { rows: images } = await pool.query(
       `SELECT url
          FROM store_images
@@ -490,7 +492,6 @@ export async function getFoodStoreByBusinessNumber(req, res) {
       [storeId]
     );
 
-    // 3) 메뉴
     const { rows: menus } = await pool.query(
       `SELECT store_id, COALESCE(category,'기타') AS category,
               name, price, image_url, description, theme
@@ -500,7 +501,6 @@ export async function getFoodStoreByBusinessNumber(req, res) {
       [storeId]
     );
 
-    // 4) 이벤트
     const { rows: ev } = await pool.query(
       `SELECT content FROM store_events WHERE store_id = $1 ORDER BY ord, id`,
       [storeId]
@@ -551,7 +551,6 @@ export async function updateFoodStore(req, res) {
 
     await client.query("BEGIN");
 
-    // 부분 업데이트
     const set = [];
     const params = [];
     Object.entries(candidate).forEach(([col, val]) => {
@@ -560,6 +559,7 @@ export async function updateFoodStore(req, res) {
         params.push(val === "" ? null : val);
       }
     });
+
     if (set.length) {
       params.push(storeId);
       await client.query(
@@ -571,15 +571,11 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try {
-      client.release();
-    } catch {}
+    try { client.release(); } catch { }
   }
 }
 
