@@ -704,36 +704,17 @@
         }
       }
 
-      // ✅ type별로 올바른 상세 API를 호출해서 메타(상호/업종/이미지) 가져오기
-      async function fetchStoreMetaByType(storeType, storeId) {
+      // ✅ /store/:id API로 메타(상호/업종/이미지) 가져오기
+      async function fetchStoreMeta(storeId) {
         try {
-          let url = "";
-
-          // ✅ store_info (푸드레지스터가 들어가는 곳)
-          if (storeType === "store_info" || storeType === "food") {
-            url = `/store/${encodeURIComponent(storeId)}/full`; 
-          }
-          // 통합
-          else if (storeType === "combined" || storeType === "combined_store_info") {
-            url = `/combined/${encodeURIComponent(storeId)}/full`; 
-          }
-          else {
-            // 기본값은 combined
-            url = `/combined/${encodeURIComponent(storeId)}/full`;
-          }
-
-          const r = await fetch(url, { cache: "no-store" });
+          const r = await fetch(`/store/${encodeURIComponent(storeId)}`, { cache: "no-store" });
           if (!r.ok) return null;
-
           const j = await r.json();
           const s = j.store || j.data || j || {};
 
           const name = (s.business_name || s.businessName || s.store_name || s.storeName || s.name || "").toString().trim();
-
-          // ✅ 업종은 business_category를 최우선으로
-          const category = (s.business_category || s.businessCategory || s.business_type || s.businessType || s.category || "").toString().trim();
-
-          const imageUrl = (s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || s.image_path || s.imagePath || "").toString().trim();
+          const category = (s.business_category || s.businessCategory || s.business_type || s.businessType || "").toString().trim();
+          const imageUrl = (s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || "").toString().trim();
 
           return { name, category, imageUrl };
         } catch {
@@ -749,11 +730,10 @@
         const nameEl = slot.querySelector(".slot-name");
         const categoryEl = slot.querySelector(".slot-category");
 
-        // ✅ store_id / id 키 혼용 대응
+        // ✅ store_id 추출 (slotData.id는 슬롯 ID일 수 있으므로 제외)
         const storeId =
           slotData.store_id ||
           slotData.storeId ||
-          slotData.id ||
           (slotData.store && (slotData.store.id || slotData.store.store_id)) ||
           null;
 
@@ -809,9 +789,9 @@
           .toString()
           .trim();
 
-        // ✅ 보강 (type 기반으로 올바른 API 호출)
+        // ✅ 보강 (/store/:id API로만 호출)
         if (storeId && (!storeName || !storeCategory || !imageUrl)) {
-          const meta = await fetchStoreMetaByType(storeType || "combined", storeId);
+          const meta = await fetchStoreMeta(storeId);
           if (meta) {
             if (!storeName && meta.name) storeName = meta.name;
             if (!storeCategory && meta.category) storeCategory = meta.category;
