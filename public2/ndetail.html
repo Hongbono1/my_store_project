@@ -650,56 +650,29 @@
         // ========== 데이터 표준화 + 상세 렌더링 ==========
         (async () => {
             try {
-                // ✅ 여러 API 후보 중 성공하는 첫 번째 사용
-                async function fetchFirstOkJson(urls) {
-                    let lastErr = null;
-                    for (const url of urls) {
-                        try {
-                            const res = await fetch(url, { cache: "no-store" });
-                            if (!res.ok) { 
-                                lastErr = new Error(`${res.status} ${url}`); 
-                                continue; 
-                            }
-                            return { url, json: await res.json() };
-                        } catch (e) {
-                            lastErr = e;
-                        }
-                    }
-                    throw lastErr || new Error("all endpoints failed");
-                }
-
                 const params = new URLSearchParams(location.search);
-                const storeId = params.get("id");
-                let type = (params.get("type") || "combined").trim(); // ✅ 기본은 combined
-                if (type === "store") type = "combined"; // ✅ 과거 데이터 호환
+                const id = params.get("id");
+                let type = (params.get("type") || "combined").trim();
 
-                if (!storeId) throw new Error("No id provided");
+                // ✅ 과거 링크 호환 (남아있으면 사고 방지)
+                if (type === "store") type = "combined";
 
-                let apiCandidates = [];
+                if (!id) throw new Error("No id provided");
 
+                let api = "";
                 if (type === "store_info") {
-                    // ✅ store_info는 combined로 절대 타면 안됨
-                    apiCandidates = [
-                        `/store/${storeId}/full`,
-                        `/store/${storeId}`,
-                    ];
-                } else if (type === "food" || type === "food_stores") {
-                    apiCandidates = [
-                        `/food-stores/${storeId}/full`,
-                        `/food-stores/${storeId}`,
-                        `/food/${storeId}/full`,
-                        `/food/${storeId}`,
-                    ];
+                    api = `/store/${id}/full`;      // foodregister (store_info 테이블)
                 } else {
-                    // ✅ combined
-                    apiCandidates = [
-                        `/combined/${storeId}/full`,
-                        `/combined/${storeId}`,
-                    ];
+                    api = `/combined/${id}/full`;   // ncombinedregister (combined_store_info 테이블)
                 }
 
-                const { url: usedApi, json } = await fetchFirstOkJson(apiCandidates);
-                console.log("[DETAIL] Using type:", type, "used api:", usedApi);
+                console.log("[DETAIL] Using type:", type, "API:", api);
+
+                const res = await fetch(api, { cache: "no-store" });
+                if (!res.ok) throw new Error(`HTTP ${res.status} from ${api}`);
+
+                const json = await res.json();
+                console.log("[DETAIL] API response:", json);
 
                 const store = json.store ?? json.data ?? {};
 
