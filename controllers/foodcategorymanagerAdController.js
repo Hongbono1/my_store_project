@@ -82,23 +82,25 @@ async function fetchSlot({ page, position, priority }) {
       s.business_no,
       s.table_source,
 
-      -- ✅ table_source에 따라 올바른 테이블에서 데이터 가져오기
+      -- ✅ table_source에 따라 올바른 테이블에서 데이터 가져오기 (NULL이면 store_info)
       COALESCE(
         NULLIF(s.business_name, ''),
         CASE 
-          WHEN s.table_source = 'store_info' THEN si.business_name
+          WHEN s.table_source = 'store_info' OR s.table_source IS NULL THEN si.business_name
           WHEN s.table_source = 'food_stores' THEN fs.business_name
-          ELSE c.business_name
+          WHEN s.table_source = 'combined_store_info' THEN c.business_name
+          ELSE ''
         END,
         ''
       ) AS business_name,
       
-      -- ✅ business_type 우선, 없으면 business_category
+      -- ✅ business_type 우선, 없으면 business_category (NULL이면 store_info)
       COALESCE(
         CASE 
-          WHEN s.table_source = 'store_info' THEN COALESCE(NULLIF(si.business_type, ''), si.business_category, '')
+          WHEN s.table_source = 'store_info' OR s.table_source IS NULL THEN COALESCE(NULLIF(si.business_type, ''), si.business_category, '')
           WHEN s.table_source = 'food_stores' THEN COALESCE(NULLIF(fs.business_type, ''), fs.business_category, '')
-          ELSE COALESCE(NULLIF(c.business_type, ''), c.business_category, '')
+          WHEN s.table_source = 'combined_store_info' THEN COALESCE(NULLIF(c.business_type, ''), c.business_category, '')
+          ELSE ''
         END,
         ''
       ) AS category,
@@ -110,10 +112,10 @@ async function fetchSlot({ page, position, priority }) {
     FROM public.admin_ad_slots s
 
     LEFT JOIN public.combined_store_info c
-      ON s.store_id = c.id AND (s.table_source = 'combined_store_info' OR s.table_source IS NULL)
+      ON s.store_id = c.id AND s.table_source = 'combined_store_info'
       
     LEFT JOIN public.store_info si
-      ON s.store_id = si.id AND s.table_source = 'store_info'
+      ON s.store_id = si.id AND (s.table_source = 'store_info' OR s.table_source IS NULL)
       
     LEFT JOIN public.food_stores fs
       ON s.store_id = fs.id AND s.table_source = 'food_stores'
@@ -122,6 +124,7 @@ async function fetchSlot({ page, position, priority }) {
       SELECT url
       FROM public.store_images
       WHERE store_id::text = s.store_id::text
+        AND (s.table_source = 'store_info' OR s.table_source IS NULL)
       ORDER BY sort_order, id
       LIMIT 1
     ) img ON TRUE
@@ -187,7 +190,12 @@ export async function saveSlot(req, res) {
     let storeId = clean(b.storeId || b.store_id) || null;
     let businessNo = clean(b.businessNo || b.business_no) || null;
     let businessName = clean(b.businessName || b.business_name) || null;
-    let tableSource = clean(b.tableSource || b.table_source) || 'combined_store_info';
+    let tableSource = clean(b.tableSource || b.table_source) || 'store_info';
+    
+    // ✅ table_source 유효성 검증
+    if (!['store_info', 'combined_store_info', 'food_stores'].includes(tableSource)) {
+      tableSource = 'store_info';
+    }
 
     let startAtLocal = clean(b.startAt || b.start_at) || "";
     let endAtLocal = clean(b.endAt || b.end_at) || "";
