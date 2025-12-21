@@ -357,11 +357,11 @@ export async function createFoodStore(req, res) {
       detail_category: detailCategory || null,
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("[createFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error", message: err?.message });
   } finally {
-    try { client.release(); } catch { }
+    try { client.release(); } catch {}
   }
 }
 
@@ -571,11 +571,11 @@ export async function updateFoodStore(req, res) {
     await client.query("COMMIT");
     return res.json({ ok: true, id: storeId });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { }
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("[updateFoodStore] error:", err);
     return res.status(500).json({ ok: false, error: "server_error" });
   } finally {
-    try { client.release(); } catch { }
+    try { client.release(); } catch {}
   }
 }
 
