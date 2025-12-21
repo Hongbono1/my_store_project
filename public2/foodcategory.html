@@ -651,9 +651,39 @@
       }
     }
 
+    // ✅ 파워 광고(1~9) 카드 DOM 자체를 섞어서 3개씩 그룹에 다시 배치
+    function shufflePowerAdsDom() {
+      const track = document.getElementById("powerAdTrack");
+      if (!track) return;
+
+      const groups = Array.from(track.querySelectorAll(".power-group"));
+      if (groups.length === 0) return;
+
+      // 각 그룹 안의 "카드 컨테이너" (w-1/3 px-2) 들을 모두 모음
+      const cards = groups.flatMap(g => Array.from(g.children)).filter(Boolean);
+      if (cards.length < 2) return;
+
+      // Fisher-Yates shuffle
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+
+      // 그룹 비우고, 3개씩 다시 채움
+      groups.forEach(g => (g.innerHTML = ""));
+      let idx = 0;
+      groups.forEach(g => {
+        for (let k = 0; k < 3 && idx < cards.length; k++) {
+          g.appendChild(cards[idx++]);
+        }
+      });
+    }
+
     // ✅ 광고 슬롯 로딩 (foodcategorymanager에서 설정한 내용 표시)
     // ✅ 파워 광고(food_power_1~9)는 랜덤 순서로 화면에 매핑
     async function loadAdSlots() {
+      // ✅ 1) 먼저 파워광고 카드 DOM 순서를 섞는다 (새로고침/첫 진입 때 랜덤)
+      shufflePowerAdsDom();
       const allSlots = Array.from(document.querySelectorAll("[data-slot][data-position]"));
 
       const isPower = (pos) => /^food_power_\d+$/.test(pos || "");
@@ -855,8 +885,8 @@
         }
       }
 
-      // ---------- 1) 일반 슬롯 먼저 로딩 ----------
-      for (const slot of otherSlots) {
+      // ---------- 1) 모든 슬롯 로딩 (파워 광고는 이미 DOM 셔플됨) ----------
+      for (const slot of allSlots) {
         const position = slot.dataset.position;
         if (!position) continue;
 
@@ -868,33 +898,6 @@
           await applySlotData(slot, slotData);
         } catch (err) {
           console.error(`[foodcategory] 슬롯 로딩 실패 (${position}):`, err);
-        }
-      }
-
-      // ---------- 2) 파워 슬롯은 "내용만 랜덤 순서로" 매핑 ----------
-      if (powerSlots.length > 0) {
-        // powerPositions = food_power_1~9 (DB에 있는 슬롯 내용들)
-        const powerPositions = shuffle(powerSlots.map((s) => s.dataset.position));
-        
-        console.log('🎲 파워 광고 랜덤 순서:', powerPositions);
-
-        // 화면에 보이는 slot(1~9) 순서대로, 랜덤 position의 내용을 덮어씀
-        const powerDatas = await Promise.all(powerPositions.map((p) => fetchSlot(p)));
-
-        for (let i = 0; i < powerSlots.length; i++) {
-          const slot = powerSlots[i];
-          resetSlotUI(slot);
-          const data = powerDatas[i];
-          if (!data) {
-            console.log(`⚠️ 파워 슬롯 ${powerPositions[i]} 데이터 없음`);
-            continue;
-          }
-          try {
-            await applySlotData(slot, data);
-            console.log(`✅ 슬롯 ${slot.dataset.position}에 ${powerPositions[i]} 데이터 적용`);
-          } catch (err) {
-            console.error(`[foodcategory] 파워 슬롯 적용 실패 (${slot.dataset.position}):`, err);
-          }
         }
       }
     }
