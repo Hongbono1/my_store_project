@@ -94,12 +94,12 @@ async function fetchSlot({ page, position, priority }) {
         ''
       ) AS business_name,
       
-      -- ✅ business_type 우선, 없으면 business_category (NULL이면 store_info)
+      -- ✅ business_category 우선 (한식/양식/중식), 없으면 business_type (NULL이면 store_info)
       COALESCE(
         CASE 
-          WHEN s.table_source = 'store_info' OR s.table_source IS NULL THEN COALESCE(NULLIF(si.business_type, ''), si.business_category, '')
-          WHEN s.table_source = 'food_stores' THEN COALESCE(NULLIF(fs.business_type, ''), fs.business_category, '')
-          WHEN s.table_source = 'combined_store_info' THEN COALESCE(NULLIF(c.business_type, ''), c.business_category, '')
+          WHEN s.table_source = 'store_info' OR s.table_source IS NULL THEN COALESCE(NULLIF(si.business_category, ''), si.business_type, '')
+          WHEN s.table_source = 'food_stores' THEN COALESCE(NULLIF(fs.business_category, ''), fs.business_type, '')
+          WHEN s.table_source = 'combined_store_info' THEN COALESCE(NULLIF(c.business_category, ''), c.business_type, '')
           ELSE ''
         END,
         ''
