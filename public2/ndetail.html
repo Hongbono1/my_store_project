@@ -650,66 +650,55 @@
         // ========== 데이터 표준화 + 상세 렌더링 ==========
         (async () => {
             try {
-                const q = new URLSearchParams(location.search);
-                const idRaw = q.get("id");
-                const bizRaw = q.get("biz"); // ✅ 사업자번호 파라미터 추가
-                const sourceRaw = q.get("source"); // ✅ table_source 파라미터 (store_info, combined_store_info, food_stores)
-                const typeRaw = q.get("type"); // ✅ store_type 파라미터 (store_info, combined)
-                const type = typeRaw || sourceRaw || "combined"; // type 우선, source 폴백, 기본값 combined
-
-                let apiUrl;
-
-                // ✅ 사업자번호가 있으면 우선 사용
-                if (bizRaw && bizRaw.trim()) {
-                    const biz = bizRaw.trim().replace(/[^\d]/g, ""); // 숫자만 추출
-                    if (biz.length === 10) {
-                        // type에 따라 API 결정
-                        if (type === "store_info" || type === "food") {
-                            apiUrl = `/store/biz/${biz}/full`;
-                        } else {
-                            apiUrl = `/combined/biz/${biz}/full`;
+                // ✅ 여러 API 후보 중 성공하는 첫 번째 사용
+                async function fetchFirstOkJson(urls) {
+                    let lastErr = null;
+                    for (const url of urls) {
+                        try {
+                            const res = await fetch(url, { cache: "no-store" });
+                            if (!res.ok) { 
+                                lastErr = new Error(`${res.status} ${url}`); 
+                                continue; 
+                            }
+                            return { url, json: await res.json() };
+                        } catch (e) {
+                            lastErr = e;
                         }
-                        console.log("[DETAIL] Using business number:", biz, "type:", type);
-                    } else {
-                        throw new Error("Invalid business number format");
                     }
-                } else if (idRaw) {
-                    // ID 기반 조회 (type 파라미터로 테이블 구분)
-                    const id = Number(idRaw);
-                    if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
-                    
-                    // ✅ type 파라미터로 API 엔드포인트 결정
-                    if (type === 'store_info' || type === 'food' || type === 'store') {
-                        apiUrl = `/store/${id}/full`; // 푸드 등록 (store_info 테이블)
-                    } else if (type === 'food_stores') {
-                        apiUrl = `/food-stores/${id}/full`; // 푸드 스토어 테이블
-                    } else {
-                        // combined, combined_store_info 또는 기본값
-                        apiUrl = `/combined/${id}/full`;
-                    }
-                    console.log("[DETAIL] Using type:", type, "API:", apiUrl);
+                    throw lastErr || new Error("all endpoints failed");
+                }
+
+                const params = new URLSearchParams(location.search);
+                const storeId = params.get("id");
+                const type = (params.get("type") || "combined").trim(); // ✅ 기본은 combined
+
+                if (!storeId) throw new Error("No id provided");
+
+                let apiCandidates = [];
+
+                if (type === "store_info") {
+                    // ✅ store_info는 combined로 절대 타면 안됨
+                    apiCandidates = [
+                        `/store/${storeId}/full`,
+                        `/store/${storeId}`,
+                    ];
+                } else if (type === "food" || type === "food_stores") {
+                    apiCandidates = [
+                        `/food-stores/${storeId}/full`,
+                        `/food-stores/${storeId}`,
+                        `/food/${storeId}/full`,
+                        `/food/${storeId}`,
+                    ];
                 } else {
-                    throw new Error("No id or business number provided");
+                    // ✅ combined
+                    apiCandidates = [
+                        `/combined/${storeId}/full`,
+                        `/combined/${storeId}`,
+                    ];
                 }
 
-                // fetch + 한 번만 폴백
-                let res = await fetch(apiUrl);
-                if (!res.ok && idRaw) {
-                    // 사업자번호로 실패하면 ID로 폴백 시도 (역호환성)
-                    const id = Number(idRaw);
-                    if (Number.isSafeInteger(id)) {
-                        const alt = type === "combined" ? `/store/${id}/full` : `/combined/${id}/full`;
-                        const tryAlt = await fetch(alt);
-                        if (tryAlt.ok) {
-                            res = tryAlt;
-                            apiUrl = alt;
-                        }
-                    }
-                }
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                const json = await res.json();
-                console.log("[DETAIL] used api:", apiUrl);
+                const { url: usedApi, json } = await fetchFirstOkJson(apiCandidates);
+                console.log("[DETAIL] Using type:", type, "used api:", usedApi);
 
                 const store = json.store ?? json.data ?? {};
 
