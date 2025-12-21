@@ -650,20 +650,25 @@
         // ========== 데이터 표준화 + 상세 렌더링 ==========
         (async () => {
             try {
-                const params = new URLSearchParams(location.search);
-                const id = params.get("id");
-                let type = (params.get("type") || "combined").trim();
+                // URL에서 type 읽기 (구버전 호환: type=store -> store_info로 취급)
+                const qs = new URLSearchParams(location.search);
+                const id = qs.get("id");
+                let type = (qs.get("type") || "").trim();
 
-                // ✅ 과거 링크 호환 (남아있으면 사고 방지)
-                if (type === "store") type = "combined";
+                if (type === "store") type = "store_info"; // ✅ 호환
 
                 if (!id) throw new Error("No id provided");
 
+                // ✅ 타입별로 API를 다르게
                 let api = "";
-                if (type === "store_info") {
-                    api = `/store/${id}/full`;      // foodregister (store_info 테이블)
+                if (type === "combined") {
+                    api = `/combined/${id}/full`;
+                } else if (type === "store_info") {
+                    // ✅ 여기! store_info는 store_info용 API로
+                    api = `/store/${id}/full`;  // foodregister (store_info 테이블)
                 } else {
-                    api = `/combined/${id}/full`;   // ncombinedregister (combined_store_info 테이블)
+                    // type이 없으면(또는 이상하면) 기본을 정하되, 충돌 방지 위해 combined로 두는게 안전
+                    api = `/combined/${id}/full`;
                 }
 
                 console.log("[DETAIL] Using type:", type, "API:", api);
