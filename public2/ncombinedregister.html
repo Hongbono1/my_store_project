@@ -878,9 +878,17 @@
           if (v) fd.append('events[]', v);
         });
 
+        // ✅ 디버깅: FormData 내용 출력
+        console.log('=== FormData 전송 내용 ===');
+        for (let [key, value] of fd.entries()) {
+          console.log(key, ':', value instanceof File ? `${value.name} (${value.size} bytes)` : value);
+        }
+
         const res = await fetch('/combined/store', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error('서버 에러');
+        console.log('서버 응답 상태:', res.status, res.statusText);
+        
         const data = await res.json();
+        console.log('서버 응답 데이터:', data);
 
         if (data.ok) {
           // ✅ 사업자번호 우선 사용, 없으면 ID로 폴백
@@ -898,9 +906,13 @@
             }
           }
         } else {
-          alert('등록에 실패했습니다.');
+          // ✅ 상세한 에러 메시지 표시
+          const errorMsg = data.message || data.error || '등록에 실패했습니다.';
+          alert(`등록 실패:\n${errorMsg}`);
+          console.error('등록 실패 상세:', data);
         }
       } catch (err) {
+        console.error('폼 제출 에러:', err);
         alert('에러: ' + err.message);
       }
     });
