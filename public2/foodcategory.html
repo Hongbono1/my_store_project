@@ -704,40 +704,36 @@
         }
       }
 
-      // ✅ store 상세에서 상호/업종/대표이미지 보강 (slotData에 없을 때)
-      async function fetchStoreMeta(storeId) {
+      // ✅ type별로 올바른 상세 API를 호출해서 메타(상호/업종/이미지) 가져오기
+      async function fetchStoreMetaByType(storeType, storeId) {
         try {
-          const r = await fetch(`/combined/${encodeURIComponent(storeId)}/full`, { cache: "no-store" });
+          let url = "";
+
+          // ✅ store_info (푸드레지스터가 들어가는 곳)
+          if (storeType === "store_info" || storeType === "food") {
+            url = `/store/${encodeURIComponent(storeId)}/full`; 
+          }
+          // 통합
+          else if (storeType === "combined" || storeType === "combined_store_info") {
+            url = `/combined/${encodeURIComponent(storeId)}/full`; 
+          }
+          else {
+            // 기본값은 combined
+            url = `/combined/${encodeURIComponent(storeId)}/full`;
+          }
+
+          const r = await fetch(url, { cache: "no-store" });
           if (!r.ok) return null;
+
           const j = await r.json();
           const s = j.store || j.data || j || {};
 
-          const name = (
-            s.business_name || s.businessName || s.store_name || s.storeName || s.name || ""
-          ).toString().trim();
+          const name = (s.business_name || s.businessName || s.store_name || s.storeName || s.name || "").toString().trim();
 
-          const category = (
-            s.business_type ||
-            s.businessType ||
-            s.business_subcategory ||
-            s.businessSubcategory ||
-            s.business_category ||
-            s.businessCategory ||
-            s.store_category ||
-            s.storeCategory ||
-            s.category ||
-            ""
-          ).toString().trim();
+          // ✅ 업종은 business_category를 최우선으로
+          const category = (s.business_category || s.businessCategory || s.business_type || s.businessType || s.category || "").toString().trim();
 
-          const imageUrl = (
-            s.main_image_url ||
-            s.mainImageUrl ||
-            s.image_url ||
-            s.imageUrl ||
-            s.image_path ||
-            s.imagePath ||
-            ""
-          ).toString().trim();
+          const imageUrl = (s.main_image_url || s.mainImageUrl || s.image_url || s.imageUrl || s.image_path || s.imagePath || "").toString().trim();
 
           return { name, category, imageUrl };
         } catch {
@@ -760,6 +756,15 @@
           slotData.id ||
           (slotData.store && (slotData.store.id || slotData.store.store_id)) ||
           null;
+
+        // ✅ store_type 추출 (table_source를 store_type으로 매핑)
+        const tableSource = slotData.table_source || slotData.tableSource || 'combined_store_info';
+        const storeType =
+          slotData.store_type ||
+          slotData.storeType ||
+          slotData.detail_type ||
+          (slotData.store && (slotData.store.store_type || slotData.store.detail_type)) ||
+          (tableSource === 'store_info' ? 'store_info' : 'combined');
 
         let storeName = (
           slotData.business_name ||
@@ -804,9 +809,9 @@
           .toString()
           .trim();
 
-        // ✅ 보강
+        // ✅ 보강 (type 기반으로 올바른 API 호출)
         if (storeId && (!storeName || !storeCategory || !imageUrl)) {
-          const meta = await fetchStoreMeta(storeId);
+          const meta = await fetchStoreMetaByType(storeType || "combined", storeId);
           if (meta) {
             if (!storeName && meta.name) storeName = meta.name;
             if (!storeCategory && meta.category) storeCategory = meta.category;
@@ -832,13 +837,11 @@
         if (storeId && position !== 'food_main_banner') {
           slot.style.cursor = "pointer";
           
-          // ✅ table_source를 URL 파라미터로 전달 (ndetail.html에서 구분용)
-          const tableSource = slotData.table_source || slotData.tableSource || 'combined_store_info';
-          const detailUrl = `/ndetail.html?id=${storeId}&source=${encodeURIComponent(tableSource)}`;
-          
           slot.onclick = (e) => {
             e.preventDefault();
-            window.location.href = detailUrl;
+            // ✅ type 파라미터로 올바른 API 호출하도록 전달
+            const t = storeType || "combined";
+            window.location.href = `/ndetail.html?id=${storeId}&type=${encodeURIComponent(t)}`;
           };
         }
       }
