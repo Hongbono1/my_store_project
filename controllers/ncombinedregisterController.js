@@ -219,11 +219,10 @@ export async function createCombinedStore(req, res) {
         `
           INSERT INTO combined_menu_items (store_id, category, name, price, image_url, description)
           VALUES ($1,$2,$3,$4,$5,$6)
-          ON CONFLICT (store_id, name)
+          ON CONFLICT (store_id, category, name)
           DO UPDATE SET
             price = EXCLUDED.price,
             image_url = COALESCE(EXCLUDED.image_url, combined_menu_items.image_url),
-            category = COALESCE(EXCLUDED.category, combined_menu_items.category),
             description = COALESCE(EXCLUDED.description, combined_menu_items.description)
         `,
         [storeId, m.category, m.name, m.price, m.image_url, m.description]
