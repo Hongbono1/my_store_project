@@ -94,6 +94,22 @@ export async function createCombinedStore(req, res) {
 
     await client.query("BEGIN");
 
+    // ✅ 같은 사업자번호 중복 등록 차단 (combined_store_info 기준)
+    const dup = await client.query(
+      `SELECT id FROM public.combined_store_info WHERE business_number = $1 LIMIT 1`,
+      [businessNumberDigits]
+    );
+
+    if (dup.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(200).json({
+        ok: false,
+        error: "duplicate_business_number",
+        message: "이미 등록된 사업자번호입니다.",
+        existingId: dup.rows[0].id,
+      });
+    }
+
     // ✅ combined_store_info 저장
     const storeSql = `
       INSERT INTO combined_store_info (
@@ -125,8 +141,8 @@ export async function createCombinedStore(req, res) {
       businessNumberDigits,                 // $1 ✅ digits-only 강제 저장 (필수)
       s(raw.businessName),                  // $2
       s(raw.businessType),                  // $3
-      s(raw.mainCategory),                  // $4
-      s(raw.subCategory),                   // $5
+      s(raw.mainCategory ?? raw.businessCategory ?? raw.business_category),  // $4
+      s(raw.subCategory ?? raw.detailCategory ?? raw.businessSubcategory ?? raw.business_subcategory), // $5
       s(raw.businessHours),                 // $6
       s(raw.deliveryOption),                // $7
       s(raw.serviceDetails),                // $8
@@ -247,7 +263,7 @@ export async function createCombinedStore(req, res) {
   } catch (err) {
     try {
       await client.query("ROLLBACK");
-    } catch {}
+    } catch { }
     console.error("[createCombinedStore] error:", err);
     return res
       .status(500)
