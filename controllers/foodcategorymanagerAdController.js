@@ -83,7 +83,8 @@ async function fetchSlot({ page, position, priority }) {
 
       -- ✅ 슬롯에 저장된 값이 없으면 combined_store_info에서 보강
       COALESCE(NULLIF(s.business_name, ''), c.business_name, '') AS business_name,
-      COALESCE(c.business_category, '') AS category,
+      -- ✅ business_type을 우선으로, 없으면 business_category 사용
+      COALESCE(NULLIF(c.business_type, ''), c.business_category, '') AS category,
 
       s.no_end,
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
