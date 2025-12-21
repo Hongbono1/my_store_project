@@ -671,7 +671,7 @@
 
       async function fetchSlot(position) {
         const res = await fetch(
-          `/foodcategorymanager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}`,
+          `/foodcategorymanager/ad/slot?page=foodcategory&position=${encodeURIComponent(position)}&t=${Date.now()}`,
           { cache: "no-store" }
         );
         if (!res.ok) return null;
@@ -874,6 +874,8 @@
       if (powerSlots.length > 0) {
         // powerPositions = food_power_1~9 (DB에 있는 슬롯 내용들)
         const powerPositions = shuffle(powerSlots.map((s) => s.dataset.position));
+        
+        console.log('🎲 파워 광고 랜덤 순서:', powerPositions);
 
         // 화면에 보이는 slot(1~9) 순서대로, 랜덤 position의 내용을 덮어씀
         const powerDatas = await Promise.all(powerPositions.map((p) => fetchSlot(p)));
@@ -882,9 +884,13 @@
           const slot = powerSlots[i];
           resetSlotUI(slot);
           const data = powerDatas[i];
-          if (!data) continue;
+          if (!data) {
+            console.log(`⚠️ 파워 슬롯 ${powerPositions[i]} 데이터 없음`);
+            continue;
+          }
           try {
             await applySlotData(slot, data);
+            console.log(`✅ 슬롯 ${slot.dataset.position}에 ${powerPositions[i]} 데이터 적용`);
           } catch (err) {
             console.error(`[foodcategory] 파워 슬롯 적용 실패 (${slot.dataset.position}):`, err);
           }
@@ -909,7 +915,9 @@
       if (!viewport || !track) return;
 
       let groups = track.querySelectorAll(".power-group").length;
-      let index = 0;
+      // ✅ 랜덤 시작 위치 (0 ~ groups-1)
+      let index = Math.floor(Math.random() * groups);
+      console.log(`🎲 파워 슬라이더 랜덤 시작: ${index + 1}번째 그룹`);
 
       // ✅ 끝에서 “뒤로” 돌아오게 하는 방향 값
       let dir = 1; // 1: 앞으로, -1: 뒤로
