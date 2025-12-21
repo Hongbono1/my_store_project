@@ -653,6 +653,7 @@
                 const q = new URLSearchParams(location.search);
                 const idRaw = q.get("id");
                 const bizRaw = q.get("biz"); // ✅ 사업자번호 파라미터 추가
+                const sourceRaw = q.get("source"); // ✅ table_source 파라미터 (store_info, combined_store_info, food_stores)
                 const type = (q.get("type") || "food").toLowerCase();
 
                 let apiUrl;
@@ -669,10 +670,20 @@
                         throw new Error("Invalid business number format");
                     }
                 } else if (idRaw) {
-                    // ID 기반 조회 (기존 방식)
+                    // ID 기반 조회 (source 파라미터로 테이블 구분)
                     const id = Number(idRaw);
                     if (!Number.isSafeInteger(id)) throw new Error("Invalid id");
-                    apiUrl = type === "combined" ? `/combined/${id}/full` : `/store/${id}/full`;
+                    
+                    // ✅ source 파라미터로 API 엔드포인트 결정
+                    if (sourceRaw === 'store_info') {
+                        apiUrl = `/store/${id}/full`; // 푸드 등록 (store_info 테이블)
+                    } else if (sourceRaw === 'food_stores') {
+                        apiUrl = `/food-stores/${id}/full`; // 푸드 스토어 테이블
+                    } else {
+                        // combined_store_info 또는 기본값
+                        apiUrl = `/combined/${id}/full`;
+                    }
+                    console.log("[DETAIL] Using source:", sourceRaw || 'combined_store_info (default)');
                 } else {
                     throw new Error("No id or business number provided");
                 }

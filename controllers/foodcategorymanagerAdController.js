@@ -80,11 +80,28 @@ async function fetchSlot({ page, position, priority }) {
       s.text_content,
       s.store_id::text AS store_id,
       s.business_no,
+      s.table_source,
 
-      -- ✅ 슬롯에 저장된 값이 없으면 combined_store_info에서 보강
-      COALESCE(NULLIF(s.business_name, ''), c.business_name, '') AS business_name,
-      -- ✅ business_type을 우선으로, 없으면 business_category 사용
-      COALESCE(NULLIF(c.business_type, ''), c.business_category, '') AS category,
+      -- ✅ table_source에 따라 올바른 테이블에서 데이터 가져오기
+      COALESCE(
+        NULLIF(s.business_name, ''),
+        CASE 
+          WHEN s.table_source = 'store_info' THEN si.business_name
+          WHEN s.table_source = 'food_stores' THEN fs.business_name
+          ELSE c.business_name
+        END,
+        ''
+      ) AS business_name,
+      
+      -- ✅ business_type 우선, 없으면 business_category
+      COALESCE(
+        CASE 
+          WHEN s.table_source = 'store_info' THEN COALESCE(NULLIF(si.business_type, ''), si.business_category, '')
+          WHEN s.table_source = 'food_stores' THEN COALESCE(NULLIF(fs.business_type, ''), fs.business_category, '')
+          ELSE COALESCE(NULLIF(c.business_type, ''), c.business_category, '')
+        END,
+        ''
+      ) AS category,
 
       s.no_end,
       to_char(s.start_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD"T"HH24:MI') AS start_at_local,
@@ -93,7 +110,13 @@ async function fetchSlot({ page, position, priority }) {
     FROM public.admin_ad_slots s
 
     LEFT JOIN public.combined_store_info c
-      ON s.store_id::text = c.id::text
+      ON s.store_id = c.id AND (s.table_source = 'combined_store_info' OR s.table_source IS NULL)
+      
+    LEFT JOIN public.store_info si
+      ON s.store_id = si.id AND s.table_source = 'store_info'
+      
+    LEFT JOIN public.food_stores fs
+      ON s.store_id = fs.id AND s.table_source = 'food_stores'
 
     LEFT JOIN LATERAL (
       SELECT url
@@ -164,6 +187,7 @@ export async function saveSlot(req, res) {
     let storeId = clean(b.storeId || b.store_id) || null;
     let businessNo = clean(b.businessNo || b.business_no) || null;
     let businessName = clean(b.businessName || b.business_name) || null;
+    let tableSource = clean(b.tableSource || b.table_source) || 'combined_store_info';
 
     let startAtLocal = clean(b.startAt || b.start_at) || "";
     let endAtLocal = clean(b.endAt || b.end_at) || "";
@@ -251,13 +275,14 @@ export async function saveSlot(req, res) {
         storeId,       // $5
         businessNo,    // $6
         businessName,  // $7
-        finalImageUrl, // $8
-        startAtLocal,  // $9
-        endAtLocal,    // $10
-        noEnd,         // $11
-        page,          // $12
-        position,      // $13
-        priority,      // $14
+        tableSource,   // $8
+        finalImageUrl, // $9
+        startAtLocal,  // $10
+        endAtLocal,    // $11
+        noEnd,         // $12
+        page,          // $13
+        position,      // $14
+        priority,      // $15
       ];
 
       const updateSql = `
@@ -270,16 +295,17 @@ export async function saveSlot(req, res) {
           store_id      = $5,
           business_no   = $6,
           business_name = $7,
-          image_url     = $8,
-          start_at      = NULLIF($9,  '')::timestamp AT TIME ZONE '${TZ}',
-          end_at        = NULLIF($10, '')::timestamp AT TIME ZONE '${TZ}',
-          no_end        = $11,
+          table_source  = $8,
+          image_url     = $9,
+          start_at      = NULLIF($10,  '')::timestamp AT TIME ZONE '${TZ}',
+          end_at        = NULLIF($11, '')::timestamp AT TIME ZONE '${TZ}',
+          no_end        = $12,
           updated_at    = NOW()
-        WHERE page = $12
-          AND position = $13
+        WHERE page = $13
+          AND position = $14
           AND (
-            ($14::int IS NULL AND priority IS NULL)
-            OR priority = $14::int
+            ($15::int IS NULL AND priority IS NULL)
+            OR priority = $15::int
           )
         RETURNING id
       `;
@@ -291,15 +317,15 @@ export async function saveSlot(req, res) {
         INSERT INTO public.admin_ad_slots
           (page, position, priority, image_url, link_url,
            slot_type, slot_mode, text_content,
-           store_id, business_no, business_name,
+           store_id, business_no, business_name, table_source,
            start_at, end_at, no_end, created_at, updated_at)
         VALUES
           ($1, $2, $3, $4, $5,
            $6, $7, $8,
-           $9, $10, $11,
-           NULLIF($12, '')::timestamp AT TIME ZONE '${TZ}',
+           $9, $10, $11, $12,
            NULLIF($13, '')::timestamp AT TIME ZONE '${TZ}',
-           $14, NOW(), NOW())
+           NULLIF($14, '')::timestamp AT TIME ZONE '${TZ}',
+           $15, NOW(), NOW())
         RETURNING id
       `;
 
@@ -307,7 +333,7 @@ export async function saveSlot(req, res) {
         page, position, priority,
         finalImageUrl, linkUrl,
         slotType, slotMode, textContent,
-        storeId, businessNo, businessName,
+        storeId, businessNo, businessName, tableSource,
         startAtLocal, endAtLocal, noEnd,
       ]);
     }
@@ -434,6 +460,7 @@ export async function searchStore(req, res) {
       WITH candidates AS (
         SELECT
           s.id::text AS id,
+          'store_info' AS table_source,
           regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           s.business_name,
           COALESCE(s.business_category, '') AS category,
@@ -445,6 +472,7 @@ export async function searchStore(req, res) {
 
         SELECT
           c.id::text AS id,
+          'combined_store_info' AS table_source,
           regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           c.business_name,
           COALESCE(c.business_category, '') AS category,
@@ -456,6 +484,7 @@ export async function searchStore(req, res) {
 
         SELECT
           f.id::text AS id,
+          'food_stores' AS table_source,
           regexp_replace(COALESCE(f.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
           f.business_name,
           COALESCE(f.business_category, '') AS category,
@@ -463,8 +492,9 @@ export async function searchStore(req, res) {
         FROM public.food_stores f
         ${whereF}
       )
-      SELECT DISTINCT ON (id)
+      SELECT DISTINCT ON (table_source, id)
         candidates.id,
+        candidates.table_source,
         candidates.business_no,
         candidates.business_name,
         candidates.category,
@@ -477,7 +507,7 @@ export async function searchStore(req, res) {
         ORDER BY sort_order, id
         LIMIT 1
       ) img ON TRUE
-      ORDER BY candidates.id, candidates.business_name
+      ORDER BY candidates.table_source, candidates.id, candidates.business_name
       LIMIT 50;
     `;
 

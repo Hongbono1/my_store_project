@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>하늘식당 디버그</title>
+</head>
+<body>
+  <h1>하늘식당 업종 디버그</h1>
+  <div id="output"></div>
+  
+  <script>
+    async function checkHaneul() {
+      const output = document.getElementById('output');
+      
+      try {
+        // 1. 모든 파워 광고 슬롯 조회
+        output.innerHTML += '<h2>파워 광고 슬롯 조회</h2>';
+        for (let i = 1; i <= 9; i++) {
+          const res = await fetch(`/foodcategorymanager/ad/slot?page=foodcategory&position=food_power_${i}&t=${Date.now()}`);
+          const data = await res.json();
+          const slot = data.slot || data.data;
+          
+          if (slot && slot.business_name) {
+            output.innerHTML += `
+              <div style="border:1px solid #ccc; margin:10px; padding:10px;">
+                <h3>food_power_${i}</h3>
+                <p><strong>상호명:</strong> ${slot.business_name || 'N/A'}</p>
+                <p><strong>category (서버응답):</strong> ${slot.category || 'N/A'}</p>
+                <p><strong>business_type:</strong> ${slot.business_type || 'N/A'}</p>
+                <p><strong>business_category:</strong> ${slot.business_category || 'N/A'}</p>
+                <p><strong>store_id:</strong> ${slot.store_id || 'N/A'}</p>
+                <pre>${JSON.stringify(slot, null, 2)}</pre>
+              </div>
+            `;
+          }
+        }
+        
+        // 2. 하늘식당 ID로 직접 조회
+        output.innerHTML += '<h2>하늘식당 직접 조회 시도</h2>';
+        
+        // combined_store_info에서 하늘식당 찾기
+        const searchRes = await fetch('/combined/search?q=하늘');
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          output.innerHTML += `<pre>검색 결과: ${JSON.stringify(searchData, null, 2)}</pre>`;
+        }
+        
+      } catch (error) {
+        output.innerHTML += `<p style="color:red">에러: ${error.message}</p>`;
+      }
+    }
+    
+    checkHaneul();
+  </script>
+</body>
+</html>
