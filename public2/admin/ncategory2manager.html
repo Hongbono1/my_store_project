@@ -268,19 +268,30 @@
             </button>
 
             <!-- 파워 광고 -->
+            <!-- ✅ 강력 추천(파워 광고 9개) -->
             <section class="mt-10">
                 <h2 class="font-bold text-2xl text-purple-600 text-center mb-4">강력 추천</h2>
 
-                <div id="powerViewport" class="relative overflow-hidden">
-                    <div id="powerAdTrack"
-                        class="flex transition-transform duration-1000 ease-in-out will-change-transform"></div>
+                <div class="neo-card p-4">
+                    <div id="powerViewport" class="relative overflow-hidden">
+                        <div id="powerAdTrack"
+                            class="flex gap-4 transition-transform duration-700 ease-in-out will-change-transform">
+                            <!-- ✅ JS에서 파워 슬롯 9개 카드 생성 -->
+                        </div>
 
-                    <button id="prevBtn"
-                        class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur shadow rounded-full px-3 py-2 hover:bg-white transition"
-                        type="button">‹</button>
-                    <button id="nextBtn"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur shadow rounded-full px-3 py-2 hover:bg-white transition"
-                        type="button">›</button>
+                        <button id="prevBtn" type="button"
+                            class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-10 h-10 flex items-center justify-center font-extrabold">
+                            ‹
+                        </button>
+                        <button id="nextBtn" type="button"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-10 h-10 flex items-center justify-center font-extrabold">
+                            ›
+                        </button>
+                    </div>
+
+                    <p class="text-xs text-slate-600 mt-3 text-center">
+                        카드 클릭 → 모달 편집 → 저장
+                    </p>
                 </div>
             </section>
 
@@ -628,6 +639,8 @@
             root.innerHTML = rows.map(({ def, slot }) => bestCardHtml(def, slot)).join("");
         }
 
+
+
         // =========================
         // POWER 슬라이더
         // =========================
@@ -635,9 +648,6 @@
             position: `ncategory2_power_${i + 1}`,
             title: `파워 광고 ${i + 1}`,
         }));
-
-        let powerIndex = 0;
-        const POWER_PER_VIEW = 3;
 
         function powerCardHtml(def, slot) {
             const img = pickImg(slot);
@@ -720,6 +730,122 @@
         document.getElementById("prevBtn").addEventListener("click", powerPrev);
         document.getElementById("nextBtn").addEventListener("click", powerNext);
         window.addEventListener("resize", setPowerTransform);
+
+        // =========================
+        // ✅ 강력추천(파워 광고) 렌더
+        // =========================
+        const powerTrack = document.getElementById("powerAdTrack");
+        const powerViewport = document.getElementById("powerViewport");
+        const prevBtn = document.getElementById("prevBtn");
+        const nextBtn = document.getElementById("nextBtn");
+
+        let powerIndex = 0;
+        let powerPerView = 3;   // 화면에 보이는 개수
+        let powerStep = 2;      // 한 번에 이동하는 개수(원하면 바꿔)
+        let powerItemWidth = 0;
+        let powerTotal = 9;
+
+        function calcPowerPerView() {
+            const w = window.innerWidth;
+            if (w < 640) powerPerView = 1;
+            else if (w < 1024) powerPerView = 2;
+            else powerPerView = 3;
+
+            powerStep = Math.min(2, powerPerView); // 기본은 2개씩 이동
+        }
+
+        function applyPowerLayout() {
+            if (!powerViewport) return;
+            const viewportW = powerViewport.clientWidth;
+            powerItemWidth = Math.floor(viewportW / powerPerView);
+
+            [...powerTrack.children].forEach((el) => {
+                el.style.flex = `0 0 ${powerItemWidth}px`;
+            });
+
+            // 현재 인덱스 위치 반영
+            powerIndex = Math.max(0, Math.min(powerIndex, Math.max(0, powerTotal - powerPerView)));
+            powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
+        }
+
+        function powerCardHtml(def, slot) {
+            const img = slot?.image_url || "/uploads/no-image.png";
+            const text = slot?.text_content || "";
+            const link = slot?.link_url || "";
+
+            return `
+    <button
+      type="button"
+      class="neo-card p-3 text-left overflow-hidden"
+      data-position="${esc(def.position)}"
+      data-title="${esc(def.title)}"
+    >
+      <div class="font-extrabold text-sm mb-2">${esc(def.title)}</div>
+
+      <div class="neo-card p-0 overflow-hidden rounded-2xl">
+        <img src="${esc(img)}" class="w-full h-28 object-cover bg-white" alt="">
+      </div>
+
+      <div class="mt-2 text-sm font-bold text-slate-800 clamp-2">${esc(text)}</div>
+      <div class="mt-1 text-[11px] text-slate-500 break-all clamp-2">${esc(link)}</div>
+
+      <div class="mt-2 inline-flex items-center gap-2">
+        <span class="px-2 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold">편집</span>
+        <span class="text-xs text-slate-500">${esc(def.position)}</span>
+      </div>
+    </button>
+  `;
+        }
+
+        async function renderPowerAds() {
+            if (!powerTrack) return;
+
+            calcPowerPerView();
+
+            powerTrack.innerHTML = "";
+
+            // 파워 슬롯 9개 API로 불러와 카드 생성
+            for (const def of SLOT_DEFS.power) {
+                const data = await apiGetSlot(def.position);
+                const slot = data?.slot || null;
+                powerTrack.insertAdjacentHTML("beforeend", powerCardHtml(def, slot));
+            }
+
+            // ✅ 클릭 → 모달 열기 바인딩
+            powerTrack.querySelectorAll("[data-position]").forEach((btn) => {
+                btn.addEventListener("click", async () => {
+                    await openModal(btn.dataset.position, btn.dataset.title);
+                });
+            });
+
+            // 레이아웃 적용
+            powerTotal = SLOT_DEFS.power.length;
+            powerIndex = 0;
+            applyPowerLayout();
+        }
+
+        // 좌우 버튼
+        if (prevBtn) {
+            prevBtn.addEventListener("click", () => {
+                powerIndex -= powerStep;
+                if (powerIndex < 0) powerIndex = Math.max(0, powerTotal - powerPerView); // 끝으로
+                powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener("click", () => {
+                powerIndex += powerStep;
+                if (powerIndex > powerTotal - powerPerView) powerIndex = 0; // 처음으로
+                powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
+            });
+        }
+
+        // 리사이즈 대응
+        window.addEventListener("resize", () => {
+            calcPowerPerView();
+            applyPowerLayout();
+        });
 
         // =========================
         // ✅ 프리미엄/사이드/MVP/하단 슬롯 데이터 반영(일관성)
@@ -850,6 +976,7 @@
 
             hideModal();
             await boot();
+            await renderPowerAds();
         });
 
         document.getElementById("btnDelete").addEventListener("click", async () => {
@@ -865,6 +992,7 @@
 
             hideModal();
             await boot();
+            await renderPowerAds();
         });
 
         const s_q = document.getElementById("s_q");
@@ -934,6 +1062,7 @@
         }
 
         boot();
+        renderPowerAds();
     </script>
 </body>
 
