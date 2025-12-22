@@ -14,9 +14,7 @@ import {
 
 const router = express.Router();
 
-// ✅ ncategory2 전용 업로드 폴더
-const UPLOAD_ROOT = process.env.UPLOAD_DIR || "/data/uploads";
-const UPLOAD_DIR = path.join(UPLOAD_ROOT, "ncategory2_ad");
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "/data/uploads";
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -29,7 +27,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
 // ✅ image / slotImage 둘 다 허용 + saveSlot(req.file) 호환
