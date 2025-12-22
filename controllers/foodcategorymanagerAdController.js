@@ -146,6 +146,35 @@ async function fetchSlot({ page, position, priority }) {
   return rows[0] || null;
 }
 
+// -------------------- 슬롯 데이터 정규화 --------------------
+function normalizeSlotData(slot) {
+  if (!slot) return null;
+
+  // ✅ table_source → store_type 정규화
+  let storeType = slot.table_source ?? null;
+  if (storeType === "combined_store_info") {
+    storeType = "combined";
+  } else if (storeType === "food_stores") {
+    storeType = "food";
+  } else if (storeType === "store_info") {
+    storeType = "open"; // 또는 원하는 타입
+  }
+
+  // ✅ link_url 서버에서 재생성 (경로 통일)
+  let finalLinkUrl = slot.link_url ?? null;
+  const storeId = slot.store_id ?? null;
+
+  if (storeId && storeType) {
+    finalLinkUrl = `/ndetail.html?id=${storeId}&type=${storeType}`;
+  }
+
+  return {
+    ...slot,
+    store_type: storeType,
+    link_url: finalLinkUrl
+  };
+}
+
 // -------------------- GET /foodcategorymanager/ad/slot --------------------
 export async function getSlot(req, res) {
   try {
@@ -160,7 +189,10 @@ export async function getSlot(req, res) {
     const priority = priRaw ? Number(priRaw) : null;
     const slot = await fetchSlot({ page, position, priority });
 
-    return res.json({ success: true, slot });
+    // ✅ 슬롯 데이터 정규화
+    const normalizedSlot = normalizeSlotData(slot);
+
+    return res.json({ success: true, slot: normalizedSlot });
   } catch (e) {
     console.error("❌ getSlot error:", e);
     return res.status(500).json({ success: false, error: e.message || "server error" });

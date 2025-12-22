@@ -891,25 +891,27 @@
         console.log('서버 응답 데이터:', data);
 
         if (data.ok) {
-          // ✅ 사업자번호 우선 사용, 없으면 ID로 폴백
-          const bizNum = data.businessNumber || document.getElementById('businessNumber').value.trim();
-          const newId = data.id || data.store_id || data.storeId;
+          const link = (data.link_url || "").trim();
 
-          if (confirm('등록이 완료되었습니다!\n상세 페이지로 이동할까요?')) {
-            // ✅ 사업자번호가 있으면 사업자번호로, 없으면 ID로 이동
-            if (bizNum && bizNum.length === 10) {
-              window.location.href = `/ndetail.html?biz=${bizNum}&type=combined`;
-            } else if (newId) {
-              window.location.href = `/ndetail.html?id=${newId}&type=combined`;
-            } else {
-              alert('등록은 완료되었으나 정보를 찾을 수 없습니다.');
+          if (confirm("등록이 완료되었습니다!\n상세 페이지로 이동할까요?")) {
+            if (link) {
+              window.location.href = link; // ✅ 서버가 만든 표준 링크로만 이동
+              return;
             }
+
+            // ✅ link_url이 없을 때만 최후 폴백
+            const newId = data.id || data.store_id || data.storeId;
+            if (newId) {
+              window.location.href = `/ndetail.html?id=${newId}&type=combined`;
+              return;
+            }
+
+            alert("등록은 완료되었으나 이동 링크를 만들 수 없습니다.");
           }
         } else {
-          // ✅ 상세한 에러 메시지 표시
-          const errorMsg = data.message || data.error || '등록에 실패했습니다.';
+          const errorMsg = data.message || data.error || "등록에 실패했습니다.";
           alert(`등록 실패:\n${errorMsg}`);
-          console.error('등록 실패 상세:', data);
+          console.error("등록 실패 상세:", data);
         }
       } catch (err) {
         console.error('폼 제출 에러:', err);

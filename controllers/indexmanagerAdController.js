@@ -157,24 +157,38 @@ async function tableExists(client, tableName) {
 function mapSlotRow(r) {
   if (!r) return null;
 
+  // ✅ store_type 정규화: combined_store_info → combined
+  let normalizedStoreType = r.store_type ?? null;
+  if (normalizedStoreType === "combined_store_info") {
+    normalizedStoreType = "combined";
+  }
+
+  // ✅ link_url 서버에서 재생성 (경로 통일)
+  let finalLinkUrl = r.link_url ?? null;
+  const storeId = r.store_id ?? null;
+  
+  if (storeId && normalizedStoreType) {
+    finalLinkUrl = `/ndetail.html?id=${storeId}&type=${normalizedStoreType}`;
+  }
+
   return {
     page: r.page,
     position: r.position,
     priority: r.priority ?? null,
 
     image_url: normalizeImageUrl(r.image_url),
-    link_url: r.link_url ?? null,
+    link_url: finalLinkUrl,
     text_content: r.text_content ?? null,
 
     business_no: r.business_no ?? null,
     business_name: r.business_name ?? null,
-    store_id: r.store_id ?? null,
+    store_id: storeId,
 
     slot_type: r.slot_type ?? null,
     slot_mode: r.slot_mode ?? null,
 
-    // ✅ store_type 포함
-    store_type: r.store_type ?? null,
+    // ✅ 정규화된 store_type 반환
+    store_type: normalizedStoreType,
 
     no_end: r.no_end ?? false,
     start_at: r.start_at ?? null,

@@ -259,7 +259,16 @@ export async function createCombinedStore(req, res) {
     await client.query("COMMIT");
     console.log("[createCombinedStore] 성공:", storeId, "biz:", businessNumberDigits);
 
-    return res.json({ ok: true, id: storeId, businessNumber: businessNumberDigits });
+    // ✅ link_url 강제 포함 (서버가 이동 경로 보장)
+    const link_url = `/ndetail.html?id=${storeId}&type=combined`;
+
+    return res.json({
+      ok: true,
+      id: storeId,
+      businessNumber: businessNumberDigits,
+      store_type: "combined",
+      link_url,
+    });
   } catch (err) {
     try {
       await client.query("ROLLBACK");
