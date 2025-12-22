@@ -253,7 +253,7 @@
         <!-- 중앙 메인 -->
         <main class="col-span-9 space-y-8">
 
-            <!-- ✅ Premium (클릭되는 슬롯 버튼) -->
+            <!-- ✅ Premium -->
             <button id="slot_ncategory2_premium" data-position="ncategory2_premium" data-title="프리미엄 배너" type="button"
                 class="relative h-60 neo-card w-full flex items-center justify-center text-center overflow-hidden">
                 <img data-role="img" src="/uploads/no-image.png"
@@ -267,7 +267,6 @@
                 </div>
             </button>
 
-            <!-- 파워 광고 -->
             <!-- ✅ 강력 추천(파워 광고 9개) -->
             <section class="mt-10">
                 <h2 class="font-bold text-2xl text-purple-600 text-center mb-4">강력 추천</h2>
@@ -381,7 +380,7 @@
 
     <div id="footer-placeholder"></div>
 
-    <!-- ✅ 모달: neo-card/btn-3d로만 통일 -->
+    <!-- ✅ 모달 -->
     <div id="modal" class="fixed inset-0 hidden z-50">
         <div id="modalOverlay" class="absolute inset-0 bg-black/40"></div>
 
@@ -586,13 +585,11 @@
         const pickCategory = (slot) => slot?.category || slot?.business_category || slot?.store_category || "";
 
         // =========================
-        // ✅ 문서 전체 클릭 이벤트를 “한 방식”으로 통일
-        // data-position 가진 버튼이면 무조건 모달
+        // ✅ 문서 전체 클릭 이벤트 통일
         // =========================
         document.addEventListener("click", (e) => {
             const btn = e.target.closest("button[data-position]");
             if (!btn) return;
-            // 모달 내부 클릭은 제외(중첩 방지)
             if (btn.closest("#modal")) return;
             openModal(btn.dataset.position, btn.dataset.title || "슬롯");
         });
@@ -639,111 +636,23 @@
             root.innerHTML = rows.map(({ def, slot }) => bestCardHtml(def, slot)).join("");
         }
 
-
-
         // =========================
-        // POWER 슬라이더
+        // ✅ POWER(강력추천) - 하나의 방식으로만 동작 (9개 카드 확실히 생성)
         // =========================
         const POWER_DEFS = Array.from({ length: 9 }).map((_, i) => ({
             position: `ncategory2_power_${i + 1}`,
             title: `파워 광고 ${i + 1}`,
         }));
 
-        function powerCardHtml(def, slot) {
-            const img = pickImg(slot);
-            const name = pickName(slot);
-            const cat = pickCategory(slot);
-            return `
-        <button class="neo-card p-3 text-left w-full" data-position="${esc(def.position)}" data-title="${esc(def.title)}" type="button">
-          <div class="flex gap-3 items-center">
-            <div class="w-20 h-16 rounded-xl overflow-hidden bg-white shrink-0">
-              <img src="${esc(img)}" class="w-full h-full object-cover" alt="">
-            </div>
-            <div class="min-w-0 flex-1">
-              <div class="font-extrabold truncate">${esc(name)}</div>
-              <div class="text-xs text-slate-600 truncate">(${esc(cat || "업종")})</div>
-            </div>
-          </div>
-        </button>
-      `;
-        }
-
-        function setPowerTransform() {
-            const track = document.getElementById("powerAdTrack");
-            const viewport = document.getElementById("powerViewport");
-            if (!track || !viewport) return;
-            const w = viewport.clientWidth;
-            track.style.transform = `translateX(${-powerIndex * w}px)`;
-        }
-
-        async function renderPower() {
-            const track = document.getElementById("powerAdTrack");
-            const viewport = document.getElementById("powerViewport");
-            if (!track || !viewport) return;
-
-            track.innerHTML = "";
-            const slides = [];
-
-            const rows = await Promise.all(POWER_DEFS.map(async (def) => {
-                const { slot } = await apiGetSlot(def.position);
-                return { def, slot };
-            }));
-
-            for (let i = 0; i < rows.length; i += POWER_PER_VIEW) {
-                const slice = rows.slice(i, i + POWER_PER_VIEW);
-                slides.push(slice);
-            }
-
-            slides.forEach((group) => {
-                const slide = document.createElement("div");
-                slide.className = "w-full shrink-0 px-1";
-                slide.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 px-2">
-          ${group.map(({ def, slot }) => powerCardHtml(def, slot)).join("")}
-        </div>`;
-                track.appendChild(slide);
-            });
-
-            powerIndex = 0;
-            requestAnimationFrame(() => {
-                track.style.width = (viewport.clientWidth * slides.length) + "px";
-                setPowerTransform();
-            });
-        }
-
-        function powerNext() {
-            const viewport = document.getElementById("powerViewport");
-            const track = document.getElementById("powerAdTrack");
-            if (!viewport || !track) return;
-            const slideCount = track.children.length || 1;
-            powerIndex = (powerIndex + 1) % slideCount;
-            setPowerTransform();
-        }
-        function powerPrev() {
-            const viewport = document.getElementById("powerViewport");
-            const track = document.getElementById("powerAdTrack");
-            if (!viewport || !track) return;
-            const slideCount = track.children.length || 1;
-            powerIndex = (powerIndex - 1 + slideCount) % slideCount;
-            setPowerTransform();
-        }
-
-        document.getElementById("prevBtn").addEventListener("click", powerPrev);
-        document.getElementById("nextBtn").addEventListener("click", powerNext);
-        window.addEventListener("resize", setPowerTransform);
-
-        // =========================
-        // ✅ 강력추천(파워 광고) 렌더
-        // =========================
         const powerTrack = document.getElementById("powerAdTrack");
         const powerViewport = document.getElementById("powerViewport");
         const prevBtn = document.getElementById("prevBtn");
         const nextBtn = document.getElementById("nextBtn");
 
         let powerIndex = 0;
-        let powerPerView = 3;   // 화면에 보이는 개수
-        let powerStep = 2;      // 한 번에 이동하는 개수(원하면 바꿔)
-        let powerItemWidth = 0;
-        let powerTotal = 9;
+        let powerPerView = 3;  // 화면에 보이는 개수
+        let powerStep = 2;     // 버튼 누르면 2개씩 이동
+        let powerTotal = POWER_DEFS.length;
 
         function calcPowerPerView() {
             const w = window.innerWidth;
@@ -751,104 +660,125 @@
             else if (w < 1024) powerPerView = 2;
             else powerPerView = 3;
 
-            powerStep = Math.min(2, powerPerView); // 기본은 2개씩 이동
-        }
-
-        function applyPowerLayout() {
-            if (!powerViewport) return;
-            const viewportW = powerViewport.clientWidth;
-            powerItemWidth = Math.floor(viewportW / powerPerView);
-
-            [...powerTrack.children].forEach((el) => {
-                el.style.flex = `0 0 ${powerItemWidth}px`;
-            });
-
-            // 현재 인덱스 위치 반영
-            powerIndex = Math.max(0, Math.min(powerIndex, Math.max(0, powerTotal - powerPerView)));
-            powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
+            // 기본은 2개씩 이동(단, 1개만 보일 때는 1개씩)
+            powerStep = (powerPerView === 1) ? 1 : 2;
         }
 
         function powerCardHtml(def, slot) {
-            const img = slot?.image_url || "/uploads/no-image.png";
-            const text = slot?.text_content || "";
-            const link = slot?.link_url || "";
+            const img = pickImg(slot);
+            const name = pickName(slot);
+            const cat = pickCategory(slot);
+            const text = pickText(slot);
+            const link = pickLink(slot);
 
             return `
-    <button
-      type="button"
-      class="neo-card p-3 text-left overflow-hidden"
-      data-position="${esc(def.position)}"
-      data-title="${esc(def.title)}"
-    >
-      <div class="font-extrabold text-sm mb-2">${esc(def.title)}</div>
+              <button
+                type="button"
+                class="neo-card p-3 text-left overflow-hidden"
+                data-position="${esc(def.position)}"
+                data-title="${esc(def.title)}"
+              >
+                <div class="font-extrabold text-sm mb-2">${esc(def.title)}</div>
 
-      <div class="neo-card p-0 overflow-hidden rounded-2xl">
-        <img src="${esc(img)}" class="w-full h-28 object-cover bg-white" alt="">
-      </div>
+                <div class="neo-card p-0 overflow-hidden rounded-2xl bg-white">
+                  <img src="${esc(img)}" class="w-full h-28 object-cover" alt="">
+                </div>
 
-      <div class="mt-2 text-sm font-bold text-slate-800 clamp-2">${esc(text)}</div>
-      <div class="mt-1 text-[11px] text-slate-500 break-all clamp-2">${esc(link)}</div>
+                <div class="mt-2">
+                  <div class="font-extrabold truncate">${esc(name)}</div>
+                  <div class="text-xs text-slate-600 truncate">(${esc(cat || "업종")})</div>
+                  <div class="text-xs text-slate-600 mt-1 clamp-2">${esc(text || "")}</div>
+                  <div class="text-[11px] text-slate-500 mt-1 break-all clamp-2">${esc(link || "")}</div>
+                </div>
 
-      <div class="mt-2 inline-flex items-center gap-2">
-        <span class="px-2 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold">편집</span>
-        <span class="text-xs text-slate-500">${esc(def.position)}</span>
-      </div>
-    </button>
-  `;
+                <div class="mt-2 inline-flex items-center gap-2">
+                  <span class="px-2 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold">편집</span>
+                  <span class="text-xs text-slate-500">${esc(def.position)}</span>
+                </div>
+              </button>
+            `;
+        }
+
+        function setPowerTransformByIndex() {
+            if (!powerTrack) return;
+            const child = powerTrack.children[powerIndex];
+            if (!child) {
+                powerTrack.style.transform = "translateX(0px)";
+                return;
+            }
+            powerTrack.style.transform = `translateX(${-child.offsetLeft}px)`;
+        }
+
+        function applyPowerLayout() {
+            if (!powerViewport || !powerTrack) return;
+
+            const viewportW = powerViewport.clientWidth;
+            const gapPx = 16; // gap-4 = 1rem = 16px
+            const itemW = Math.floor((viewportW - gapPx * (powerPerView - 1)) / powerPerView);
+
+            [...powerTrack.children].forEach((el) => {
+                el.style.flex = `0 0 ${itemW}px`;
+            });
+
+            const maxIndex = Math.max(0, powerTotal - powerPerView);
+            if (powerIndex > maxIndex) powerIndex = maxIndex;
+
+            requestAnimationFrame(setPowerTransformByIndex);
+        }
+
+        function powerPrev() {
+            const maxIndex = Math.max(0, powerTotal - powerPerView);
+            if (maxIndex === 0) return;
+
+            powerIndex -= powerStep;
+            if (powerIndex < 0) powerIndex = maxIndex; // 끝으로
+            setPowerTransformByIndex();
+        }
+
+        function powerNext() {
+            const maxIndex = Math.max(0, powerTotal - powerPerView);
+            if (maxIndex === 0) return;
+
+            powerIndex += powerStep;
+            if (powerIndex > maxIndex) powerIndex = 0; // 처음으로
+            setPowerTransformByIndex();
         }
 
         async function renderPowerAds() {
             if (!powerTrack) return;
 
             calcPowerPerView();
-
             powerTrack.innerHTML = "";
 
-            // 파워 슬롯 9개 API로 불러와 카드 생성
-            for (const def of SLOT_DEFS.power) {
-                const data = await apiGetSlot(def.position);
-                const slot = data?.slot || null;
+            // ✅ 9개 슬롯을 동시에 불러와 렌더(에러/지연에도 안전)
+            const rows = await Promise.all(POWER_DEFS.map(async (def) => {
+                const { slot } = await apiGetSlot(def.position);
+                return { def, slot };
+            }));
+
+            rows.forEach(({ def, slot }) => {
                 powerTrack.insertAdjacentHTML("beforeend", powerCardHtml(def, slot));
-            }
-
-            // ✅ 클릭 → 모달 열기 바인딩
-            powerTrack.querySelectorAll("[data-position]").forEach((btn) => {
-                btn.addEventListener("click", async () => {
-                    await openModal(btn.dataset.position, btn.dataset.title);
-                });
             });
 
-            // 레이아웃 적용
-            powerTotal = SLOT_DEFS.power.length;
+            powerTotal = POWER_DEFS.length;
             powerIndex = 0;
-            applyPowerLayout();
-        }
 
-        // 좌우 버튼
-        if (prevBtn) {
-            prevBtn.addEventListener("click", () => {
-                powerIndex -= powerStep;
-                if (powerIndex < 0) powerIndex = Math.max(0, powerTotal - powerPerView); // 끝으로
-                powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
+            // ✅ 레이아웃 적용 후 첫 위치 정렬
+            requestAnimationFrame(() => {
+                applyPowerLayout();
+                setPowerTransformByIndex();
             });
         }
 
-        if (nextBtn) {
-            nextBtn.addEventListener("click", () => {
-                powerIndex += powerStep;
-                if (powerIndex > powerTotal - powerPerView) powerIndex = 0; // 처음으로
-                powerTrack.style.transform = `translateX(${-powerIndex * powerItemWidth}px)`;
-            });
-        }
-
-        // 리사이즈 대응
+        if (prevBtn) prevBtn.addEventListener("click", powerPrev);
+        if (nextBtn) nextBtn.addEventListener("click", powerNext);
         window.addEventListener("resize", () => {
             calcPowerPerView();
             applyPowerLayout();
         });
 
         // =========================
-        // ✅ 프리미엄/사이드/MVP/하단 슬롯 데이터 반영(일관성)
+        // ✅ 프리미엄/사이드/MVP/하단 슬롯 데이터 반영
         // =========================
         async function renderStaticSlots() {
             const list = [
@@ -867,7 +797,6 @@
 
                 const { slot } = await apiGetSlot(def.position);
 
-                // 공통: img/text/link
                 const imgEl = el.querySelector('[data-role="img"]');
                 const textEl = el.querySelector('[data-role="text"]');
                 const linkEl = el.querySelector('[data-role="link"]');
@@ -876,7 +805,6 @@
                 if (textEl) textEl.textContent = pickText(slot) || (def.position === "ncategory2_premium" ? "클릭해서 배너 텍스트/링크/이미지 편집" : "");
                 if (linkEl) linkEl.textContent = pickLink(slot) || "";
 
-                // MVP/HIGHLIGHT 전용 표시
                 if (def.position === "ncategory2_mvp" || def.position === "ncategory2_highlight") {
                     const nameEl = el.querySelector('[data-role="name"]');
                     const catEl = el.querySelector('[data-role="cat"]');
@@ -976,7 +904,6 @@
 
             hideModal();
             await boot();
-            await renderPowerAds();
         });
 
         document.getElementById("btnDelete").addEventListener("click", async () => {
@@ -992,7 +919,6 @@
 
             hideModal();
             await boot();
-            await renderPowerAds();
         });
 
         const s_q = document.getElementById("s_q");
@@ -1057,12 +983,10 @@
         async function boot() {
             await renderStaticSlots();
             await renderBest();
-            await renderPower();
-            setPowerTransform();
+            await renderPowerAds();
         }
 
         boot();
-        renderPowerAds();
     </script>
 </body>
 
