@@ -48,6 +48,8 @@ import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
+import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
+
 
 import pool from "./db.js";
 
@@ -133,6 +135,7 @@ const uploadDirs = [
   path.join(UPLOAD_ROOT, "traditionalmarket"),
   path.join(UPLOAD_ROOT, "performingart"),
   path.join(UPLOAD_ROOT, "manager_ad"), // ✅ indexmanager 광고 업로드 폴더
+  path.join(UPLOAD_ROOT, "ncategory2_ad"), // ✅ ncategory2 광고 업로드 폴더
 ];
 
 uploadDirs.forEach((dir) => {
@@ -364,6 +367,9 @@ app.use("/manager/ad", indexmanagerAdRouter);
 
 // ✅ FOOD CATEGORY 관리자 API (새 경로로 분리)
 app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
+
+// ✅ NCATEGORY2 관리자 API (추가만)
+app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
