@@ -80,7 +80,6 @@
             width: 100%;
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid rgba(148, 163, 184, 0.7);
-            /* slate-400 느낌 */
             border-radius: 0.9rem;
             padding: 0.55rem 0.85rem;
             box-shadow:
@@ -103,7 +102,6 @@
                 0 2px 10px rgba(15, 23, 42, 0.06);
         }
 
-        /* 파일 인풋도 너무 허전하면 */
         .filefield {
             width: 100%;
             padding: 0.35rem 0;
@@ -452,7 +450,8 @@
             }
         </style>
 
-        <div class="relative mx-auto mt-10 w-[95vw] max-w-4xl neo-card p-6">
+        <!-- ✅ 변경: 모달 자체 스크롤 추가 (max-h + overflow-y) -->
+        <div class="relative mx-auto mt-10 w-[95vw] max-w-4xl neo-card p-6 max-h-[85vh] overflow-y-auto">
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h3 id="modalTitle" class="text-xl font-extrabold text-blue-700">슬롯 편집</h3>
@@ -491,12 +490,13 @@
                 <!-- ✅ 편집폼 (가게 검색을 위로 올림) -->
                 <div class="lg:col-span-7 space-y-4">
 
-                    <!-- ✅ 가게 검색 (슬롯 기본 정보 위로 배치 + 텍스트 입력 추가) -->
+                    <!-- ✅ 가게 검색 -->
                     <div class="neo-card p-4">
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <div class="text-sm font-extrabold">가게 검색</div>
                                 <div class="text-[11px] text-slate-600 mt-1">검색 후 “선택”하면 텍스트/링크 자동 입력</div>
+                                <div class="text-[11px] text-slate-500 mt-1">※ combined_store_info(=combined)만 표시</div>
                             </div>
                             <button id="btnSearch" class="btn-3d" type="button">검색</button>
                         </div>
@@ -512,7 +512,6 @@
                             </div>
                         </div>
 
-                        <!-- ✅ 추가: 검색 영역에서 직접 텍스트 입력(선택 입력용) -->
                         <div class="mt-3">
                             <div class="text-xs font-bold text-slate-700">텍스트 입력(선택)</div>
                             <div class="text-[11px] text-slate-500 mt-1">가게 연결 없이 텍스트만 넣고 싶을 때 사용</div>
@@ -527,10 +526,16 @@
                             </div>
                         </div>
 
-                        <div id="searchResults" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        <!-- ✅ 변경: 검색 결과 영역에 스크롤 추가 + 박스(카드) 형태 제거용 리스트 스타일 -->
+                        <div class="mt-4 neo-card p-3">
+                            <div class="text-xs font-extrabold text-slate-700 mb-2">검색 결과</div>
+                            <div id="searchResults" class="max-h-64 overflow-y-auto divide-y divide-slate-200/80">
+                                <!-- JS 렌더 -->
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- ✅ 슬롯 기본 정보 (아래로 내려옴) -->
+                    <!-- ✅ 슬롯 기본 정보 -->
                     <div class="neo-card p-4">
                         <div class="text-sm font-extrabold mb-3">슬롯 기본 정보</div>
 
@@ -587,11 +592,9 @@
                     <div id="modalMsg" class="text-xs text-slate-600"></div>
                 </div>
 
-
                 <div id="modalMsg" class="text-xs text-slate-600"></div>
             </div>
         </div>
-    </div>
     </div>
 
     <script>
@@ -737,8 +740,8 @@
         const nextBtn = document.getElementById("nextBtn");
 
         let powerIndex = 0;
-        let powerPerView = 3;  // 화면에 보이는 개수
-        let powerStep = 2;     // 버튼 누르면 2개씩 이동
+        let powerPerView = 3;
+        let powerStep = 2;
         let powerTotal = POWER_DEFS.length;
 
         function calcPowerPerView() {
@@ -747,7 +750,6 @@
             else if (w < 1024) powerPerView = 2;
             else powerPerView = 3;
 
-            // 기본은 2개씩 이동(단, 1개만 보일 때는 1개씩)
             powerStep = (powerPerView === 1) ? 1 : 2;
         }
 
@@ -800,7 +802,7 @@
             if (!powerViewport || !powerTrack) return;
 
             const viewportW = powerViewport.clientWidth;
-            const gapPx = 16; // gap-4 = 1rem = 16px
+            const gapPx = 16;
             const itemW = Math.floor((viewportW - gapPx * (powerPerView - 1)) / powerPerView);
 
             [...powerTrack.children].forEach((el) => {
@@ -818,7 +820,7 @@
             if (maxIndex === 0) return;
 
             powerIndex -= powerStep;
-            if (powerIndex < 0) powerIndex = maxIndex; // 끝으로
+            if (powerIndex < 0) powerIndex = maxIndex;
             setPowerTransformByIndex();
         }
 
@@ -827,7 +829,7 @@
             if (maxIndex === 0) return;
 
             powerIndex += powerStep;
-            if (powerIndex > maxIndex) powerIndex = 0; // 처음으로
+            if (powerIndex > maxIndex) powerIndex = 0;
             setPowerTransformByIndex();
         }
 
@@ -837,7 +839,6 @@
             calcPowerPerView();
             powerTrack.innerHTML = "";
 
-            // ✅ 9개 슬롯을 동시에 불러와 렌더(에러/지연에도 안전)
             const rows = await Promise.all(POWER_DEFS.map(async (def) => {
                 const { slot } = await apiGetSlot(def.position);
                 return { def, slot };
@@ -850,7 +851,6 @@
             powerTotal = POWER_DEFS.length;
             powerIndex = 0;
 
-            // ✅ 레이아웃 적용 후 첫 위치 정렬
             requestAnimationFrame(() => {
                 applyPowerLayout();
                 setPowerTransformByIndex();
@@ -1028,6 +1028,12 @@
         bindEnterSearch(s_q);
         bindEnterSearch(s_biz);
 
+        // ✅ 추가: combined_store_info만 보이게 필터 함수
+        function isCombinedOnly(store) {
+            const t = String(store?.store_type || store?.detail_type || store?.type || "").toLowerCase().trim();
+            return (t === "combined" || t === "combined_store_info");
+        }
+
         document.getElementById("btnSearch").addEventListener("click", async () => {
             setMsg("검색 중...");
 
@@ -1038,33 +1044,46 @@
             const root = document.getElementById("searchResults");
             root.innerHTML = "";
 
-            const stores = data?.stores || [];
+            const allStores = data?.stores || [];
+            const stores = allStores.filter(isCombinedOnly);
+
             if (stores.length === 0) {
-                root.innerHTML = `<div class="text-sm text-slate-600">검색 결과 없음</div>`;
+                root.innerHTML = `<div class="text-sm text-slate-600 py-2">combined_store_info 결과 없음</div>`;
                 setMsg("");
                 return;
             }
 
-            stores.forEach(s => {
-                const link = buildStoreLink(s.store_type, s.id);
+            // ✅ 변경: "박스(카드) 형태" 제거하고 한 줄 리스트 스타일로 렌더
+            stores.forEach((s) => {
+                const name = s.business_name || "";
+                const cat = s.category || "";
+                const bizNo = s.business_no || "";
+                const link = buildStoreLink(s.store_type, s.id); // 화면엔 안 보여도 선택 시 자동 입력
 
-                const card = document.createElement("div");
-                card.className = "neo-card p-3";
-                card.innerHTML = `
-          <div class="font-extrabold">${esc(s.business_name || "")}</div>
-          <div class="text-xs text-slate-600 mt-1">${esc(s.category || "")}</div>
-          <div class="text-[11px] text-slate-500 mt-1">사업자: ${esc(s.business_no || "")}</div>
-          <div class="text-[11px] text-slate-500 mt-1 break-all">링크: ${esc(link)}</div>
-          <button class="mt-2 px-3 py-1 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700" type="button">선택</button>
-        `;
+                const row = document.createElement("div");
+                row.className = "py-2 flex items-center justify-between gap-3";
 
-                card.querySelector("button").addEventListener("click", () => {
-                    f_text.value = s.business_name || "";
+                row.innerHTML = `
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <div class="font-extrabold truncate">${esc(name)}</div>
+                      <span class="text-xs text-slate-400">|</span>
+                      <div class="text-sm text-slate-700 truncate">${esc(cat)}</div>
+                    </div>
+                    <div class="text-[11px] text-slate-500 mt-1">사업자: ${esc(bizNo)}</div>
+                  </div>
+                  <button class="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700 shrink-0" type="button">
+                    선택
+                  </button>
+                `;
+
+                row.querySelector("button").addEventListener("click", () => {
+                    f_text.value = name;
                     f_link.value = link;
                     syncPreview();
                 });
 
-                root.appendChild(card);
+                root.appendChild(row);
             });
 
             setMsg("");
