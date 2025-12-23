@@ -1000,7 +1000,7 @@
             console.log("[DEBUG] modalEl:", modalEl, "classList:", modalEl?.classList);
             modalEl?.classList.remove("hidden");
             console.log("[DEBUG] 모달 hidden 클래스 제거 완료");
-            
+
             if (el("slotModalSub")) {
                 el("slotModalSub").textContent =
                     `page=${state.currentKey.page} / position=${state.currentKey.position}` +
@@ -1018,7 +1018,54 @@
         }
 
         function closeSlotModal() {
-            el("slotModal")?.classList.add("hidden");
+            const modal = el("slotModal");
+            if (!modal) return;
+            modal.classList.add("hidden");
+        }
+
+        // ✅ 모달 닫기 이벤트 바인딩(닫기버튼/배경/ESC)
+        function bindModalCloseEvents() {
+            const modal = el("slotModal");
+            if (!modal) return;
+
+            // 1) 닫기 버튼들(아이디가 다를 수도 있어서 안전하게 2개 지원)
+            const closeBtn = el("slotModalCloseBtn") || el("m_closeBtn");
+            if (closeBtn) {
+                closeBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeSlotModal();
+                });
+            }
+
+            // 2) 배경 클릭(Backdrop에 id가 있으면 우선, 없으면 modal 자체에서 처리)
+            const backdrop = el("slotModalBackdrop");
+            if (backdrop) {
+                backdrop.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeSlotModal();
+                });
+            } else {
+                // 백드랍 id가 없으면: 모달 바깥 영역 클릭 시 닫기
+                modal.addEventListener("mousedown", (e) => {
+                    if (e.target === modal) closeSlotModal();
+                });
+            }
+
+            // 3) ESC 닫기
+            document.addEventListener("keydown", (e) => {
+                if (e.key !== "Escape") return;
+                if (modal.classList.contains("hidden")) return;
+                closeSlotModal();
+            });
+
+            // 4) 모달 안에서 click이 바깥으로 전파돼서 닫히는 문제 방지(필요시)
+            const panel = el("slotModalPanel");
+            if (panel) {
+                panel.addEventListener("mousedown", (e) => e.stopPropagation());
+                panel.addEventListener("click", (e) => e.stopPropagation());
+            }
         }
 
         async function loadSlotIntoModal() {
@@ -1252,6 +1299,7 @@
 
         // ---------- init ----------
         document.addEventListener("DOMContentLoaded", async () => {
+            bindModalCloseEvents();
             buildPowerSliderDom();
             buildBestGridDom();
             bindAdminClicks();
