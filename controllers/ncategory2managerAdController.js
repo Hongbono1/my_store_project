@@ -1,374 +1,256 @@
-// controllers/ncategory2managerAdController.js
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 import pool from "../db.js";
+
+export const UPLOAD_SUBDIR = "manager_ad";
+export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
+export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
+
+// ✅ 테이블(푸드 매니저와 동일하게 쓰는 전제)
+// - 컬럼명이 다르면 여기 SQL의 컬럼만 Neon에 맞게 바꾸면 됨.
+const SLOTS_TABLE = "public.admin_ad_slots";
+
+function ensureUploadDir() {
+  fs.mkdirSync(UPLOAD_ABS_DIR, { recursive: true });
+}
 
 function clean(v) {
   if (v === undefined || v === null) return "";
   return String(v).trim();
 }
 
-function toBool(v) {
-  const s = String(v ?? "").toLowerCase().trim();
-  return s === "true" || s === "1" || s === "yes" || s === "y" || s === "on";
-}
-
 function digitsOnly(v) {
   return clean(v).replace(/[^\d]/g, "");
 }
 
-function toDateOrNull(v) {
-  const s = clean(v);
-  if (!s) return null;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  return s.slice(0, 10);
+function safeInt(v) {
+  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
-const TABLE = "public.admin_ad_slots";
+function nowIso() {
+  return new Date().toISOString();
+}
 
-/* ------------------------------------------------------------------
- * slot_type 체크제약 자동 적응 (DB 허용값을 런타임에 읽어서 캐싱)
- *  - 네 로그처럼 "image"가 막힐 수 있으니, 허용값 중 가장 적합한 값을 선택
- * ------------------------------------------------------------------ */
-let _slotTypeAllowedCache = null;
+/** multer storage factory */
+export function makeMulterStorage() {
+  ensureUploadDir();
 
-async function getAllowedSlotTypes() {
-  if (_slotTypeAllowedCache) return _slotTypeAllowedCache;
+  return {
+    destination: (_req, _file, cb) => cb(null, UPLOAD_ABS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const name = `${Date.now()}_${crypto.randomBytes(6).toString("hex")}${ext || ""}`;
+      cb(null, name);
+    },
+  };
+}
 
+export function fileFilter(_req, file, cb) {
+  const ok = /^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.mimetype || "");
+  if (!ok) return cb(new Error("Only image files are allowed"));
+  cb(null, true);
+}
+
+/** GET /slots */
+export async function listSlots(req, res) {
   try {
-    const { rows } = await pool.query(
-      `
-      SELECT pg_get_constraintdef(c.oid) AS def
-      FROM pg_constraint c
-      JOIN pg_class t ON t.oid = c.conrelid
-      JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE n.nspname='public'
-        AND t.relname='admin_ad_slots'
-        AND c.conname='admin_ad_slots_slot_type_check'
-      LIMIT 1
-      `
-    );
-
-    const def = rows[0]?.def || "";
-    // 예: CHECK ((slot_type = ANY (ARRAY['text'::text, 'img'::text])))
-    // 또는: CHECK ((slot_type IN ('text','img')))
-    const found = [];
-    const re = /'([^']+)'/g;
-    let m;
-    while ((m = re.exec(def))) {
-      if (m[1]) found.push(m[1]);
-    }
-
-    _slotTypeAllowedCache = found.length ? Array.from(new Set(found)) : null;
-    return _slotTypeAllowedCache;
+    // page='ncategory2' 기준으로 불러오되,
+    // 테이블에 page 컬럼이 없으면 WHERE 절을 제거해서 쓰면 됨.
+    const sql = `
+      SELECT
+        position,
+        page,
+        slot_type,
+        slot_mode,
+        store_type,
+        store_id,
+        business_no,
+        business_name,
+        category,
+        image_url,
+        text_content,
+        link_url,
+        updated_at
+      FROM ${SLOTS_TABLE}
+      WHERE page = 'ncategory2'
+      ORDER BY position ASC
+    `;
+    const { rows } = await pool.query(sql);
+    return res.json({ success: true, slots: rows });
   } catch (e) {
-    // 체크제약을 못 읽어도 서버는 살아야 함
-    _slotTypeAllowedCache = null;
-    return null;
+    return res.status(500).json({ success: false, error: e.message });
   }
 }
 
-function pickBestSlotType(allowed, wantImage) {
-  // allowed가 있으면 그 안에서 선택
-  if (Array.isArray(allowed) && allowed.length) {
-    const lower = allowed.map((x) => String(x).toLowerCase());
-    const mapBack = (valLower) => allowed[lower.indexOf(valLower)];
-
-    if (wantImage) {
-      // 흔한 후보 순서: img > image > photo > banner ...
-      for (const cand of ["img", "image", "photo", "banner", "picture"]) {
-        const idx = lower.indexOf(cand);
-        if (idx >= 0) return mapBack(cand);
-      }
-      // 이미지용이 딱히 없으면 첫 번째 허용값
-      return allowed[0];
-    }
-
-    // 텍스트 후보: text > title > content ...
-    for (const cand of ["text", "title", "content", "label"]) {
-      const idx = lower.indexOf(cand);
-      if (idx >= 0) return mapBack(cand);
-    }
-    return allowed[0];
-  }
-
-  // allowed를 못 읽으면 (fallback) 일단 text/img 우선
-  return wantImage ? "img" : "text";
-}
-
-// multer가 single/any 어떤 방식이든 파일명 뽑기
-function getUploadedFileName(req) {
-  if (req.file?.filename) return req.file.filename;
-  if (Array.isArray(req.files) && req.files.length) {
-    // slotImage 필드 우선
-    const picked =
-      req.files.find((f) => f.fieldname === "slotImage") ||
-      req.files[0];
-    return picked?.filename || "";
-  }
-  return "";
-}
-
-// ✅ 슬롯 조회
+/** GET /slot?position=... */
 export async function getSlot(req, res) {
   try {
-    const page = clean(req.query.page);
     const position = clean(req.query.position);
-    const priority = Number(req.query.priority ?? 1) || 1;
+    if (!position) return res.json({ success: true, slot: null });
 
-    if (!page || !position) {
-      return res.status(400).json({ ok: false, message: "page/position required" });
-    }
-
-    const { rows } = await pool.query(
-      `
+    const sql = `
       SELECT
-        page,
         position,
-        priority,
-        COALESCE(slot_type,'') AS slot_type,
-        COALESCE(text_content,'') AS text_content,
-        COALESCE(image_url,'') AS image_url,
-        COALESCE(link_url,'') AS link_url,
-        COALESCE(store_type,'') AS store_type,
-        COALESCE(store_id,'') AS store_id,
-        COALESCE(business_name,'') AS business_name,
-        start_at,
-        end_at,
-        COALESCE(no_end,false) AS no_end,
-        created_at,
+        page,
+        slot_type,
+        slot_mode,
+        store_type,
+        store_id,
+        business_no,
+        business_name,
+        category,
+        image_url,
+        text_content,
+        link_url,
         updated_at
-      FROM ${TABLE}
-      WHERE page=$1 AND position=$2 AND priority=$3
+      FROM ${SLOTS_TABLE}
+      WHERE page = 'ncategory2' AND position = $1
       LIMIT 1
-      `,
-      [page, position, priority]
-    );
-
-    return res.json({ ok: true, slot: rows[0] || null });
-  } catch (err) {
-    console.error("[ncategory2manager] getSlot error:", err);
-    return res.status(500).json({ ok: false, message: err.message });
+    `;
+    const { rows } = await pool.query(sql, [position]);
+    return res.json({ success: true, slot: rows[0] || null });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 }
 
-// ✅ 슬롯 저장(업서트) - slot_type NOT NULL + 체크제약 대응 포함
-export async function saveSlot(req, res) {
-  try {
-    const page = clean(req.body.page);
-    const position = clean(req.body.position);
-    const priority = Number(req.body.priority ?? 1) || 1;
-
-    if (!page || !position) {
-      return res.status(400).json({ ok: false, message: "page/position required" });
-    }
-
-    const text_content = clean(req.body.text_content);
-    const link_url = clean(req.body.link_url);
-    const start_at = toDateOrNull(req.body.start_at);
-    const end_at = toDateOrNull(req.body.end_at);
-    const no_end = toBool(req.body.no_end);
-
-    // ✅ 가게 선택 정보 (재발 방지)
-    const store_type = clean(req.body.store_type);
-    const store_id = clean(req.body.store_id);
-    const business_name = clean(req.body.business_name);
-
-    // ✅ 기존값 조회(이미지/slot_type 유지용)
-    const prev = await pool.query(
-      `
-      SELECT
-        COALESCE(image_url,'') AS image_url,
-        COALESCE(slot_type,'') AS slot_type
-      FROM ${TABLE}
-      WHERE page=$1 AND position=$2 AND priority=$3
-      LIMIT 1
-      `,
-      [page, position, priority]
-    );
-
-    const prevImage = prev.rows[0]?.image_url || "";
-    const prevSlotType = prev.rows[0]?.slot_type || "";
-
-    // ✅ 업로드된 이미지가 있으면 /uploads/파일명으로 저장
-    let image_url = "";
-    const uploaded = getUploadedFileName(req);
-    if (uploaded) {
-      image_url = `/uploads/${uploaded}`;
-    } else {
-      image_url = prevImage || "";
-    }
-
-    // ✅ no_end=true면 end_at은 null
-    const finalEndAt = no_end ? null : end_at;
-
-    // ✅ slot_type 보정:
-    //   - 프론트가 slot_type을 보내면 우선 (단, DB 허용값에 맞춰 재보정)
-    //   - 없으면 기존값
-    //   - 없으면 이미지 여부로 자동
-    const reqSlotTypeRaw = clean(req.body.slot_type);
-    const wantImage = !!image_url;
-
-    const allowed = await getAllowedSlotTypes();
-
-    // 요청값이 있으면 그것도 "허용값에 맞춰" 교정
-    let slot_type = "";
-    if (reqSlotTypeRaw) {
-      // image -> img 같은 흔한 변환도 여기서 같이 처리
-      const low = reqSlotTypeRaw.toLowerCase();
-      const normalized =
-        low === "image" ? "img" :
-        low === "사진" ? "img" :
-        low;
-      // allowed가 있으면 allowed 내에서 가장 근접한 걸 택하고, 없으면 normalized 사용
-      if (Array.isArray(allowed) && allowed.length) {
-        const lowerAllowed = allowed.map((x) => String(x).toLowerCase());
-        const idx = lowerAllowed.indexOf(normalized);
-        slot_type = idx >= 0 ? allowed[idx] : pickBestSlotType(allowed, wantImage);
-      } else {
-        slot_type = normalized;
-      }
-    } else if (prevSlotType) {
-      // 기존값이 있는데도 allowed가 있으면 안전하게 검증/교정
-      if (Array.isArray(allowed) && allowed.length) {
-        const lowerAllowed = allowed.map((x) => String(x).toLowerCase());
-        const idx = lowerAllowed.indexOf(String(prevSlotType).toLowerCase());
-        slot_type = idx >= 0 ? allowed[idx] : pickBestSlotType(allowed, wantImage);
-      } else {
-        slot_type = prevSlotType;
-      }
-    } else {
-      slot_type = pickBestSlotType(allowed, wantImage);
-    }
-
-    // ✅ 최종적으로 빈값이면 무조건 fallback
-    if (!slot_type) slot_type = wantImage ? "img" : "text";
-
-    // ✅ upsert
-    try {
-      await pool.query(
-        `
-        INSERT INTO ${TABLE}
-          (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, store_type, store_id, business_name, updated_at)
-        VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
-        ON CONFLICT (page, position, priority)
-        DO UPDATE SET
-          slot_type=EXCLUDED.slot_type,
-          text_content=EXCLUDED.text_content,
-          image_url=EXCLUDED.image_url,
-          link_url=EXCLUDED.link_url,
-          start_at=EXCLUDED.start_at,
-          end_at=EXCLUDED.end_at,
-          no_end=EXCLUDED.no_end,
-          store_type=EXCLUDED.store_type,
-          store_id=EXCLUDED.store_id,
-          business_name=EXCLUDED.business_name,
-          updated_at=NOW()
-        `,
-        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
-      );
-    } catch (e) {
-      // fallback: update 먼저, 안되면 insert
-      const upd = await pool.query(
-        `
-        UPDATE ${TABLE}
-        SET
-          slot_type=$4,
-          text_content=$5,
-          image_url=$6,
-          link_url=$7,
-          start_at=$8,
-          end_at=$9,
-          no_end=$10,
-          store_type=$11,
-          store_id=$12,
-          business_name=$13,
-          updated_at=NOW()
-        WHERE page=$1 AND position=$2 AND priority=$3
-        `,
-        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
-      );
-
-      if (upd.rowCount === 0) {
-        await pool.query(
-          `
-          INSERT INTO ${TABLE}
-            (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, store_type, store_id, business_name, created_at, updated_at)
-          VALUES
-            ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
-          `,
-          [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
-        );
-      }
-    }
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("[ncategory2manager] saveSlot error:", err);
-    return res.status(500).json({ ok: false, message: err.message });
-  }
-}
-
-// ✅ 슬롯 삭제(레코드 삭제, 파일은 삭제 안 함)
-export async function deleteSlot(req, res) {
-  try {
-    const page = clean(req.query.page);
-    const position = clean(req.query.position);
-    const priority = Number(req.query.priority ?? 1) || 1;
-
-    if (!page || !position) {
-      return res.status(400).json({ ok: false, message: "page/position required" });
-    }
-
-    await pool.query(
-      `DELETE FROM ${TABLE} WHERE page=$1 AND position=$2 AND priority=$3`,
-      [page, position, priority]
-    );
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("[ncategory2manager] deleteSlot error:", err);
-    return res.status(500).json({ ok: false, message: err.message });
-  }
-}
-
-// ✅ 가게 검색(이름/사업자번호) - combined_store_info만
+/** GET /search-store?q=...&bizNo=...  (combined_store_info만) */
 export async function searchStore(req, res) {
   try {
-    const bizNo = digitsOnly(req.query.bizNo);
     const q = clean(req.query.q);
+    const bizNo = digitsOnly(req.query.bizNo);
 
     const params = [];
-    let where = "WHERE 1=1";
+    let where = `WHERE 1=1`;
+
+    if (q) {
+      params.push(`%${q}%`);
+      params.push(`%${q}%`);
+      where += ` AND (business_name ILIKE $${params.length - 1} OR business_category ILIKE $${params.length})`;
+    }
 
     if (bizNo) {
       params.push(`%${bizNo}%`);
       where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
     }
 
-    if (q) {
-      params.push(`%${q}%`);
-      where += ` AND (business_name ILIKE $${params.length} OR COALESCE(business_category,'') ILIKE $${params.length})`;
-    }
-
     const sql = `
       SELECT
-        'combined_store_info' AS store_type,
         id::text AS id,
         regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         business_name,
-        COALESCE(business_category,'') AS category
+        business_category AS category
       FROM public.combined_store_info
       ${where}
-      ORDER BY business_name
+      ORDER BY id DESC
       LIMIT 50
     `;
 
     const { rows } = await pool.query(sql, params);
+    return res.json({ success: true, stores: rows });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+}
 
-    return res.json({ ok: true, stores: rows });
-  } catch (err) {
-    console.error("[ncategory2manager] searchStore error:", err);
-    return res.status(500).json({ ok: false, message: err.message });
+/** POST /slot (multipart) */
+export async function upsertSlot(req, res) {
+  try {
+    const position = clean(req.body.position);
+    const page = clean(req.body.page) || "ncategory2";
+    const slot_type = clean(req.body.slot_type) || "image";
+    const slot_mode = clean(req.body.slot_mode) || "store";
+
+    const store_type = clean(req.body.store_type);
+    const store_id = clean(req.body.store_id);
+    const business_no = digitsOnly(req.body.business_no);
+    const business_name = clean(req.body.business_name);
+    const category = clean(req.body.category);
+    const text_content = clean(req.body.text_content);
+    const link_url = clean(req.body.link_url);
+
+    if (!position) return res.status(400).json({ success: false, error: "position required" });
+
+    // ✅ 이미지 파일 있으면 반영
+    let image_url = clean(req.body.image_url);
+    const file = Array.isArray(req.files) && req.files.length ? req.files[0] : null;
+    if (file?.filename) {
+      image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
+    }
+
+    // ✅ store 모드인데 store_id 없으면 막기
+    if (slot_mode === "store" && !store_id) {
+      return res.status(400).json({ success: false, error: "store mode requires store_id" });
+    }
+
+    // ✅ admin_ad_slots 에 upsert
+    // - 테이블 PK/UNIQUE가 (page, position) 이면 ON CONFLICT (page, position)
+    // - position 단독이면 ON CONFLICT (position) 로 바꾸면 됨
+    const sql = `
+      INSERT INTO ${SLOTS_TABLE} (
+        page, position,
+        slot_type, slot_mode,
+        store_type, store_id,
+        business_no, business_name, category,
+        image_url, text_content, link_url,
+        updated_at
+      )
+      VALUES (
+        $1,$2,
+        $3,$4,
+        $5,$6,
+        $7,$8,$9,
+        $10,$11,$12,
+        NOW()
+      )
+      ON CONFLICT (page, position)
+      DO UPDATE SET
+        slot_type = EXCLUDED.slot_type,
+        slot_mode = EXCLUDED.slot_mode,
+        store_type = EXCLUDED.store_type,
+        store_id = EXCLUDED.store_id,
+        business_no = EXCLUDED.business_no,
+        business_name = EXCLUDED.business_name,
+        category = EXCLUDED.category,
+        image_url = COALESCE(EXCLUDED.image_url, ${SLOTS_TABLE}.image_url),
+        text_content = EXCLUDED.text_content,
+        link_url = EXCLUDED.link_url,
+        updated_at = NOW()
+      RETURNING
+        position, page, slot_type, slot_mode,
+        store_type, store_id, business_no, business_name, category,
+        image_url, text_content, link_url, updated_at
+    `;
+
+    const values = [
+      page, position,
+      slot_type, slot_mode,
+      store_type || null, store_id || null,
+      business_no || null, business_name || null, category || null,
+      image_url || null, text_content || null, link_url || null
+    ];
+
+    const { rows } = await pool.query(sql, values);
+    return res.json({ success: true, slot: rows[0] || null });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+}
+
+/** DELETE /slot?position=... */
+export async function deleteSlot(req, res) {
+  try {
+    const position = clean(req.query.position);
+    if (!position) return res.status(400).json({ success: false, error: "position required" });
+
+    // page 조건 포함 (page 컬럼 없으면 제거)
+    const sql = `DELETE FROM ${SLOTS_TABLE} WHERE page='ncategory2' AND position=$1`;
+    await pool.query(sql, [position]);
+
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 }

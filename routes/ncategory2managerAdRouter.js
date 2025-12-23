@@ -1,59 +1,43 @@
-// routes/ncategory2managerAdRouter.js
 import express from "express";
 import multer from "multer";
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
 
 import {
   getSlot,
-  saveSlot,
+  listSlots,
+  upsertSlot,
   deleteSlot,
   searchStore,
+  makeMulterStorage,
+  fileFilter,
 } from "../controllers/ncategory2managerAdController.js";
 
 const router = express.Router();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "/data/uploads";
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "");
-    cb(null, `${crypto.randomUUID()}${ext}`);
-  },
-});
+// ✅ diskStorage
+const storage = multer.diskStorage(makeMulterStorage());
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 },
 });
 
-// ✅ image / slotImage 둘 다 허용 + saveSlot(req.file) 호환
-const uploadSlot = upload.fields([
-  { name: "image", maxCount: 1 },
-  { name: "slotImage", maxCount: 1 },
-]);
+// ✅ Unexpected field 방지
+const uploadAny = upload.any();
 
+function multerErrorHandler(err, _req, res, _next) {
+  return res.status(400).json({
+    success: false,
+    error: err?.message || "upload error",
+  });
+}
+
+// ===== API =====
 router.get("/slot", getSlot);
+router.get("/slots", listSlots);
+router.get("/search-store", searchStore);
 
-router.post(
-  "/slot",
-  uploadSlot,
-  (req, _res, next) => {
-    const f =
-      (req.files?.image && req.files.image[0]) ||
-      (req.files?.slotImage && req.files.slotImage[0]) ||
-      null;
-
-    if (f) req.file = f;
-    next();
-  },
-  saveSlot
-);
-
+router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
 router.delete("/slot", deleteSlot);
-router.get("/store/search", searchStore);
 
 export default router;
