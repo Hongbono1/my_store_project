@@ -1074,6 +1074,7 @@
                         </div>
 
                         <input id="fieldStoreId" type="hidden" />
+                        <input id="fieldTableSource" type="hidden" />
                     </div>
 
                     <div class="divider"></div>
@@ -1813,7 +1814,8 @@
                         data-biz="${escapeHtml(store.business_no)}"
                         data-name="${escapeHtml(store.business_name)}"
                         data-image="${escapeHtml(store.image_url || '')}"
-                        data-category="${escapeHtml(store.category || '')}">
+                        data-category="${escapeHtml(store.category || '')}"
+                        data-table-source="${escapeHtml(store.table_source || 'store_info')}">
                     <div class="font-extrabold text-slate-900">${escapeHtml(store.business_name)}</div>
                     <div class="text-xs text-slate-600 mt-1">
                         ${escapeHtml(store.business_no)} ${store.category ? `· ${escapeHtml(store.category)}` : ''}
@@ -1828,6 +1830,10 @@
                     if (fieldStoreId) fieldStoreId.value = item.dataset.id || "";
                     if (fieldBizNo) fieldBizNo.value = item.dataset.biz || "";
                     if (fieldBizName) fieldBizName.value = item.dataset.name || "";
+                    
+                    // ✅ table_source 저장
+                    const fieldTableSource = document.getElementById("fieldTableSource");
+                    if (fieldTableSource) fieldTableSource.value = item.dataset.tableSource || "store_info";
 
                     currentStoreImageUrl = item.dataset.image || "";
 
@@ -1987,8 +1993,12 @@
                     const imageUrl = clean(currentStoreImageUrl || currentSlotData?.image_url);
                     if (imageUrl) fd.append("imageUrl", imageUrl);
 
-                    // 링크를 안 넣었는데 storeId만 있는 경우 기본 상세 링크
-                    if (!linkUrl && storeId) fd.append("linkUrl", `/ndetail.html?id=${storeId}&type=store`);
+                    // ✅ 검색 결과에서 받은 table_source 사용 (기본값: store_info)
+                    const fieldTableSource = document.getElementById("fieldTableSource");
+                    const tableSource = fieldTableSource?.value || "store_info";
+                    fd.append("tableSource", tableSource);
+
+                    // ✅ 링크는 controller에서 tableSource 기반으로 자동 생성
                 }
 
                 const startAt = clean(fieldStartAt?.value);
