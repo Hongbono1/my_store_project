@@ -157,7 +157,7 @@ function normalizeSlotData(slot) {
   } else if (storeType === "food_stores") {
     storeType = "food";
   } else if (storeType === "store_info") {
-    storeType = "open"; // 또는 원하는 타입
+    storeType = "store_info"; // ✅ 수정: ndetail.html이 type=store_info를 기대함
   }
 
   // ✅ link_url 서버에서 재생성 (경로 통일)
