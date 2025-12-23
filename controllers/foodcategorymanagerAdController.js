@@ -22,6 +22,21 @@ function digitsOnly(v) {
   return clean(v).replace(/[^\d]/g, "");
 }
 
+/**
+ * ✅ position 정규화(사이드 광고 2/3 연결 핵심)
+ * - food_sidebar_ad_2  -> food_sidebar_ad2
+ * - food_sidebar_ad_3  -> food_sidebar_ad3
+ * (ad1은 원래 ad로 쓰는 경우가 많아서 건드리지 않음)
+ */
+function normalizePosition(pos) {
+  const p = clean(pos);
+  if (!p) return "";
+  // _ad_2 / _ad_3 형태만 정규화
+  return p
+    .replace(/_ad_2$/i, "_ad2")
+    .replace(/_ad_3$/i, "_ad3");
+}
+
 // ⚠️ 주의: 광고 슬롯의 image_url이 "가게 공용 이미지"를 가리킬 수 있어서,
 //      여기서 파일을 지워버리면 다른 슬롯/가게에서도 이미지가 깨질 수 있음.
 //      그래서 슬롯 reset/delete에서는 unlink 하지 않도록 아래 로직에서 사용을 제한함.
@@ -152,26 +167,22 @@ function normalizeSlotData(slot) {
 
   // ✅ table_source → store_type 정규화
   let storeType = slot.table_source ?? null;
-  if (storeType === "combined_store_info") {
-    storeType = "combined";
-  } else if (storeType === "food_stores") {
-    storeType = "food";
-  } else if (storeType === "store_info") {
-    storeType = "store_info"; // ✅ 수정: ndetail.html이 type=store_info를 기대함
-  }
+  if (storeType === "combined_store_info") storeType = "combined";
+  else if (storeType === "food_stores") storeType = "food";
+  else if (storeType === "store_info") storeType = "store_info";
 
-  // ✅ link_url 서버에서 재생성 (경로 통일)
-  let finalLinkUrl = slot.link_url ?? null;
   const storeId = slot.store_id ?? null;
 
-  if (storeId && storeType) {
+  // ✅ link_url은 "store 모드"일 때만 강제 재생성(배너/텍스트 링크 덮어쓰기 방지)
+  let finalLinkUrl = slot.link_url ?? null;
+  if (slot.slot_mode === "store" && storeId && storeType) {
     finalLinkUrl = `/ndetail.html?id=${storeId}&type=${storeType}`;
   }
 
   return {
     ...slot,
     store_type: storeType,
-    link_url: finalLinkUrl
+    link_url: finalLinkUrl,
   };
 }
 
@@ -179,7 +190,8 @@ function normalizeSlotData(slot) {
 export async function getSlot(req, res) {
   try {
     const page = clean(req.query.page);
-    const position = clean(req.query.position);
+    // ✅ 여기!
+    const position = normalizePosition(req.query.position);
     const priRaw = clean(req.query.priority);
 
     if (!page || !position) {
@@ -189,9 +201,7 @@ export async function getSlot(req, res) {
     const priority = priRaw ? Number(priRaw) : null;
     const slot = await fetchSlot({ page, position, priority });
 
-    // ✅ 슬롯 데이터 정규화
     const normalizedSlot = normalizeSlotData(slot);
-
     return res.json({ success: true, slot: normalizedSlot });
   } catch (e) {
     console.error("❌ getSlot error:", e);
@@ -206,7 +216,8 @@ export async function saveSlot(req, res) {
     const b = req.body || {};
 
     const page = clean(b.page);
-    const position = clean(b.position);
+    // ✅ 여기!
+    const position = normalizePosition(b.position);
     if (!page || !position) {
       return res.status(400).json({ success: false, error: "page/position required" });
     }
@@ -222,22 +233,18 @@ export async function saveSlot(req, res) {
     let storeId = clean(b.storeId || b.store_id) || null;
     let businessNo = clean(b.businessNo || b.business_no) || null;
     let businessName = clean(b.businessName || b.business_name) || null;
-    let tableSource = clean(b.tableSource || b.table_source) || 'store_info';
-    
+    let tableSource = clean(b.tableSource || b.table_source) || "store_info";
+
     // ✅ table_source 유효성 검증
-    if (!['store_info', 'combined_store_info', 'food_stores'].includes(tableSource)) {
-      tableSource = 'store_info';
+    if (!["store_info", "combined_store_info", "food_stores"].includes(tableSource)) {
+      tableSource = "store_info";
     }
 
-    // ✅ 재발 방지: 가게 선택 시 link_url 자동 생성 (규칙 통일)
-    if (storeId && !linkUrl) {
-      if (tableSource === 'combined_store_info') {
-        linkUrl = `/ndetail.html?id=${storeId}&type=combined`;
-      } else if (tableSource === 'store_info') {
-        linkUrl = `/ndetail.html?id=${storeId}&type=store_info`;
-      } else if (tableSource === 'food_stores') {
-        linkUrl = `/ndetail.html?id=${storeId}&type=food`;
-      }
+    // ✅ 재발 방지: "store 모드"에서만 link_url 자동 생성
+    if (slotMode === "store" && storeId && !linkUrl) {
+      if (tableSource === "combined_store_info") linkUrl = `/ndetail.html?id=${storeId}&type=combined`;
+      else if (tableSource === "store_info") linkUrl = `/ndetail.html?id=${storeId}&type=store_info`;
+      else if (tableSource === "food_stores") linkUrl = `/ndetail.html?id=${storeId}&type=food`;
     }
 
     let startAtLocal = clean(b.startAt || b.start_at) || "";
@@ -282,8 +289,6 @@ export async function saveSlot(req, res) {
     }
 
     // ✅ "입력초기화" 동작: clearImage=true가 오면
-    //    - 해당 슬롯의 store/link/text/date/image 전부 비움
-    //    - 파일은 삭제하지 않음(공유 이미지 깨짐 방지)
     if (clearImage && !uploaded && !overrideImageUrl) {
       slotType = "banner";
       slotMode = "banner";
@@ -306,7 +311,6 @@ export async function saveSlot(req, res) {
     if (clearImage) {
       finalImageUrl = null;
     } else if (uploaded) {
-      // 교체 시에도 기존 파일 unlink는 하지 않음(안전)
       finalImageUrl = newImageUrl;
     } else if (overrideImageUrl) {
       finalImageUrl = overrideImageUrl;
@@ -392,9 +396,10 @@ export async function saveSlot(req, res) {
     await client.query("COMMIT");
 
     const slot = await fetchSlot({ page, position, priority });
-    return res.json({ success: true, slot });
+    const normalizedSlot = normalizeSlotData(slot);
+    return res.json({ success: true, slot: normalizedSlot });
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("❌ saveSlot error:", e);
     return res.status(500).json({ success: false, error: e.message || "server error" });
   } finally {
@@ -407,7 +412,8 @@ export async function deleteSlot(req, res) {
   const client = await pool.connect();
   try {
     const page = clean(req.query.page);
-    const position = clean(req.query.position);
+    // ✅ 여기!
+    const position = normalizePosition(req.query.position);
     const priRaw = clean(req.query.priority);
 
     if (!page || !position) {
@@ -450,7 +456,7 @@ export async function deleteSlot(req, res) {
       return res.json({ success: true, deleted: 0 });
     }
 
-    // ✅ 삭제 시에도 파일 unlink 하지 않음(공유 이미지 깨짐 방지)
+    // ✅ 삭제 시에도 파일 unlink 하지 않음
     if (priority === null) {
       await client.query(
         `DELETE FROM public.admin_ad_slots WHERE page=$1 AND position=$2 AND priority IS NULL`,
@@ -466,7 +472,7 @@ export async function deleteSlot(req, res) {
     await client.query("COMMIT");
     return res.json({ success: true, deleted: 1 });
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try { await client.query("ROLLBACK"); } catch { }
     console.error("❌ deleteSlot error:", e);
     return res.status(500).json({ success: false, error: "server error" });
   } finally {
@@ -574,19 +580,15 @@ export async function searchStore(req, res) {
 export async function fixLinks(req, res) {
   try {
     const tableSource = req.params.tableSource;
-    
-    let targetType = '';
-    if (tableSource === 'store_info') {
-      targetType = 'store_info';
-    } else if (tableSource === 'combined_store_info') {
-      targetType = 'combined';
-    } else if (tableSource === 'food_stores') {
-      targetType = 'food';
-    } else {
-      return res.status(400).json({ success: false, error: 'Invalid tableSource' });
-    }
-    
-    const result = await pool.query(`
+
+    let targetType = "";
+    if (tableSource === "store_info") targetType = "store_info";
+    else if (tableSource === "combined_store_info") targetType = "combined";
+    else if (tableSource === "food_stores") targetType = "food";
+    else return res.status(400).json({ success: false, error: "Invalid tableSource" });
+
+    const result = await pool.query(
+      `
       UPDATE public.admin_ad_slots
       SET link_url = '/ndetail.html?id=' || store_id || '&type=' || $1
       WHERE page = 'foodcategory'
@@ -599,12 +601,14 @@ export async function fixLinks(req, res) {
           OR link_url NOT LIKE '%type=${targetType}%'
         )
       RETURNING id, position, store_id, business_name, link_url;
-    `, [targetType, tableSource]);
-    
-    return res.json({ 
-      success: true, 
+      `,
+      [targetType, tableSource]
+    );
+
+    return res.json({
+      success: true,
       count: result.rowCount,
-      updated: result.rows 
+      updated: result.rows,
     });
   } catch (e) {
     console.error("❌ fixLinks error:", e);
@@ -636,7 +640,7 @@ export async function checkLinks(req, res) {
         AND store_id IS NOT NULL
       ORDER BY position, priority;
     `);
-    
+
     return res.json({ success: true, slots: rows });
   } catch (e) {
     console.error("❌ checkLinks error:", e);
