@@ -708,7 +708,10 @@
             wrap.setAttribute("data-position", position);
             wrap.setAttribute("data-label", label);
             wrap.innerHTML = `
-      <img data-role="img" src="/uploads/sample-1.jpg" alt="${label}" class="w-full ${imgHClass} object-cover">
+      <div class="w-full ${imgHClass} bg-white/40 flex items-center justify-center">
+        <img data-role="img" src="" alt="${label}" class="w-full h-full object-cover hidden">
+        <div data-role="noimg" class="text-xs text-slate-500">NO IMG</div>
+      </div>
       <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
         <div class="font-bold text-lg" data-role="name">${label}</div>
         <div class="text-sm text-slate-600" data-role="category">업종:</div>
@@ -763,8 +766,9 @@
                 card.setAttribute("data-label", `최고의가게 ${i + 1}`);
 
                 card.innerHTML = `
-        <div class="w-full h-60">
-          <img data-role="img" src="/uploads/sample-1.jpg" alt="상호명" class="w-full h-full object-cover">
+        <div class="w-full h-60 bg-white/40 flex items-center justify-center">
+          <img data-role="img" src="" alt="상호명" class="w-full h-full object-cover hidden">
+          <div data-role="noimg" class="text-xs text-slate-500">NO IMG</div>
         </div>
         <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-3">
           <div class="font-bold text-lg leading-tight" data-role="name">상호명</div>
@@ -782,13 +786,12 @@
             if (!slotEl) return;
 
             const img = slotEl.querySelector('[data-role="img"]');
+            const noimg = slotEl.querySelector('[data-role="noimg"]');
             const name = slotEl.querySelector('[data-role="name"]');
             const category = slotEl.querySelector('[data-role="category"]');
             const desc = slotEl.querySelector('[data-role="desc"]');
 
-            const fallbackImg = img?.getAttribute("src") || "";
-            const imageUrl = clean(slot?.image_url || slot?.imageUrl || "") || fallbackImg;
-
+            const imageUrl = clean(slot?.image_url || slot?.imageUrl || "");
             const businessName =
                 clean(slot?.business_name || slot?.businessName || "") ||
                 clean(slotEl.getAttribute("data-label") || "");
@@ -796,9 +799,19 @@
             const cat = pickCategory(slot);
             const textContent = clean(slot?.text_content || slot?.textContent || "");
 
-            if (img) img.src = imageUrl || fallbackImg;
-            if (name) name.textContent = businessName || "";
+            if (img) {
+                if (imageUrl) {
+                    img.src = imageUrl;
+                    img.classList.remove("hidden");
+                    if (noimg) noimg.classList.add("hidden");
+                } else {
+                    img.src = "";
+                    img.classList.add("hidden");
+                    if (noimg) noimg.classList.remove("hidden");
+                }
+            }
 
+            if (name) name.textContent = businessName || "";
             if (category) category.textContent = cat ? `업종: ${cat}` : "업종:";
             if (desc) desc.textContent = textContent || desc.textContent || "";
 
