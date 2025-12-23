@@ -1,34 +1,30 @@
-btnSave?.addEventListener("click", async () => {
-  if (!currentSlotKey) {
-    alert("먼저 왼쪽에서 슬롯을 선택하세요.");
-    return;
-  }
+// routes/newindexmanagerAdRouter.js
+import express from "express";
 
-  const payload = {
-    page: inputPage.value.trim(),        // "index"
-    position: inputPosition.value.trim(),// 예: "index_main_top"
-    image_url: inputImageUrl.value.trim(),
-    link_url: inputLinkUrl.value.trim(),
-    text_content: inputTextContent.value,
-  };
+import {
+  getSlot,
+  listSlots,
+  listSlotItems,
+  upsertSlot,
+  deleteSlot,
+  searchStore,
+} from "../controllers/newindexmanagerAdController.js";
 
-  try {
-    const res = await fetch("/manager/newindex/slot", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+const router = express.Router();
 
-    const json = await res.json();
-    console.log("[newindexmanager] 저장 결과:", json);
+// 상태 확인용
+router.get("/ping", (_req, res) => res.json({ success: true, ok: true }));
 
-    if (json.success) {
-      alert("슬롯이 저장되었습니다.");
-    } else {
-      alert("저장 중 오류: " + (json.error || "알 수 없는 오류"));
-    }
-  } catch (err) {
-    console.error(err);
-    alert("서버 통신 중 오류가 발생했습니다.");
-  }
-});
+// 슬롯 조회
+router.get("/slot", getSlot);
+router.get("/slots", listSlots);
+router.get("/slot-items", listSlotItems);
+
+// 슬롯 저장/삭제
+router.post("/slot", upsertSlot);
+router.delete("/slot", deleteSlot);
+
+// 가게 검색
+router.get("/search-store", searchStore);
+
+export default router; // ✅ 이게 없어서 서버가 죽었음(502 원인)

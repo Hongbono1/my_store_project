@@ -1,219 +1,294 @@
 // controllers/newindexmanagerAdController.js
 import pool from "../db.js";
 
-// 문자열 정리
-function s(v) {
+const SLOTS_TABLE = "public.admin_ad_slots";
+const ITEMS_TABLE = "public.admin_ad_slot_items";
+
+// -------------------- 유틸 --------------------
+function clean(v) {
   if (v === undefined || v === null) return "";
   return String(v).trim();
 }
-
-// page, position 검증
-function validatePagePosition(page, position) {
-  const p = s(page);
-  const pos = s(position);
-  if (!p || !pos) {
-    throw new Error("page와 position은 필수입니다.");
-  }
-  return { page: p, position: pos };
+function digitsOnly(v) {
+  return clean(v).replace(/[^\d]/g, "");
+}
+function toInt(v, def = 0) {
+  const n = Number(String(v ?? "").replace(/[^\d-]/g, ""));
+  return Number.isFinite(n) ? n : def;
 }
 
-/**
- * GET /manager/newindex/slot?page=index&position=index_main_top
- * → 특정 슬롯 1개 조회
- */
-export async function getNewIndexSlot(req, res) {
+// -------------------- 가게 검색 --------------------
+// bizNo(사업자번호) 또는 q(상호 키워드)로 통합 검색
+export async function searchStore(req, res) {
   try {
-    const { page, position } = validatePagePosition(
-      req.query.page,
-      req.query.position
-    );
+    const bizNo = digitsOnly(req.query.bizNo);
+    const q = clean(req.query.q);
 
+    if (!bizNo && !q) {
+      return res.status(400).json({ success: false, error: "bizNo or q required" });
+    }
+
+    const params = [];
+    let whereBiz = "";
+    let whereQ = "";
+
+    if (bizNo) {
+      params.push(`%${bizNo}%`);
+      whereBiz = `AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
+    }
+    if (q) {
+      params.push(`%${q}%`);
+      whereQ = `AND (COALESCE(business_name::text,'') ILIKE $${params.length} OR COALESCE(business_category::text,'') ILIKE $${params.length})`;
+    }
+
+    // ✅ food_stores / combined_store_info / store_info 를 한 번에 검색
+    // 컬럼명( business_number / business_name / business_category ) 기준
+    // 테이블에 따라 컬럼이 다르면 여기만 맞춰주면 됨.
     const sql = `
       SELECT
-        id,
-        page,
-        position,
-        priority,
-        image_url,
-        link_url,
-        text_content,
-        start_at,
-        end_at,
-        no_end,
-        created_at,
-        updated_at
-      FROM public.admin_ad_slots
-      WHERE page = $1
-        AND position = $2
-      ORDER BY priority ASC, id ASC
-      LIMIT 1
+        'food' AS store_type,
+        id::text AS id,
+        COALESCE(business_number::text,'') AS business_number,
+        COALESCE(business_name::text,'') AS business_name,
+        COALESCE(business_category::text,'') AS business_category
+      FROM public.food_stores
+      WHERE 1=1
+        ${whereBiz}
+        ${whereQ}
+
+      UNION ALL
+
+      SELECT
+        'combined' AS store_type,
+        id::text AS id,
+        COALESCE(business_number::text,'') AS business_number,
+        COALESCE(business_name::text,'') AS business_name,
+        COALESCE(business_category::text,'') AS business_category
+      FROM public.combined_store_info
+      WHERE 1=1
+        ${whereBiz}
+        ${whereQ}
+
+      UNION ALL
+
+      SELECT
+        'store_info' AS store_type,
+        id::text AS id,
+        COALESCE(business_number::text,'') AS business_number,
+        COALESCE(business_name::text,'') AS business_name,
+        COALESCE(business_category::text,'') AS business_category
+      FROM public.store_info
+      WHERE 1=1
+        ${whereBiz}
+        ${whereQ}
+
+      ORDER BY store_type, id::int
+      LIMIT 50
     `;
-    const params = [page, position];
 
     const { rows } = await pool.query(sql, params);
-    const slot = rows[0] || null;
-
-    return res.json({
-      success: true,
-      slot,
-    });
+    return res.json({ success: true, items: rows });
   } catch (err) {
-    console.error("[getNewIndexSlot] 오류:", err);
-    return res.status(400).json({
-      success: false,
-      error: err.message || "slot 조회 중 오류가 발생했습니다.",
-    });
+    console.error("[newindexmanager][searchStore] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
   }
 }
 
-/**
- * GET /manager/newindex/slots?page=index
- * → 해당 page의 슬롯 목록 (newindexmanager 전용)
- */
-export async function listNewIndexSlots(req, res) {
+// -------------------- 슬롯 조회(단일) --------------------
+export async function getSlot(req, res) {
   try {
-    const page = s(req.query.page || "index");
+    const page = clean(req.query.page);
+    const position = clean(req.query.position);
+
+    if (!page || !position) {
+      return res.status(400).json({ success: false, error: "page and position required" });
+    }
 
     const sql = `
-      SELECT
-        id,
-        page,
-        position,
-        priority,
-        image_url,
-        link_url,
-        text_content,
-        start_at,
-        end_at,
-        no_end,
-        created_at,
-        updated_at
-      FROM public.admin_ad_slots
-      WHERE page = $1
-      ORDER BY position ASC, priority ASC, id ASC
+      SELECT *
+      FROM ${SLOTS_TABLE}
+      WHERE page = $1 AND position = $2
+      LIMIT 1
     `;
-    const { rows } = await pool.query(sql, [page]);
+    const { rows } = await pool.query(sql, [page, position]);
 
-    return res.json({
-      success: true,
-      page,
-      slots: rows,
-    });
+    return res.json({ success: true, slot: rows[0] || null });
   } catch (err) {
-    console.error("[listNewIndexSlots] 오류:", err);
-    return res.status(500).json({
-      success: false,
-      error: "slot 목록 조회 중 오류가 발생했습니다.",
-    });
+    console.error("[newindexmanager][getSlot] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
   }
 }
 
-/**
- * POST /manager/newindex/slot
- * JSON body:
- * {
- *   "page": "index",
- *   "position": "index_main_top",
- *   "image_url": "/uploads/xxx.jpg",
- *   "link_url": "/ndetail.html?id=1&type=store_info",
- *   "text_content": "텍스트 내용"
- * }
- *
- * → page+position+priority=1 기준으로 UPSERT
- */
-export async function upsertNewIndexSlot(req, res) {
+// -------------------- 슬롯 목록 --------------------
+export async function listSlots(req, res) {
+  try {
+    const page = clean(req.query.page); // optional
+    const params = [];
+    let where = "WHERE 1=1";
+    if (page) {
+      params.push(page);
+      where += ` AND page = $${params.length}`;
+    }
+
+    const sql = `
+      SELECT *
+      FROM ${SLOTS_TABLE}
+      ${where}
+      ORDER BY page, position
+    `;
+    const { rows } = await pool.query(sql, params);
+    return res.json({ success: true, items: rows });
+  } catch (err) {
+    console.error("[newindexmanager][listSlots] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
+  }
+}
+
+// -------------------- 슬롯 아이템(멀티) 조회 --------------------
+export async function listSlotItems(req, res) {
+  try {
+    const page = clean(req.query.page);
+    const position = clean(req.query.position);
+
+    if (!page || !position) {
+      return res.status(400).json({ success: false, error: "page and position required" });
+    }
+
+    const sql = `
+      SELECT *
+      FROM ${ITEMS_TABLE}
+      WHERE page = $1 AND position = $2
+      ORDER BY COALESCE(priority, 999999) ASC, id ASC
+    `;
+    const { rows } = await pool.query(sql, [page, position]);
+
+    return res.json({ success: true, items: rows });
+  } catch (err) {
+    // 아이템 테이블이 아직 없거나 컬럼이 다를 수도 있으니 로그는 남기고 빈 배열로도 가능
+    console.error("[newindexmanager][listSlotItems] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
+  }
+}
+
+// -------------------- 슬롯 저장(업서트) --------------------
+// ✅ ON CONFLICT 의존 없이: 먼저 존재 확인 → update/insert
+export async function upsertSlot(req, res) {
   const client = await pool.connect();
   try {
-    const { page, position, image_url, link_url, text_content } = req.body || {};
-    const { page: p, position: pos } = validatePagePosition(page, position);
+    const page = clean(req.body.page);
+    const position = clean(req.body.position);
 
-    const img = s(image_url);
-    const link = s(link_url);
-    const text = s(text_content);
+    if (!page || !position) {
+      return res.status(400).json({ success: false, error: "page and position required" });
+    }
+
+    const label = clean(req.body.label);
+    const type = clean(req.body.type) || null;
+
+    const image_url = clean(req.body.image_url) || null;
+    const link_url = clean(req.body.link_url) || null;
+    const text_content = clean(req.body.text_content) || null;
+
+    const store_type = clean(req.body.store_type) || null;
+    const store_id = clean(req.body.store_id) || null;
+    const business_number = digitsOnly(req.body.business_number) || null;
 
     await client.query("BEGIN");
 
-    // 존재 여부 확인 (priority = 1)
-    const selectSql = `
+    // 존재 확인
+    const findSql = `
       SELECT id
-      FROM public.admin_ad_slots
-      WHERE page = $1
-        AND position = $2
-        AND priority = 1
-      ORDER BY id ASC
+      FROM ${SLOTS_TABLE}
+      WHERE page = $1 AND position = $2
       LIMIT 1
     `;
-    const selectParams = [p, pos];
-    const selectResult = await client.query(selectSql, selectParams);
+    const found = await client.query(findSql, [page, position]);
+    const existingId = found.rows?.[0]?.id;
 
-    if (selectResult.rowCount > 0) {
-      // UPDATE
-      const id = selectResult.rows[0].id;
-      const updateSql = `
-        UPDATE public.admin_ad_slots
+    if (existingId) {
+      const updSql = `
+        UPDATE ${SLOTS_TABLE}
         SET
-          image_url   = $1,
-          link_url    = $2,
-          text_content = $3,
-          updated_at  = NOW()
-        WHERE id = $4
+          label = COALESCE($3, label),
+          type = COALESCE($4, type),
+          image_url = $5,
+          link_url = $6,
+          text_content = $7,
+          store_type = $8,
+          store_id = $9,
+          business_number = $10,
+          updated_at = NOW()
+        WHERE id = $1 AND page = $2
+        RETURNING *
       `;
-      const updateParams = [img || null, link || null, text || null, id];
-      await client.query(updateSql, updateParams);
-    } else {
-      // INSERT (priority = 1)
-      const insertSql = `
-        INSERT INTO public.admin_ad_slots
-          (page, position, priority, image_url, link_url, text_content,
-           start_at, end_at, no_end, created_at, updated_at)
-        VALUES
-          ($1,   $2,       1,        $3,        $4,       $5,
-           NOW(), NULL,   TRUE,     NOW(),     NOW())
-        RETURNING id
-      `;
-      const insertParams = [p, pos, img || null, link || null, text || null];
-      await client.query(insertSql, insertParams);
-    }
-
-    await client.query("COMMIT");
-
-    const { rows } = await client.query(
-      `
-      SELECT
-        id,
+      const upd = await client.query(updSql, [
+        existingId,
         page,
-        position,
-        priority,
+        label || null,
+        type,
         image_url,
         link_url,
         text_content,
-        start_at,
-        end_at,
-        no_end,
-        created_at,
-        updated_at
-      FROM public.admin_ad_slots
-      WHERE page = $1
-        AND position = $2
-        AND priority = 1
-      ORDER BY id ASC
-      LIMIT 1
-      `,
-      [p, pos]
-    );
+        store_type,
+        store_id,
+        business_number,
+      ]);
 
-    return res.json({
-      success: true,
-      slot: rows[0] || null,
-    });
+      await client.query("COMMIT");
+      return res.json({ success: true, slot: upd.rows[0] });
+    } else {
+      const insSql = `
+        INSERT INTO ${SLOTS_TABLE}
+          (page, position, label, type, image_url, link_url, text_content, store_type, store_id, business_number, created_at, updated_at)
+        VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
+        RETURNING *
+      `;
+      const ins = await client.query(insSql, [
+        page,
+        position,
+        label || null,
+        type,
+        image_url,
+        link_url,
+        text_content,
+        store_type,
+        store_id,
+        business_number,
+      ]);
+
+      await client.query("COMMIT");
+      return res.json({ success: true, slot: ins.rows[0] });
+    }
   } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("[upsertNewIndexSlot] 오류:", err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || "slot 저장 중 오류가 발생했습니다.",
-    });
+    try { await client.query("ROLLBACK"); } catch {}
+    console.error("[newindexmanager][upsertSlot] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
   } finally {
     client.release();
+  }
+}
+
+// -------------------- 슬롯 삭제 --------------------
+export async function deleteSlot(req, res) {
+  try {
+    const page = clean(req.query.page || req.body?.page);
+    const position = clean(req.query.position || req.body?.position);
+
+    if (!page || !position) {
+      return res.status(400).json({ success: false, error: "page and position required" });
+    }
+
+    const sql = `
+      DELETE FROM ${SLOTS_TABLE}
+      WHERE page = $1 AND position = $2
+      RETURNING *
+    `;
+    const { rows } = await pool.query(sql, [page, position]);
+
+    return res.json({ success: true, deleted: rows[0] || null });
+  } catch (err) {
+    console.error("[newindexmanager][deleteSlot] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
   }
 }
