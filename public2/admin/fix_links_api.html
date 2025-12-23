@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>푸드카테고리 링크 일괄 수정</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h1 class="text-2xl font-bold mb-4">🔧 푸드카테고리 슬롯 링크 일괄 수정</h1>
+            <p class="text-slate-600 mb-6">
+                DB에 저장된 잘못된 link_url을 올바른 타입으로 수정합니다.<br>
+                (store_info → type=store_info, combined_store_info → type=combined)
+            </p>
+            
+            <button id="btnFix" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                링크 수정 실행
+            </button>
+            
+            <div id="output" class="mt-6 p-4 bg-slate-100 rounded-lg font-mono text-sm hidden"></div>
+            <pre id="results" class="mt-4 p-4 bg-slate-800 text-green-400 rounded-lg text-xs overflow-auto hidden"></pre>
+        </div>
+    </div>
+
+    <script>
+        const btnFix = document.getElementById('btnFix');
+        const output = document.getElementById('output');
+        const results = document.getElementById('results');
+
+        btnFix.addEventListener('click', async () => {
+            btnFix.disabled = true;
+            btnFix.textContent = '수정 중...';
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-blue-600">⏳ 처리 중...</div>';
+            
+            try {
+                // 1. store_info 수정
+                output.innerHTML += '<div class="mt-2">1️⃣ store_info 테이블 링크 수정 중...</div>';
+                const res1 = await fetch('/foodcategorymanager/ad/fix-links/store_info', { method: 'POST' });
+                const data1 = await res1.json();
+                output.innerHTML += `<div class="text-green-600">✅ ${data1.count || 0}개 수정됨</div>`;
+                
+                // 2. combined_store_info 수정
+                output.innerHTML += '<div class="mt-2">2️⃣ combined_store_info 테이블 링크 수정 중...</div>';
+                const res2 = await fetch('/foodcategorymanager/ad/fix-links/combined_store_info', { method: 'POST' });
+                const data2 = await res2.json();
+                output.innerHTML += `<div class="text-green-600">✅ ${data2.count || 0}개 수정됨</div>`;
+                
+                // 3. food_stores 수정
+                output.innerHTML += '<div class="mt-2">3️⃣ food_stores 테이블 링크 수정 중...</div>';
+                const res3 = await fetch('/foodcategorymanager/ad/fix-links/food_stores', { method: 'POST' });
+                const data3 = await res3.json();
+                output.innerHTML += `<div class="text-green-600">✅ ${data3.count || 0}개 수정됨</div>`;
+                
+                // 4. 결과 확인
+                output.innerHTML += '<div class="mt-4 text-blue-600">📊 수정 후 상태 확인 중...</div>';
+                const res4 = await fetch('/foodcategorymanager/ad/check-links');
+                const data4 = await res4.json();
+                
+                results.classList.remove('hidden');
+                results.textContent = JSON.stringify(data4.slots || [], null, 2);
+                
+                output.innerHTML += `<div class="mt-2 text-green-600 font-bold">✅ 모든 수정 완료! (총 ${data4.slots?.length || 0}개 슬롯)</div>`;
+                btnFix.textContent = '✅ 수정 완료';
+            } catch (err) {
+                console.error(err);
+                output.innerHTML += `<div class="mt-2 text-red-600">❌ 오류: ${err.message}</div>`;
+                btnFix.disabled = false;
+                btnFix.textContent = '다시 시도';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -569,3 +569,77 @@ export async function searchStore(req, res) {
     return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
+
+// -------------------- POST /foodcategorymanager/ad/fix-links/:tableSource --------------------
+export async function fixLinks(req, res) {
+  try {
+    const tableSource = req.params.tableSource;
+    
+    let targetType = '';
+    if (tableSource === 'store_info') {
+      targetType = 'store_info';
+    } else if (tableSource === 'combined_store_info') {
+      targetType = 'combined';
+    } else if (tableSource === 'food_stores') {
+      targetType = 'food';
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid tableSource' });
+    }
+    
+    const result = await pool.query(`
+      UPDATE public.admin_ad_slots
+      SET link_url = '/ndetail.html?id=' || store_id || '&type=' || $1
+      WHERE page = 'foodcategory'
+        AND table_source = $2
+        AND store_id IS NOT NULL
+        AND (
+          link_url IS NULL 
+          OR link_url = ''
+          OR link_url LIKE '%type=open%'
+          OR link_url NOT LIKE '%type=${targetType}%'
+        )
+      RETURNING id, position, store_id, business_name, link_url;
+    `, [targetType, tableSource]);
+    
+    return res.json({ 
+      success: true, 
+      count: result.rowCount,
+      updated: result.rows 
+    });
+  } catch (e) {
+    console.error("❌ fixLinks error:", e);
+    return res.status(500).json({ success: false, error: e.message || "server error" });
+  }
+}
+
+// -------------------- GET /foodcategorymanager/ad/check-links --------------------
+export async function checkLinks(req, res) {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        id,
+        position,
+        priority,
+        table_source,
+        store_id,
+        business_name,
+        link_url,
+        CASE 
+          WHEN link_url LIKE '%type=store_info%' THEN 'OK: store_info'
+          WHEN link_url LIKE '%type=combined%' THEN 'OK: combined'
+          WHEN link_url LIKE '%type=food%' THEN 'OK: food'
+          WHEN link_url LIKE '%type=open%' THEN 'ERROR: type=open (outdated)'
+          ELSE 'ERROR: invalid or missing type'
+        END as status
+      FROM public.admin_ad_slots
+      WHERE page = 'foodcategory'
+        AND store_id IS NOT NULL
+      ORDER BY position, priority;
+    `);
+    
+    return res.json({ success: true, slots: rows });
+  } catch (e) {
+    console.error("❌ checkLinks error:", e);
+    return res.status(500).json({ success: false, error: e.message || "server error" });
+  }
+}

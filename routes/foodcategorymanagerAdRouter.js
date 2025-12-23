@@ -10,6 +10,8 @@ import {
   saveSlot,
   deleteSlot,
   searchStore,
+  fixLinks,
+  checkLinks,
 } from "../controllers/foodcategorymanagerAdController.js";
 
 const router = express.Router();
@@ -55,5 +57,9 @@ router.post(
 
 router.delete("/slot", deleteSlot);
 router.get("/store/search", searchStore);
+
+// ✅ 링크 수정 API
+router.post("/fix-links/:tableSource", fixLinks);
+router.get("/check-links", checkLinks);
 
 export default router;
