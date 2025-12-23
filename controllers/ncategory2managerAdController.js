@@ -18,10 +18,9 @@ function digitsOnly(v) {
 function toDateOrNull(v) {
   const s = clean(v);
   if (!s) return null;
-  // "YYYY-MM-DD" 또는 ISO 일부도 허용
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  return s.slice(0, 10);
+  return s.slice(0, 10); // YYYY-MM-DD
 }
 
 const TABLE = "public.admin_ad_slots";
@@ -43,6 +42,7 @@ export async function getSlot(req, res) {
         page,
         position,
         priority,
+        COALESCE(slot_type,'') AS slot_type,
         COALESCE(text_content,'') AS text_content,
         COALESCE(image_url,'') AS image_url,
         COALESCE(link_url,'') AS link_url,
@@ -65,7 +65,7 @@ export async function getSlot(req, res) {
   }
 }
 
-// ✅ 슬롯 저장(업서트)
+// ✅ 슬롯 저장(업서트) - slot_type NOT NULL 대응 포함
 export async function saveSlot(req, res) {
   try {
     const page = clean(req.body.page);
@@ -78,40 +78,50 @@ export async function saveSlot(req, res) {
 
     const text_content = clean(req.body.text_content);
     const link_url = clean(req.body.link_url);
+
     const start_at = toDateOrNull(req.body.start_at);
     const end_at = toDateOrNull(req.body.end_at);
     const no_end = toBool(req.body.no_end);
 
-    // ✅ 업로드된 이미지가 있으면 /uploads/파일명으로 저장
-    let image_url = "";
-    if (req.file?.filename) {
-      image_url = `/uploads/${req.file.filename}`;
-    } else {
-      // 업로드 없으면 기존값 유지
-      const prev = await pool.query(
-        `SELECT COALESCE(image_url,'') AS image_url
-         FROM ${TABLE}
-         WHERE page=$1 AND position=$2 AND priority=$3
-         LIMIT 1`,
-        [page, position, priority]
-      );
-      image_url = prev.rows[0]?.image_url || "";
-    }
-
-    // ✅ no_end=true면 end_at은 null로 처리(헷갈림 방지)
+    // ✅ no_end=true면 end_at은 null
     const finalEndAt = no_end ? null : end_at;
 
-    // ✅ 테이블에 유니크가 있으면 ON CONFLICT가 동작
-    // (없으면 에러 나니까 fallback 로직도 같이 둠)
+    // ✅ 기존값 조회(이미지/slot_type 유지용)
+    const prev = await pool.query(
+      `
+      SELECT
+        COALESCE(image_url,'') AS image_url,
+        COALESCE(slot_type,'') AS slot_type
+      FROM ${TABLE}
+      WHERE page=$1 AND position=$2 AND priority=$3
+      LIMIT 1
+      `,
+      [page, position, priority]
+    );
+
+    const prevImage = prev.rows[0]?.image_url || "";
+    const prevSlotType = prev.rows[0]?.slot_type || "";
+
+    // ✅ 업로드된 이미지가 있으면 /uploads/파일명으로 저장, 없으면 기존값 유지
+    let image_url = prevImage;
+    if (req.file?.filename) image_url = `/uploads/${req.file.filename}`;
+
+    // ✅ slot_type (NOT NULL) 보정: (요청값 > 기존값 > 이미지 있으면 image > text)
+    const reqSlotType = clean(req.body.slot_type); // 프론트가 보내면 그대로 수용
+    const slot_type = reqSlotType || prevSlotType || (image_url ? "image" : "text");
+
+    // ✅ 테이블에 유니크가 있으면 ON CONFLICT가 동작 (page, position, priority)
+    // (없으면 fallback 로직)
     try {
       await pool.query(
         `
         INSERT INTO ${TABLE}
-          (page, position, priority, text_content, image_url, link_url, start_at, end_at, no_end, updated_at)
+          (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, updated_at)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
         ON CONFLICT (page, position, priority)
         DO UPDATE SET
+          slot_type=EXCLUDED.slot_type,
           text_content=EXCLUDED.text_content,
           image_url=EXCLUDED.image_url,
           link_url=EXCLUDED.link_url,
@@ -120,28 +130,36 @@ export async function saveSlot(req, res) {
           no_end=EXCLUDED.no_end,
           updated_at=NOW()
         `,
-        [page, position, priority, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
       );
     } catch (e) {
       // ✅ fallback: update 먼저, 안되면 insert
       const upd = await pool.query(
         `
         UPDATE ${TABLE}
-        SET text_content=$4, image_url=$5, link_url=$6, start_at=$7, end_at=$8, no_end=$9, updated_at=NOW()
+        SET
+          slot_type=$4,
+          text_content=$5,
+          image_url=$6,
+          link_url=$7,
+          start_at=$8,
+          end_at=$9,
+          no_end=$10,
+          updated_at=NOW()
         WHERE page=$1 AND position=$2 AND priority=$3
         `,
-        [page, position, priority, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
       );
 
       if (upd.rowCount === 0) {
         await pool.query(
           `
           INSERT INTO ${TABLE}
-            (page, position, priority, text_content, image_url, link_url, start_at, end_at, no_end, created_at, updated_at)
+            (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, created_at, updated_at)
           VALUES
-            ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
+            ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
           `,
-          [page, position, priority, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+          [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
         );
       }
     }
@@ -164,10 +182,11 @@ export async function deleteSlot(req, res) {
       return res.status(400).json({ ok: false, message: "page/position required" });
     }
 
-    await pool.query(
-      `DELETE FROM ${TABLE} WHERE page=$1 AND position=$2 AND priority=$3`,
-      [page, position, priority]
-    );
+    await pool.query(`DELETE FROM ${TABLE} WHERE page=$1 AND position=$2 AND priority=$3`, [
+      page,
+      position,
+      priority,
+    ]);
 
     return res.json({ ok: true });
   } catch (err) {
@@ -176,29 +195,30 @@ export async function deleteSlot(req, res) {
   }
 }
 
-// ✅ 가게 검색(이름/사업자번호)
+// ✅ 가게 검색(이름/사업자번호) - combined_store_info만
 export async function searchStore(req, res) {
   try {
     const bizNo = digitsOnly(req.query.bizNo);
     const q = clean(req.query.q);
 
-    // ✅ 가능한 범위에서 “전체 가게”에 가까운 테이블들을 union
-    // - combined_store_info
-    // - store_info
-    // (없어도 에러 안 나게 하려면 실제로 존재하는 테이블로만 쓰는게 정답인데,
-    //  지금은 ncategory2가 “전체 카테고리”라 이 2개를 우선으로 둠)
     const params = [];
-    let where = "WHERE 1=1";
+    const where = [];
 
     if (bizNo) {
       params.push(`%${bizNo}%`);
-      where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
+      where.push(
+        `regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`
+      );
     }
 
     if (q) {
       params.push(`%${q}%`);
-      where += ` AND (business_name ILIKE $${params.length} OR COALESCE(business_category,'') ILIKE $${params.length})`;
+      where.push(
+        `(business_name ILIKE $${params.length} OR COALESCE(business_category,'') ILIKE $${params.length})`
+      );
     }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const sql = `
       SELECT
@@ -208,25 +228,12 @@ export async function searchStore(req, res) {
         business_name,
         COALESCE(business_category,'') AS category
       FROM public.combined_store_info
-      ${where}
-
-      UNION ALL
-
-      SELECT
-        'store_info' AS store_type,
-        id::text AS id,
-        regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-        business_name,
-        COALESCE(business_category,'') AS category
-      FROM public.store_info
-      ${where}
-
+      ${whereSql}
       ORDER BY business_name
       LIMIT 50
     `;
 
-    const { rows } = await pool.query(sql, [...params, ...params]);
-
+    const { rows } = await pool.query(sql, params);
     return res.json({ ok: true, stores: rows });
   } catch (err) {
     console.error("[ncategory2manager] searchStore error:", err);
