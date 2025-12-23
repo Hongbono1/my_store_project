@@ -7,9 +7,10 @@ export const UPLOAD_SUBDIR = "manager_ad";
 export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
-// ✅ 테이블(푸드 매니저와 동일하게 쓰는 전제)
-// - 컬럼명이 다르면 여기 SQL의 컬럼만 Neon에 맞게 바꾸면 됨.
 const SLOTS_TABLE = "public.admin_ad_slots";
+
+// ✅ ncategory2는 combined_store_info 기준(표시용 업종 JOIN)
+const STORE_TABLE = "public.combined_store_info";
 
 function ensureUploadDir() {
   fs.mkdirSync(UPLOAD_ABS_DIR, { recursive: true });
@@ -24,13 +25,16 @@ function digitsOnly(v) {
   return clean(v).replace(/[^\d]/g, "");
 }
 
-function safeInt(v) {
-  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+function safeIntOrNull(v) {
+  const s = clean(v);
+  if (!s) return null;
+  const n = Number(String(s).replace(/[^\d-]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
-function nowIso() {
-  return new Date().toISOString();
+function toBool(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "y" || s === "on";
 }
 
 /** multer storage factory */
@@ -53,74 +57,108 @@ export function fileFilter(_req, file, cb) {
   cb(null, true);
 }
 
-/** GET /slots */
+/** GET /slots?page=ncategory2 */
 export async function listSlots(req, res) {
   try {
-    // page='ncategory2' 기준으로 불러오되,
-    // 테이블에 page 컬럼이 없으면 WHERE 절을 제거해서 쓰면 됨.
+    const page = clean(req.query.page) || "ncategory2";
+
+    // ✅ admin_ad_slots 실제 컬럼만 + 표시용 업종은 JOIN 결과로만 제공
     const sql = `
       SELECT
-        position,
-        page,
-        slot_type,
-        slot_mode,
-        store_type,
-        store_id,
-        business_no,
-        business_name,
-        business_category,
-        image_url,
-        text_content,
-        link_url,
-        updated_at
-      FROM ${SLOTS_TABLE}
-      WHERE page = 'ncategory2'
-      ORDER BY position ASC
+        s.id,
+        s.page,
+        s.position,
+        s.priority,
+        s.slot_type,
+        s.slot_mode,
+        s.store_id,
+        s.business_no,
+        s.business_name,
+        s.image_url,
+        s.link_url,
+        s.text_content,
+        s.created_at,
+        s.updated_at,
+        s.start_date,
+        s.end_date,
+        s.no_end,
+        s.start_at,
+        s.end_at,
+        s.store_type,
+        s.table_source,
+
+        COALESCE(c.business_category, '') AS business_category
+      FROM ${SLOTS_TABLE} s
+      LEFT JOIN ${STORE_TABLE} c
+        ON s.table_source = 'combined_store_info'
+       AND c.id = s.store_id
+      WHERE s.page = $1
+      ORDER BY s.position ASC, s.priority ASC NULLS FIRST
     `;
-    const { rows } = await pool.query(sql);
+
+    const { rows } = await pool.query(sql, [page]);
     return res.json({ success: true, slots: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 }
 
-/** GET /slot?position=... */
+/** GET /slot?page=...&position=...&priority=... */
 export async function getSlot(req, res) {
   try {
+    const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
+    const priority = safeIntOrNull(req.query.priority); // "" -> null
+
     if (!position) return res.json({ success: true, slot: null });
 
     const sql = `
       SELECT
-        position,
-        page,
-        slot_type,
-        slot_mode,
-        store_type,
-        store_id,
-        business_no,
-        business_name,
-        business_category,
-        image_url,
-        text_content,
-        link_url,
-        updated_at
-      FROM ${SLOTS_TABLE}
-      WHERE page = 'ncategory2' AND position = $1
+        s.id,
+        s.page,
+        s.position,
+        s.priority,
+        s.slot_type,
+        s.slot_mode,
+        s.store_id,
+        s.business_no,
+        s.business_name,
+        s.image_url,
+        s.link_url,
+        s.text_content,
+        s.created_at,
+        s.updated_at,
+        s.start_date,
+        s.end_date,
+        s.no_end,
+        s.start_at,
+        s.end_at,
+        s.store_type,
+        s.table_source,
+
+        COALESCE(c.business_category, '') AS business_category
+      FROM ${SLOTS_TABLE} s
+      LEFT JOIN ${STORE_TABLE} c
+        ON s.table_source = 'combined_store_info'
+       AND c.id = s.store_id
+      WHERE s.page = $1
+        AND s.position = $2
+        AND (s.priority IS NOT DISTINCT FROM $3)
       LIMIT 1
     `;
-    const { rows } = await pool.query(sql, [position]);
+
+    const { rows } = await pool.query(sql, [page, position, priority]);
     return res.json({ success: true, slot: rows[0] || null });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 }
 
-/** GET /search-store?q=...&bizNo=...  (combined_store_info만) */
+/** GET /store/search?q=...&bizNo=... (combined_store_info만) */
 export async function searchStore(req, res) {
   try {
     const q = clean(req.query.q);
-    const bizNo = digitsOnly(req.query.bizNo);
+    const bizNo = digitsOnly(req.query.bizNo || req.query.businessNo || req.query.business_no);
 
     const params = [];
     let where = `WHERE 1=1`;
@@ -142,7 +180,7 @@ export async function searchStore(req, res) {
         regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         business_name,
         business_category AS category
-      FROM public.combined_store_info
+      FROM ${STORE_TABLE}
       ${where}
       ORDER BY id DESC
       LIMIT 50
@@ -158,78 +196,114 @@ export async function searchStore(req, res) {
 /** POST /slot (multipart) */
 export async function upsertSlot(req, res) {
   try {
-    const position = clean(req.body.position);
     const page = clean(req.body.page) || "ncategory2";
-    const slot_type = clean(req.body.slot_type) || "image";
-    const slot_mode = clean(req.body.slot_mode) || "store";
+    const position = clean(req.body.position);
+    const priority = safeIntOrNull(req.body.priority); // "" -> null
 
-    const store_type = clean(req.body.store_type);
-    const store_id = clean(req.body.store_id);
-    const business_no = digitsOnly(req.body.business_no);
-    const business_name = clean(req.body.business_name);
-    const category = clean(req.body.category);
-    const text_content = clean(req.body.text_content);
-    const link_url = clean(req.body.link_url);
+    const slot_type = clean(req.body.slot_type || req.body.slotType) || "image";
+    const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "store";
+
+    let store_type = clean(req.body.store_type || req.body.storeType);
+    let table_source = clean(req.body.table_source || req.body.tableSource);
+    let store_id = safeIntOrNull(req.body.store_id || req.body.storeId);
+    let business_no = digitsOnly(req.body.business_no || req.body.businessNo);
+    let business_name = clean(req.body.business_name || req.body.businessName);
+
+    const text_content = clean(req.body.text_content || req.body.textContent);
+    const link_url = clean(req.body.link_url || req.body.linkUrl);
+
+    const keepImage = toBool(req.body.keepImage || req.body.keep_image);
+    const clearImage = toBool(req.body.clearImage || req.body.clear_image);
 
     if (!position) return res.status(400).json({ success: false, error: "position required" });
-
-    // ✅ 이미지 파일 있으면 반영
-    let image_url = clean(req.body.image_url);
-    const file = Array.isArray(req.files) && req.files.length ? req.files[0] : null;
-    if (file?.filename) {
-      image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
-    }
 
     // ✅ store 모드인데 store_id 없으면 막기
     if (slot_mode === "store" && !store_id) {
       return res.status(400).json({ success: false, error: "store mode requires store_id" });
     }
 
-    // ✅ admin_ad_slots 에 upsert
-    // - 테이블 PK/UNIQUE가 (page, position) 이면 ON CONFLICT (page, position)
-    // - position 단독이면 ON CONFLICT (position) 로 바꾸면 됨
+    // ✅ banner 모드면 가게 연결 필드는 비움
+    if (slot_mode !== "store") {
+      store_type = "";
+      table_source = "";
+      store_id = null;
+      business_no = "";
+      business_name = "";
+    }
+
+    // ✅ 이미지 처리 (clear 우선)
+    let image_url = clean(req.body.image_url || req.body.imageUrl);
+    image_url = image_url ? image_url : null;
+
+    const file = Array.isArray(req.files) && req.files.length ? req.files[0] : null;
+    if (file?.filename) {
+      image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
+    }
+
+    // clear 체크면 무조건 null
+    if (clearImage) {
+      image_url = null;
+    }
+
+    // ✅ upsert
+    // - UNIQUE가 (page, position) 이라는 전제로 유지
+    // - priority를 쓰고 싶으면 UNIQUE/ON CONFLICT도 (page, position, priority)로 맞춰야 함
     const sql = `
       INSERT INTO ${SLOTS_TABLE} (
-        page, position,
+        page, position, priority,
         slot_type, slot_mode,
-        store_type, store_id,
-        business_no, business_name, category,
-        image_url, text_content, link_url,
+        store_type, table_source,
+        store_id, business_no, business_name,
+        image_url, link_url, text_content,
         updated_at
       )
       VALUES (
-        $1,$2,
-        $3,$4,
-        $5,$6,
-        $7,$8,$9,
-        $10,$11,$12,
+        $1,$2,$3,
+        $4,$5,
+        $6,$7,
+        $8,$9,$10,
+        $11,$12,$13,
         NOW()
       )
       ON CONFLICT (page, position)
       DO UPDATE SET
+        priority = EXCLUDED.priority,
         slot_type = EXCLUDED.slot_type,
         slot_mode = EXCLUDED.slot_mode,
         store_type = EXCLUDED.store_type,
+        table_source = EXCLUDED.table_source,
         store_id = EXCLUDED.store_id,
         business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-        category = EXCLUDED.category,
-        image_url = COALESCE(EXCLUDED.image_url, ${SLOTS_TABLE}.image_url),
-        text_content = EXCLUDED.text_content,
+
+        -- ✅ 이미지 규칙:
+        -- clearImage=true면 NULL
+        -- 아니면 새 값이 있으면 새 값, 없으면 기존 유지
+        image_url = CASE
+          WHEN $14 = true THEN NULL
+          ELSE COALESCE(EXCLUDED.image_url, ${SLOTS_TABLE}.image_url)
+        END,
+
         link_url = EXCLUDED.link_url,
+        text_content = EXCLUDED.text_content,
         updated_at = NOW()
       RETURNING
-        position, page, slot_type, slot_mode,
-        store_type, store_id, business_no, business_name, category,
-        image_url, text_content, link_url, updated_at
+        id, page, position, priority,
+        slot_type, slot_mode,
+        store_type, table_source,
+        store_id, business_no, business_name,
+        image_url, link_url, text_content,
+        created_at, updated_at,
+        start_date, end_date, no_end, start_at, end_at
     `;
 
     const values = [
-      page, position,
+      page, position, priority,
       slot_type, slot_mode,
-      store_type || null, store_id || null,
-      business_no || null, business_name || null, category || null,
-      image_url || null, text_content || null, link_url || null
+      store_type || null, table_source || null,
+      store_id, business_no || null, business_name || null,
+      image_url, link_url || null, text_content || null,
+      clearImage, // $14
     ];
 
     const { rows } = await pool.query(sql, values);
@@ -239,15 +313,22 @@ export async function upsertSlot(req, res) {
   }
 }
 
-/** DELETE /slot?position=... */
+/** DELETE /slot?page=...&position=...&priority=... */
 export async function deleteSlot(req, res) {
   try {
+    const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
+    const priority = safeIntOrNull(req.query.priority);
+
     if (!position) return res.status(400).json({ success: false, error: "position required" });
 
-    // page 조건 포함 (page 컬럼 없으면 제거)
-    const sql = `DELETE FROM ${SLOTS_TABLE} WHERE page='ncategory2' AND position=$1`;
-    await pool.query(sql, [position]);
+    const sql = `
+      DELETE FROM ${SLOTS_TABLE}
+      WHERE page = $1
+        AND position = $2
+        AND (priority IS NOT DISTINCT FROM $3)
+    `;
+    await pool.query(sql, [page, position, priority]);
 
     return res.json({ success: true });
   } catch (e) {
