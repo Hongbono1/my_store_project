@@ -129,6 +129,9 @@ export async function getSlot(req, res) {
         COALESCE(text_content,'') AS text_content,
         COALESCE(image_url,'') AS image_url,
         COALESCE(link_url,'') AS link_url,
+        COALESCE(store_type,'') AS store_type,
+        COALESCE(store_id,'') AS store_id,
+        COALESCE(business_name,'') AS business_name,
         start_at,
         end_at,
         COALESCE(no_end,false) AS no_end,
@@ -164,6 +167,11 @@ export async function saveSlot(req, res) {
     const start_at = toDateOrNull(req.body.start_at);
     const end_at = toDateOrNull(req.body.end_at);
     const no_end = toBool(req.body.no_end);
+
+    // ✅ 가게 선택 정보 (재발 방지)
+    const store_type = clean(req.body.store_type);
+    const store_id = clean(req.body.store_id);
+    const business_name = clean(req.body.business_name);
 
     // ✅ 기존값 조회(이미지/slot_type 유지용)
     const prev = await pool.query(
@@ -240,9 +248,9 @@ export async function saveSlot(req, res) {
       await pool.query(
         `
         INSERT INTO ${TABLE}
-          (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, updated_at)
+          (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, store_type, store_id, business_name, updated_at)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
         ON CONFLICT (page, position, priority)
         DO UPDATE SET
           slot_type=EXCLUDED.slot_type,
@@ -252,9 +260,12 @@ export async function saveSlot(req, res) {
           start_at=EXCLUDED.start_at,
           end_at=EXCLUDED.end_at,
           no_end=EXCLUDED.no_end,
+          store_type=EXCLUDED.store_type,
+          store_id=EXCLUDED.store_id,
+          business_name=EXCLUDED.business_name,
           updated_at=NOW()
         `,
-        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
       );
     } catch (e) {
       // fallback: update 먼저, 안되면 insert
@@ -269,21 +280,24 @@ export async function saveSlot(req, res) {
           start_at=$8,
           end_at=$9,
           no_end=$10,
+          store_type=$11,
+          store_id=$12,
+          business_name=$13,
           updated_at=NOW()
         WHERE page=$1 AND position=$2 AND priority=$3
         `,
-        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+        [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
       );
 
       if (upd.rowCount === 0) {
         await pool.query(
           `
           INSERT INTO ${TABLE}
-            (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, created_at, updated_at)
+            (page, position, priority, slot_type, text_content, image_url, link_url, start_at, end_at, no_end, store_type, store_id, business_name, created_at, updated_at)
           VALUES
-            ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
+            ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
           `,
-          [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end]
+          [page, position, priority, slot_type, text_content, image_url, link_url, start_at, finalEndAt, no_end, store_type, store_id, business_name]
         );
       }
     }

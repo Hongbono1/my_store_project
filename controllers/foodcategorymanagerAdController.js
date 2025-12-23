@@ -229,6 +229,17 @@ export async function saveSlot(req, res) {
       tableSource = 'store_info';
     }
 
+    // ✅ 재발 방지: 가게 선택 시 link_url 자동 생성 (규칙 통일)
+    if (storeId && !linkUrl) {
+      if (tableSource === 'combined_store_info') {
+        linkUrl = `/ndetail.html?id=${storeId}&type=combined`;
+      } else if (tableSource === 'store_info') {
+        linkUrl = `/ndetail.html?id=${storeId}&type=store_info`;
+      } else if (tableSource === 'food_stores') {
+        linkUrl = `/ndetail.html?id=${storeId}&type=food`;
+      }
+    }
+
     let startAtLocal = clean(b.startAt || b.start_at) || "";
     let endAtLocal = clean(b.endAt || b.end_at) || "";
     let noEnd = toBool(b.noEnd || b.no_end);

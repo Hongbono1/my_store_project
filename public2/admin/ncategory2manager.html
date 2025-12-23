@@ -549,6 +549,9 @@
                         <div class="text-sm font-extrabold mb-3">슬롯 기본 정보</div>
 
                         <input type="hidden" id="f_position" />
+                        <input type="hidden" id="f_store_type" />
+                        <input type="hidden" id="f_store_id" />
+                        <input type="hidden" id="f_business_name" />
 
                         <div class="grid grid-cols-1 gap-3">
                             <div>
@@ -946,6 +949,9 @@
         const previewMeta = document.getElementById("previewMeta");
 
         const f_position = document.getElementById("f_position");
+        const f_store_type = document.getElementById("f_store_type");
+        const f_store_id = document.getElementById("f_store_id");
+        const f_business_name = document.getElementById("f_business_name");
         const f_text = document.getElementById("f_text");
         const f_link = document.getElementById("f_link");
         const f_image = document.getElementById("f_image");
@@ -1010,6 +1016,11 @@
             fd.append("start_at", f_start.value || "");
             fd.append("end_at", f_end.value || "");
             fd.append("no_end", f_noend.checked ? "true" : "false");
+
+            // ✅ 가게 선택 정보 추가 (재발 방지)
+            fd.append("store_type", f_store_type.value || "");
+            fd.append("store_id", f_store_id.value || "");
+            fd.append("business_name", f_business_name.value || "");
 
             if (f_image.files && f_image.files[0]) fd.append("slotImage", f_image.files[0]);
             fd.append("slot_type", (f_image.files && f_image.files[0]) ? "image" : "text");
@@ -1110,8 +1121,24 @@
                 `;
 
                 row.querySelector("button").addEventListener("click", () => {
+                    // ✅ 가게 정보 저장
+                    f_store_type.value = s.store_type || "";
+                    f_store_id.value = s.id || "";
+                    f_business_name.value = name;
+                    
+                    // ✅ 텍스트는 상호명으로 설정
                     f_text.value = name;
-                    f_link.value = link;
+                    
+                    // ✅ link_url 자동 생성 (규칙 통일)
+                    const storeType = String(s.store_type || "").toLowerCase().trim();
+                    if (storeType === "combined" || storeType === "combined_store_info") {
+                        f_link.value = `/ndetail.html?id=${s.id}&type=combined`;
+                    } else if (storeType === "store_info") {
+                        f_link.value = `/detail.html?id=${s.id}`;
+                    } else {
+                        f_link.value = link; // fallback
+                    }
+                    
                     syncPreview();
                 });
 
