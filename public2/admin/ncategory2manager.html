@@ -535,10 +535,15 @@
     <script>
         // ---------- 공통 ----------
         const el = (id) => document.getElementById(id);
-        const digitsOnly = (v) => String(v || "").replace(/[^\d]/g, "");
+        const clean = (v) => (v == null ? "" : String(v).trim());
+        const digitsOnly = (v) => clean(v).replace(/[^\d]/g, "");
 
-        fetch("/components/header.html").then(r => r.text()).then(d => el("header-placeholder").innerHTML = d);
-        fetch("/components/footer.html").then(r => r.text()).then(d => el("footer-placeholder").innerHTML = d);
+        fetch("/components/header.html")
+            .then((r) => r.text())
+            .then((d) => (el("header-placeholder").innerHTML = d));
+        fetch("/components/footer.html")
+            .then((r) => r.text())
+            .then((d) => (el("footer-placeholder").innerHTML = d));
 
         function toggleSub(btn) {
             const ul = btn.nextElementSibling;
@@ -550,20 +555,41 @@
             if (document.referrer && document.referrer !== location.href) window.history.back();
             else window.location.href = "/category.html";
         }
-        function goNext() { window.history.forward(); }
+        function goNext() {
+            window.history.forward();
+        }
 
         // ---------- API ----------
-        const API_BASE = "/ncategory2manager/ad";
+        const API_BASE = "/ncategory2manager/ad"; // server.js: app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
         const PAGE = "ncategory2";
         const DEFAULT_TABLE_SOURCE = "combined_store_info";
 
-        function buildCombinedLink(id) {
-            return `/ndetail.html?id=${encodeURIComponent(String(id))}&type=combined`;
+        function buildStoreLink(tableSource, storeId) {
+            const t = clean(tableSource) || DEFAULT_TABLE_SOURCE;
+            const id = clean(storeId);
+            if (!id) return "#";
+
+            if (t === "combined_store_info" || t === "combined") {
+                return `/ndetail.html?id=${encodeURIComponent(id)}&type=combined`;
+            }
+            if (t === "food_stores" || t === "food") {
+                return `/ndetail.html?id=${encodeURIComponent(id)}&type=food`;
+            }
+            if (t === "store_info") {
+                return `/detail.html?id=${encodeURIComponent(id)}`;
+            }
+            return `/ndetail.html?id=${encodeURIComponent(id)}&type=combined`;
+        }
+
+        async function fetchJson(url, opt = {}) {
+            const r = await fetch(url, opt);
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data?.error || data?.message || `HTTP ${r.status}`);
+            return data;
         }
 
         async function apiListSlots() {
-            const r = await fetch(`${API_BASE}/slots?page=${encodeURIComponent(PAGE)}`);
-            const data = await r.json().catch(() => ({}));
+            const data = await fetchJson(`${API_BASE}/slots?page=${encodeURIComponent(PAGE)}`);
             if (data && data.success === true) return data.slots || [];
             if (Array.isArray(data?.slots)) return data.slots;
             throw new Error(data?.error || "슬롯 목록 로드 실패");
@@ -575,32 +601,50 @@
             if (position) url.searchParams.set("position", position);
             if (priority !== "" && priority !== null && priority !== undefined) url.searchParams.set("priority", String(priority));
 
-            const r = await fetch(url.toString());
-            const data = await r.json().catch(() => ({}));
+            const data = await fetchJson(url.toString());
             if (data && data.success === true) return data.slot || null;
             return null;
         }
 
+        // ✅ 가게 검색(경로 fallback 포함)
         async function apiSearchStore({ q, bizNo }) {
-            const url = new URL(`${API_BASE}/store/search`, window.location.origin);
-            if (q) url.searchParams.set("q", q);
+            const Q = clean(q);
+            const B = digitsOnly(bizNo);
 
-            if (bizNo) {
-                url.searchParams.set("bizNo", bizNo);
-                url.searchParams.set("businessNo", bizNo);
-                url.searchParams.set("business_no", bizNo);
+            const params = new URLSearchParams();
+            if (Q) params.set("q", Q);
+            if (B) {
+                params.set("bizNo", B);
+                params.set("businessNo", B);
+                params.set("business_no", B);
             }
 
-            const r = await fetch(url.toString());
-            const data = await r.json().catch(() => ({}));
-            if (data && data.ok === true) return data.stores || [];
-            if (data && data.success === true) return data.stores || [];
-            throw new Error(data?.error || "검색 실패");
+            const tryUrls = [
+                `${API_BASE}/store/search?${params.toString()}`,      // 네가 현재 쓰는 경로
+                `${API_BASE}/search-store?${params.toString()}`,     // 푸드에서 흔히 쓰는 형태
+                `${API_BASE}/store-search?${params.toString()}`,
+                `${API_BASE}/searchStore?${params.toString()}`,
+                `${API_BASE}/stores/search?${params.toString()}`
+            ];
+
+            let lastErr = null;
+            for (const u of tryUrls) {
+                try {
+                    const data = await fetchJson(u);
+                    if (data?.ok === true || data?.success === true) return data.stores || [];
+                    if (Array.isArray(data?.stores)) return data.stores;
+                    if (Array.isArray(data?.data)) return data.data;
+                    if (Array.isArray(data)) return data;
+                    return data?.stores || [];
+                } catch (e) {
+                    lastErr = e;
+                }
+            }
+            throw lastErr || new Error("검색 실패");
         }
 
         async function apiUpsertSlot(formData) {
-            const r = await fetch(`${API_BASE}/slot`, { method: "POST", body: formData });
-            const data = await r.json().catch(() => ({}));
+            const data = await fetchJson(`${API_BASE}/slot`, { method: "POST", body: formData });
             if (!data || data.success !== true) throw new Error(data?.error || "저장 실패");
             return data.slot || null;
         }
@@ -608,8 +652,6 @@
         // ---------- 슬롯 화면 구성 ----------
         const POWER_POS = Array.from({ length: 9 }, (_, i) => `ncategory2_power_${i + 1}`);
         const BEST_POS = Array.from({ length: 9 }, (_, i) => `ncategory2_best_${i + 1}`);
-
-        // ✅ Premium 슬롯 position 추가(중요)
         const PREMIUM_POS = "ncategory2_premium";
 
         const state = {
@@ -619,12 +661,14 @@
         };
 
         function pickCategory(obj) {
-            return obj?.category
-                || obj?.business_category
-                || obj?.businessCategory
-                || obj?.store_category
-                || obj?.storeCategory
-                || "";
+            return clean(
+                obj?.category ||
+                obj?.business_category ||
+                obj?.businessCategory ||
+                obj?.store_category ||
+                obj?.storeCategory ||
+                ""
+            );
         }
 
         function makeSlotCard(position, label, imgHClass = "h-60 md:h-64") {
@@ -633,17 +677,18 @@
             wrap.setAttribute("data-position", position);
             wrap.setAttribute("data-label", label);
             wrap.innerHTML = `
-        <img data-role="img" src="/uploads/sample-1.jpg" alt="${label}" class="w-full ${imgHClass} object-cover">
-        <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
-          <div class="font-bold text-lg" data-role="name">${label}</div>
-          <div class="text-sm text-slate-600" data-role="category">업종:</div>
-        </div>
-      `;
+      <img data-role="img" src="/uploads/sample-1.jpg" alt="${label}" class="w-full ${imgHClass} object-cover">
+      <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
+        <div class="font-bold text-lg" data-role="name">${label}</div>
+        <div class="text-sm text-slate-600" data-role="category">업종:</div>
+      </div>
+    `;
             return wrap;
         }
 
         function buildPowerSliderDom() {
             const track = el("powerAdTrack");
+            if (!track) return;
             track.innerHTML = "";
 
             for (let g = 0; g < 3; g++) {
@@ -671,6 +716,7 @@
 
         function buildBestGridDom() {
             const grid = el("bestGrid");
+            if (!grid) return;
             grid.innerHTML = "";
 
             for (let i = 0; i < 9; i++) {
@@ -686,21 +732,21 @@
                 card.setAttribute("data-label", `최고의가게 ${i + 1}`);
 
                 card.innerHTML = `
-          <div class="w-full h-60">
-            <img data-role="img" src="/uploads/sample-1.jpg" alt="상호명" class="w-full h-full object-cover">
-          </div>
-          <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-3">
-            <div class="font-bold text-lg leading-tight" data-role="name">상호명</div>
-            <div class="text-sm text-slate-600" data-role="category">업종:</div>
-          </div>
-        `;
+        <div class="w-full h-60">
+          <img data-role="img" src="/uploads/sample-1.jpg" alt="상호명" class="w-full h-full object-cover">
+        </div>
+        <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-3">
+          <div class="font-bold text-lg leading-tight" data-role="name">상호명</div>
+          <div class="text-sm text-slate-600" data-role="category">업종:</div>
+        </div>
+      `;
 
                 a.appendChild(card);
                 grid.appendChild(a);
             }
         }
 
-        // ✅ Premium도 text_content(설명) 표시 가능하게 확장
+        // ✅ Premium도 text_content(설명) 표시 가능
         function applySlotToEl(slotEl, slot) {
             if (!slotEl) return;
 
@@ -710,30 +756,30 @@
             const desc = slotEl.querySelector('[data-role="desc"]');
 
             const fallbackImg = img?.getAttribute("src") || "";
-            const imageUrl = slot?.image_url || slot?.imageUrl || fallbackImg;
+            const imageUrl = clean(slot?.image_url || slot?.imageUrl || "") || fallbackImg;
 
             const businessName =
-                slot?.business_name || slot?.businessName ||
-                (slotEl.getAttribute("data-label") || "");
+                clean(slot?.business_name || slot?.businessName || "") ||
+                clean(slotEl.getAttribute("data-label") || "");
 
             const cat = pickCategory(slot);
-            const textContent = slot?.text_content || slot?.textContent || "";
+            const textContent = clean(slot?.text_content || slot?.textContent || "");
 
             if (img) img.src = imageUrl || fallbackImg;
             if (name) name.textContent = businessName || "";
 
-            // 기존 카드들은 category 라인
             if (category) category.textContent = cat ? `업종: ${cat}` : "업종:";
-
-            // Premium 박스는 desc 라인
             if (desc) desc.textContent = textContent || desc.textContent || "";
 
             const a = slotEl.closest("a");
-            if (a) a.href = slot?.link_url || slot?.linkUrl || "#";
+            if (a) a.href = clean(slot?.link_url || slot?.linkUrl || "") || "#";
         }
 
         function bindAdminClicks() {
-            document.querySelectorAll("[data-position]").forEach(target => {
+            document.querySelectorAll("[data-position]").forEach((target) => {
+                if (target.dataset.bound === "1") return;
+                target.dataset.bound = "1";
+
                 target.addEventListener("click", (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -746,9 +792,9 @@
         async function loadAndRender() {
             const rows = await apiListSlots();
             state.slots.clear();
-            rows.forEach(r => state.slots.set(r.position, r));
+            rows.forEach((r) => state.slots.set(r.position, r));
 
-            document.querySelectorAll("[data-position]").forEach(slotEl => {
+            document.querySelectorAll("[data-position]").forEach((slotEl) => {
                 const pos = slotEl.getAttribute("data-position");
                 applySlotToEl(slotEl, state.slots.get(pos));
             });
@@ -780,32 +826,55 @@
             function nextManual() {
                 if (groups <= 1) return;
                 if (index < groups - 1) index++;
-                else { dir = -1; index = groups - 2; }
+                else {
+                    dir = -1;
+                    index = groups - 2;
+                }
                 updateSlider();
             }
 
             function prevManual() {
                 if (groups <= 1) return;
                 if (index > 0) index--;
-                else { dir = 1; index = 1; }
+                else {
+                    dir = 1;
+                    index = 1;
+                }
                 updateSlider();
             }
 
             const nextBtn = el("nextBtn");
             const prevBtn = el("prevBtn");
             if (nextBtn && prevBtn) {
-                nextBtn.addEventListener("click", () => { stopAuto(); nextManual(); startAuto(); });
-                prevBtn.addEventListener("click", () => { stopAuto(); prevManual(); startAuto(); });
+                nextBtn.addEventListener("click", () => {
+                    stopAuto();
+                    nextManual();
+                    startAuto();
+                });
+                prevBtn.addEventListener("click", () => {
+                    stopAuto();
+                    prevManual();
+                    startAuto();
+                });
             }
 
             window.addEventListener("resize", updateSlider);
 
             const INTERVAL = 10000;
             let timer = null;
-            function startAuto() { if (!timer) timer = setInterval(stepAuto, INTERVAL); }
-            function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+            function startAuto() {
+                if (!timer) timer = setInterval(stepAuto, INTERVAL);
+            }
+            function stopAuto() {
+                if (timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            }
 
-            document.addEventListener("visibilitychange", () => { document.hidden ? stopAuto() : startAuto(); });
+            document.addEventListener("visibilitychange", () => {
+                document.hidden ? stopAuto() : startAuto();
+            });
             viewport.addEventListener("mouseenter", stopAuto);
             viewport.addEventListener("mouseleave", startAuto);
 
@@ -824,8 +893,9 @@
             const empty = el("m_previewEmpty");
             if (!img || !empty) return;
 
-            if (url) {
-                img.src = url;
+            const u = clean(url);
+            if (u) {
+                img.src = u;
                 img.classList.remove("hidden");
                 empty.classList.add("hidden");
             } else {
@@ -843,50 +913,53 @@
             setStatus("");
             state.selectedCategory = "";
 
-            el("m_imageFile").value = "";
-            el("m_keepImage").checked = false;
-            el("m_clearImage").checked = false;
+            if (el("m_imageFile")) el("m_imageFile").value = "";
+            if (el("m_keepImage")) el("m_keepImage").checked = false;
+            if (el("m_clearImage")) el("m_clearImage").checked = false;
 
-            el("m_imageUrl").value = "";
+            if (el("m_imageUrl")) el("m_imageUrl").value = "";
             setPreview("");
 
-            el("m_tableSource").value = "";
-            el("m_storeId").value = "";
-            el("m_businessNo").value = "";
-            el("m_businessName").value = "";
-            el("m_categoryView").value = "";
+            // ✅ 기본값 유지
+            if (el("m_tableSource")) el("m_tableSource").value = DEFAULT_TABLE_SOURCE;
+            if (el("m_storeId")) el("m_storeId").value = "";
+            if (el("m_businessNo")) el("m_businessNo").value = "";
+            if (el("m_businessName")) el("m_businessName").value = "";
+            if (el("m_categoryView")) el("m_categoryView").value = "";
 
-            el("m_linkUrl").value = "";
-            el("m_textContent").value = "";
+            if (el("m_linkUrl")) el("m_linkUrl").value = "";
+            if (el("m_textContent")) el("m_textContent").value = "";
 
-            el("storeSearchResults").innerHTML = "";
-            el("storeSearchQ").value = "";
-            el("storeSearchBizNo").value = "";
+            if (el("storeSearchResults")) el("storeSearchResults").innerHTML = "";
+            if (el("storeSearchQ")) el("storeSearchQ").value = "";
+            if (el("storeSearchBizNo")) el("storeSearchBizNo").value = "";
 
-            document.querySelectorAll('input[name="m_slotMode"]').forEach(r => r.checked = (r.value === "banner"));
+            document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === "banner"));
         }
 
         async function openSlotModal(position, priority = "") {
             state.currentKey.page = PAGE;
-            state.currentKey.position = position || "";
-            state.currentKey.priority = (priority === null || priority === undefined) ? "" : String(priority);
+            state.currentKey.position = clean(position);
+            state.currentKey.priority = priority === null || priority === undefined ? "" : String(priority);
 
-            el("m_page").value = state.currentKey.page;
-            el("m_position").value = state.currentKey.position;
-            el("m_priority").value = state.currentKey.priority;
+            if (el("m_page")) el("m_page").value = state.currentKey.page;
+            if (el("m_position")) el("m_position").value = state.currentKey.position;
+            if (el("m_priority")) el("m_priority").value = state.currentKey.priority;
 
             clearModalFields();
 
-            el("slotModal").classList.remove("hidden");
-            el("slotModalSub").textContent =
-                `page=${state.currentKey.page} / position=${state.currentKey.position}` +
-                (state.currentKey.priority ? ` / priority=${state.currentKey.priority}` : " / priority=NULL");
+            el("slotModal")?.classList.remove("hidden");
+            if (el("slotModalSub")) {
+                el("slotModalSub").textContent =
+                    `page=${state.currentKey.page} / position=${state.currentKey.position}` +
+                    (state.currentKey.priority ? ` / priority=${state.currentKey.priority}` : " / priority=NULL");
+            }
 
             await loadSlotIntoModal();
         }
 
         function closeSlotModal() {
-            el("slotModal").classList.add("hidden");
+            el("slotModal")?.classList.add("hidden");
         }
 
         async function loadSlotIntoModal() {
@@ -899,24 +972,24 @@
                     return;
                 }
 
-                const mode = (slot.slot_mode || slot.slotMode || "banner");
-                document.querySelectorAll('input[name="m_slotMode"]').forEach(r => r.checked = (r.value === mode));
+                const mode = clean(slot.slot_mode || slot.slotMode || "banner");
+                document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === mode));
 
-                const img = slot.image_url || slot.imageUrl || "";
-                el("m_imageUrl").value = img || "";
-                setPreview(img || "");
+                const img = clean(slot.image_url || slot.imageUrl || "");
+                if (el("m_imageUrl")) el("m_imageUrl").value = img;
+                setPreview(img);
 
-                el("m_tableSource").value = slot.table_source || slot.tableSource || "";
-                el("m_storeId").value = slot.store_id || slot.storeId || "";
-                el("m_businessNo").value = slot.business_no || slot.businessNo || "";
-                el("m_businessName").value = slot.business_name || slot.businessName || "";
+                if (el("m_tableSource")) el("m_tableSource").value = clean(slot.table_source || slot.tableSource || DEFAULT_TABLE_SOURCE);
+                if (el("m_storeId")) el("m_storeId").value = clean(slot.store_id || slot.storeId || "");
+                if (el("m_businessNo")) el("m_businessNo").value = clean(slot.business_no || slot.businessNo || "");
+                if (el("m_businessName")) el("m_businessName").value = clean(slot.business_name || slot.businessName || "");
 
                 const cat = pickCategory(slot);
                 state.selectedCategory = cat || "";
-                el("m_categoryView").value = cat || "";
+                if (el("m_categoryView")) el("m_categoryView").value = cat;
 
-                el("m_linkUrl").value = slot.link_url || slot.linkUrl || "";
-                el("m_textContent").value = slot.text_content || slot.textContent || "";
+                if (el("m_linkUrl")) el("m_linkUrl").value = clean(slot.link_url || slot.linkUrl || "");
+                if (el("m_textContent")) el("m_textContent").value = clean(slot.text_content || slot.textContent || "");
 
                 setStatus("불러오기 완료");
             } catch (e) {
@@ -928,21 +1001,26 @@
         // ✅ 가게 검색
         async function doStoreSearch() {
             try {
-                const q = (el("storeSearchQ").value || "").trim();
-                const bizNo = digitsOnly((el("storeSearchBizNo").value || "").trim());
+                const q = clean(el("storeSearchQ")?.value);
+                const bizNo = digitsOnly(clean(el("storeSearchBizNo")?.value));
+
+                if (!q && !bizNo) {
+                    el("storeSearchResults").innerHTML = `<div class="text-sm text-rose-600">가게명/업종 또는 사업자번호를 입력하세요</div>`;
+                    return;
+                }
 
                 el("storeSearchResults").innerHTML = `<div class="text-sm text-slate-500">검색 중...</div>`;
                 const stores = await apiSearchStore({ q, bizNo });
-
                 renderStoreResults(stores || []);
             } catch (e) {
                 console.error(e);
-                el("storeSearchResults").innerHTML = `<div class="text-sm text-rose-600">검색 오류</div>`;
+                el("storeSearchResults").innerHTML = `<div class="text-sm text-rose-600">검색 오류: ${e.message || "error"}</div>`;
             }
         }
 
         function renderStoreResults(stores) {
             const wrap = el("storeSearchResults");
+            if (!wrap) return;
             wrap.innerHTML = "";
 
             if (!stores.length) {
@@ -951,30 +1029,40 @@
             }
 
             stores.forEach((s) => {
-                const id = s.id || "";
-                const biz = s.business_no || s.businessNo || s.business_number || "";
-                const name = s.business_name || s.businessName || s.business_name_kor || "";
+                const id = clean(s.id);
+                const biz = clean(s.business_no || s.businessNo || s.business_number || "");
+                const name = clean(s.business_name || s.businessName || s.business_name_kor || "");
                 const cat = pickCategory(s);
-                const img = s.image_url || s.imageUrl || s.thumb_url || "";
+                const img = clean(s.image_url || s.imageUrl || s.thumb_url || "");
+                const tableSource = clean(s.table_source || s.tableSource || DEFAULT_TABLE_SOURCE);
 
                 const row = document.createElement("div");
                 row.className = "neo-card p-3 flex gap-3 items-center";
 
                 row.innerHTML = `
-          <div class="w-16 h-12 rounded-xl overflow-hidden bg-white/60 shrink-0">
-            ${img ? `<img src="${img}" class="w-full h-full object-cover" />`
-                        : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">NO IMG</div>`}
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="font-extrabold text-slate-800 truncate">${name || "-"}</div>
-            <div class="text-xs text-slate-600 mt-0.5 truncate">${cat ? `(${cat})` : ""} ${biz ? `· ${biz}` : ""}</div>
-            <div class="text-[11px] text-slate-400 mt-0.5 truncate">${DEFAULT_TABLE_SOURCE} · id=${id}</div>
-          </div>
-          <button class="btn-3d shrink-0" type="button">선택</button>
-        `;
+        <div class="w-16 h-12 rounded-xl overflow-hidden bg-white/60 shrink-0">
+          ${img
+                        ? `<img src="${img}" class="w-full h-full object-cover" />`
+                        : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">NO IMG</div>`
+                    }
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-extrabold text-slate-800 truncate">${name || "-"}</div>
+          <div class="text-xs text-slate-600 mt-0.5 truncate">${cat ? `(${cat})` : ""} ${biz ? `· ${biz}` : ""}</div>
+          <div class="text-[11px] text-slate-400 mt-0.5 truncate">${tableSource} · id=${id}</div>
+        </div>
+        <button class="btn-3d shrink-0" type="button">선택</button>
+      `;
 
                 row.querySelector("button").addEventListener("click", () => {
-                    applySelectedStore({ id, business_no: biz, business_name: name, category: cat });
+                    applySelectedStore({
+                        id,
+                        business_no: biz,
+                        business_name: name,
+                        category: cat,
+                        image_url: img,
+                        table_source: tableSource,
+                    });
                 });
 
                 wrap.appendChild(row);
@@ -983,21 +1071,28 @@
 
         // ✅ “선택” 시 자동 매핑
         function applySelectedStore(store) {
-            const storeId = store.id || "";
-            const businessNo = store.business_no || "";
-            const businessName = store.business_name || "";
-            const category = store.category || "";
+            const storeId = clean(store.id);
+            const businessNo = clean(store.business_no);
+            const businessName = clean(store.business_name);
+            const category = clean(store.category);
+            const imageUrl = clean(store.image_url);
+            const tableSource = clean(store.table_source) || DEFAULT_TABLE_SOURCE;
 
             state.selectedCategory = category || "";
 
-            el("m_storeId").value = storeId;
-            el("m_tableSource").value = DEFAULT_TABLE_SOURCE;
-            el("m_businessNo").value = businessNo;
-            el("m_businessName").value = businessName;
-            el("m_categoryView").value = category || "";
+            if (el("m_storeId")) el("m_storeId").value = storeId;
+            if (el("m_tableSource")) el("m_tableSource").value = tableSource;
+            if (el("m_businessNo")) el("m_businessNo").value = businessNo;
+            if (el("m_businessName")) el("m_businessName").value = businessName;
+            if (el("m_categoryView")) el("m_categoryView").value = category || "";
 
-            document.querySelectorAll('input[name="m_slotMode"]').forEach(r => r.checked = (r.value === "store"));
-            el("m_linkUrl").value = buildCombinedLink(storeId);
+            // ✅ 이미지 미리보기/URL 자동 반영(있을 때)
+            if (el("m_imageUrl")) el("m_imageUrl").value = imageUrl || clean(el("m_imageUrl").value);
+            setPreview(imageUrl || clean(el("m_imageUrl")?.value));
+
+            document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === "store"));
+
+            if (el("m_linkUrl")) el("m_linkUrl").value = buildStoreLink(tableSource, storeId);
 
             setStatus("가게 연결 완료 (저장 누르세요)");
         }
@@ -1007,9 +1102,11 @@
             try {
                 setStatus("저장 중...");
 
-                const page = el("m_page").value;
-                const position = el("m_position").value;
-                const priority = el("m_priority").value;
+                const page = clean(el("m_page")?.value) || PAGE;
+                const position = clean(el("m_position")?.value);
+                const priority = clean(el("m_priority")?.value);
+
+                if (!position) throw new Error("position(슬롯)이 비어있음");
 
                 const mode = getMode();
                 const fd = new FormData();
@@ -1024,38 +1121,40 @@
                 fd.append("slot_type", "image");
                 fd.append("slotType", "image");
 
-                const linkUrl = (el("m_linkUrl").value || "").trim();
-                const textContent = (el("m_textContent").value || "").trim();
+                const linkUrl = clean(el("m_linkUrl")?.value);
+                const textContent = clean(el("m_textContent")?.value);
+
                 fd.append("link_url", linkUrl);
                 fd.append("linkUrl", linkUrl);
                 fd.append("text_content", textContent);
                 fd.append("textContent", textContent);
 
-                const imageUrl = (el("m_imageUrl").value || "").trim();
+                const imageUrl = clean(el("m_imageUrl")?.value);
                 fd.append("image_url", imageUrl);
                 fd.append("imageUrl", imageUrl);
 
-                fd.append("keepImage", el("m_keepImage").checked ? "true" : "false");
-                fd.append("keep_image", el("m_keepImage").checked ? "true" : "false");
+                const keep = el("m_keepImage")?.checked ? "true" : "false";
+                const clear = el("m_clearImage")?.checked ? "true" : "false";
+                fd.append("keepImage", keep);
+                fd.append("keep_image", keep);
+                fd.append("clearImage", clear);
+                fd.append("clear_image", clear);
 
-                fd.append("clearImage", el("m_clearImage").checked ? "true" : "false");
-                fd.append("clear_image", el("m_clearImage").checked ? "true" : "false");
-
-                const file = el("m_imageFile").files && el("m_imageFile").files[0];
+                const file = el("m_imageFile")?.files?.[0];
                 if (file) fd.append("image", file);
 
-                const cat = (state.selectedCategory || "").trim();
+                const cat = clean(state.selectedCategory);
                 fd.append("category", cat);
                 fd.append("business_category", cat);
                 fd.append("businessCategory", cat);
 
                 if (mode === "store") {
-                    const storeId = (el("m_storeId").value || "").trim();
+                    const storeId = clean(el("m_storeId")?.value);
                     if (!storeId) throw new Error("가게연결 모드인데 store_id가 비어있음(가게 선택 먼저)");
 
-                    const tableSource = (el("m_tableSource").value || "").trim() || DEFAULT_TABLE_SOURCE;
-                    const businessNo = (el("m_businessNo").value || "").trim();
-                    const businessName = (el("m_businessName").value || "").trim();
+                    const tableSource = clean(el("m_tableSource")?.value) || DEFAULT_TABLE_SOURCE;
+                    const businessNo = clean(el("m_businessNo")?.value);
+                    const businessName = clean(el("m_businessName")?.value);
 
                     fd.append("table_source", tableSource);
                     fd.append("tableSource", tableSource);
@@ -1102,13 +1201,30 @@
             await loadAndRender();
             initPowerSlider();
 
-            el("m_imageFile").addEventListener("change", () => {
-                const f = el("m_imageFile").files && el("m_imageFile").files[0];
-                if (!f) return;
-                setPreview(URL.createObjectURL(f));
+            // 파일 미리보기
+            if (el("m_imageFile")) {
+                el("m_imageFile").addEventListener("change", () => {
+                    const f = el("m_imageFile").files && el("m_imageFile").files[0];
+                    if (!f) return;
+                    setPreview(URL.createObjectURL(f));
+                });
+            }
+
+            // ESC로 닫기
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    if (!el("slotModal")?.classList.contains("hidden")) closeSlotModal();
+                }
             });
         });
+
+        // ✅ 필요 시 전역 노출(HTML에서 onclick으로 부를 때)
+        window.openSlotModal = openSlotModal;
+        window.closeSlotModal = closeSlotModal;
+        window.doStoreSearch = doStoreSearch;
+        window.saveSlotFromModal = saveSlotFromModal;
     </script>
+
 </body>
 
 </html>
