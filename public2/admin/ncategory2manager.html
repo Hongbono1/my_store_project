@@ -284,7 +284,7 @@
     <div id="footer-placeholder"></div>
 
     <!-- ✅ 공통 모달 (foodcategorymanager 모달 그대로 이식) -->
-    <div id="modalRoot" class="hidden" data-page="" data-position="">
+    <div id="slotModal" class="hidden" data-page="" data-position="">
         <div class="modal-backdrop"></div>
 
         <div class="modal-panel">
@@ -599,11 +599,10 @@
             const url = new URL(`${API_BASE}/slot`, window.location.origin);
             if (page) url.searchParams.set("page", page);
             if (position) url.searchParams.set("position", position);
-            if (priority !== "" && priority !== null && priority !== undefined) url.searchParams.set("priority", String(priority));
+            if (priority !== "" && priority != null) url.searchParams.set("priority", String(priority));
 
-            const data = await fetchJson(url.toString());
-            if (data && data.success === true) return data.slot || null;
-            return null;
+            // ✅ category는 서버에 없는 칼럼이므로 절대 보내지 않음
+            return await fetchJson(url.toString());
         }
 
         // ✅ 가게 검색(경로 fallback 포함)
@@ -776,17 +775,25 @@
         }
 
         function bindAdminClicks() {
-            document.querySelectorAll("[data-position]").forEach((target) => {
-                if (target.dataset.bound === "1") return;
-                target.dataset.bound = "1";
+            document.addEventListener("click", async (e) => {
+                const target = e.target.closest("[data-position]");
+                if (!target) return;
 
-                target.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const position = target.getAttribute("data-position");
-                    openSlotModal(position, "");
-                });
-            });
+                e.preventDefault();
+                e.stopPropagation();
+
+                const position = target.getAttribute("data-position") || "";
+                if (!position) return;
+
+                const modal = el("slotModal");
+                if (!modal) {
+                    console.error("[modal] #slotModal 이 HTML에 없습니다.");
+                    alert("모달 HTML(#slotModal)이 페이지에 없습니다. id 확인하세요.");
+                    return;
+                }
+
+                await openSlotModal(position, "");
+            }, true);
         }
 
         async function loadAndRender() {
@@ -1143,8 +1150,7 @@
                 const file = el("m_imageFile")?.files?.[0];
                 if (file) fd.append("image", file);
 
-                const cat = clean(state.selectedCategory);
-                fd.append("category", cat);
+                const cat = (state.selectedCategory || "").trim();
                 fd.append("business_category", cat);
                 fd.append("businessCategory", cat);
 
