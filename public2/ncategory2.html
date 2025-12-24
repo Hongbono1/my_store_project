@@ -1030,18 +1030,21 @@
 
                     // DOM에 박혀있는 슬롯 카드들
                     const nodes = Array.from(document.querySelectorAll("[data-ad-slot]"));
+                    console.log(`🔍 [hydrateAds] 슬롯 카드 ${nodes.length}개 발견`);
                     if (!nodes.length) return;
 
                     try {
                         const items = await fetchSlotItems(page);
+                        console.log(`📦 [hydrateAds] API 응답: ${items.length}개 광고 데이터`, items);
 
                         // page 값이 없고 position/priority만 오는 케이스도 많아서 보정
-                        // (page가 비어있으면 여기서 강제로 page=category로 취급)
+                        // (page가 비어있으면 여기서 강제로 page=ncategory2로 취급)
                         for (const it of items) {
                             if (!it.page && !it.slot_page && !it.ad_page) it.page = page;
                         }
 
                         const map = indexByPositionPriority(items);
+                        console.log(`🗺️ [hydrateAds] 매핑된 광고:`, map);
 
                         for (const a of nodes) {
                             const p = cleanStr(a.getAttribute("data-page"));
@@ -1049,7 +1052,12 @@
                             const pri = cleanStr(a.getAttribute("data-priority"));
                             const key = `${p}|${pos}|${pri}`;
                             const found = map.get(key);
-                            if (found) applyItemToCard(a, found);
+                            if (found) {
+                                console.log(`✅ [hydrateAds] 매칭됨: ${key}`, found);
+                                applyItemToCard(a, found);
+                            } else {
+                                console.log(`⚠️ [hydrateAds] 매칭 실패: ${key}`);
+                            }
                         }
 
                         // 파워 슬라이더는 이미지 변경 후 리사이즈 한번
@@ -1066,7 +1074,7 @@
                         }
 
                     } catch (err) {
-                        console.warn("⚠️ category slot hydrate skipped:", err?.message || err);
+                        console.error("❌ [hydrateAds] category slot hydrate 실패:", err?.message || err);
                         // 실패해도 샘플 카드 그대로 유지(요구사항)
                     }
                 }
