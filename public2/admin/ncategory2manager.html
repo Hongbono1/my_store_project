@@ -315,9 +315,9 @@
 
     <div id="footer-placeholder"></div>
 
-    <!-- ✅ 공통 모달 (foodcategorymanager 모달 그대로 이식) -->
+    <!-- ✅ 공통 모달 (foodcategorymanager 모달 그대로) : </body> 바로 위에 넣기 -->
     <div id="slotModal" class="hidden">
-        <div class="modal-backdrop"></div>
+        <div class="modal-backdrop" onclick="closeSlotModal()"></div>
 
         <div class="modal-panel">
             <div class="modal-card">
@@ -328,7 +328,8 @@
                             <h3 id="modalTitle" class="text-xl sm:text-2xl font-extrabold">슬롯 수정</h3>
                             <p class="text-xs text-gray-500 mt-1">
                                 page: <b id="modalPageText"></b> /
-                                position: <span id="modalPositionText" class="font-semibold"></span>
+                                position: <span id="modalPositionText" class="font-semibold"></span> /
+                                priority: <span id="modalPriorityText" class="font-semibold"></span>
                             </p>
                         </div>
 
@@ -354,8 +355,8 @@
                                     <ol class="mt-3 space-y-2 text-sm text-slate-700 leading-relaxed list-decimal pl-5">
                                         <li><b>/admin/ncategory2manager.html</b> 접속</li>
                                         <li>원하는 슬롯 클릭 → <b>모달 열림</b></li>
-                                        <li><b>우선순위</b> 입력(기본 1) → 내용/이미지/기간 입력 → <b>저장</b></li>
-                                        <li>같은 슬롯에서 다른 우선순위(2,3…)를 선택해 추가 후보 등록 가능</li>
+                                        <li><b>우선순위</b> 선택(기본 1) → 내용/이미지/기간 입력 → <b>저장</b></li>
+                                        <li>같은 슬롯에서 다른 우선순위(2,3…)를 선택해 후보 추가 가능</li>
                                     </ol>
 
                                     <div class="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-900">
@@ -370,215 +371,415 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- 상태 -->
+                    <div id="m_status" class="mt-4 text-sm text-slate-700"></div>
                 </div>
 
                 <!-- 본문 -->
-                <div class="p-6 space-y-6">
-                    <!-- 텍스트 전용 슬롯 안내 -->
-                    <div id="textOnlyHint" class="hidden rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                        <div class="text-sm font-bold text-slate-800">📝 이 슬롯은 텍스트 전용입니다.</div>
-                        <div class="mt-1 text-xs text-slate-500">
-                            이미지/가게연결/링크 입력은 숨김 처리됩니다. (글만 작성)
-                        </div>
-                    </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <!-- LEFT: 콘텐츠 -->
+                        <div class="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                            <div class="font-extrabold text-slate-800 mb-3">콘텐츠</div>
 
-                    <!-- 모드 선택 -->
-                    <div id="modeBlock" class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                        <p class="text-sm font-semibold mb-3">광고 방식 선택</p>
-                        <div class="flex flex-wrap gap-4">
-                            <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="slotMode" value="image" class="accent-blue-600" checked>
-                                <span>이미지 배너</span>
-                            </label>
-                            <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="slotMode" value="store" class="accent-emerald-600">
-                                <span>가게 연결</span>
-                            </label>
-                            <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="slotMode" value="text" class="accent-indigo-600">
-                                <span>텍스트 전용</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- 텍스트 입력 -->
-                    <div id="textBlock" class="hidden space-y-2">
-                        <label class="text-sm font-semibold">내용 (텍스트)</label>
-                        <textarea id="fieldTextContent" class="field mt-2 min-h-[180px] resize-y"
-                            placeholder="예) 한 줄당 1개씩 입력&#10;첫번째 줄&#10;두번째 줄&#10;세번째 줄"></textarea>
-                        <p class="text-xs text-gray-500">
-                            줄바꿈(Enter) 기준으로 표시됩니다. (사이드 링크 슬롯은 이름|링크 형식)
-                        </p>
-                    </div>
-
-                    <!-- 링크 -->
-                    <div id="linkBlock">
-                        <label class="text-sm font-semibold">링크 URL (선택)</label>
-                        <input id="fieldLinkUrl" class="field mt-2"
-                            placeholder="/ndetail.html?id=123&type=store 또는 https://..." />
-                    </div>
-
-                    <div id="dividerAfterLink" class="divider"></div>
-
-                    <!-- 이미지 블록 -->
-                    <div id="imageBlock" class="space-y-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-sm font-semibold">이미지 파일</label>
-                                <input id="fieldImageFile" type="file" accept="image/*" class="field mt-2 bg-white" />
-                                <p class="text-xs text-gray-500 mt-1">
-                                    파일을 선택하지 않으면, 가게 연결 시 가게 대표 이미지를 사용합니다.
-                                </p>
+                            <!-- 모드 -->
+                            <div class="flex flex-wrap gap-3">
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="radio" name="m_slotMode" value="banner" checked />
+                                    <span class="font-semibold">배너(이미지/텍스트)</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="radio" name="m_slotMode" value="store" />
+                                    <span class="font-semibold">가게 연결</span>
+                                </label>
                             </div>
-                            <div>
-                                <label class="text-sm font-semibold">현재 이미지 미리보기</label>
+
+                            <!-- 우선순위 -->
+                            <div class="mt-4">
+                                <label class="block text-sm font-bold text-slate-700 mb-1">우선순위</label>
+                                <select id="m_priority_select"
+                                    class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                </select>
+                            </div>
+
+                            <!-- 기간 -->
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">시작일</label>
+                                    <input id="m_startAt" type="datetime-local"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">종료일</label>
+                                    <input id="m_endAt" type="datetime-local"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
+                            </div>
+
+                            <div class="mt-2 flex items-center gap-3 text-sm">
+                                <label class="flex items-center gap-2">
+                                    <input id="m_noEnd" type="checkbox" />
+                                    <span>종료 없음</span>
+                                </label>
+                            </div>
+
+                            <!-- 이미지 -->
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">이미지 업로드</label>
+                                    <input id="m_imageFile" type="file" accept="image/*"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                    <div class="mt-2 flex items-center gap-3 text-sm">
+                                        <label class="flex items-center gap-2">
+                                            <input id="m_keepImage" type="checkbox" />
+                                            <span>기존 이미지 유지</span>
+                                        </label>
+                                        <label class="flex items-center gap-2">
+                                            <input id="m_clearImage" type="checkbox" />
+                                            <span>이미지 제거</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">이미지 URL(선택)</label>
+                                    <input id="m_imageUrl" type="text" placeholder="/uploads/manager_ad/xxx.jpg"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
+                            </div>
+
+                            <!-- 미리보기 -->
+                            <div class="mt-4">
+                                <label class="block text-sm font-bold text-slate-700 mb-2">미리보기</label>
                                 <div
-                                    class="mt-2 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden aspect-[16/9] flex items-center justify-center">
-                                    <img id="currentPreviewImg" src="" alt="preview"
-                                        class="w-full h-full object-cover hidden" />
-                                    <span id="currentPreviewEmpty" class="text-xs text-gray-400">이미지 없음</span>
+                                    class="w-full h-48 rounded-2xl bg-white/50 border border-slate-200 overflow-hidden flex items-center justify-center">
+                                    <img id="m_previewImg" class="hidden w-full h-full object-cover" alt="preview" />
+                                    <div id="m_previewEmpty" class="text-sm text-slate-400">이미지를 선택하거나 URL을 입력하세요</div>
+                                </div>
+                            </div>
+
+                            <!-- 링크/텍스트 -->
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">링크 URL</label>
+                                    <input id="m_linkUrl" type="text" placeholder="/ndetail.html?id=1&type=combined"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">텍스트(선택)</label>
+                                    <input id="m_textContent" type="text" placeholder="홍보 문구"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- 가게 연결 블록 -->
-                    <div id="storeBlock" class="space-y-4 hidden">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-sm font-semibold">사업자번호</label>
-                                <input id="fieldBizNo" class="field mt-2" placeholder="예) 2910802895" />
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold">상호명</label>
-                                <input id="fieldBizName" class="field mt-2" placeholder="예) 하늘식당" />
-                            </div>
-                        </div>
+                        <!-- RIGHT: 가게 검색 -->
+                        <div class="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                            <div class="font-extrabold text-slate-800 mb-3">가게 검색 / 연결</div>
 
-                        <div class="flex items-center gap-2">
-                            <button id="btnSearchStore"
-                                class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
-                                가게 검색
-                            </button>
-                            <span id="storeSearchHint" class="text-xs text-gray-500"></span>
-                        </div>
-
-                        <div id="storeResults" class="border border-slate-100 rounded-xl overflow-hidden">
-                            <div class="px-4 py-3 bg-slate-50 text-sm font-semibold">검색 결과</div>
-                            <div id="storeResultsBody" class="p-4 text-sm text-gray-500">
-                                검색어를 입력하고 “가게 검색”을 눌러주세요.
-                            </div>
-                        </div>
-
-                        <input id="fieldStoreId" type="hidden" />
-                        <input id="fieldTableSource" type="hidden" />
-                    </div>
-
-                    <div class="divider"></div>
-
-                    <!-- 우선순위 -->
-                    <div class="mt-4 p-3 rounded-xl border border-blue-100 bg-white/70">
-                        <div class="flex flex-col md:flex-row md:items-end gap-3">
-                            <div class="flex-1">
-                                <label class="text-sm font-semibold text-gray-700">우선순위</label>
-                                <input name="priority" id="adPriority" type="number" min="1" step="1" value="1"
-                                    class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-300" />
-                                <p class="mt-1 text-xs text-gray-500">
-                                    1이 가장 먼저 노출됩니다. (1,2,3… 여러 개 등록 가능)
-                                </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">가게명/업종 검색</label>
+                                    <input id="storeSearchQ" type="text" placeholder="예: 하늘식당"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">사업자번호 검색</label>
+                                    <input id="storeSearchBizNo" type="text" inputmode="numeric"
+                                        placeholder="예: 2910802895"
+                                        class="w-full rounded-xl border border-slate-200 bg-white/70 px-3 py-2" />
+                                </div>
                             </div>
 
-                            <button type="button" id="btnLoadPriority"
-                                class="rounded-xl px-4 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-sm">
-                                이 우선순위 불러오기
-                            </button>
-
-                            <button type="button" id="btnDeletePriority"
-                                class="rounded-xl px-4 py-2 border border-red-200 bg-red-50 hover:bg-red-100 text-sm">
-                                이 우선순위 삭제
-                            </button>
-                        </div>
-
-                        <details class="mt-3">
-                            <summary class="cursor-pointer text-sm text-gray-700">등록된 후보 목록 보기 (1~6)</summary>
-                            <div id="candidateList" class="mt-2 grid gap-2"></div>
-                        </details>
-
-                        <div id="prioritySupportHint" class="mt-3 text-xs text-slate-500"></div>
-                    </div>
-
-                    <!-- 기간 -->
-                    <div class="rounded-xl border border-slate-100 p-4">
-                        <div class="flex items-center justify-between">
-                            <p class="text-sm font-semibold">광고 기간 설정</p>
-                            <label class="flex items-center gap-2 text-xs">
-                                <input id="fieldNoEnd" type="checkbox" class="accent-blue-600">
-                                <span class="text-gray-700">계속 유지 (종료 없음)</span>
-                            </label>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                            <div>
-                                <label class="text-xs font-semibold text-gray-600">시작 일시</label>
-                                <input id="fieldStartAt" type="datetime-local" class="field mt-2" />
+                            <div class="mt-3 flex items-center gap-2">
+                                <button type="button"
+                                    class="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700"
+                                    onclick="doStoreSearch()">가게 검색</button>
+                                <div class="text-sm text-slate-500">검색 결과에서 <b>선택</b>하면 자동 매핑됩니다.</div>
                             </div>
-                            <div>
-                                <label class="text-xs font-semibold text-gray-600">종료 일시</label>
-                                <input id="fieldEndAt" type="datetime-local" class="field mt-2" />
+
+                            <div class="mt-4">
+                                <div class="font-bold text-slate-800">검색 결과</div>
+                                <div id="storeSearchResults" class="mt-2 space-y-2">
+                                    <div class="text-sm text-slate-500">검색어를 입력하고 “가게 검색”을 눌러주세요.</div>
+                                </div>
                             </div>
+
+                            <div class="mt-5 border-t border-slate-200 pt-4">
+                                <div class="font-bold text-slate-800 mb-2">선택된 가게 정보(자동 입력)</div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1">table_source</label>
+                                        <input id="m_tableSource" type="text" readonly
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1">store_id</label>
+                                        <input id="m_storeId" type="text" readonly
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1">사업자번호</label>
+                                        <input id="m_businessNo" type="text" readonly
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1">상호명</label>
+                                        <input id="m_businessName" type="text" readonly
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />
+                                    </div>
+
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-bold text-slate-700 mb-1">업종(표시용)</label>
+                                        <input id="m_categoryView" type="text" readonly
+                                            class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
-                    <!-- 요약 -->
-                    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                        <p class="text-sm font-semibold mb-2">현재 선택 정보</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500">선택 이미지:</span>
-                                <span id="textSelectedImage" class="font-semibold text-slate-800">없음</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500">연결 가게:</span>
-                                <span id="textSelectedStore" class="font-semibold text-slate-800">없음</span>
-                            </div>
-                        </div>
-
-                        <div class="mt-2 text-xs text-slate-500">
-                            텍스트 전용 슬롯은 “선택 이미지/연결 가게”가 표시되지 않습니다.
-                        </div>
-                    </div>
-
-                    <!-- 버튼 -->
-                    <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                        <button id="btnResetModal"
-                            class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
-                            입력 초기화
-                        </button>
-                        <button id="btnSaveSlot"
-                            class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
-                            슬롯 저장
+                    <!-- 저장 -->
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button type="button" onclick="saveSlotFromModal()"
+                            class="px-5 py-2 rounded-xl bg-blue-600 text-white font-extrabold hover:bg-blue-700">
+                            저장
                         </button>
                     </div>
+
+                    <!-- hidden keys -->
+                    <input id="m_page" type="hidden" />
+                    <input id="m_position" type="hidden" />
+                    <input id="m_priority" type="hidden" />
                 </div>
             </div>
         </div>
     </div>
 
+
+    <!-- 본문 -->
+    <div class="p-6 space-y-6">
+        <!-- 텍스트 전용 슬롯 안내 -->
+        <div id="textOnlyHint" class="hidden rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div class="text-sm font-bold text-slate-800">📝 이 슬롯은 텍스트 전용입니다.</div>
+            <div class="mt-1 text-xs text-slate-500">
+                이미지/가게연결/링크 입력은 숨김 처리됩니다. (글만 작성)
+            </div>
+        </div>
+
+        <!-- 모드 선택 -->
+        <div id="modeBlock" class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p class="text-sm font-semibold mb-3">광고 방식 선택</p>
+            <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="slotMode" value="image" class="accent-blue-600" checked>
+                    <span>이미지 배너</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="slotMode" value="store" class="accent-emerald-600">
+                    <span>가게 연결</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="slotMode" value="text" class="accent-indigo-600">
+                    <span>텍스트 전용</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 텍스트 입력 -->
+        <div id="textBlock" class="hidden space-y-2">
+            <label class="text-sm font-semibold">내용 (텍스트)</label>
+            <textarea id="fieldTextContent" class="field mt-2 min-h-[180px] resize-y"
+                placeholder="예) 한 줄당 1개씩 입력&#10;첫번째 줄&#10;두번째 줄&#10;세번째 줄"></textarea>
+            <p class="text-xs text-gray-500">
+                줄바꿈(Enter) 기준으로 표시됩니다. (사이드 링크 슬롯은 이름|링크 형식)
+            </p>
+        </div>
+
+        <!-- 링크 -->
+        <div id="linkBlock">
+            <label class="text-sm font-semibold">링크 URL (선택)</label>
+            <input id="fieldLinkUrl" class="field mt-2" placeholder="/ndetail.html?id=123&type=store 또는 https://..." />
+        </div>
+
+        <div id="dividerAfterLink" class="divider"></div>
+
+        <!-- 이미지 블록 -->
+        <div id="imageBlock" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm font-semibold">이미지 파일</label>
+                    <input id="fieldImageFile" type="file" accept="image/*" class="field mt-2 bg-white" />
+                    <p class="text-xs text-gray-500 mt-1">
+                        파일을 선택하지 않으면, 가게 연결 시 가게 대표 이미지를 사용합니다.
+                    </p>
+                </div>
+                <div>
+                    <label class="text-sm font-semibold">현재 이미지 미리보기</label>
+                    <div
+                        class="mt-2 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden aspect-[16/9] flex items-center justify-center">
+                        <img id="currentPreviewImg" src="" alt="preview" class="w-full h-full object-cover hidden" />
+                        <span id="currentPreviewEmpty" class="text-xs text-gray-400">이미지 없음</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 가게 연결 블록 -->
+        <div id="storeBlock" class="space-y-4 hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm font-semibold">사업자번호</label>
+                    <input id="fieldBizNo" class="field mt-2" placeholder="예) 2910802895" />
+                </div>
+                <div>
+                    <label class="text-sm font-semibold">상호명</label>
+                    <input id="fieldBizName" class="field mt-2" placeholder="예) 하늘식당" />
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button id="btnSearchStore"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
+                    가게 검색
+                </button>
+                <span id="storeSearchHint" class="text-xs text-gray-500"></span>
+            </div>
+
+            <div id="storeResults" class="border border-slate-100 rounded-xl overflow-hidden">
+                <div class="px-4 py-3 bg-slate-50 text-sm font-semibold">검색 결과</div>
+                <div id="storeResultsBody" class="p-4 text-sm text-gray-500">
+                    검색어를 입력하고 “가게 검색”을 눌러주세요.
+                </div>
+            </div>
+
+            <input id="fieldStoreId" type="hidden" />
+            <input id="fieldTableSource" type="hidden" />
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- 우선순위 -->
+        <div class="mt-4 p-3 rounded-xl border border-blue-100 bg-white/70">
+            <div class="flex flex-col md:flex-row md:items-end gap-3">
+                <div class="flex-1">
+                    <label class="text-sm font-semibold text-gray-700">우선순위</label>
+                    <input name="priority" id="adPriority" type="number" min="1" step="1" value="1"
+                        class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-300" />
+                    <p class="mt-1 text-xs text-gray-500">
+                        1이 가장 먼저 노출됩니다. (1,2,3… 여러 개 등록 가능)
+                    </p>
+                </div>
+
+                <button type="button" id="btnLoadPriority"
+                    class="rounded-xl px-4 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-sm">
+                    이 우선순위 불러오기
+                </button>
+
+                <button type="button" id="btnDeletePriority"
+                    class="rounded-xl px-4 py-2 border border-red-200 bg-red-50 hover:bg-red-100 text-sm">
+                    이 우선순위 삭제
+                </button>
+            </div>
+
+            <details class="mt-3">
+                <summary class="cursor-pointer text-sm text-gray-700">등록된 후보 목록 보기 (1~6)</summary>
+                <div id="candidateList" class="mt-2 grid gap-2"></div>
+            </details>
+
+            <div id="prioritySupportHint" class="mt-3 text-xs text-slate-500"></div>
+        </div>
+
+        <!-- 기간 -->
+        <div class="rounded-xl border border-slate-100 p-4">
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-semibold">광고 기간 설정</p>
+                <label class="flex items-center gap-2 text-xs">
+                    <input id="fieldNoEnd" type="checkbox" class="accent-blue-600">
+                    <span class="text-gray-700">계속 유지 (종료 없음)</span>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">시작 일시</label>
+                    <input id="fieldStartAt" type="datetime-local" class="field mt-2" />
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">종료 일시</label>
+                    <input id="fieldEndAt" type="datetime-local" class="field mt-2" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 요약 -->
+        <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p class="text-sm font-semibold mb-2">현재 선택 정보</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">선택 이미지:</span>
+                    <span id="textSelectedImage" class="font-semibold text-slate-800">없음</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">연결 가게:</span>
+                    <span id="textSelectedStore" class="font-semibold text-slate-800">없음</span>
+                </div>
+            </div>
+
+            <div class="mt-2 text-xs text-slate-500">
+                텍스트 전용 슬롯은 “선택 이미지/연결 가게”가 표시되지 않습니다.
+            </div>
+        </div>
+
+        <!-- 버튼 -->
+        <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
+            <button id="btnResetModal"
+                class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
+                입력 초기화
+            </button>
+            <button id="btnSaveSlot"
+                class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                슬롯 저장
+            </button>
+        </div>
+    </div>
+    </div>
+    </div>
+    </div>
+
     <script>
-        // ---------- 공통 ----------
+        // =========================
+        // ✅ 공통 유틸 / 헤더푸터
+        // =========================
         const el = (id) => document.getElementById(id);
         const clean = (v) => (v == null ? "" : String(v).trim());
         const digitsOnly = (v) => clean(v).replace(/[^\d]/g, "");
 
-        fetch("/components/header.html")
-            .then((r) => r.text())
-            .then((d) => (el("header-placeholder").innerHTML = d));
-        fetch("/components/footer.html")
-            .then((r) => r.text())
-            .then((d) => (el("footer-placeholder").innerHTML = d));
+        // header/footer
+        (async () => {
+            try {
+                const h = await fetch("/components/header.html").then((r) => r.text());
+                const hp = el("header-placeholder");
+                if (hp) hp.innerHTML = h;
+            } catch (_) { }
+            try {
+                const f = await fetch("/components/footer.html").then((r) => r.text());
+                const fp = el("footer-placeholder");
+                if (fp) fp.innerHTML = f;
+            } catch (_) { }
+        })();
 
         function toggleSub(btn) {
-            const ul = btn.nextElementSibling;
+            const ul = btn?.nextElementSibling;
             if (!ul) return;
             ul.classList.toggle("hidden");
         }
@@ -591,8 +792,15 @@
             window.history.forward();
         }
 
-        // ---------- API ----------
-        const API_BASE = "/ncategory2manager/ad"; // server.js: app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
+        // 전역 노출(HTML onclick)
+        window.toggleSub = toggleSub;
+        window.goBack = goBack;
+        window.goNext = goNext;
+
+        // =========================
+        // ✅ API 설정
+        // =========================
+        const API_BASE = "/ncategory2manager/ad";
         const PAGE = "ncategory2";
         const DEFAULT_TABLE_SOURCE = "combined_store_info";
 
@@ -622,9 +830,9 @@
 
         async function apiListSlots() {
             const data = await fetchJson(`${API_BASE}/slots?page=${encodeURIComponent(PAGE)}`);
-            if (data && data.success === true) return data.slots || [];
+            if (data?.success === true) return data.slots || [];
             if (Array.isArray(data?.slots)) return data.slots;
-            throw new Error(data?.error || "슬롯 목록 로드 실패");
+            return [];
         }
 
         async function apiGetSlot({ page, position, priority }) {
@@ -632,12 +840,15 @@
             if (page) url.searchParams.set("page", page);
             if (position) url.searchParams.set("position", position);
             if (priority !== "" && priority != null) url.searchParams.set("priority", String(priority));
-
-            // ✅ category는 서버에 없는 칼럼이므로 절대 보내지 않음
             return await fetchJson(url.toString());
         }
 
-        // ✅ 가게 검색(경로 fallback 포함)
+        async function apiUpsertSlot(formData) {
+            const data = await fetchJson(`${API_BASE}/slot`, { method: "POST", body: formData });
+            if (!data || data.success !== true) throw new Error(data?.error || "저장 실패");
+            return data.slot || null;
+        }
+
         async function apiSearchStore({ q, bizNo }) {
             const Q = clean(q);
             const B = digitsOnly(bizNo);
@@ -650,19 +861,20 @@
                 params.set("business_no", B);
             }
 
+            // ✅ 푸드/기존 컨트롤러 경로차이 대비 (fallback)
             const tryUrls = [
-                `${API_BASE}/store/search?${params.toString()}`,      // 네가 현재 쓰는 경로
-                `${API_BASE}/search-store?${params.toString()}`,     // 푸드에서 흔히 쓰는 형태
+                `${API_BASE}/store/search?${params.toString()}`,
+                `${API_BASE}/search-store?${params.toString()}`,
                 `${API_BASE}/store-search?${params.toString()}`,
                 `${API_BASE}/searchStore?${params.toString()}`,
-                `${API_BASE}/stores/search?${params.toString()}`
+                `${API_BASE}/stores/search?${params.toString()}`,
             ];
 
             let lastErr = null;
             for (const u of tryUrls) {
                 try {
                     const data = await fetchJson(u);
-                    if (data?.ok === true || data?.success === true) return data.stores || [];
+                    if (data?.success === true || data?.ok === true) return data.stores || [];
                     if (Array.isArray(data?.stores)) return data.stores;
                     if (Array.isArray(data?.data)) return data.data;
                     if (Array.isArray(data)) return data;
@@ -674,16 +886,11 @@
             throw lastErr || new Error("검색 실패");
         }
 
-        async function apiUpsertSlot(formData) {
-            const data = await fetchJson(`${API_BASE}/slot`, { method: "POST", body: formData });
-            if (!data || data.success !== true) throw new Error(data?.error || "저장 실패");
-            return data.slot || null;
-        }
-
-        // ---------- 슬롯 화면 구성 ----------
+        // =========================
+        // ✅ 슬롯 DOM 생성(파워/베스트)
+        // =========================
         const POWER_POS = Array.from({ length: 9 }, (_, i) => `ncategory2_power_${i + 1}`);
         const BEST_POS = Array.from({ length: 9 }, (_, i) => `ncategory2_best_${i + 1}`);
-        const PREMIUM_POS = "ncategory2_premium";
 
         const state = {
             slots: new Map(),
@@ -781,7 +988,6 @@
             }
         }
 
-        // ✅ Premium도 text_content(설명) 표시 가능
         function applySlotToEl(slotEl, slot) {
             if (!slotEl) return;
 
@@ -789,7 +995,7 @@
             const noimg = slotEl.querySelector('[data-role="noimg"]');
             const name = slotEl.querySelector('[data-role="name"]');
             const category = slotEl.querySelector('[data-role="category"]');
-            const desc = slotEl.querySelector('[data-role="desc"]');
+            const desc = slotEl.querySelector('[data-role="desc"]'); // Premium 설명용
 
             const imageUrl = clean(slot?.image_url || slot?.imageUrl || "");
             const businessName =
@@ -819,42 +1025,6 @@
             if (a) a.href = clean(slot?.link_url || slot?.linkUrl || "") || "#";
         }
 
-        function bindAdminClicks() {
-            console.log("[DEBUG] bindAdminClicks() 호출됨");
-            document.addEventListener("click", async (e) => {
-                console.log("[DEBUG] 클릭 이벤트 발생:", e.target);
-                
-                // 모달 내부 클릭 무시
-                if (e.target.closest("#slotModal")) {
-                    console.log("[DEBUG] 모달 내부 클릭 무시");
-                    return;
-                }
-                
-                const target = e.target.closest("[data-position]");
-                console.log("[DEBUG] closest 결과:", target);
-                if (!target) return;
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                const position = target.getAttribute("data-position") || "";
-                console.log("[DEBUG] position:", position);
-                if (!position) return;
-
-                const modal = el("slotModal");
-                console.log("[DEBUG] modal 요소:", modal);
-                if (!modal) {
-                    console.error("[modal] #slotModal 이 HTML에 없습니다.");
-                    alert("모달 HTML(#slotModal)이 페이지에 없습니다. id 확인하세요.");
-                    return;
-                }
-
-                console.log("[DEBUG] openSlotModal 호출 시작");
-                await openSlotModal(position, "");
-                console.log("[DEBUG] openSlotModal 호출 완료");
-            }, true);
-        }
-
         async function loadAndRender() {
             const rows = await apiListSlots();
             state.slots.clear();
@@ -866,7 +1036,9 @@
             });
         }
 
-        // ---------- 슬라이더 ----------
+        // =========================
+        // ✅ 파워 슬라이더(2개씩 이동 / 왕복)
+        // =========================
         function initPowerSlider() {
             const viewport = el("powerViewport");
             const track = el("powerAdTrack");
@@ -892,55 +1064,30 @@
             function nextManual() {
                 if (groups <= 1) return;
                 if (index < groups - 1) index++;
-                else {
-                    dir = -1;
-                    index = groups - 2;
-                }
+                else { dir = -1; index = groups - 2; }
                 updateSlider();
             }
 
             function prevManual() {
                 if (groups <= 1) return;
                 if (index > 0) index--;
-                else {
-                    dir = 1;
-                    index = 1;
-                }
+                else { dir = 1; index = 1; }
                 updateSlider();
             }
 
             const nextBtn = el("nextBtn");
             const prevBtn = el("prevBtn");
-            if (nextBtn && prevBtn) {
-                nextBtn.addEventListener("click", () => {
-                    stopAuto();
-                    nextManual();
-                    startAuto();
-                });
-                prevBtn.addEventListener("click", () => {
-                    stopAuto();
-                    prevManual();
-                    startAuto();
-                });
-            }
+            if (nextBtn) nextBtn.addEventListener("click", () => { stopAuto(); nextManual(); startAuto(); });
+            if (prevBtn) prevBtn.addEventListener("click", () => { stopAuto(); prevManual(); startAuto(); });
 
             window.addEventListener("resize", updateSlider);
 
             const INTERVAL = 10000;
             let timer = null;
-            function startAuto() {
-                if (!timer) timer = setInterval(stepAuto, INTERVAL);
-            }
-            function stopAuto() {
-                if (timer) {
-                    clearInterval(timer);
-                    timer = null;
-                }
-            }
+            function startAuto() { if (!timer) timer = setInterval(stepAuto, INTERVAL); }
+            function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
 
-            document.addEventListener("visibilitychange", () => {
-                document.hidden ? stopAuto() : startAuto();
-            });
+            document.addEventListener("visibilitychange", () => { document.hidden ? stopAuto() : startAuto(); });
             viewport.addEventListener("mouseenter", stopAuto);
             viewport.addEventListener("mouseleave", startAuto);
 
@@ -948,7 +1095,9 @@
             startAuto();
         }
 
-        // ---------- 모달 ----------
+        // =========================
+        // ✅ 모달(푸드와 동일 동작)
+        // =========================
         function setStatus(msg) {
             const s = el("m_status");
             if (s) s.textContent = msg || "";
@@ -975,10 +1124,17 @@
             return document.querySelector('input[name="m_slotMode"]:checked')?.value || "banner";
         }
 
-        function clearModalFields() {
+        function syncPriorityText() {
+            const p = clean(el("m_priority")?.value || "");
+            const t = el("modalPriorityText");
+            if (t) t.textContent = p || "NULL";
+        }
+
+        function clearModalFields(keepKeys = true) {
             setStatus("");
             state.selectedCategory = "";
 
+            // 콘텐츠
             if (el("m_imageFile")) el("m_imageFile").value = "";
             if (el("m_keepImage")) el("m_keepImage").checked = false;
             if (el("m_clearImage")) el("m_clearImage").checked = false;
@@ -986,53 +1142,76 @@
             if (el("m_imageUrl")) el("m_imageUrl").value = "";
             setPreview("");
 
-            // ✅ 기본값 유지
+            if (el("m_linkUrl")) el("m_linkUrl").value = "";
+            if (el("m_textContent")) el("m_textContent").value = "";
+
+            // 기간
+            if (el("m_startAt")) el("m_startAt").value = "";
+            if (el("m_endAt")) el("m_endAt").value = "";
+            if (el("m_noEnd")) el("m_noEnd").checked = false;
+
+            // 가게
             if (el("m_tableSource")) el("m_tableSource").value = DEFAULT_TABLE_SOURCE;
             if (el("m_storeId")) el("m_storeId").value = "";
             if (el("m_businessNo")) el("m_businessNo").value = "";
             if (el("m_businessName")) el("m_businessName").value = "";
             if (el("m_categoryView")) el("m_categoryView").value = "";
 
-            if (el("m_linkUrl")) el("m_linkUrl").value = "";
-            if (el("m_textContent")) el("m_textContent").value = "";
-
-            if (el("storeSearchResults")) el("storeSearchResults").innerHTML = "";
+            if (el("storeSearchResults")) el("storeSearchResults").innerHTML = `<div class="text-sm text-slate-500">검색어를 입력하고 “가게 검색”을 눌러주세요.</div>`;
             if (el("storeSearchQ")) el("storeSearchQ").value = "";
             if (el("storeSearchBizNo")) el("storeSearchBizNo").value = "";
 
+            // 모드 기본 banner
             document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === "banner"));
+
+            // 우선순위 select 동기화(있으면)
+            if (el("m_priority_select")) {
+                const cur = clean(el("m_priority")?.value || "1") || "1";
+                el("m_priority_select").value = cur;
+            }
+
+            if (!keepKeys) {
+                if (el("m_page")) el("m_page").value = "";
+                if (el("m_position")) el("m_position").value = "";
+                if (el("m_priority")) el("m_priority").value = "";
+            }
+            syncPriorityText();
         }
 
         async function openSlotModal(position, priority = "") {
-            console.log("[DEBUG] openSlotModal 호출됨 - position:", position, "priority:", priority);
             state.currentKey.page = PAGE;
             state.currentKey.position = clean(position);
-            state.currentKey.priority = priority === null || priority === undefined ? "" : String(priority);
+            state.currentKey.priority = (priority === null || priority === undefined) ? "" : String(priority);
 
             if (el("m_page")) el("m_page").value = state.currentKey.page;
             if (el("m_position")) el("m_position").value = state.currentKey.position;
             if (el("m_priority")) el("m_priority").value = state.currentKey.priority;
 
-            clearModalFields();
+            // 상단 텍스트
+            if (el("modalPageText")) el("modalPageText").textContent = state.currentKey.page;
+            if (el("modalPositionText")) el("modalPositionText").textContent = state.currentKey.position;
+            syncPriorityText();
 
-            console.log("[DEBUG] 모달 hidden 클래스 제거 시작");
+            clearModalFields(true);
+
             const modalEl = el("slotModal");
-            console.log("[DEBUG] modalEl:", modalEl, "classList:", modalEl?.classList);
-            modalEl?.classList.remove("hidden");
-            console.log("[DEBUG] 모달 hidden 클래스 제거 완료");
+            if (!modalEl) {
+                alert("모달 #slotModal이 없습니다. HTML id 확인하세요.");
+                return;
+            }
+            modalEl.classList.remove("hidden");
 
-            if (el("slotModalSub")) {
-                el("slotModalSub").textContent =
-                    `page=${state.currentKey.page} / position=${state.currentKey.position}` +
-                    (state.currentKey.priority ? ` / priority=${state.currentKey.priority}` : " / priority=NULL");
+            // 우선순위 select가 있으면 hidden에 맞춰 세팅
+            if (el("m_priority_select")) {
+                const p = clean(el("m_priority")?.value || "1") || "1";
+                el("m_priority_select").value = p;
             }
 
-            console.log("[DEBUG] loadSlotIntoModal 호출 시작");
+            // 로드
             try {
                 await loadSlotIntoModal();
-                console.log("[DEBUG] loadSlotIntoModal 호출 완료");
             } catch (err) {
-                console.warn("[DEBUG] loadSlotIntoModal 에러 (무시하고 모달 표시):", err);
+                console.warn(err);
                 setStatus("슬롯 로드 실패 (신규 입력 가능)");
             }
         }
@@ -1043,85 +1222,59 @@
             modal.classList.add("hidden");
         }
 
-        // ✅ 모달 닫기 이벤트 바인딩(닫기버튼/배경/ESC)
-        function bindModalCloseEvents() {
-            const modal = el("slotModal");
-            if (!modal) return;
-
-            // 1) 닫기 버튼들(아이디가 다를 수도 있어서 안전하게 2개 지원)
-            const closeBtn = el("btnCloseModal") || el("slotModalCloseBtn") || el("m_closeBtn");
-            if (closeBtn) {
-                closeBtn.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    closeSlotModal();
-                });
-            }
-
-            // 2) 배경 클릭(Backdrop에 id가 있으면 우선, 없으면 modal 자체에서 처리)
-            const backdrop = el("slotModalBackdrop");
-            if (backdrop) {
-                backdrop.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    closeSlotModal();
-                });
-            } else {
-                // 백드랍 id가 없으면: 모달 바깥 영역 클릭 시 닫기
-                modal.addEventListener("mousedown", (e) => {
-                    if (e.target === modal) closeSlotModal();
-                });
-            }
-
-            // 3) ESC 닫기
-            document.addEventListener("keydown", (e) => {
-                if (e.key !== "Escape") return;
-                if (modal.classList.contains("hidden")) return;
-                closeSlotModal();
-            });
-
-            // 4) 모달 안에서 click이 바깥으로 전파돼서 닫히는 문제 방지(필요시)
-            const panel = el("slotModalPanel");
-            if (panel) {
-                panel.addEventListener("mousedown", (e) => e.stopPropagation());
-                panel.addEventListener("click", (e) => e.stopPropagation());
-            }
-        }
-
         async function loadSlotIntoModal() {
-            try {
-                setStatus("불러오는 중...");
-                const slot = await apiGetSlot(state.currentKey);
+            setStatus("불러오는 중...");
 
-                if (!slot) {
-                    setStatus("슬롯 없음(신규)");
-                    return;
-                }
+            const page = clean(el("m_page")?.value) || PAGE;
+            const position = clean(el("m_position")?.value);
+            const priority = clean(el("m_priority")?.value);
 
-                const mode = clean(slot.slot_mode || slot.slotMode || "banner");
-                document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === mode));
-
-                const img = clean(slot.image_url || slot.imageUrl || "");
-                if (el("m_imageUrl")) el("m_imageUrl").value = img;
-                setPreview(img);
-
-                if (el("m_tableSource")) el("m_tableSource").value = clean(slot.table_source || slot.tableSource || DEFAULT_TABLE_SOURCE);
-                if (el("m_storeId")) el("m_storeId").value = clean(slot.store_id || slot.storeId || "");
-                if (el("m_businessNo")) el("m_businessNo").value = clean(slot.business_no || slot.businessNo || "");
-                if (el("m_businessName")) el("m_businessName").value = clean(slot.business_name || slot.businessName || "");
-
-                const cat = pickCategory(slot);
-                state.selectedCategory = cat || "";
-                if (el("m_categoryView")) el("m_categoryView").value = cat;
-
-                if (el("m_linkUrl")) el("m_linkUrl").value = clean(slot.link_url || slot.linkUrl || "");
-                if (el("m_textContent")) el("m_textContent").value = clean(slot.text_content || slot.textContent || "");
-
-                setStatus("불러오기 완료");
-            } catch (e) {
-                console.error(e);
-                setStatus("불러오기 실패");
+            const slot = await apiGetSlot({ page, position, priority });
+            if (!slot) {
+                setStatus("슬롯 없음(신규)");
+                return;
             }
+
+            // mode
+            const mode = clean(slot.slot_mode || slot.slotMode || "banner");
+            document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === mode));
+
+            // priority (서버가 내려주면 반영)
+            const p = clean(slot.priority ?? priority);
+            if (el("m_priority")) el("m_priority").value = p;
+            if (el("m_priority_select") && p) el("m_priority_select").value = p;
+            syncPriorityText();
+
+            // 기간
+            const startAt = clean(slot.start_at || slot.startAt || "");
+            const endAt = clean(slot.end_at || slot.endAt || "");
+            const noEnd = String(slot.no_end ?? slot.noEnd ?? "").toLowerCase() === "true" || slot.no_end === true || slot.noEnd === true;
+
+            if (el("m_startAt")) el("m_startAt").value = startAt ? startAt.slice(0, 16) : "";
+            if (el("m_endAt")) el("m_endAt").value = endAt ? endAt.slice(0, 16) : "";
+            if (el("m_noEnd")) el("m_noEnd").checked = !!noEnd;
+            if (el("m_endAt")) el("m_endAt").disabled = !!noEnd;
+
+            // 이미지
+            const img = clean(slot.image_url || slot.imageUrl || "");
+            if (el("m_imageUrl")) el("m_imageUrl").value = img;
+            setPreview(img);
+
+            // 가게
+            if (el("m_tableSource")) el("m_tableSource").value = clean(slot.table_source || slot.tableSource || DEFAULT_TABLE_SOURCE);
+            if (el("m_storeId")) el("m_storeId").value = clean(slot.store_id || slot.storeId || "");
+            if (el("m_businessNo")) el("m_businessNo").value = clean(slot.business_no || slot.businessNo || "");
+            if (el("m_businessName")) el("m_businessName").value = clean(slot.business_name || slot.businessName || "");
+
+            const cat = pickCategory(slot);
+            state.selectedCategory = cat || "";
+            if (el("m_categoryView")) el("m_categoryView").value = cat;
+
+            // 링크/텍스트
+            if (el("m_linkUrl")) el("m_linkUrl").value = clean(slot.link_url || slot.linkUrl || "");
+            if (el("m_textContent")) el("m_textContent").value = clean(slot.text_content || slot.textContent || "");
+
+            setStatus("불러오기 완료");
         }
 
         // ✅ 가게 검색
@@ -1167,10 +1320,8 @@
 
                 row.innerHTML = `
         <div class="w-16 h-12 rounded-xl overflow-hidden bg-white/60 shrink-0">
-          ${img
-                        ? `<img src="${img}" class="w-full h-full object-cover" />`
-                        : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">NO IMG</div>`
-                    }
+          ${img ? `<img src="${img}" class="w-full h-full object-cover" />`
+                        : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">NO IMG</div>`}
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-extrabold text-slate-800 truncate">${name || "-"}</div>
@@ -1212,12 +1363,13 @@
             if (el("m_businessName")) el("m_businessName").value = businessName;
             if (el("m_categoryView")) el("m_categoryView").value = category || "";
 
-            // ✅ 이미지 미리보기/URL 자동 반영(있을 때)
-            if (el("m_imageUrl")) el("m_imageUrl").value = imageUrl || clean(el("m_imageUrl").value);
+            if (el("m_imageUrl") && imageUrl) el("m_imageUrl").value = imageUrl;
             setPreview(imageUrl || clean(el("m_imageUrl")?.value));
 
+            // 모드 store로
             document.querySelectorAll('input[name="m_slotMode"]').forEach((r) => (r.checked = r.value === "store"));
 
+            // 링크 자동
             if (el("m_linkUrl")) el("m_linkUrl").value = buildStoreLink(tableSource, storeId);
 
             setStatus("가게 연결 완료 (저장 누르세요)");
@@ -1237,42 +1389,58 @@
                 const mode = getMode();
                 const fd = new FormData();
 
+                // keys
                 fd.append("page", page);
                 fd.append("position", position);
                 if (priority !== "") fd.append("priority", priority);
 
+                // mode/type (호환)
                 fd.append("slot_mode", mode);
                 fd.append("slotMode", mode);
-
                 fd.append("slot_type", "image");
                 fd.append("slotType", "image");
 
+                // 기간
+                const startAt = clean(el("m_startAt")?.value);
+                const endAt = clean(el("m_endAt")?.value);
+                const noEnd = el("m_noEnd")?.checked ? "true" : "false";
+                fd.append("start_at", startAt);
+                fd.append("startAt", startAt);
+                fd.append("end_at", endAt);
+                fd.append("endAt", endAt);
+                fd.append("no_end", noEnd);
+                fd.append("noEnd", noEnd);
+
+                // 콘텐츠
                 const linkUrl = clean(el("m_linkUrl")?.value);
                 const textContent = clean(el("m_textContent")?.value);
+                const imageUrl = clean(el("m_imageUrl")?.value);
 
                 fd.append("link_url", linkUrl);
                 fd.append("linkUrl", linkUrl);
                 fd.append("text_content", textContent);
                 fd.append("textContent", textContent);
 
-                const imageUrl = clean(el("m_imageUrl")?.value);
                 fd.append("image_url", imageUrl);
                 fd.append("imageUrl", imageUrl);
 
+                // keep/clear
                 const keep = el("m_keepImage")?.checked ? "true" : "false";
                 const clear = el("m_clearImage")?.checked ? "true" : "false";
-                fd.append("keepImage", keep);
                 fd.append("keep_image", keep);
-                fd.append("clearImage", clear);
+                fd.append("keepImage", keep);
                 fd.append("clear_image", clear);
+                fd.append("clearImage", clear);
 
                 const file = el("m_imageFile")?.files?.[0];
                 if (file) fd.append("image", file);
 
+                // category(표시용) - 서버가 무시해도 OK, 문제되면 이 2줄만 지우면 됨
                 const cat = (state.selectedCategory || "").trim();
                 fd.append("business_category", cat);
                 fd.append("businessCategory", cat);
 
+                // store mode 필수값
                 if (mode === "store") {
                     const storeId = clean(el("m_storeId")?.value);
                     if (!storeId) throw new Error("가게연결 모드인데 store_id가 비어있음(가게 선택 먼저)");
@@ -1306,9 +1474,9 @@
                 await apiUpsertSlot(fd);
 
                 setStatus("저장 완료");
-
                 await loadAndRender();
-                bindAdminClicks();
+
+                // 저장 후 다시 현재 우선순위 내용 로드
                 await loadSlotIntoModal();
             } catch (e) {
                 console.error(e);
@@ -1317,34 +1485,125 @@
             }
         }
 
-        // ---------- init ----------
-        document.addEventListener("DOMContentLoaded", async () => {
-            bindModalCloseEvents();
-            buildPowerSliderDom();
-            buildBestGridDom();
-            bindAdminClicks();
+        // =========================
+        // ✅ 클릭 바인딩(슬롯 클릭 → 모달)
+        // =========================
+        function bindAdminClicks() {
+            document.addEventListener("click", async (e) => {
+                // 모달 내부 클릭은 무시
+                if (e.target.closest("#slotModal")) return;
 
-            await loadAndRender();
-            initPowerSlider();
+                const target = e.target.closest("[data-position]");
+                if (!target) return;
 
-            // 파일 미리보기
-            if (el("m_imageFile")) {
-                el("m_imageFile").addEventListener("change", () => {
-                    const f = el("m_imageFile").files && el("m_imageFile").files[0];
+                e.preventDefault();
+                e.stopPropagation();
+
+                const position = target.getAttribute("data-position") || "";
+                if (!position) return;
+
+                // 현재 priority는 select 값으로 기본
+                const p = clean(el("m_priority_select")?.value || el("m_priority")?.value || "1");
+                if (el("m_priority")) el("m_priority").value = p;
+
+                await openSlotModal(position, p);
+            }, true);
+        }
+
+        // =========================
+        // ✅ 모달 이벤트(닫기/ESC/도움말/미리보기/우선순위)
+        // =========================
+        function bindModalEvents() {
+            // 닫기 버튼
+            const closeBtn = el("btnCloseModal");
+            if (closeBtn) closeBtn.addEventListener("click", (e) => { e.preventDefault(); closeSlotModal(); });
+
+            // ESC
+            document.addEventListener("keydown", (e) => {
+                if (e.key !== "Escape") return;
+                if (!el("slotModal")?.classList.contains("hidden")) closeSlotModal();
+            });
+
+            // 우선순위 select -> hidden 동기화 + 로드
+            const ps = el("m_priority_select");
+            if (ps) {
+                ps.addEventListener("change", async () => {
+                    const v = clean(ps.value || "1") || "1";
+                    if (el("m_priority")) el("m_priority").value = v;
+                    syncPriorityText();
+                    // 우선순위 바꾸면 그 우선순위 데이터 불러오기
+                    try { await loadSlotIntoModal(); } catch (_) { }
+                });
+            }
+
+            // 종료 없음 체크
+            const noEnd = el("m_noEnd");
+            if (noEnd) {
+                noEnd.addEventListener("change", () => {
+                    const end = el("m_endAt");
+                    if (end) end.disabled = !!noEnd.checked;
+                });
+            }
+
+            // 이미지 파일 미리보기
+            const file = el("m_imageFile");
+            if (file) {
+                file.addEventListener("change", () => {
+                    const f = file.files && file.files[0];
                     if (!f) return;
                     setPreview(URL.createObjectURL(f));
                 });
             }
 
-            // ESC로 닫기
-            document.addEventListener("keydown", (e) => {
-                if (e.key === "Escape") {
-                    if (!el("slotModal")?.classList.contains("hidden")) closeSlotModal();
-                }
-            });
+            // 이미지 URL 입력 미리보기
+            const imgUrl = el("m_imageUrl");
+            if (imgUrl) {
+                imgUrl.addEventListener("input", () => setPreview(clean(imgUrl.value)));
+            }
+
+            // 가게 검색 버튼(모달 내부 onclick도 있지만, 안전하게 한번 더)
+            const btnSearch = document.querySelector('button[onclick="doStoreSearch()"]');
+            if (btnSearch) btnSearch.addEventListener("click", (e) => { e.preventDefault(); doStoreSearch(); });
+
+            // 저장 버튼(모달 내부 onclick도 있지만, 안전하게 한번 더)
+            const btnSave = document.querySelector('button[onclick="saveSlotFromModal()"]');
+            if (btnSave) btnSave.addEventListener("click", (e) => { e.preventDefault(); saveSlotFromModal(); });
+
+            // 사용법 팝오버
+            const helpBtn = el("adHelpBtn");
+            const helpPop = el("adHelpPopover");
+            const helpClose = el("adHelpCloseBtn");
+            if (helpBtn && helpPop) {
+                helpBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    helpPop.classList.toggle("hidden");
+                    const open = !helpPop.classList.contains("hidden");
+                    helpBtn.setAttribute("aria-expanded", open ? "true" : "false");
+                });
+            }
+            if (helpClose && helpPop) {
+                helpClose.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    helpPop.classList.add("hidden");
+                    if (helpBtn) helpBtn.setAttribute("aria-expanded", "false");
+                });
+            }
+        }
+
+        // =========================
+        // ✅ init
+        // =========================
+        document.addEventListener("DOMContentLoaded", async () => {
+            buildPowerSliderDom();
+            buildBestGridDom();
+            bindAdminClicks();
+            bindModalEvents();
+
+            await loadAndRender();
+            initPowerSlider();
         });
 
-        // ✅ 필요 시 전역 노출(HTML에서 onclick으로 부를 때)
+        // 전역 노출(HTML onclick)
         window.openSlotModal = openSlotModal;
         window.closeSlotModal = closeSlotModal;
         window.doStoreSearch = doStoreSearch;
