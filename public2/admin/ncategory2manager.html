@@ -712,24 +712,20 @@
                     return [];
                 }
 
-                async function apiSearchStore({ q, bizNo }) {
-                    const Q = clean(q);
-                    const B = digitsOnly(bizNo);
+                async function apiSearchStore({ q = "", bizNo = "" } = {}) {
+                    const qs = new URLSearchParams();
+                    if (q) qs.set("q", q);
+                    if (bizNo) qs.set("bizNo", bizNo);
 
-                    const url = `/manager/ad/search-store?q=${encodeURIComponent(Q)}&businessNo=${encodeURIComponent(B||'')}`;
+                    const url = `${API_BASE}/search-store?${qs.toString()}`;
+                    console.log("✅ apiSearchStore hit:", url);
 
-                    try {
-                        const data = await fetchJson(url);
-                        console.log("✅ apiSearchStore hit:", url, "version=", data?.version);
-                        if (data?.success === true || data?.ok === true) return data.stores || [];
-                        if (Array.isArray(data?.stores)) return data.stores;
-                        if (Array.isArray(data?.data)) return data.data;
-                        if (Array.isArray(data)) return data;
-                        return data?.stores || [];
-                    } catch (e) {
-                        console.error("❌ 검색 오류:", e.message);
-                        throw new Error(`검색 실패: ${e.message}`);
-                    }
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`검색 실패: HTTP ${res.status}`);
+                    
+                    const data = await res.json();
+                    console.log("✅ searchStore version:", data?.version);
+                    return data?.stores || data?.data || [];
                 }
 
                 // =========================
