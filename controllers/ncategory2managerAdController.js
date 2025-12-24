@@ -210,7 +210,13 @@ export async function searchStore(req, res) {
     if (q) {
       params.push(`%${q}%`);
       params.push(`%${q}%`);
-      where += ` AND (business_name ILIKE $${params.length - 1} OR business_category ILIKE $${params.length})`;
+      params.push(`%${q}%`);
+      // ✅ 상호/업종/업태까지 검색
+      where += ` AND (
+        business_name ILIKE $${params.length - 2}
+        OR business_category ILIKE $${params.length - 1}
+        OR business_type ILIKE $${params.length}
+      )`;
     }
 
     if (bizNo) {
@@ -218,17 +224,20 @@ export async function searchStore(req, res) {
       where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
     }
 
+    // ✅ 아무 조건 없으면 최근 10개만
+    const limit = (!q && !bizNo) ? 10 : 50;
+
     const sql = `
-      SELECT
-        id::text AS id,
-        regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-        business_name,
-        business_category AS category
-      FROM ${STORE_TABLE}
-      ${where}
-      ORDER BY id DESC
-      LIMIT 50
-    `;
+  SELECT
+    id::text AS id,
+    regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+    business_name,
+    business_category AS category
+  FROM ${STORE_TABLE}
+  ${where}
+  ORDER BY id DESC
+  LIMIT ${limit}
+`;
 
     const { rows } = await pool.query(sql, params);
     return res.json({ success: true, stores: rows });
