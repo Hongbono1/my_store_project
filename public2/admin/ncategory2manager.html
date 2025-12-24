@@ -716,36 +716,20 @@
                     const Q = clean(q);
                     const B = digitsOnly(bizNo);
 
-                    const params = new URLSearchParams();
-                    if (Q) params.set("q", Q);
-                    if (B) {
-                        params.set("bizNo", B);
-                        params.set("businessNo", B);
-                        params.set("business_no", B);
-                    }
+                    const url = `/manager/ad/search-store?q=${encodeURIComponent(Q)}&businessNo=${encodeURIComponent(B||'')}`;
 
-                    const tryUrls = [
-                        `${API_BASE}/search-store?${params.toString()}`,
-                        `${API_BASE}/store-search?${params.toString()}`,
-                        `${API_BASE}/searchStore?${params.toString()}`,
-                        `${API_BASE}/stores/search?${params.toString()}`,
-                    ];
-
-                    let lastErr = null;
-                    for (const u of tryUrls) {
-                        try {
-                            const data = await fetchJson(u);
-                            console.log("✅ apiSearchStore hit:", u, "version=", data?.version);
-                            if (data?.success === true || data?.ok === true) return data.stores || [];
-                            if (Array.isArray(data?.stores)) return data.stores;
-                            if (Array.isArray(data?.data)) return data.data;
-                            if (Array.isArray(data)) return data;
-                            return data?.stores || [];
-                        } catch (e) {
-                            lastErr = e;
-                        }
+                    try {
+                        const data = await fetchJson(url);
+                        console.log("✅ apiSearchStore hit:", url, "version=", data?.version);
+                        if (data?.success === true || data?.ok === true) return data.stores || [];
+                        if (Array.isArray(data?.stores)) return data.stores;
+                        if (Array.isArray(data?.data)) return data.data;
+                        if (Array.isArray(data)) return data;
+                        return data?.stores || [];
+                    } catch (e) {
+                        console.error("❌ 검색 오류:", e.message);
+                        throw new Error(`검색 실패: ${e.message}`);
                     }
-                    throw lastErr || new Error("검색 실패");
                 }
 
                 // =========================
@@ -1483,13 +1467,12 @@
                         el("adPriority").value = "1";
                         state.current.priority = "1";
 
-                        setModalStatus("저장 완료 ✅");
-                        alert("저장 완료 ✅");
-
-                        // ✅ 1번만
                         await loadAndRender();
                         await loadSlotIntoModal();
                         await refreshCandidateList();
+
+                        setModalStatus("저장 완료 ✅");
+                        alert("저장 완료 ✅");
                     } catch (e) {
                         setModalStatus(`❌ 저장 실패: ${e.message}`);
                         alert(`저장 실패: ${e.message || "저장 오류"}`);

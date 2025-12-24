@@ -309,17 +309,24 @@ export async function searchStore(req, res) {
 
     const sql = `
       SELECT
-        id::text AS id,
-        regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-        business_name,
-        business_type,
-        business_category,
-        business_subcategory,
-        business_category AS category,
-        COALESCE(NULLIF(main_image_url,''), '') AS image_url
-      FROM ${STORE_TABLE}
+        s.id::text AS id,
+        regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+        s.business_name,
+        s.business_type,
+        s.business_category,
+        s.business_subcategory,
+        s.business_category AS category,
+        COALESCE(NULLIF(s.main_image_url,''), img.url, '') AS image_url
+      FROM ${STORE_TABLE} s
+      LEFT JOIN LATERAL (
+        SELECT url
+        FROM public.combined_store_images
+        WHERE store_id = s.id
+        ORDER BY sort_order ASC, id ASC
+        LIMIT 1
+      ) img ON true
       ${where}
-      ORDER BY id DESC
+      ORDER BY s.id DESC
       LIMIT ${limit}
     `;
 
