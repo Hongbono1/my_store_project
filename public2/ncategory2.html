@@ -692,60 +692,71 @@
             .then(d => document.getElementById("footer-placeholder").innerHTML = d)
             .catch(() => { });
 
-        // ✅ 서브카테고리 토글
         function toggleSub(btn) {
             const ul = btn.nextElementSibling;
             if (!ul) return;
             ul.classList.toggle("hidden");
         }
-
         function goBack() {
-            if (document.referrer && document.referrer !== location.href) {
-                window.history.back();
-            } else {
-                window.location.href = "/category.html";
-            }
+            if (document.referrer && document.referrer !== location.href) window.history.back();
+            else window.location.href = "/category.html";
         }
-        function goNext() {
-            window.history.forward();
-        }
+        function goNext() { window.history.forward(); }
 
         // =========================================================
-        // ✅ 카테고리 페이지: DB/관리자 슬롯 데이터로 화면 채우기
+        // ✅ 여기부터: 추천/최고의가게/좌측(MVP/HIGHLIGHT) 로딩 로직 (교체)
         // =========================================================
-        const AD_API_BASE = "/indexmanager/ad"; // ✅ 네 서버 라우터에 맞춰 사용
 
-        const PAGE = "category";
-        const POS_POWER = "category_power";
-        const POS_MVP = "category_mvp";
-        const POS_HIGHLIGHT = "category_highlight";
-        const POS_BEST = "category_best";
+        // ✅ 서버에 실제로 붙어있는 라우터를 자동 탐색 (404 방지)
+        const AD_API_CANDIDATES = [
+            "/ncategory2manager/ad",
+            "/indexmanager/ad",
+            "/newindexmanager/ad",
+            "/foodcategorymanager/ad",
+        ];
+
+        // ✅ DB에 이미 저장돼 있는 naming 기준 우선(네가 보여준 값)
+        const PAGE_CANDIDATES = ["food", "category", "index", "ncategory2"];
+
+        // ✅ legacy 슬롯(단일 슬롯)일 때 모아오기 위한 후보들
+        const LEGACY_POWER_POS = Array.from({ length: 9 }, (_, i) => `food_power_${i + 1}`);
+        const LEGACY_BEST_POS = Array.from({ length: 9 }, (_, i) => `food_best_${i + 1}`);
+        const LEGACY_MVP_POS = "food_mvp";
+        const LEGACY_HIGHLIGHT_POS = "food_highlight";
+
+        // ✅ slot-items(신규 다중 아이템)일 때 position 후보
+        const ITEMS_POWER_POS = ["food_power", "category_power", "power"];
+        const ITEMS_BEST_POS = ["food_best", "category_best", "best"];
 
         function safeStr(v) { return (v == null ? "" : String(v)); }
-        function el(id) { return document.getElementById(id); }
+        const el = (id) => document.getElementById(id);
 
         async function fetchJson(url) {
             const res = await fetch(url, { headers: { "Accept": "application/json" } });
-            if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(`HTTP ${res.status} ${text}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
         }
 
-        async function getSlotItems(page, position) {
-            const qs = new URLSearchParams({ page, position });
-            const data = await fetchJson(`${AD_API_BASE}/slot-items?${qs.toString()}`);
-            return Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+        async function probeBase(base) {
+            // slot 또는 slots가 200이면 base OK로 판단
+            for (const p of PAGE_CANDIDATES) {
+                const qs = new URLSearchParams({ page: p, position: "food_mvp" });
+                try {
+                    const r = await fetch(`${base}/slot?${qs.toString()}`);
+                    if (r.ok) return { base, page: p };
+                } catch (_) { }
+            }
+            return null;
         }
 
-        async function getSlot(page, position) {
-            const qs = new URLSearchParams({ page, position });
-            const data = await fetchJson(`${AD_API_BASE}/slot?${qs.toString()}`);
-            return data?.slot ? data.slot : data;
+        async function pickApiBaseAndPage() {
+            for (const base of AD_API_CANDIDATES) {
+                const ok = await probeBase(base);
+                if (ok) return ok;
+            }
+            return { base: AD_API_CANDIDATES[0], page: PAGE_CANDIDATES[0] }; // 그래도 기본값
         }
 
-        // ✅ link_url 우선, 없으면 store_type/id 기반 생성
         function buildStoreLink(item) {
             const link = safeStr(item?.link_url).trim();
             if (link) return link;
@@ -754,11 +765,43 @@
             const id = item?.store_id ?? item?.id ?? "";
             if (!id) return "#";
 
-            // 네 프로젝트 상세 링크 규칙
             if (t === "food") return `/ndetail.html?id=${id}&type=food`;
             if (t === "combined" || t === "combined_store_info") return `/ndetail.html?id=${id}&type=combined`;
             if (t === "store_info") return `/ndetail.html?id=${id}&type=store_info`;
             return `/ndetail.html?id=${id}&type=${encodeURIComponent(t || "store_info")}`;
+        }
+
+        // ✅ slot-items 시도 (없으면 [] 반환)
+        async function tryGetSlotItems(base, page, position) {
+            const qs = new URLSearchParams({ page, position });
+            try {
+                const data = await fetchJson(`${base}/slot-items?${qs.toString()}`);
+                const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+                return items;
+            } catch (_) {
+                return [];
+            }
+        }
+
+        // ✅ slot(단일) 가져오기 (없으면 null)
+        async function tryGetSlot(base, page, position) {
+            const qs = new URLSearchParams({ page, position });
+            try {
+                const data = await fetchJson(`${base}/slot?${qs.toString()}`);
+                return data?.slot ? data.slot : data;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        // ✅ legacy 슬롯 여러 개 모으기
+        async function getLegacySlotsAsList(base, page, positions) {
+            const out = [];
+            for (const pos of positions) {
+                const slot = await tryGetSlot(base, page, pos);
+                if (slot && (slot.image_url || slot.business_name || slot.store_id || slot.link_url)) out.push(slot);
+            }
+            return out;
         }
 
         // -------------------------
@@ -773,21 +816,19 @@
 
             const chunkSize = 3;
             const groups = [];
-            for (let i = 0; i < items.length; i += chunkSize) {
-                groups.push(items.slice(i, i + chunkSize));
-            }
+            for (let i = 0; i < items.length; i += chunkSize) groups.push(items.slice(i, i + chunkSize));
 
             if (!groups.length) {
                 track.innerHTML = `
-          <div class="power-group flex basis-full shrink-0">
-            <div class="w-full px-2">
-              <div class="neo-card p-6 text-center border-2 border-dashed border-purple-200">
-                <div class="font-bold text-lg text-purple-600">강력 추천 등록 없음</div>
-                <div class="text-sm text-slate-600 mt-1">관리자에서 ${POS_POWER} 슬롯을 등록하세요.</div>
-              </div>
+        <div class="power-group flex basis-full shrink-0">
+          <div class="w-full px-2">
+            <div class="neo-card p-6 text-center border-2 border-dashed border-purple-200">
+              <div class="font-bold text-lg text-purple-600">강력 추천 등록 없음</div>
+              <div class="text-sm text-slate-600 mt-1">관리자에서 food_power_* 또는 food_power(아이템) 등록 필요</div>
             </div>
           </div>
-        `;
+        </div>
+      `;
                 return;
             }
 
@@ -812,19 +853,18 @@
                     const href = buildStoreLink(it);
 
                     col.innerHTML = `
-            <a href="${href}" class="block">
-              <div class="neo-card p-0 overflow-hidden relative rounded-2xl border-4 border-yellow-200">
-                <img src="${img}" alt="${name}" class="w-full h-60 md:h-64 object-cover">
-                <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
-                  <div class="font-bold text-lg">${name}</div>
-                  <div class="text-sm text-slate-600">업종: ${cat}</div>
-                </div>
+          <a href="${href}" class="block">
+            <div class="neo-card p-0 overflow-hidden relative rounded-2xl border-4 border-yellow-200">
+              <img src="${img}" alt="${name}" class="w-full h-60 md:h-64 object-cover">
+              <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
+                <div class="font-bold text-lg">${name}</div>
+                <div class="text-sm text-slate-600">업종: ${cat}</div>
               </div>
-            </a>
-          `;
+            </div>
+          </a>
+        `;
                     groupDiv.appendChild(col);
                 }
-
                 track.appendChild(groupDiv);
             }
         }
@@ -839,7 +879,7 @@
             const catEl = el(ids.cat);
             if (!linkEl || !imgEl || !nameEl || !catEl) return;
 
-            if (!slot || Object.keys(slot).length === 0) {
+            if (!slot) {
                 linkEl.href = "#";
                 nameEl.textContent = "등록된 가게 없음";
                 catEl.textContent = "업종";
@@ -859,7 +899,7 @@
         }
 
         // -------------------------
-        // 렌더링: 최고의 가게 (최대 6개)
+        // 렌더링: 최고의 가게
         // -------------------------
         function renderBest(items) {
             const grid = el("bestGrid");
@@ -869,11 +909,11 @@
 
             if (!items.length) {
                 grid.innerHTML = `
-          <div class="neo-card p-6 text-center border-2 border-dashed border-slate-200 col-span-full">
-            <div class="font-bold text-lg">최고의 가게 등록 없음</div>
-            <div class="text-sm text-slate-600 mt-1">관리자에서 ${POS_BEST} 슬롯을 등록하세요.</div>
-          </div>
-        `;
+        <div class="neo-card p-6 text-center border-2 border-dashed border-slate-200 col-span-full">
+          <div class="font-bold text-lg">최고의 가게 등록 없음</div>
+          <div class="text-sm text-slate-600 mt-1">관리자에서 food_best_* 또는 food_best(아이템) 등록 필요</div>
+        </div>
+      `;
                 return;
             }
 
@@ -888,22 +928,22 @@
                 a.href = href;
                 a.className = "block group";
                 a.innerHTML = `
-          <div class="neo-card p-0 overflow-hidden relative rounded-2xl transition-transform">
-            <div class="w-full h-60">
-              <img src="${img}" alt="${name}" class="w-full h-full object-cover">
-            </div>
-            <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-3">
-              <div class="font-bold text-lg leading-tight">${name}</div>
-              <div class="text-sm text-slate-600">업종: ${cat}</div>
-            </div>
+        <div class="neo-card p-0 overflow-hidden relative rounded-2xl transition-transform">
+          <div class="w-full h-60">
+            <img src="${img}" alt="${name}" class="w-full h-full object-cover">
           </div>
-        `;
+          <div class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-3">
+            <div class="font-bold text-lg leading-tight">${name}</div>
+            <div class="text-sm text-slate-600">업종: ${cat}</div>
+          </div>
+        </div>
+      `;
                 grid.appendChild(a);
             }
         }
 
         // -------------------------
-        // 파워 슬라이더 (렌더 후 초기화)
+        // 파워 슬라이더
         // -------------------------
         function initPowerSliderAfterRender() {
             const viewport = el("powerViewport");
@@ -911,7 +951,7 @@
             if (!viewport || !track) return;
 
             let groups = track.querySelectorAll(".power-group").length;
-            if (groups <= 0) return;
+            if (groups <= 1) return;
 
             let index = Math.floor(Math.random() * groups);
             let dir = 1;
@@ -922,24 +962,9 @@
             }
 
             function stepAuto() {
-                if (groups <= 1) return;
                 if (index >= groups - 1) dir = -1;
                 else if (index <= 0) dir = 1;
                 index = index + dir;
-                updateSlider();
-            }
-
-            function nextManual() {
-                if (groups <= 1) return;
-                if (index < groups - 1) index++;
-                else { dir = -1; index = Math.max(0, groups - 2); }
-                updateSlider();
-            }
-
-            function prevManual() {
-                if (groups <= 1) return;
-                if (index > 0) index--;
-                else { dir = 1; index = Math.min(groups - 1, 1); }
                 updateSlider();
             }
 
@@ -947,8 +972,8 @@
             const prevBtn = el("prevBtn");
 
             if (nextBtn && prevBtn) {
-                nextBtn.onclick = () => { stopAuto(); nextManual(); startAuto(); };
-                prevBtn.onclick = () => { stopAuto(); prevManual(); startAuto(); };
+                nextBtn.onclick = () => { stopAuto(); index = Math.min(groups - 1, index + 1); updateSlider(); startAuto(); };
+                prevBtn.onclick = () => { stopAuto(); index = Math.max(0, index - 1); updateSlider(); startAuto(); };
             }
 
             window.addEventListener("resize", updateSlider);
@@ -958,10 +983,7 @@
             function startAuto() { if (!timer) timer = setInterval(stepAuto, INTERVAL); }
             function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
 
-            document.addEventListener("visibilitychange", () => {
-                document.hidden ? stopAuto() : startAuto();
-            });
-
+            document.addEventListener("visibilitychange", () => document.hidden ? stopAuto() : startAuto());
             viewport.addEventListener("mouseenter", stopAuto);
             viewport.addEventListener("mouseleave", startAuto);
 
@@ -970,33 +992,47 @@
         }
 
         // -------------------------
-        // 전체 로딩
+        // ✅ 전체 로딩 (핵심)
         // -------------------------
         async function loadCategoryAds() {
-            try {
-                const [powerItems, bestItems, mvpSlot, highlightSlot] = await Promise.all([
-                    getSlotItems(PAGE, POS_POWER),
-                    getSlotItems(PAGE, POS_BEST),
-                    getSlot(PAGE, POS_MVP),
-                    getSlot(PAGE, POS_HIGHLIGHT),
-                ]);
+            const picked = await pickApiBaseAndPage();
+            const base = picked.base;
+            const page = picked.page;
 
-                renderPower(powerItems);
-                renderBest(bestItems);
-
-                renderOne(mvpSlot, { link: "mvpLink", img: "mvpImg", name: "mvpName", cat: "mvpCat" });
-                renderOne(highlightSlot, { link: "highlightLink", img: "highlightImg", name: "highlightName", cat: "highlightCat" });
-
-                initPowerSliderAfterRender();
-            } catch (err) {
-                console.error("❌ category ads load error:", err);
+            // 1) slot-items 먼저 시도
+            let powerItems = [];
+            for (const pos of ITEMS_POWER_POS) {
+                powerItems = await tryGetSlotItems(base, page, pos);
+                if (powerItems.length) break;
             }
+
+            let bestItems = [];
+            for (const pos of ITEMS_BEST_POS) {
+                bestItems = await tryGetSlotItems(base, page, pos);
+                if (bestItems.length) break;
+            }
+
+            // 2) slot-items가 비었으면 legacy 슬롯 모아서 사용
+            if (!powerItems.length) powerItems = await getLegacySlotsAsList(base, page, LEGACY_POWER_POS);
+            if (!bestItems.length) bestItems = await getLegacySlotsAsList(base, page, LEGACY_BEST_POS);
+
+            const mvpSlot = await tryGetSlot(base, page, LEGACY_MVP_POS);
+            const highlightSlot = await tryGetSlot(base, page, LEGACY_HIGHLIGHT_POS);
+
+            renderPower(powerItems);
+            renderBest(bestItems);
+            renderOne(mvpSlot, { link: "mvpLink", img: "mvpImg", name: "mvpName", cat: "mvpCat" });
+            renderOne(highlightSlot, { link: "highlightLink", img: "highlightImg", name: "highlightName", cat: "highlightCat" });
+
+            initPowerSliderAfterRender();
+
+            // ✅ 디버그(콘솔에서 확인)
+            console.log("[ADS]", { base, page, powerCount: powerItems.length, bestCount: bestItems.length, mvp: !!mvpSlot, highlight: !!highlightSlot });
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            loadCategoryAds();
-        });
+        document.addEventListener("DOMContentLoaded", loadCategoryAds);
     </script>
+
 </body>
 
 </html>
