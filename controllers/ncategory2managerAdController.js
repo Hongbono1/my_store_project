@@ -185,12 +185,11 @@ export async function getSlot(req, res) {
   }
 }
 
-/** ✅ GET /slot-items?page=...&position=...&priority=... : 프론트가 호출하는 후보 목록 */
+/** ✅ GET /slot-items?page=...&position=... : 프론트가 호출하는 후보 목록 */
 export async function listSlotItems(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
-    const priority = safeIntOrNull(req.query.priority);
 
     if (!position) return res.json({ success: true, items: [] });
 
@@ -236,17 +235,18 @@ export async function listSlotItems(req, res) {
        )
       WHERE s.page = $1
         AND s.position = $2
-        AND (s.priority IS NOT DISTINCT FROM $3)
-      LIMIT 1
+      ORDER BY s.priority ASC NULLS FIRST, s.updated_at DESC
+      LIMIT 50
     `;
 
-    const { rows } = await pool.query(sql, [page, position, priority]);
+    const { rows } = await pool.query(sql, [page, position]);
     return res.json({ success: true, items: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 }
 
+/** GET /search-store?q=...&bizNo=... (combined_store_info만) */
 /** GET /search-store?q=...&bizNo=... (combined_store_info만) */
 export async function searchStore(req, res) {
   try {
@@ -257,10 +257,7 @@ export async function searchStore(req, res) {
     let where = `WHERE 1=1`;
 
     if (q) {
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
       where += ` AND (
         business_name ILIKE $${params.length - 3}
         OR business_category ILIKE $${params.length - 2}
@@ -274,10 +271,8 @@ export async function searchStore(req, res) {
       where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
     }
 
-    // ✅ 아무 조건 없으면 최근 10개만
     const limit = (!q && !bizNo) ? 10 : 50;
 
-    // ✅ 업종 키를 business_category로 내려주고, 기존 category도 같이 유지(프론트 호환)
     const sql = `
       SELECT
         id::text AS id,
@@ -294,7 +289,9 @@ export async function searchStore(req, res) {
     `;
 
     const { rows } = await pool.query(sql, params);
-    return res.json({ success: true, stores: rows });
+
+    // ✅ 배포/라우팅 확인용 버전 태그 (이게 안 보이면 너는 지금 예전 서버코드를 보고 있는 거임)
+    return res.json({ success: true, version: "searchStore-v2-2025-12-24", stores: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
