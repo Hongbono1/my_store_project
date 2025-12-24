@@ -257,7 +257,7 @@ export async function upsertSlot(req, res) {
     const position = clean(req.body.position);
     const priority = safeIntOrNull(req.body.priority); // "" -> null
 
-    // ✅ slot_mode 기본값은 image (store로 기본 잡히면 store_id 때문에 400 터짐)
+    // ✅ slot_mode 기본값은 image (이미지 모드가 기본)
     const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "image";
 
     // ✅ slot_type은 banner/text만 허용 → 강제 보정
