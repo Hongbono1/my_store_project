@@ -188,10 +188,12 @@
                 </li>
             </ul>
 
-            <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300">
+            <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300 admin-slot"
+                data-position="ncategory2_sidebar_ad" data-label="사이드 광고">
                 <h3 class="font-bold text-lg mb-2">광고 영역</h3>
                 <p class="text-sm text-gray-600">이곳은 광고 배너/이미지가 들어갈 박스입니다.</p>
-                <img src="/uploads/sample-ad.jpg" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl">
+                <img data-role="img" src="" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl hidden">
+                <div data-role="noimg" class="mt-3 text-xs text-slate-500">NO IMG</div>
             </div>
         </aside>
 
@@ -278,17 +280,17 @@
                 </div>
             </section>
 
-            <div class="grid grid-cols-2 gap-6">
-                <div class="neo-card p-6 text-center">
-                    <h3 class="font-bold text-lg mb-2">하단 박스 1</h3>
-                    <p class="text-gray-600 text-sm">이곳은 설명 텍스트</p>
+            <div class="neo-card p-0 overflow-hidden relative rounded-2xl admin-slot"
+                data-position="ncategory2_bottom_1" data-label="하단 박스 1">
+                <div class="w-full h-40 bg-white/40 flex items-center justify-center">
+                    <img data-role="img" src="" class="w-full h-full object-cover hidden" alt="하단1">
+                    <div data-role="noimg" class="text-xs text-slate-500">NO IMG</div>
                 </div>
-                <div class="neo-card p-6 text-center">
-                    <h3 class="font-bold text-lg mb-2">하단 박스 2</h3>
-                    <p class="text-gray-600 text-sm">이곳은 설명 텍스트</p>
+                <div class="p-4 text-center">
+                    <div class="font-bold text-lg" data-role="name">하단 박스 1</div>
+                    <div class="text-sm text-slate-600" data-role="category">업종:</div>
                 </div>
             </div>
-
         </main>
     </div>
 
@@ -614,6 +616,12 @@
         const API_BASE = "/manager/ad";
         const PAGE = "ncategory2";
         const DEFAULT_TABLE_SOURCE = "combined_store_info";
+
+        // ✅ 강제 "가게+이미지 등록" 슬롯 목록
+        const FORCE_STORE_IMAGE_POSITIONS = new Set([
+            "ncategory2_bottom_1",
+            "ncategory2_sidebar_ad",
+        ]);
 
         function buildStoreLink(tableSource, storeId) {
             const t = clean(tableSource) || DEFAULT_TABLE_SOURCE;
@@ -1095,9 +1103,16 @@
             if (el("modalPositionText")) el("modalPositionText").textContent = pos;
 
             clearModalFields(true);
-            // 기본 모드 image
-            document.querySelectorAll('input[name="slotMode"]').forEach(r => r.checked = r.value === "image");
-            applyModeUI("image");
+            
+            // ✅ 강제 store 모드 슬롯인 경우 자동 설정
+            if (FORCE_STORE_IMAGE_POSITIONS.has(pos)) {
+                document.querySelectorAll('input[name="slotMode"]').forEach(r => r.checked = r.value === "store");
+                applyModeUI("store");
+            } else {
+                // 기본 모드 image
+                document.querySelectorAll('input[name="slotMode"]').forEach(r => r.checked = r.value === "image");
+                applyModeUI("image");
+            }
 
             modal.classList.remove("hidden");
 
@@ -1239,7 +1254,7 @@
 
                 row.querySelector("button").addEventListener("click", () => {
                     if (!id) {
-                        alert("이 검색 결과에 id가 없습니다. (store_id가 비어있음) 서버 searchStore 응답 필드를 확인하세요.");
+                        alert("실제 가게 결과가 아닙니다.");
                         return;
                     }
                     applySelectedStore({
@@ -1381,7 +1396,7 @@
                 if (mode === "store") {
                     const storeId = clean(el("fieldStoreId")?.value);
                     console.log("🔍 store 모드 저장:", { storeId, fieldStoreIdEl: el("fieldStoreId") });
-                    
+
                     if (!storeId) {
                         console.error("❌ store_id가 비어있음!");
                         throw new Error("가게연결 모드인데 store_id가 비어있음(가게 선택 먼저)");
@@ -1427,8 +1442,8 @@
                 await loadSlotIntoModal();
                 await refreshCandidateList();
             } catch (e) {
-                setModalStatus("");
-                alert(e.message || "저장 오류");
+                setModalStatus(`❌ 저장 실패: ${e.message}`);
+                alert(`저장 실패: ${e.message || "저장 오류"}`);
             }
         }
 
