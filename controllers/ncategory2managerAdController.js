@@ -8,8 +8,6 @@ export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
 const SLOTS_TABLE = "public.admin_ad_slots";
-
-// ✅ ncategory2는 combined_store_info 기준(표시용 업종 JOIN)
 const STORE_TABLE = "public.combined_store_info";
 
 function ensureUploadDir() {
@@ -37,16 +35,14 @@ function toBool(v) {
   return s === "true" || s === "1" || s === "yes" || s === "y" || s === "on";
 }
 
-// ✅ DB 체크 제약: slot_type 은 banner/text만 허용
+// DB 제약: slot_type 은 banner/text만
 function normalizeSlotType(slot_type, slot_mode) {
   const st = clean(slot_type).toLowerCase();
   const sm = clean(slot_mode).toLowerCase();
 
-  // 프론트에서 image 라고 보내도 DB는 banner
   if (st === "image") return "banner";
   if (st === "banner" || st === "text") return st;
 
-  // slot_mode 기준으로 추론
   if (sm === "text") return "text";
   return "banner";
 }
@@ -71,44 +67,56 @@ export function fileFilter(_req, file, cb) {
   cb(null, true);
 }
 
+/** ✅ 공통 SELECT (업종/상호/사업자번호 보강 + JOIN 캐스팅) */
+const BASE_SELECT = `
+  SELECT
+    s.id,
+    s.page,
+    s.position,
+    s.priority,
+    s.slot_type,
+    s.slot_mode,
+    s.store_id,
+    s.table_source,
+
+    COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
+    COALESCE(
+      NULLIF(s.business_no,''),
+      regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
+      ''
+    ) AS business_no,
+
+    s.image_url,
+    s.link_url,
+    s.text_content,
+    s.created_at,
+    s.updated_at,
+    s.start_date,
+    s.end_date,
+    s.no_end,
+    s.start_at,
+    s.end_at,
+    s.store_type,
+
+    COALESCE(c.business_category, '') AS business_category
+  FROM ${SLOTS_TABLE} s
+  LEFT JOIN ${STORE_TABLE} c
+    ON c.id::text = s.store_id::text
+   AND (
+        s.table_source = 'combined_store_info'
+     OR s.table_source = 'combined'
+     OR s.table_source IS NULL
+     OR s.table_source = ''
+   )
+`;
+
 /** GET /slots?page=ncategory2 */
 export async function listSlots(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
 
     const sql = `
-      SELECT
-        s.id,
-        s.page,
-        s.position,
-        s.priority,
-        s.slot_type,
-        s.slot_mode,
-        s.store_id,
-        s.business_no,
-        s.business_name,
-        s.image_url,
-        s.link_url,
-        s.text_content,
-        s.created_at,
-        s.updated_at,
-        s.start_date,
-        s.end_date,
-        s.no_end,
-        s.start_at,
-        s.end_at,
-        s.store_type,
-        s.table_source,
-
-        COALESCE(c.business_category, '') AS business_category
-      FROM ${SLOTS_TABLE} s
-      LEFT JOIN ${STORE_TABLE} c
-        ON c.id = s.store_id
-       AND (
-            s.table_source = 'combined_store_info'
-         OR s.table_source = 'combined'
-         OR s.table_source IS NULL
-       )
+      ${BASE_SELECT}
       WHERE s.page = $1
       ORDER BY s.position ASC, s.priority ASC NULLS FIRST
     `;
@@ -130,50 +138,12 @@ export async function getSlot(req, res) {
     if (!position) return res.json({ success: true, slot: null });
 
     const sql = `
-  SELECT
-    s.id,
-    s.page,
-    s.position,
-    s.priority,
-    s.slot_type,
-    s.slot_mode,
-    s.store_id,
-    s.table_source,
-
-    -- ✅ 슬롯에 저장된 값이 비어있으면 가게 테이블 값으로 보강
-    COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
-    COALESCE(
-      NULLIF(s.business_no,''),
-      regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
-      ''
-    ) AS business_no,
-
-    s.image_url,
-    s.link_url,
-    s.text_content,
-    s.created_at,
-    s.updated_at,
-    s.start_date,
-    s.end_date,
-    s.no_end,
-    s.start_at,
-    s.end_at,
-    s.store_type,
-
-    COALESCE(c.business_category, '') AS business_category
-  FROM ${SLOTS_TABLE} s
-  LEFT JOIN ${STORE_TABLE} c
-    ON c.id::text = s.store_id::text
-   AND (
-        s.table_source = 'combined_store_info'
-     OR s.table_source = 'combined'
-     OR s.table_source IS NULL
-     OR s.table_source = ''
-   )
-  WHERE s.page = $1
-  ORDER BY s.position ASC, s.priority ASC NULLS FIRST
-`;
-
+      ${BASE_SELECT}
+      WHERE s.page = $1
+        AND s.position = $2
+        AND (s.priority IS NOT DISTINCT FROM $3)
+      LIMIT 1
+    `;
 
     const { rows } = await pool.query(sql, [page, position, priority]);
     return res.json({ success: true, slot: rows[0] || null });
@@ -182,7 +152,7 @@ export async function getSlot(req, res) {
   }
 }
 
-/** ✅ GET /slot-items?page=...&position=... : 프론트가 호출하는 후보 목록 */
+/** ✅ GET /slot-items?page=...&position=... : 해당 position의 모든 아이템(우선순위 포함) */
 export async function listSlotItems(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
@@ -190,51 +160,12 @@ export async function listSlotItems(req, res) {
     if (!position) return res.json({ success: true, items: [] });
 
     const sql = `
-  SELECT
-    s.id,
-    s.page,
-    s.position,
-    s.priority,
-    s.slot_type,
-    s.slot_mode,
-    s.store_id,
-    s.table_source,
-
-    COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
-    COALESCE(
-      NULLIF(s.business_no,''),
-      regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
-      ''
-    ) AS business_no,
-
-    s.image_url,
-    s.link_url,
-    s.text_content,
-    s.created_at,
-    s.updated_at,
-    s.start_date,
-    s.end_date,
-    s.no_end,
-    s.start_at,
-    s.end_at,
-    s.store_type,
-
-    COALESCE(c.business_category, '') AS business_category
-  FROM ${SLOTS_TABLE} s
-  LEFT JOIN ${STORE_TABLE} c
-    ON c.id::text = s.store_id::text
-   AND (
-        s.table_source = 'combined_store_info'
-     OR s.table_source = 'combined'
-     OR s.table_source IS NULL
-     OR s.table_source = ''
-   )
-  WHERE s.page = $1
-    AND s.position = $2
-    AND (s.priority IS NOT DISTINCT FROM $3)
-  LIMIT 1
-`;
-
+      ${BASE_SELECT}
+      WHERE s.page = $1
+        AND s.position = $2
+      ORDER BY s.priority ASC NULLS LAST, s.updated_at DESC
+      LIMIT 50
+    `;
 
     const { rows } = await pool.query(sql, [page, position]);
     return res.json({ success: true, items: rows });
@@ -253,10 +184,7 @@ export async function searchStore(req, res) {
     let where = `WHERE 1=1`;
 
     if (q) {
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
-      // ✅ 상호/업종/업태까지 검색
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
       where += ` AND (
         business_name ILIKE $${params.length - 2}
         OR business_category ILIKE $${params.length - 1}
@@ -269,20 +197,19 @@ export async function searchStore(req, res) {
       where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
     }
 
-    // ✅ 아무 조건 없으면 최근 10개만
     const limit = (!q && !bizNo) ? 10 : 50;
 
     const sql = `
-  SELECT
-    id::text AS id,
-    regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-    business_name,
-    business_category AS category
-  FROM ${STORE_TABLE}
-  ${where}
-  ORDER BY id DESC
-  LIMIT ${limit}
-`;
+      SELECT
+        id::text AS id,
+        regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+        business_name,
+        business_category AS category
+      FROM ${STORE_TABLE}
+      ${where}
+      ORDER BY id DESC
+      LIMIT ${limit}
+    `;
 
     const { rows } = await pool.query(sql, params);
     return res.json({ success: true, stores: rows });
@@ -298,10 +225,7 @@ export async function upsertSlot(req, res) {
     const position = clean(req.body.position);
     const priority = safeIntOrNull(req.body.priority);
 
-    // ✅ slot_mode 기본값은 image가 안전
     const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "image";
-
-    // ✅ DB 제약 대응: banner/text만 저장
     const raw_slot_type = clean(req.body.slot_type || req.body.slotType);
     const slot_type = normalizeSlotType(raw_slot_type, slot_mode);
 
@@ -318,12 +242,10 @@ export async function upsertSlot(req, res) {
 
     if (!position) return res.status(400).json({ success: false, error: "position required" });
 
-    // ✅ store 모드인데 store_id 없으면 막기
     if (slot_mode === "store" && !store_id) {
       return res.status(400).json({ success: false, error: "store mode requires store_id" });
     }
 
-    // ✅ store 모드가 아니면 가게 필드는 비움
     if (slot_mode !== "store") {
       store_type = "";
       table_source = "";
@@ -332,17 +254,16 @@ export async function upsertSlot(req, res) {
       business_name = "";
     }
 
-    // ✅ 이미지 처리
     let image_url = clean(req.body.image_url || req.body.imageUrl);
     image_url = image_url ? image_url : null;
 
     const file = Array.isArray(req.files) && req.files.length ? req.files[0] : null;
-    if (file?.filename) {
-      image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
-    }
-
+    if (file?.filename) image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
     if (clearImage) image_url = null;
 
+    // ✅ 중요: upsert 기준이 (page, position) 이면 하단박스 1/2처럼
+    //         같은 position에서 priority로 여러개를 저장하려 할 때 덮어써짐.
+    //         너 DB가 (page, position, priority) 유니크라면 아래 ON CONFLICT를 그에 맞춰야 함.
     const sql = `
       INSERT INTO ${SLOTS_TABLE} (
         page, position, priority,
@@ -360,9 +281,8 @@ export async function upsertSlot(req, res) {
         $11,$12,$13,
         NOW()
       )
-      ON CONFLICT (page, position)
+      ON CONFLICT (page, position, priority)
       DO UPDATE SET
-        priority = EXCLUDED.priority,
         slot_type = EXCLUDED.slot_type,
         slot_mode = EXCLUDED.slot_mode,
         store_type = EXCLUDED.store_type,
@@ -377,14 +297,7 @@ export async function upsertSlot(req, res) {
         link_url = EXCLUDED.link_url,
         text_content = EXCLUDED.text_content,
         updated_at = NOW()
-      RETURNING
-        id, page, position, priority,
-        slot_type, slot_mode,
-        store_type, table_source,
-        store_id, business_no, business_name,
-        image_url, link_url, text_content,
-        created_at, updated_at,
-        start_date, end_date, no_end, start_at, end_at
+      RETURNING *
     `;
 
     const values = [
