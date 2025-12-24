@@ -1311,6 +1311,8 @@
                     const imageUrl = clean(store.image_url);
                     const tableSource = clean(store.table_source) || DEFAULT_TABLE_SOURCE;
 
+                    console.log("✅ applySelectedStore - imageUrl:", imageUrl);
+
                     if (el("fieldStoreId")) el("fieldStoreId").value = storeId;
                     if (el("fieldTableSource")) el("fieldTableSource").value = tableSource;
                     if (el("fieldBizNo")) el("fieldBizNo").value = businessNo;
@@ -1325,7 +1327,12 @@
 
                     // preview는 "가게 이미지가 있으면" 그걸 current로 설정
                     const modal = el("slotModal");
-                    if (modal) modal.dataset.currentImage = imageUrl || (modal.dataset.currentImage || "");
+                    if (modal) {
+                        // 가게 이미지가 있으면 우선 사용, 없으면 기존 유지
+                        if (imageUrl) {
+                            modal.dataset.currentImage = imageUrl;
+                        }
+                    }
                     setPreview(modal?.dataset.currentImage || "");
 
                     // summary
@@ -1407,19 +1414,24 @@
                         const currentImage = clean(modal?.dataset.currentImage || "");
                         const file = el("fieldImageFile")?.files?.[0];
 
+                        console.log("💾 저장 시 이미지 상태:", { currentImage, hasFile: !!file, mode });
+
                         if (file) {
                             fd.append("image", file);
+                            console.log("✅ 파일 업로드:", file.name);
                             // 서버가 image_url도 같이 받을 수 있어도 문제 없음
                         } else {
                             // 기존 이미지 유지/삭제 판단
                             if (currentImage) {
                                 fd.append("image_url", currentImage);
                                 fd.append("imageUrl", currentImage);
+                                console.log("✅ 기존 이미지 유지:", currentImage);
                                 fd.append("keep_image", "true");
                                 fd.append("keepImage", "true");
                             } else {
                                 fd.append("clear_image", "true");
                                 fd.append("clearImage", "true");
+                                console.log("⚠️ 이미지 없음 (clear)");
                             }
                         }
 
