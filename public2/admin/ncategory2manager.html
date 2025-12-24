@@ -672,9 +672,12 @@
 
                 async function apiListSlots() {
                     const data = await fetchJson(`${API_BASE}/slots?page=${encodeURIComponent(PAGE)}`);
-                    if (data?.success === true) return data.slots || [];
-                    if (Array.isArray(data?.slots)) return data.slots;
-                    return [];
+                    let rows = [];
+                    if (data?.success === true) rows = data.slots || [];
+                    else if (Array.isArray(data?.slots)) rows = data.slots;
+                    else if (Array.isArray(data)) rows = data;
+                    // ✅ priority=1만 화면 반영
+                    return rows.filter(r => String(r.priority ?? r.ad_priority ?? "1") === "1");
                 }
 
                 async function apiGetSlot({ page, position, priority }) {
@@ -889,7 +892,7 @@
                 }
 
                 async function loadAndRender() {
-                    const rows = await apiListSlots();
+                    const rows = await apiListSlots(); // ✅ 이미 priority=1만 들어옴
                     state.slots.clear();
                     rows.forEach((r) => state.slots.set(r.position, r));
 
@@ -1462,8 +1465,14 @@
 
                         await apiUpsertSlot(fd);
 
+                        // ✅ 저장 후 화면은 항상 priority=1 기준으로 다시 로드
+                        el("adPriority").value = "1";
+                        state.current.priority = "1";
+
                         setModalStatus("저장 완료 ✅");
                         alert("저장 완료 ✅");
+
+                        // ✅ 1번만
                         await loadAndRender();
                         await loadSlotIntoModal();
                         await refreshCandidateList();

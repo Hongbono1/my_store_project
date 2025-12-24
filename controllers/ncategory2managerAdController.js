@@ -37,6 +37,30 @@ function toBool(v) {
   return s === "true" || s === "1" || s === "yes" || s === "y" || s === "on";
 }
 
+// ✅ 이미지 URL을 브라우저에서 열리는 형태로 통일
+function toPublicImageUrl(v) {
+  const s = clean(v);
+  if (!s) return "";
+
+  // 이미 http(s)면 그대로
+  if (/^https?:\/\//i.test(s)) return s;
+
+  // 로컬 절대 경로(/data/uploads/...)면 /uploads로 바꿔야 함
+  // 예: /data/uploads/combined_store/abc.jpg -> /uploads/combined_store/abc.jpg
+  if (s.startsWith("/data/uploads/")) {
+    return s.replace("/data/uploads/", "/uploads/");
+  }
+
+  // /uploads 로 시작하면 OK
+  if (s.startsWith("/uploads/")) return s;
+
+  // uploads/ 로 들어오면 앞에 / 붙여줌
+  if (s.startsWith("uploads/")) return `/${s}`;
+
+  // 그 외에는 안전하게 /uploads/ 밑으로 붙인다
+  return `/uploads/${s.replace(/^\/+/, "")}`;
+}
+
 // ✅ DB 체크 제약: slot_type 은 banner/text만 허용
 function normalizeSlotType(slot_type, slot_mode) {
   const st = clean(slot_type).toLowerCase();
@@ -115,6 +139,9 @@ export async function listSlots(req, res) {
     `;
 
     const { rows } = await pool.query(sql, [page]);
+    rows.forEach(r => {
+      r.image_url = toPublicImageUrl(r.image_url);
+    });
     return res.json({ success: true, slots: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -179,7 +206,11 @@ export async function getSlot(req, res) {
     `;
 
     const { rows } = await pool.query(sql, [page, position, priority]);
-    return res.json({ success: true, slot: rows[0] || null });
+    const slot = rows[0] || null;
+    if (slot) {
+      slot.image_url = toPublicImageUrl(slot.image_url);
+    }
+    return res.json({ success: true, slot });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -240,6 +271,9 @@ export async function listSlotItems(req, res) {
     `;
 
     const { rows } = await pool.query(sql, [page, position]);
+    rows.forEach(r => {
+      r.image_url = toPublicImageUrl(r.image_url);
+    });
     return res.json({ success: true, items: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -290,6 +324,9 @@ export async function searchStore(req, res) {
     `;
 
     const { rows } = await pool.query(sql, params);
+    rows.forEach(r => {
+      r.image_url = toPublicImageUrl(r.image_url);
+    });
 
     // ✅ 배포/라우팅 확인용 버전 태그 (이게 안 보이면 너는 지금 예전 서버코드를 보고 있는 거임)
     return res.json({ success: true, version: "searchStore-v2-2025-12-24", stores: rows });
