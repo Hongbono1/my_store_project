@@ -712,7 +712,7 @@
                     return [];
                 }
 
-                async function apiSearchStore({ q = "", bizNo = "" } = {}) {
+                async function apiSearchStore(q, bizNo) {
                     const qs = new URLSearchParams();
                     if (q) qs.set("q", q);
                     if (bizNo) qs.set("bizNo", bizNo);
@@ -725,7 +725,7 @@
                     
                     const data = await res.json();
                     console.log("✅ searchStore version:", data?.version);
-                    return data?.stores || data?.data || [];
+                    return data.stores || [];
                 }
 
                 // =========================
@@ -1233,7 +1233,7 @@
                     const qRaw = clean(el("fieldBizName")?.value);
                     const bizRaw = digitsOnly(clean(el("fieldBizNo")?.value));
 
-                    // ✅ 빈 검색어면 기본 리스트(10개) 요청
+                    // ✅ 빈 검색어면 __all__로 자동 변환 (기본 리스트 10개 요청)
                     const q = qRaw.length ? qRaw : "__all__";
                     const bizNo = qRaw ? "" : bizRaw;
 
@@ -1241,8 +1241,8 @@
                     if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 중...</div>`;
 
                     try {
-                        const stores = await apiSearchStore({ q, bizNo });
-                        console.log("✅ searchStore version 확인:", stores);
+                        const stores = await apiSearchStore(q, bizNo);
+                        console.log("✅ searchStore 결과:", stores.length, "개");
                         if (!Array.isArray(stores) || stores.length === 0) {
                             // ✅ 기존 화면을 지우지 않고 안내만
                             if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
