@@ -1,9 +1,11 @@
+// routes/ncategory2managerAdRouter.js
 import express from "express";
 import multer from "multer";
 
 import {
   getSlot,
   listSlots,
+  listSlotItems,     // ✅ 추가
   upsertSlot,
   deleteSlot,
   searchStore,
@@ -25,6 +27,7 @@ const upload = multer({
 // ✅ Unexpected field 방지
 const uploadAny = upload.any();
 
+// ✅ multer 에러를 JSON으로 반환 (에러 미들웨어)
 function multerErrorHandler(err, _req, res, _next) {
   return res.status(400).json({
     success: false,
@@ -35,9 +38,13 @@ function multerErrorHandler(err, _req, res, _next) {
 // ===== API =====
 router.get("/slot", getSlot);
 router.get("/slots", listSlots);
+router.get("/slot-items", listSlotItems);  // ✅ 추가 (404 해결)
 router.get("/search-store", searchStore);
 
-router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
+router.post("/slot", uploadAny, upsertSlot);
 router.delete("/slot", deleteSlot);
+
+// ✅ 반드시 라우터 맨 아래에 에러 핸들러 등록
+router.use(multerErrorHandler);
 
 export default router;

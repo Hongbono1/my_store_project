@@ -1,3 +1,4 @@
+// controllers/ncategory2managerAdController.js
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -37,6 +38,14 @@ function toBool(v) {
   return s === "true" || s === "1" || s === "yes" || s === "y" || s === "on";
 }
 
+/** ✅ slot_type은 DB 제약: banner | text 만 */
+function normalizeSlotType(slotMode, slotTypeRaw) {
+  const t = clean(slotTypeRaw).toLowerCase();
+  if (t === "banner" || t === "text") return t;
+  // UI slotMode 기준으로 강제 결정
+  return clean(slotMode).toLowerCase() === "text" ? "text" : "banner";
+}
+
 /** multer storage factory */
 export function makeMulterStorage() {
   ensureUploadDir();
@@ -62,7 +71,6 @@ export async function listSlots(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
 
-    // ✅ admin_ad_slots 실제 컬럼만 + 표시용 업종은 JOIN 결과로만 제공
     const sql = `
       SELECT
         s.id,
@@ -98,6 +106,55 @@ export async function listSlots(req, res) {
 
     const { rows } = await pool.query(sql, [page]);
     return res.json({ success: true, slots: rows });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+}
+
+/** ✅ GET /slot-items?page=...&position=...  (404 없애고 후보목록 제공) */
+export async function listSlotItems(req, res) {
+  try {
+    const page = clean(req.query.page) || "ncategory2";
+    const position = clean(req.query.position);
+
+    if (!position) return res.json({ success: true, items: [] });
+
+    // 현재 테이블이 admin_ad_slots 하나라면, "후보"는 결국 이 테이블의 rows.
+    // (UNIQUE가 (page, position) 이면 사실상 1개만 나오지만, 404 방지 + UI용 응답은 가능)
+    const sql = `
+      SELECT
+        s.id,
+        s.page,
+        s.position,
+        s.priority,
+        s.slot_type,
+        s.slot_mode,
+        s.store_id,
+        s.business_no,
+        s.business_name,
+        s.image_url,
+        s.link_url,
+        s.text_content,
+        s.created_at,
+        s.updated_at,
+        s.start_at,
+        s.end_at,
+        s.no_end,
+        s.store_type,
+        s.table_source,
+        COALESCE(c.business_category, '') AS business_category
+      FROM ${SLOTS_TABLE} s
+      LEFT JOIN ${STORE_TABLE} c
+        ON s.table_source = 'combined_store_info'
+       AND c.id = s.store_id
+      WHERE s.page = $1
+        AND s.position = $2
+      ORDER BY s.priority ASC NULLS FIRST, s.updated_at DESC
+      LIMIT 50
+    `;
+
+    const { rows } = await pool.query(sql, [page, position]);
+    return res.json({ success: true, items: rows });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -200,8 +257,11 @@ export async function upsertSlot(req, res) {
     const position = clean(req.body.position);
     const priority = safeIntOrNull(req.body.priority); // "" -> null
 
-    const slot_type = clean(req.body.slot_type || req.body.slotType) || "image";
-    const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "store";
+    // ✅ slot_mode 기본값은 image (store로 기본 잡히면 store_id 때문에 400 터짐)
+    const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "image";
+
+    // ✅ slot_type은 banner/text만 허용 → 강제 보정
+    const slot_type = normalizeSlotType(slot_mode, req.body.slot_type || req.body.slotType);
 
     let store_type = clean(req.body.store_type || req.body.storeType);
     let table_source = clean(req.body.table_source || req.body.tableSource);
@@ -212,8 +272,12 @@ export async function upsertSlot(req, res) {
     const text_content = clean(req.body.text_content || req.body.textContent);
     const link_url = clean(req.body.link_url || req.body.linkUrl);
 
-    const keepImage = toBool(req.body.keepImage || req.body.keep_image);
     const clearImage = toBool(req.body.clearImage || req.body.clear_image);
+
+    // 기간(모달에서 보내는 값 받아둠) - DB 컬럼 존재하니 저장
+    const start_at = clean(req.body.start_at || req.body.startAt) || null;
+    const end_at = clean(req.body.end_at || req.body.endAt) || null;
+    const no_end = toBool(req.body.no_end || req.body.noEnd);
 
     if (!position) return res.status(400).json({ success: false, error: "position required" });
 
@@ -222,7 +286,7 @@ export async function upsertSlot(req, res) {
       return res.status(400).json({ success: false, error: "store mode requires store_id" });
     }
 
-    // ✅ banner 모드면 가게 연결 필드는 비움
+    // ✅ store 모드가 아니면 가게 연결 필드 비움
     if (slot_mode !== "store") {
       store_type = "";
       table_source = "";
@@ -231,7 +295,8 @@ export async function upsertSlot(req, res) {
       business_name = "";
     }
 
-    // ✅ 이미지 처리 (clear 우선)
+    // ✅ text 모드면 이미지도 의미 없음 → 강제로 제거(원하면 유지로 바꿔도 됨)
+    // (지금 UX는 텍스트 전용이라 이미지/가게/링크 숨김이라 null이 더 안전)
     let image_url = clean(req.body.image_url || req.body.imageUrl);
     image_url = image_url ? image_url : null;
 
@@ -240,14 +305,10 @@ export async function upsertSlot(req, res) {
       image_url = `${UPLOAD_PUBLIC_PREFIX}/${file.filename}`;
     }
 
-    // clear 체크면 무조건 null
-    if (clearImage) {
+    if (clearImage || slot_mode === "text") {
       image_url = null;
     }
 
-    // ✅ upsert
-    // - UNIQUE가 (page, position) 이라는 전제로 유지
-    // - priority를 쓰고 싶으면 UNIQUE/ON CONFLICT도 (page, position, priority)로 맞춰야 함
     const sql = `
       INSERT INTO ${SLOTS_TABLE} (
         page, position, priority,
@@ -255,6 +316,7 @@ export async function upsertSlot(req, res) {
         store_type, table_source,
         store_id, business_no, business_name,
         image_url, link_url, text_content,
+        start_at, end_at, no_end,
         updated_at
       )
       VALUES (
@@ -263,6 +325,7 @@ export async function upsertSlot(req, res) {
         $6,$7,
         $8,$9,$10,
         $11,$12,$13,
+        $14,$15,$16,
         NOW()
       )
       ON CONFLICT (page, position)
@@ -275,17 +338,12 @@ export async function upsertSlot(req, res) {
         store_id = EXCLUDED.store_id,
         business_no = EXCLUDED.business_no,
         business_name = EXCLUDED.business_name,
-
-        -- ✅ 이미지 규칙:
-        -- clearImage=true면 NULL
-        -- 아니면 새 값이 있으면 새 값, 없으면 기존 유지
-        image_url = CASE
-          WHEN $14 = true THEN NULL
-          ELSE COALESCE(EXCLUDED.image_url, ${SLOTS_TABLE}.image_url)
-        END,
-
+        image_url = EXCLUDED.image_url,
         link_url = EXCLUDED.link_url,
         text_content = EXCLUDED.text_content,
+        start_at = EXCLUDED.start_at,
+        end_at = EXCLUDED.end_at,
+        no_end = EXCLUDED.no_end,
         updated_at = NOW()
       RETURNING
         id, page, position, priority,
@@ -294,7 +352,7 @@ export async function upsertSlot(req, res) {
         store_id, business_no, business_name,
         image_url, link_url, text_content,
         created_at, updated_at,
-        start_date, end_date, no_end, start_at, end_at
+        start_at, end_at, no_end
     `;
 
     const values = [
@@ -303,7 +361,7 @@ export async function upsertSlot(req, res) {
       store_type || null, table_source || null,
       store_id, business_no || null, business_name || null,
       image_url, link_url || null, text_content || null,
-      clearImage, // $14
+      start_at, end_at, no_end,
     ];
 
     const { rows } = await pool.query(sql, values);
