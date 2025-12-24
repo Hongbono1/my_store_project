@@ -287,25 +287,28 @@ export async function searchStore(req, res) {
     const q = clean(req.query.q);
     const bizNo = digitsOnly(req.query.bizNo || req.query.businessNo || req.query.business_no);
 
-    const params = [];
-    let where = `WHERE 1=1`;
+    // ✅ __all__ 또는 빈값이면 최신 10개 리턴
+    const wantAll = !q || q === "__all__";
 
-    if (q) {
+    const params = [];
+    let where = "";
+
+    if (!wantAll) {
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
-      where += ` AND (
+      where = ` WHERE (
         business_name ILIKE $${params.length - 3}
         OR business_category ILIKE $${params.length - 2}
         OR business_type ILIKE $${params.length - 1}
         OR business_subcategory ILIKE $${params.length}
       )`;
+
+      if (bizNo) {
+        params.push(`%${bizNo}%`);
+        where += ` OR regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
+      }
     }
 
-    if (bizNo) {
-      params.push(`%${bizNo}%`);
-      where += ` AND regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
-    }
-
-    const limit = (!q && !bizNo) ? 10 : 50;
+    const limit = wantAll ? 10 : 50;
 
     const sql = `
       SELECT
