@@ -758,6 +758,26 @@
                     );
                 }
 
+                function pickThumb(store) {
+                    return (
+                        store.image_url ||   // 우리가 맞추려는 표준
+                        store.url ||         // combined_store_images 실제 컬럼
+                        store.thumb_url ||
+                        store.imageUrl ||
+                        (Array.isArray(store.images) && store.images[0] ? store.images[0] : "") ||
+                        "/uploads/no-image.png"
+                    );
+                }
+
+                function setImg(imgEl, src) {
+                    if (!imgEl) return;
+                    imgEl.src = src || "/uploads/no-image.png";
+                    imgEl.onerror = () => {
+                        imgEl.onerror = null;
+                        imgEl.src = "/uploads/no-image.png";
+                    };
+                }
+
                 function makeSlotCard(position, label, imgHClass = "h-60 md:h-64") {
                     const wrap = document.createElement("div");
                     wrap.className = "neo-card p-0 overflow-hidden relative rounded-2xl border-4 border-yellow-200 admin-slot";
@@ -1221,15 +1241,27 @@
                     const q = qRaw;
                     const bizNo = q ? "" : bizRaw;
 
-                    el("storeResultsBody").innerHTML = `<div class="text-sm text-slate-500">검색 중...</div>`;
+                    const wrap = el("storeResultsBody");
+                    if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 중...</div>`;
 
                     try {
                         const stores = await apiSearchStore({ q, bizNo });
                         console.log("✅ searchStore version 확인:", stores);
-                        renderStoreResults(stores || []);
+                        if (!Array.isArray(stores) || stores.length === 0) {
+                            // ✅ 기존 화면을 지우지 않고 안내만
+                            if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
+                            setModalStatus("검색 결과 없음");
+                            return;
+                        }
+                        renderStoreResults(stores);
                     } catch (e) {
-                        el("storeResultsBody").innerHTML =
-                            `<div class="text-sm text-rose-600">검색 오류: ${e.message || "error"}</div>`;
+                        console.error("❌ 검색 오류:", e);
+                        // ✅ 기존 화면 유지, 오류 메시지만 표시
+                        setModalStatus(`검색 오류: ${e.message || "error"}`);
+                        if (wrap && !wrap.querySelector(".neo-card")) {
+                            // 기존 결과가 없을 때만 오류 표시
+                            wrap.innerHTML = `<div class="text-sm text-rose-600">검색 오류: ${e.message || "error"}</div>`;
+                        }
                     }
                 }
 
@@ -1248,26 +1280,40 @@
                         const biz = clean(s.business_no || s.businessNo || s.business_number || "");
                         const name = clean(s.business_name || s.businessName || s.business_name_kor || "");
                         const cat = pickCategory(s);
-                        const img = clean(s.image_url || s.imageUrl || s.thumb_url || "");
+                        const thumb = pickThumb(s);
                         const tableSource = clean(s.table_source || s.tableSource || DEFAULT_TABLE_SOURCE);
 
                         const row = document.createElement("div");
                         row.className = "neo-card p-3 flex gap-3 items-center mb-2";
 
-                        row.innerHTML = `
-          <div class="w-16 h-12 rounded-xl overflow-hidden bg-white/60 shrink-0">
-            ${img ? `<img src="${img}" class="w-full h-full object-cover" />`
-                                : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">NO IMG</div>`}
-          </div>
-          <div class="flex-1 min-w-0">
+                        const imgContainer = document.createElement("div");
+                        imgContainer.className = "w-16 h-12 rounded-xl overflow-hidden bg-white/60 shrink-0";
+
+                        if (thumb && thumb !== "/uploads/no-image.png") {
+                            const img = document.createElement("img");
+                            img.className = "w-full h-full object-cover";
+                            setImg(img, thumb);
+                            imgContainer.appendChild(img);
+                        } else {
+                            const noImg = document.createElement("div");
+                            noImg.className = "w-full h-full flex items-center justify-center text-xs text-slate-400";
+                            noImg.textContent = "NO IMG";
+                            imgContainer.appendChild(noImg);
+                        }
+
+                        const infoDiv = document.createElement("div");
+                        infoDiv.className = "flex-1 min-w-0";
+                        infoDiv.innerHTML = `
             <div class="font-extrabold text-slate-800 truncate">${name || "-"}</div>
             <div class="text-xs text-slate-600 mt-0.5 truncate">${cat ? `(${cat})` : ""} ${biz ? `· ${biz}` : ""}</div>
             <div class="text-[11px] text-slate-400 mt-0.5 truncate">${tableSource} · id=${id}</div>
-          </div>
-          <button class="btn-3d shrink-0" type="button">선택</button>
-        `;
+          `;
 
-                        row.querySelector("button").addEventListener("click", () => {
+                        const btn = document.createElement("button");
+                        btn.className = "btn-3d shrink-0";
+                        btn.type = "button";
+                        btn.textContent = "선택";
+                        btn.addEventListener("click", () => {
                             if (!id) {
                                 alert("실제 가게 결과가 아닙니다.");
                                 return;
@@ -1277,11 +1323,14 @@
                                 business_no: biz,
                                 business_name: name,
                                 category: cat,
-                                image_url: img,
+                                image_url: thumb,
                                 table_source: tableSource,
                             });
                         });
 
+                        row.appendChild(imgContainer);
+                        row.appendChild(infoDiv);
+                        row.appendChild(btn);
                         wrap.appendChild(row);
                     });
                 }
