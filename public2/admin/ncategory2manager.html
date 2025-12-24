@@ -1285,6 +1285,26 @@
             setModalStatus("가게 연결 완료 (저장 누르세요)");
         }
 
+        // ✅ 가게 선택 여부 검증
+        function ensureStoreSelectedOrRevert() {
+            const storeId = clean(el("fieldStoreId")?.value);
+            if (storeId) return true;
+
+            alert("가게 연결은 검색 결과에서 '선택'을 눌러야 저장할 수 있습니다.");
+
+            // store 모드로 못 가게 이미지 모드로 되돌림
+            document.querySelectorAll('input[name="slotMode"]').forEach(r => {
+                r.checked = (r.value === "image");
+            });
+            applyModeUI("image");
+
+            // 안내 문구
+            const hint = el("storeSearchHint");
+            if (hint) hint.textContent = "먼저 가게 검색 → '선택' 후 다시 저장하세요.";
+
+            return false;
+        }
+
         // ✅ 저장
         async function saveSlotFromModal() {
             try {
@@ -1294,6 +1314,10 @@
                 if (!position) throw new Error("position(슬롯)이 비어있음");
 
                 const mode = getMode();
+                if (mode === "store") {
+                    const ok = ensureStoreSelectedOrRevert();
+                    if (!ok) return;
+                }
                 const priority = clean(el("adPriority")?.value || "1") || "1";
                 state.current.priority = priority;
 
@@ -1437,7 +1461,13 @@
 
             // 모드 변경 UI 반영
             document.querySelectorAll('input[name="slotMode"]').forEach((r) => {
-                r.addEventListener("change", () => applyModeUI(getMode()));
+                r.addEventListener("change", () => {
+                    const mode = getMode();
+                    if (mode === "store") {
+                        if (!ensureStoreSelectedOrRevert()) return;
+                    }
+                    applyModeUI(mode);
+                });
             });
 
             // 종료 없음 체크
