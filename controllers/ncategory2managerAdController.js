@@ -103,8 +103,12 @@ export async function listSlots(req, res) {
         COALESCE(c.business_category, '') AS business_category
       FROM ${SLOTS_TABLE} s
       LEFT JOIN ${STORE_TABLE} c
-        ON s.table_source = 'combined_store_info'
-       AND c.id = s.store_id
+        ON c.id = s.store_id
+       AND (
+            s.table_source = 'combined_store_info'
+         OR s.table_source = 'combined'
+         OR s.table_source IS NULL
+       )
       WHERE s.page = $1
       ORDER BY s.position ASC, s.priority ASC NULLS FIRST
     `;
@@ -152,8 +156,12 @@ export async function getSlot(req, res) {
         COALESCE(c.business_category, '') AS business_category
       FROM ${SLOTS_TABLE} s
       LEFT JOIN ${STORE_TABLE} c
-        ON s.table_source = 'combined_store_info'
-       AND c.id = s.store_id
+        ON c.id = s.store_id
+       AND (
+            s.table_source = 'combined_store_info'
+         OR s.table_source = 'combined'
+         OR s.table_source IS NULL
+       )
       WHERE s.page = $1
         AND s.position = $2
         AND (s.priority IS NOT DISTINCT FROM $3)
