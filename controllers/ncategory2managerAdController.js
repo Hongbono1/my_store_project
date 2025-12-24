@@ -87,7 +87,7 @@ export async function listSlots(req, res) {
         s.store_id,
         s.business_no,
         s.business_name,
-        s.image_url,
+        COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
         s.link_url,
         s.text_content,
         s.created_at,
@@ -149,7 +149,7 @@ export async function getSlot(req, res) {
           ''
         ) AS business_no,
 
-        s.image_url,
+        COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
         s.link_url,
         s.text_content,
         s.created_at,
@@ -211,7 +211,7 @@ export async function listSlotItems(req, res) {
           ''
         ) AS business_no,
 
-        s.image_url,
+        COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
         s.link_url,
         s.text_content,
         s.created_at,
@@ -281,7 +281,8 @@ export async function searchStore(req, res) {
         business_type,
         business_category,
         business_subcategory,
-        business_category AS category
+        business_category AS category,
+        COALESCE(NULLIF(main_image_url,''), '') AS image_url
       FROM ${STORE_TABLE}
       ${where}
       ORDER BY id DESC
