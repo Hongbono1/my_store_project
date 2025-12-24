@@ -130,43 +130,50 @@ export async function getSlot(req, res) {
     if (!position) return res.json({ success: true, slot: null });
 
     const sql = `
-      SELECT
-        s.id,
-        s.page,
-        s.position,
-        s.priority,
-        s.slot_type,
-        s.slot_mode,
-        s.store_id,
-        s.business_no,
-        s.business_name,
-        s.image_url,
-        s.link_url,
-        s.text_content,
-        s.created_at,
-        s.updated_at,
-        s.start_date,
-        s.end_date,
-        s.no_end,
-        s.start_at,
-        s.end_at,
-        s.store_type,
-        s.table_source,
+  SELECT
+    s.id,
+    s.page,
+    s.position,
+    s.priority,
+    s.slot_type,
+    s.slot_mode,
+    s.store_id,
+    s.table_source,
 
-        COALESCE(c.business_category, '') AS business_category
-      FROM ${SLOTS_TABLE} s
-      LEFT JOIN ${STORE_TABLE} c
-        ON c.id = s.store_id
-       AND (
-            s.table_source = 'combined_store_info'
-         OR s.table_source = 'combined'
-         OR s.table_source IS NULL
-       )
-      WHERE s.page = $1
-        AND s.position = $2
-        AND (s.priority IS NOT DISTINCT FROM $3)
-      LIMIT 1
-    `;
+    -- ✅ 슬롯에 저장된 값이 비어있으면 가게 테이블 값으로 보강
+    COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
+    COALESCE(
+      NULLIF(s.business_no,''),
+      regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
+      ''
+    ) AS business_no,
+
+    s.image_url,
+    s.link_url,
+    s.text_content,
+    s.created_at,
+    s.updated_at,
+    s.start_date,
+    s.end_date,
+    s.no_end,
+    s.start_at,
+    s.end_at,
+    s.store_type,
+
+    COALESCE(c.business_category, '') AS business_category
+  FROM ${SLOTS_TABLE} s
+  LEFT JOIN ${STORE_TABLE} c
+    ON c.id::text = s.store_id::text
+   AND (
+        s.table_source = 'combined_store_info'
+     OR s.table_source = 'combined'
+     OR s.table_source IS NULL
+     OR s.table_source = ''
+   )
+  WHERE s.page = $1
+  ORDER BY s.position ASC, s.priority ASC NULLS FIRST
+`;
+
 
     const { rows } = await pool.query(sql, [page, position, priority]);
     return res.json({ success: true, slot: rows[0] || null });
@@ -183,22 +190,52 @@ export async function listSlotItems(req, res) {
     if (!position) return res.json({ success: true, items: [] });
 
     const sql = `
-      SELECT
-        priority,
-        slot_type,
-        slot_mode,
-        store_id,
-        business_no,
-        business_name,
-        image_url,
-        link_url,
-        text_content,
-        table_source,
-        updated_at
-      FROM ${SLOTS_TABLE}
-      WHERE page = $1 AND position = $2
-      ORDER BY priority ASC NULLS FIRST, updated_at DESC
-    `;
+  SELECT
+    s.id,
+    s.page,
+    s.position,
+    s.priority,
+    s.slot_type,
+    s.slot_mode,
+    s.store_id,
+    s.table_source,
+
+    COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
+    COALESCE(
+      NULLIF(s.business_no,''),
+      regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
+      ''
+    ) AS business_no,
+
+    s.image_url,
+    s.link_url,
+    s.text_content,
+    s.created_at,
+    s.updated_at,
+    s.start_date,
+    s.end_date,
+    s.no_end,
+    s.start_at,
+    s.end_at,
+    s.store_type,
+
+    COALESCE(c.business_category, '') AS business_category
+  FROM ${SLOTS_TABLE} s
+  LEFT JOIN ${STORE_TABLE} c
+    ON c.id::text = s.store_id::text
+   AND (
+        s.table_source = 'combined_store_info'
+     OR s.table_source = 'combined'
+     OR s.table_source IS NULL
+     OR s.table_source = ''
+   )
+  WHERE s.page = $1
+    AND s.position = $2
+    AND (s.priority IS NOT DISTINCT FROM $3)
+  LIMIT 1
+`;
+
+
     const { rows } = await pool.query(sql, [page, position]);
     return res.json({ success: true, items: rows });
   } catch (e) {
