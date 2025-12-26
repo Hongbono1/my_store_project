@@ -807,59 +807,44 @@
       await initFoodCategorySidebar();
     });
 
-    // ✅ 동적 푸드 카테고리 사이드바 (통합 API 사용 + 푸드만 필터)
     async function fetchFoodCategoryTree() {
       try {
-        // ✅ 현재 서버에서 살아있는 엔드포인트
-        const res = await fetch("/ncategory2manager/ad/search-store?q=__all__", { cache: "no-store" });
+        const res = await fetch("/foodcategorymanager/ad/search-store?q=__all__", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const json = await res.json();
         const stores = json.stores || json.items || json.rows || [];
 
-        // ✅ 푸드로 판단할 키워드(필요하면 여기만 추가/수정)
-        const FOOD_KEYWORDS = [
-          "음식", "식당", "맛집", "카페", "커피", "디저트", "베이커리",
-          "한식", "중식", "일식", "양식", "분식",
-          "치킨", "피자", "햄버거", "족발", "보쌈", "국밥", "고기", "회", "해산물",
-          "술집", "호프", "포차", "바", "주점"
-        ];
+        // ✅ 음식점만 쓰고 싶으면 유지(원치 않으면 제거)
+        const onlyFood = stores.filter(s => String(s.business_type || "").trim() === "음식점");
 
-        function isFoodStore(s) {
-          const cat = (s.business_category || s.category || "").toString().trim();
-          const sub = (s.business_subcategory || s.subcategory || "").toString().trim();
-          const type = (s.business_type || "").toString().trim();
-          const hay = `${cat} ${sub} ${type}`;
-          return FOOD_KEYWORDS.some(k => hay.includes(k));
-        }
+        // ✅ category(상위)별로 모으기
+        const map = new Map(); // category -> Set(detail)  (한식만 사용)
+        const cats = new Set(); // 전체 category 목록
 
-        // ✅ 통합 stores 중 “푸드”만 남김
-        const foodStores = stores.filter(isFoodStore);
-
-        // ✅ 푸드가 하나도 없으면(현재 DB에 푸드가 아직 없거나 키워드가 안 맞는 경우)
-        if (!foodStores.length) {
-          console.warn("[fetchFoodCategoryTree] 통합 데이터에서 푸드로 분류된 항목이 없습니다.");
-          return [];
-        }
-
-        const map = new Map();
-
-        for (const s of foodStores) {
-          const cat = (s.business_category || s.category || "").toString().trim();
+        for (const s of onlyFood) {
+          const cat = String(s.business_category || "").trim(); // 한식/중식/양식...
           if (!cat) continue;
 
-          if (!map.has(cat)) map.set(cat, new Set());
+          cats.add(cat);
 
-          const sub = (s.business_subcategory || s.subcategory || "").toString().trim();
-          if (sub) map.get(cat).add(sub);
+          // ✅ 한식만 detail_category를 하위로 모음
+          if (cat === "한식") {
+            if (!map.has(cat)) map.set(cat, new Set());
+            const detail = String(s.detail_category || "").trim(); // 국밥/백반...
+            if (detail) map.get(cat).add(detail);
+          }
         }
 
-        const list = [...map.entries()]
-          .map(([category, set]) => ({
+        // ✅ tree 형태로 변환: 한식만 subcategories 채움, 나머진 빈 배열
+        const list = [...cats]
+          .sort((a, b) => a.localeCompare(b, "ko"))
+          .map(category => ({
             category,
-            subcategories: [...set].sort((a, b) => a.localeCompare(b, "ko")),
-          }))
-          .sort((a, b) => a.category.localeCompare(b.category, "ko"));
+            subcategories: category === "한식"
+              ? [...(map.get("한식") || new Set())].sort((a, b) => a.localeCompare(b, "ko"))
+              : []
+          }));
 
         return list;
       } catch (err) {
