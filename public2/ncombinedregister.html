@@ -830,7 +830,7 @@
     })();
 
     // --- 폼 제출 핸들러 ---
-    document.getElementById('businessForm')?.addEventListener('submit', async function(e) {
+    document.getElementById('businessForm')?.addEventListener('submit', async function (e) {
       e.preventDefault();
 
       try {
@@ -840,9 +840,23 @@
         const road = document.getElementById('roadAddress')?.value?.trim() || '';
         const detail = document.getElementById('detailAddress')?.value?.trim() || '';
 
+        // ✅ 업종/세부 분리 전송
         const catHidden = document.getElementById('businessCategoryCombined'); // name="businessCategory"
-        const addrHidden = document.getElementById('addressCombined');          // name="address"
-        if (catHidden) catHidden.value = [main, sub].filter(Boolean).join(' / ');
+        if (catHidden) catHidden.value = main; // ✅ 업종만
+
+        const subHidden = document.getElementById('businessSubcategory'); // name="businessSubcategory"
+        if (subHidden) subHidden.value = sub; // ✅ 세부만
+
+        // ✅ 미용/이발이면 businessType도 자동 설정
+        if (main === '미용/이발') {
+          const bt = (sub === '이발소') ? '이발'
+                   : (sub === '미용실') ? '미용'
+                   : '';
+          if (bt) document.getElementById('businessType').value = bt;
+        }
+
+        // 주소 결합
+        const addrHidden = document.getElementById('addressCombined'); // name="address"
         if (addrHidden) addrHidden.value = [road, detail].filter(Boolean).join(' ');
 
         // ✅ 사업자번호를 hidden input에 설정 (폼 제출 전)
@@ -886,7 +900,7 @@
 
         const res = await fetch('/combined/store', { method: 'POST', body: fd });
         console.log('서버 응답 상태:', res.status, res.statusText);
-        
+
         const data = await res.json();
         console.log('서버 응답 데이터:', data);
 
