@@ -12,6 +12,7 @@ import {
   searchStore,
   fixLinks,
   checkLinks,
+  debugStoreCount, // ✅ 추가
 } from "../controllers/foodcategorymanagerAdController.js";
 
 const router = express.Router();
@@ -56,57 +57,16 @@ router.post(
 );
 
 router.delete("/slot", deleteSlot);
+
+// ✅ 가게 검색 (푸드: store_info)
 router.get("/store/search", searchStore);
-router.get("/search-store", searchStore); // ✅ 별칭 추가 (ncategory2manager와 동일한 경로)
+router.get("/search-store", searchStore); // ✅ 프론트에서 쓰는 경로
+
+// ✅ 디버그(정말 DB에 store_info가 보이는지)
+router.get("/debug-store-count", debugStoreCount);
 
 // ✅ 링크 수정 API
 router.post("/fix-links/:tableSource", fixLinks);
 router.get("/check-links", checkLinks);
-
-// ✅ 실제 store_info 조회해서 내려주는 search-store
-router.get("/search-store", async (req, res) => {
-  try {
-    const qRaw = (req.query.q || "").toString().trim();
-    const q = (qRaw === "__all__") ? "" : qRaw;
-
-    const params = [];
-    let where = "";
-
-    if (q) {
-      params.push(`%${q}%`);
-      where = `
-        WHERE
-          business_name ILIKE $1
-          OR business_number ILIKE $1
-          OR business_type ILIKE $1
-          OR business_category ILIKE $1
-          OR detail_category ILIKE $1
-      `;
-    }
-
-    const sql = `
-      SELECT
-        id,
-        business_number,
-        business_name,
-        business_type,
-        business_category,
-        detail_category,
-        address,
-        phone
-      FROM public.store_info
-      ${where}
-      ORDER BY id DESC
-      LIMIT 2000
-    `;
-
-    const { rows } = await pool.query(sql, params);
-
-    return res.json({ ok: true, stores: rows });
-  } catch (err) {
-    console.error("[foodcategorymanager/search-store] error:", err);
-    return res.status(500).json({ ok: false, message: "server error" });
-  }
-});
 
 export default router;

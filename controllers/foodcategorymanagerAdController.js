@@ -480,12 +480,45 @@ export async function deleteSlot(req, res) {
   }
 }
 
-// -------------------- GET /foodcategorymanager/ad/store/search --------------------
+// -------------------- GET /foodcategorymanager/ad/store/search
+// -------------------- GET /foodcategorymanager/ad/search-store
 export async function searchStore(req, res) {
   try {
     const bizNo = digitsOnly(req.query.bizNo);
-    const q = clean(req.query.q);
 
+    const qRaw = clean(req.query.q);
+    const isAll = qRaw === "__all__";       // ✅ 여기!
+    const q = isAll ? "" : qRaw;
+
+    // ✅ 1) q=__all__ 이면: "푸드 사이드바용"으로 store_info만 전체 내려줌
+    //    (통합/푸드_stores 섞이는 문제 방지)
+    if (isAll && !bizNo) {
+      const sql = `
+        SELECT
+          s.id::text AS id,
+          'store_info' AS table_source,
+          regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
+          s.business_name,
+          COALESCE(s.business_category, '') AS category,
+          COALESCE(s.detail_category, '') AS detail_category,
+          COALESCE(img.url, NULL) AS image_url
+        FROM public.store_info s
+        LEFT JOIN LATERAL (
+          SELECT url
+          FROM public.store_images
+          WHERE CAST(store_id AS text) = s.id::text
+          ORDER BY sort_order, id
+          LIMIT 1
+        ) img ON TRUE
+        ORDER BY s.id DESC
+        LIMIT 2000;
+      `;
+
+      const { rows } = await pool.query(sql);
+      return res.json({ ok: true, stores: rows || [] });
+    }
+
+    // ✅ 2) 그 외(검색/사업자번호): 기존 로직(UNION) 유지
     const params = [];
     const condS = [];
     const condC = [];
