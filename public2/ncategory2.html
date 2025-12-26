@@ -105,9 +105,13 @@
     <div class="max-w-6xl mx-auto grid grid-cols-12 gap-6 py-6 px-4 items-stretch">
 
         <!-- 좌측 사이드바 -->
-        <aside class="col-span-3 neo-card p-3 sidebar-scroll self-stretch">
-            <h2 class="font-bold text-2xl mb-4 text-center">CATEGORY</h2>
-            <ul class="space-y-3">
+        <aside class="col-span-3 neo-card p-3 flex flex-col self-stretch">
+          <h2 class="font-bold text-2xl mb-4 text-center">CATEGORY</h2>
+
+          <!-- ✅ 동적 카테고리 렌더링 영역 -->
+          <ul id="categoryList" class="space-y-3 flex-1 sidebar-scroll pr-1">
+            <li class="text-center text-sm text-gray-500 py-8">카테고리 불러오는 중...</li>
+          </ul>
 
                 <!-- 병원 -->
                 <li class="mb-5">
@@ -537,12 +541,12 @@
                 </li>
             </ul>
 
-            <!-- ✅ 광고 박스 -->
-            <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300">
-                <h3 class="font-bold text-lg mb-2">광고 영역</h3>
-                <p class="text-sm text-gray-600">이곳은 광고 배너/이미지가 들어갈 박스입니다.</p>
-                <img src="/uploads/sample-ad.jpg" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl">
-            </div>
+          <!-- ✅ 광고 박스 -->
+          <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300">
+            <h3 class="font-bold text-lg mb-2">광고 영역</h3>
+            <p class="text-sm text-gray-600">이곳은 광고 배너/이미지가 들어갈 박스입니다.</p>
+            <img src="/uploads/sample-ad.jpg" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl">
+          </div>
         </aside>
 
         <!-- 중앙 메인 -->
@@ -968,6 +972,125 @@
                 // =========================================================
                 const AD_API_BASE = "/ncategory2manager/ad"; // 필요 시 너 라우터에 맞게 변경
 
+                // ===============================
+                // ✅ 사이드바 카테고리 동적 생성
+                // - 기존 search-store?q=__all__ API 사용 (서버 수정 없음)
+                // ===============================
+                async function fetchCategoryTreeFromStores() {
+                  const url = `${AD_API_BASE}/search-store?q=__all__`;
+                  const res = await fetch(url, { cache: "no-store" });
+                  if (!res.ok) throw new Error(`category HTTP ${res.status}`);
+
+                  const json = await res.json();
+                  const stores = json.stores || json.items || json.rows || [];
+
+                  // category -> Set(subcategory)
+                  const map = new Map();
+
+                  for (const s of stores) {
+                    const cat = cleanStr(s.business_category || s.category);
+                    if (!cat) continue;
+
+                    if (!map.has(cat)) map.set(cat, new Set());
+
+                    const sub = cleanStr(s.business_subcategory || s.subcategory);
+                    if (sub) map.get(cat).add(sub);
+                  }
+
+                  // 정렬해서 반환
+                  const list = [...map.entries()]
+                    .map(([category, set]) => ({
+                      category,
+                      subcategories: [...set].sort((a, b) => a.localeCompare(b, "ko")),
+                    }))
+                    .sort((a, b) => a.category.localeCompare(b.category, "ko"));
+
+                  return list;
+                }
+
+                function buildSubcategoryLink(category, subcategory) {
+                  // ✅ 여기 링크 규칙은 subcategory.html 로직에 맞춰서 쓰면 됨
+                  // 지금은 표준 형태로: type=combined, category/subcategory 전달
+                  const c = encodeURIComponent(category);
+                  const s = subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : "";
+                  return `/subcategory.html?type=combined&category=${c}${s}`;
+                }
+
+                function renderSidebarCategories(tree) {
+                  const listEl = document.getElementById("categoryList");
+                  if (!listEl) return;
+
+                  if (!tree.length) {
+                    listEl.innerHTML = `<li class="text-center text-sm text-gray-500 py-8">표시할 카테고리가 없습니다.</li>`;
+                    return;
+                  }
+
+                  listEl.innerHTML = "";
+
+                  for (const item of tree) {
+                    const cat = item.category;
+                    const subs = item.subcategories || [];
+
+                    const li = document.createElement("li");
+                    li.className = "mb-5";
+
+                    // 토글 버튼(서브 있으면 펼춨)
+                    const btn = document.createElement("button");
+                    btn.className =
+                      "w-full text-left px-4 py-2 neo-card flex justify-between items-center font-bold text-lg";
+                    btn.innerHTML = `
+                      <span class="truncate">${cat}</span>
+                      <span class="shrink-0">▼</span>
+                    `;
+
+                    // 서브 리스트
+                    const ul = document.createElement("ul");
+                    ul.className = "ml-4 mt-2 space-y-3 hidden";
+
+                    if (subs.length) {
+                      for (const sub of subs) {
+                        const a = document.createElement("a");
+                        a.href = buildSubcategoryLink(cat, sub);
+                        a.className = "block px-3 py-2 neo-card text-center";
+                        a.textContent = sub;
+                        const subLi = document.createElement("li");
+                        subLi.appendChild(a);
+                        ul.appendChild(subLi);
+                      }
+                    } else {
+                      // 서브카테고리 없는 업종은 "전체"로 연결
+                      const a = document.createElement("a");
+                      a.href = buildSubcategoryLink(cat, "");
+                      a.className = "block px-3 py-2 neo-card text-center";
+                      a.textContent = "전체";
+                      const subLi = document.createElement("li");
+                      subLi.appendChild(a);
+                      ul.appendChild(subLi);
+                    }
+
+                    btn.addEventListener("click", () => {
+                      ul.classList.toggle("hidden");
+                    });
+
+                    li.appendChild(btn);
+                    li.appendChild(ul);
+                    listEl.appendChild(li);
+                  }
+                }
+
+                async function initDynamicSidebar() {
+                  try {
+                    const tree = await fetchCategoryTreeFromStores();
+                    renderSidebarCategories(tree);
+                  } catch (e) {
+                    console.error("❌ [sidebar] 카테고리 로드 실패:", e?.message || e);
+                    const listEl = document.getElementById("categoryList");
+                    if (listEl) {
+                      listEl.innerHTML = `<li class="text-center text-sm text-red-600 py-8">카테고리 불러오기 실패</li>`;
+                    }
+                  }
+                }
+
                 function cleanStr(v) {
                     if (v === undefined || v === null) return "";
                     return String(v).trim();
@@ -1113,6 +1236,9 @@
 
                     // ✅ 먼저 슬롯 연결 시도(샘플 유지 + 덮어쓰기 방식)
                     hydrateAds();
+
+                    // ✅ 사이드바 카테고리 동적 생성
+                    initDynamicSidebar();
 
                     let groups = track.querySelectorAll(".power-group").length;
                     let index = Math.floor(Math.random() * groups);
