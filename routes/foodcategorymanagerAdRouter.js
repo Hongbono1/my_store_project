@@ -57,6 +57,7 @@ router.post(
 
 router.delete("/slot", deleteSlot);
 router.get("/store/search", searchStore);
+router.get("/search-store", searchStore); // ✅ 별칭 추가 (ncategory2manager와 동일한 경로)
 
 // ✅ 링크 수정 API
 router.post("/fix-links/:tableSource", fixLinks);

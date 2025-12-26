@@ -810,7 +810,8 @@
     // ✅ 동적 푸드 카테고리 사이드바
     async function fetchFoodCategoryTree() {
       try {
-        const res = await fetch("/foodcategorymanager/ad/search-store?q=__all__", { cache: "no-store" });
+        // ✅ combined_store_info에서 category+subcategory를 가져오기 위해 ncategory2manager 사용
+        const res = await fetch("/ncategory2manager/ad/search-store?q=__all__", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const json = await res.json();
@@ -819,12 +820,13 @@
         const map = new Map();
 
         for (const s of stores) {
-          const cat = (s.food_category || s.category || "").trim();
+          // ✅ 응답 기준: business_category / business_subcategory
+          const cat = (s.business_category || s.category || "").toString().trim();
           if (!cat) continue;
 
           if (!map.has(cat)) map.set(cat, new Set());
 
-          const sub = (s.food_subcategory || s.subcategory || "").trim();
+          const sub = (s.business_subcategory || s.subcategory || "").toString().trim();
           if (sub) map.get(cat).add(sub);
         }
 
