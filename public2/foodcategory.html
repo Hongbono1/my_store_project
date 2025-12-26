@@ -808,6 +808,7 @@
     });
 
     // ✅ 동적 푸드 카테고리 사이드바 (디버그 로그 포함 + 한식만 하위(detail_category))
+    // ✅ 동적 푸드 카테고리 사이드바 (수정본: store_info 응답 컬럼에 맞춤)
     async function fetchFoodCategoryTree() {
       const url = "/foodcategorymanager/ad/search-store?q=__all__";
       console.log("[sidebar] fetch start:", url);
@@ -823,44 +824,39 @@
 
         // ✅ stores 배열 후보 전부 대응
         const stores = json.stores || json.items || json.rows || json.data || [];
-        console.log("[sidebar] stores length:", Array.isArray(stores) ? stores.length : "not-array", stores?.[0]);
-
-        // ✅ 혹시 응답이 객체 형태면 방어
         const list = Array.isArray(stores) ? stores : [];
 
-        // ✅ (선택) 음식점만 보이게 하고 싶으면 유지, 아니면 주석 처리
-        const onlyFood = list.filter(s => String(s.business_type || "").trim() === "음식점");
-        console.log("[sidebar] onlyFood length:", onlyFood.length);
+        console.log("[sidebar] stores length:", list.length, list?.[0]);
 
-        // ✅ 상위(버튼): business_category (한식/중식/양식...)
+        // ✅ 상위(버튼): category (한식/중식/양식...)
         // ✅ 하위(펼침): detail_category (한식만)
         const cats = new Set();
         const hansikDetails = new Set();
 
-        for (const s of onlyFood) {
-          const cat = String(s.business_category || "").trim();
+        for (const s of list) {
+          const cat = String(s.category || s.business_category || "").trim();
           if (!cat) continue;
 
           cats.add(cat);
 
           if (cat === "한식") {
-            const detail = String(s.detail_category || "").trim();
+            const detail = String(s.detail_category || s.detailCategory || "").trim();
             if (detail) hansikDetails.add(detail);
           }
         }
 
         const tree = [...cats]
           .sort((a, b) => a.localeCompare(b, "ko"))
-          .map(category => ({
+          .map((category) => ({
             category,
-            subcategories: category === "한식"
-              ? [...hansikDetails].sort((a, b) => a.localeCompare(b, "ko"))
-              : []
+            subcategories:
+              category === "한식"
+                ? [...hansikDetails].sort((a, b) => a.localeCompare(b, "ko"))
+                : [],
           }));
 
         console.log("[sidebar] tree:", tree);
         return tree;
-
       } catch (err) {
         console.error("[sidebar] fetchFoodCategoryTree failed:", err);
         return [];
