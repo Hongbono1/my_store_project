@@ -74,82 +74,10 @@
   <!-- ✅ 좌측 사이드 바 -->
   <div class="max-w-7xl mx-auto grid grid-cols-12 gap-6 py-6 px-4">
 
-    <aside class="col-span-3 neo-card p-5">
+    <aside class="col-span-3 neo-card p-5 flex flex-col self-stretch">
       <h2 class="font-bold text-lg mb-4 text-center">FOOD CATEGORY</h2>
-      <ul class="space-y-2 text-base">
-
-        <!-- ✅ 한식 (서브카테고리 있음) -->
-        <li>
-          <button class="w-full text-left px-3 py-2 neo-card flex justify-between items-center"
-            onclick="toggleSub(this)">
-            한식 <span>▼</span>
-          </button>
-          <ul class="ml-4 mt-1 space-y-1 hidden">
-            <!-- 전부 한식 리스트로 보내되, sub 파라미터로 구분 -->
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=밥" class="block px-3 py-2 neo-card">
-                밥 (비빔밥/덮밥/백반)
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=찌개탕" class="block px-3 py-2 neo-card">
-                찌개/탕
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=고기구이" class="block px-3 py-2 neo-card">
-                고기/구이
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=생선" class="block px-3 py-2 neo-card">
-                생선
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=족발보쌈" class="block px-3 py-2 neo-card">
-                족발/보쌈
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=국밥" class="block px-3 py-2 neo-card">
-                국밥
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=반찬" class="block px-3 py-2 neo-card">
-                반찬
-              </a>
-            </li>
-            <li>
-              <a href="/subcategory.html?type=food&category=한식&sub=기타한식" class="block px-3 py-2 neo-card">
-                기타
-              </a>
-            </li>
-          </ul>
-        </li>
-
-        <!-- ✅ 중식 -->
-        <li><a href="/subcategory.html?type=food&category=중식" class="block px-3 py-2 neo-card">중식</a></li>
-
-        <!-- ✅ 양식 -->
-        <li><a href="/subcategory.html?type=food&category=양식" class="block px-3 py-2 neo-card">양식</a></li>
-
-        <!-- ✅ 분식 -->
-        <li><a href="/subcategory.html?type=food&category=분식" class="block px-3 py-2 neo-card">분식</a></li>
-
-        <!-- ✅ 치킨 -->
-        <li><a href="/subcategory.html?type=food&category=치킨" class="block px-3 py-2 neo-card">치킨</a></li>
-
-        <!-- ✅ 카페 -->
-        <li><a href="/subcategory.html?type=food&category=카페" class="block px-3 py-2 neo-card">카페</a></li>
-
-        <!-- ✅ 패스트푸드 -->
-        <li><a href="/subcategory.html?type=food&category=패스트푸드" class="block px-3 py-2 neo-card">패스트푸드</a></li>
-
-        <!-- ✅ 기타 -->
-        <li><a href="/subcategory.html?type=food&category=기타" class="block px-3 py-2 neo-card">기타</a></li>
-
+      <ul id="foodCategoryList" class="space-y-2 text-base flex-1 list-none">
+        <li class="text-center py-4 text-gray-500">카테고리 불러오는 중...</li>
       </ul>
 
       <!-- 광고박스 1 -->
@@ -823,13 +751,113 @@
       }
     }
 
-    document.addEventListener("DOMContentLoaded", loadAdSlots);
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadAdSlots();
+      await initFoodCategorySidebar();
+    });
 
-    // ✅ 서브카테고리 토글
-    function toggleSub(btn) {
-      const ul = btn.nextElementSibling;
-      if (!ul) return;
-      ul.classList.toggle("hidden");
+    // ✅ 동적 푸드 카테고리 사이드바
+    async function fetchFoodCategoryTree() {
+      try {
+        const res = await fetch("/foodcategorymanager/ad/search-store?q=__all__", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const json = await res.json();
+        const stores = json.stores || json.items || json.rows || [];
+        
+        const map = new Map();
+        
+        for (const s of stores) {
+          const cat = (s.food_category || s.category || "").trim();
+          if (!cat) continue;
+          
+          if (!map.has(cat)) map.set(cat, new Set());
+          
+          const sub = (s.food_subcategory || s.subcategory || "").trim();
+          if (sub) map.get(cat).add(sub);
+        }
+        
+        const list = [...map.entries()]
+          .map(([category, set]) => ({
+            category,
+            subcategories: [...set].sort((a, b) => a.localeCompare(b, "ko")),
+          }))
+          .sort((a, b) => a.category.localeCompare(b.category, "ko"));
+        
+        return list;
+      } catch (err) {
+        console.error("[fetchFoodCategoryTree] 실패:", err);
+        return [];
+      }
+    }
+    
+    function renderFoodSidebar(tree) {
+      const listEl = document.getElementById("foodCategoryList");
+      if (!listEl) return;
+      
+      if (!tree.length) {
+        listEl.innerHTML = `<li class="text-center text-sm text-gray-500 py-8">표시할 카테고리가 없습니다.</li>`;
+        return;
+      }
+      
+      listEl.innerHTML = "";
+      
+      for (const item of tree) {
+        const cat = item.category;
+        const subs = item.subcategories || [];
+        
+        const li = document.createElement("li");
+        li.className = "mb-2";
+        
+        if (subs.length > 0) {
+          // 서브카테고리 있음 - 버튼으로
+          const btn = document.createElement("button");
+          btn.className = "w-full text-left px-3 py-2 neo-card flex justify-between items-center";
+          btn.innerHTML = `${cat} <span>▼</span>`;
+          
+          const subUl = document.createElement("ul");
+          subUl.className = "ml-4 mt-1 space-y-1 hidden";
+          
+          for (const sub of subs) {
+            const subLi = document.createElement("li");
+            const subA = document.createElement("a");
+            subA.href = `/subcategory.html?type=food&category=${encodeURIComponent(cat)}&subcategory=${encodeURIComponent(sub)}`;
+            subA.className = "block px-3 py-2 neo-card text-sm";
+            subA.textContent = sub;
+            subLi.appendChild(subA);
+            subUl.appendChild(subLi);
+          }
+          
+          btn.addEventListener("click", () => {
+            subUl.classList.toggle("hidden");
+          });
+          
+          li.appendChild(btn);
+          li.appendChild(subUl);
+        } else {
+          // 서브카테고리 없음 - 링크로
+          const a = document.createElement("a");
+          a.href = `/subcategory.html?type=food&category=${encodeURIComponent(cat)}`;
+          a.className = "block px-3 py-2 neo-card";
+          a.textContent = cat;
+          li.appendChild(a);
+        }
+        
+        listEl.appendChild(li);
+      }
+    }
+    
+    async function initFoodCategorySidebar() {
+      try {
+        const tree = await fetchFoodCategoryTree();
+        renderFoodSidebar(tree);
+      } catch (err) {
+        console.error("[initFoodCategorySidebar] 실패:", err);
+        const listEl = document.getElementById("foodCategoryList");
+        if (listEl) {
+          listEl.innerHTML = `<li class="text-center text-sm text-red-500 py-4">카테고리를 불러올 수 없습니다.</li>`;
+        }
+      }
     }
 
     // ✅ 파워 광고 슬라이더
