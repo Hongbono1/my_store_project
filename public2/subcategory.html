@@ -13,7 +13,8 @@
 
     <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
         <div class="flex-1 flex justify-center">
-            <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
+            <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain"
+                onerror="this.onerror=null;this.src='/uploads/no-image.png';">
         </div>
         <div class="flex-1 text-left">
             <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
@@ -68,11 +69,40 @@
         // URL params
         const params = new URLSearchParams(window.location.search);
         const TYPE = (params.get("type") || "food").toLowerCase();
-        const CATEGORY = params.get("category") || "";
-        const SUB = (params.get("sub") || "").trim();
+        let CATEGORY = (params.get("category") || "").trim();
+        let SUB = (params.get("sub") || "").trim();
 
         // 한식 소제목(고정)
         const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
+
+        // ✅ 미용/이발 소제목(고정)
+        const BEAUTY_PARENT = "미용/이발";
+        const BEAUTY_SUBS = ["미용", "이발", "네일", "피부관리", "왁싱", "기타"];
+
+        // ✅ category가 '미용' 또는 '이발' 등으로 단독 들어오면 -> (미용/이발 + sub)로 정규화
+        (function normalizeBeautyParams() {
+            if (TYPE !== "beauty" && TYPE !== "combined") return;
+
+            // category가 하위(미용/이발/네일...)로 들어오면
+            if (BEAUTY_SUBS.includes(CATEGORY) && !SUB) {
+                SUB = CATEGORY;
+                CATEGORY = BEAUTY_PARENT;
+
+                const q = new URLSearchParams(location.search);
+                q.set("category", CATEGORY);
+                q.set("sub", SUB);
+                history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+            }
+
+            // category가 아예 없고 sub만 들어온 경우(혹시 대비)
+            if (!CATEGORY && SUB && BEAUTY_SUBS.includes(SUB)) {
+                CATEGORY = BEAUTY_PARENT;
+                const q = new URLSearchParams(location.search);
+                q.set("category", CATEGORY);
+                q.set("sub", SUB);
+                history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+            }
+        })();
 
         // 전체 데이터를 1번만 받아두고, 화면은 여기서 필터링
         let ALL_STORES = [];
@@ -98,10 +128,25 @@
             return src.startsWith("/") ? src : "/" + src;
         }
 
+        // ✅ 한식 detail_category
         function getDetailCategory(store) {
-            // ✅ detail_category가 비어있으면 기타한식으로 보내기
             const raw = (store.detail_category ?? store.detailCategory ?? "").toString().trim();
             return raw ? raw : "기타한식";
+        }
+
+        // ✅ 미용/이발 detail(서버/DB 컬럼명을 몰라도 최대한 커버)
+        function getBeautySub(store) {
+            const raw =
+                (store.business_subcategory ??
+                    store.businessSubcategory ??
+                    store.subcategory ??
+                    store.sub_category ??
+                    store.detail_category ??
+                    store.detailCategory ??
+                    "").toString().trim();
+
+            // 값이 없으면 기타로
+            return raw ? raw : "기타";
         }
 
         function setHansikHero(subVal) {
@@ -120,6 +165,25 @@
                                             : subVal === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
                                                 : subVal === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
                                                     : "우리동네 한식 맛집들을 모았습니다.",
+                image: "/uploads/sample-banner-product.png"
+            };
+        }
+
+        // ✅ 미용/이발 히어로
+        function setBeautyHero(subVal) {
+            const base = BEAUTY_PARENT;
+            const subLabel = subVal ? ` · ${subVal}` : "";
+
+            DATA.hero = {
+                title: `${base}${subLabel}`,
+                subtitle:
+                    subVal === "미용" ? "커트 · 염색 · 펌 등 미용 서비스를 한 곳에"
+                        : subVal === "이발" ? "클래식 바버 · 남성 이발 · 스타일링 전문"
+                            : subVal === "네일" ? "네일아트 · 젤네일 · 케어 전문"
+                                : subVal === "피부관리" ? "피부케어 · 에스테틱 · 관리 전문"
+                                    : subVal === "왁싱" ? "왁싱 · 제모 · 케어 전문"
+                                        : subVal === "기타" ? "미용/이발 관련 기타 업종 모음"
+                                            : "미용/이발 카테고리 가게를 확인하세요.",
                 image: "/uploads/sample-banner-product.png"
             };
         }
@@ -169,16 +233,27 @@
                     } catch (_) { }
 
                 } else if (TYPE === "beauty" || TYPE === "combined") {
-                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
-                    ALL_STORES = json.stores || [];
-                    DATA.stores = ALL_STORES;
+                    // ✅ 미용/이발은 parent(미용/이발)로 한번에 가져와서 sub로 화면 분리
+                    const parentCategory = (CATEGORY === BEAUTY_PARENT) ? BEAUTY_PARENT : CATEGORY;
 
-                    DATA.hero = {
-                        title: CATEGORY || "카테고리",
-                        subtitle: "카테고리별 가게를 확인하세요.",
-                        image: "/uploads/sample-banner-product.png"
-                    };
-                    DATA.filters = [];
+                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(parentCategory)}`);
+                    ALL_STORES = json.stores || [];
+
+                    // hero/filters
+                    if (parentCategory === BEAUTY_PARENT) {
+                        DATA.filters = BEAUTY_SUBS.slice();
+                        setBeautyHero(SUB);
+                    } else {
+                        DATA.filters = [];
+                        DATA.hero = {
+                            title: parentCategory || "카테고리",
+                            subtitle: "카테고리별 가게를 확인하세요.",
+                            image: "/uploads/sample-banner-product.png"
+                        };
+                    }
+
+                    // ✅ 최초 렌더 sub 적용(미용/이발일 때만)
+                    applySubFilter(SUB, false);
 
                     // best/new (있으면 가져오기)
                     try {
@@ -205,10 +280,10 @@
         }
 
         function applySubFilter(subVal, updateHistory = true) {
+            const sub = (subVal || "").trim();
+
             // ✅ 한식에서만 detail_category로 분리
             if (TYPE === "food" && CATEGORY === "한식") {
-                const sub = (subVal || "").trim();
-
                 if (!sub) {
                     DATA.stores = ALL_STORES.slice();
                     setHansikHero("");
@@ -232,7 +307,32 @@
                 return;
             }
 
-            // 한식이 아니면 필터 없음
+            // ✅ 미용/이발에서만 sub로 분리
+            if ((TYPE === "beauty" || TYPE === "combined") && CATEGORY === BEAUTY_PARENT) {
+                if (!sub) {
+                    DATA.stores = ALL_STORES.slice();
+                    setBeautyHero("");
+                    if (updateHistory) {
+                        const q = new URLSearchParams(location.search);
+                        q.delete("sub");
+                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+                    }
+                    return;
+                }
+
+                // ✅ store의 sub 값으로 분리(컬럼 다양성 대비)
+                DATA.stores = ALL_STORES.filter(s => getBeautySub(s) === sub);
+                setBeautyHero(sub);
+
+                if (updateHistory) {
+                    const q = new URLSearchParams(location.search);
+                    q.set("sub", sub);
+                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+                }
+                return;
+            }
+
+            // 그 외는 필터 없음
             DATA.stores = ALL_STORES.slice();
         }
 
@@ -265,7 +365,9 @@
 
                 card.innerHTML = `
           <div class="relative h-[260px]">
-            <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
+            <img src="${imgNorm}" alt="${escapeHtml(dispName)}"
+                 class="w-full h-full object-cover rounded-t-2xl"
+                 onerror="this.onerror=null;this.src='/uploads/no-image.png';">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
               <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
               <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
@@ -301,7 +403,9 @@
                 card.className = "block rounded-2xl overflow-hidden bg-white hover:shadow-lg transition";
                 card.innerHTML = `
           <div class="h-40">
-            <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover">
+            <img src="${img}" alt="${escapeHtml(name)}"
+                 class="w-full h-full object-cover"
+                 onerror="this.onerror=null;this.src='/uploads/no-image.png';">
           </div>
           <div class="p-3 text-sm font-semibold truncate">${escapeHtml(name)}</div>
         `;
@@ -312,7 +416,8 @@
         function bindHero() {
             document.getElementById("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
             document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
-            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
+            const img = document.getElementById("heroImage");
+            img.src = DATA.hero?.image || "/uploads/sample-banner-product.png";
         }
 
         function makeFilterBtn(label, tagVal) {
@@ -335,10 +440,17 @@
             const wrap = document.getElementById("filterContainer");
             wrap.innerHTML = "";
 
-            // ✅ 한식이면 항상 소제목 버튼 보여주기 (SUB 유무와 무관)
+            // ✅ 한식이면 항상 소제목 버튼 보여주기
             if (TYPE === "food" && CATEGORY === "한식") {
                 wrap.appendChild(makeFilterBtn("All", ""));
                 HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
+                return;
+            }
+
+            // ✅ 미용/이발이면 항상 소제목 버튼 보여주기
+            if ((TYPE === "beauty" || TYPE === "combined") && CATEGORY === BEAUTY_PARENT) {
+                wrap.appendChild(makeFilterBtn("All", ""));
+                BEAUTY_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
                 return;
             }
 
