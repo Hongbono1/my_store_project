@@ -9,10 +9,9 @@ import {
   getSlot,
   saveSlot,
   deleteSlot,
-  searchStore,
+  searchStore,   // ✅ 이제 store_info 전용으로 쓸 거야(컨트롤러에서 수정)
   fixLinks,
   checkLinks,
-  debugStoreCount, // ✅ 추가
 } from "../controllers/foodcategorymanagerAdController.js";
 
 const router = express.Router();
@@ -39,9 +38,12 @@ const uploadSlot = upload.fields([
   { name: "slotImage", maxCount: 1 },
 ]);
 
-router.get("/slot", getSlot);
-router.get("/debug-store-info", debugStoreInfo);
+// ✅ 디버그(라우터가 살아있는지 확인용)
+router.get("/debug/ping", (_req, res) => {
+  res.json({ ok: true, router: "foodcategorymanager/ad" });
+});
 
+router.get("/slot", getSlot);
 
 router.post(
   "/slot",
@@ -60,14 +62,13 @@ router.post(
 
 router.delete("/slot", deleteSlot);
 
-// ✅ 가게 검색 (푸드: store_info)
+// ✅ 가게 검색(푸드 카테고리 매니저는 store_info만)
+router.get("/search-store", searchStore);
+
+// (기존 호환)
 router.get("/store/search", searchStore);
-router.get("/search-store", searchStore); // ✅ 프론트에서 쓰는 경로
 
-// ✅ 디버그(정말 DB에 store_info가 보이는지)
-router.get("/debug-store-count", debugStoreCount);
-
-// ✅ 링크 수정 API
+// ✅ 링크 수정/점검
 router.post("/fix-links/:tableSource", fixLinks);
 router.get("/check-links", checkLinks);
 

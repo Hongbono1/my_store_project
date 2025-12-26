@@ -224,7 +224,7 @@ export async function listSlotItems(req, res) {
 
     // ✅ position이 없으면 해당 page의 모든 슬롯 반환
     let sql, params;
-    
+
     if (!position) {
       sql = `
         SELECT
@@ -330,68 +330,69 @@ export async function listSlotItems(req, res) {
   }
 }
 
-/** GET /search-store?q=...&bizNo=... (combined_store_info만) */
-/** GET /search-store?q=...&bizNo=... (combined_store_info만) */
+// -------------------- GET /foodcategorymanager/ad/search-store --------------------
+// ✅ foodcategorymanager는 "store_info"만 조회 + q=__all__ 전체조회 지원
 export async function searchStore(req, res) {
   try {
-    const q = clean(req.query.q);
-    const bizNo = digitsOnly(req.query.bizNo || req.query.businessNo || req.query.business_no);
+    const qRaw = clean(req.query.q);
+    const q = (qRaw === "__all__") ? "" : qRaw;
 
-    // ✅ __all__ 또는 빈값이면 최신 10개 리턴
-    const wantAll = !q || q === "__all__";
+    const bizNo = digitsOnly(req.query.bizNo);
 
     const params = [];
-    let where = "";
+    const cond = [];
 
-    if (!wantAll) {
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
-      where = ` WHERE (
-        business_name ILIKE $${params.length - 3}
-        OR business_category ILIKE $${params.length - 2}
-        OR business_type ILIKE $${params.length - 1}
-        OR business_subcategory ILIKE $${params.length}
-      )`;
-
-      if (bizNo) {
-        params.push(`%${bizNo}%`);
-        where += ` OR regexp_replace(COALESCE(business_number::text,''), '[^0-9]', '', 'g') ILIKE $${params.length}`;
-      }
+    if (bizNo) {
+      params.push(bizNo);
+      const idx = params.length;
+      cond.push(`regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') = $${idx}`);
     }
 
-    const limit = wantAll ? 10 : 50;
+    if (q) {
+      params.push(`%${q}%`);
+      const idx = params.length;
+      cond.push(`
+        (
+          s.business_name ILIKE $${idx}
+          OR COALESCE(s.business_number::text,'') ILIKE $${idx}
+          OR COALESCE(s.business_type,'') ILIKE $${idx}
+          OR COALESCE(s.business_category,'') ILIKE $${idx}
+          OR COALESCE(s.detail_category,'') ILIKE $${idx}
+        )
+      `);
+    }
 
+    const where = cond.length ? `WHERE ${cond.join(" AND ")}` : "";
+
+    // ⚠️ store_images 컬럼/정렬 컬럼이 환경마다 다를 수 있어서
+    //    안전하게 id 기준으로 1장만 가져오게 함
     const sql = `
       SELECT
         s.id::text AS id,
+        'store_info' AS table_source,
         regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
         s.business_name,
-        s.business_type,
-        s.business_category,
-        s.business_subcategory,
-        s.business_category AS category,
-        COALESCE(NULLIF(s.main_image_url,''), img.url, '') AS image_url
-      FROM ${STORE_TABLE} s
+        COALESCE(s.business_category, '') AS business_category,
+        COALESCE(s.detail_category, '') AS detail_category,
+        COALESCE(img.url, '') AS image_url
+      FROM public.store_info s
       LEFT JOIN LATERAL (
         SELECT url
-        FROM public.combined_store_images
-        WHERE store_id = s.id
-        ORDER BY sort_order ASC, id ASC
+        FROM public.store_images
+        WHERE store_id::text = s.id::text
+        ORDER BY id DESC
         LIMIT 1
-      ) img ON true
+      ) img ON TRUE
       ${where}
       ORDER BY s.id DESC
-      LIMIT ${limit}
+      LIMIT 2000;
     `;
 
     const { rows } = await pool.query(sql, params);
-    rows.forEach(r => {
-      r.image_url = toPublicImageUrl(r.image_url);
-    });
-
-    // ✅ 배포/라우팅 확인용 버전 태그 (이게 안 보이면 너는 지금 예전 서버코드를 보고 있는 거임)
-    return res.json({ success: true, version: "searchStore-v2-2025-12-24", stores: rows });
+    return res.json({ ok: true, version: "foodcategory-search-store-store_info-only", stores: rows || [] });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    console.error("❌ [foodcategorymanager/search-store] error:", e);
+    return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
 
