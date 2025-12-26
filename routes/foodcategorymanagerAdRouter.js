@@ -9,7 +9,7 @@ import {
   getSlot,
   saveSlot,
   deleteSlot,
-  searchStore,   // ✅ 이제 store_info 전용으로 쓸 거야(컨트롤러에서 수정)
+  searchStore, // ✅ store_info 전용으로 컨트롤러에서 처리
   fixLinks,
   checkLinks,
 } from "../controllers/foodcategorymanagerAdController.js";
