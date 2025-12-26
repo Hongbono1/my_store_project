@@ -222,55 +222,105 @@ export async function listSlotItems(req, res) {
     const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
 
-    if (!position) return res.json({ success: true, items: [] });
+    // ✅ position이 없으면 해당 page의 모든 슬롯 반환
+    let sql, params;
+    
+    if (!position) {
+      sql = `
+        SELECT
+          s.id,
+          s.page,
+          s.position,
+          s.priority,
+          s.slot_type,
+          s.slot_mode,
+          s.store_id,
+          s.table_source,
 
-    const sql = `
-      SELECT
-        s.id,
-        s.page,
-        s.position,
-        s.priority,
-        s.slot_type,
-        s.slot_mode,
-        s.store_id,
-        s.table_source,
+          COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
+          COALESCE(
+            NULLIF(s.business_no,''),
+            regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
+            ''
+          ) AS business_no,
 
-        COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
-        COALESCE(
-          NULLIF(s.business_no,''),
-          regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
-          ''
-        ) AS business_no,
+          COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
+          s.link_url,
+          s.text_content,
+          s.created_at,
+          s.updated_at,
+          s.start_date,
+          s.end_date,
+          s.no_end,
+          s.start_at,
+          s.end_at,
+          s.store_type,
 
-        COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
-        s.link_url,
-        s.text_content,
-        s.created_at,
-        s.updated_at,
-        s.start_date,
-        s.end_date,
-        s.no_end,
-        s.start_at,
-        s.end_at,
-        s.store_type,
+          COALESCE(c.business_category, '') AS business_category
+        FROM ${SLOTS_TABLE} s
+        LEFT JOIN ${STORE_TABLE} c
+          ON c.id::text = s.store_id::text
+         AND (
+              s.table_source = 'combined_store_info'
+           OR s.table_source = 'combined'
+           OR s.table_source IS NULL
+           OR s.table_source = ''
+         )
+        WHERE s.page = $1
+        ORDER BY s.position ASC, s.priority ASC NULLS FIRST, s.updated_at DESC
+        LIMIT 100
+      `;
+      params = [page];
+    } else {
+      sql = `
+        SELECT
+          s.id,
+          s.page,
+          s.position,
+          s.priority,
+          s.slot_type,
+          s.slot_mode,
+          s.store_id,
+          s.table_source,
 
-        COALESCE(c.business_category, '') AS business_category
-      FROM ${SLOTS_TABLE} s
-      LEFT JOIN ${STORE_TABLE} c
-        ON c.id::text = s.store_id::text
-       AND (
-            s.table_source = 'combined_store_info'
-         OR s.table_source = 'combined'
-         OR s.table_source IS NULL
-         OR s.table_source = ''
-       )
-      WHERE s.page = $1
-        AND s.position = $2
-      ORDER BY s.priority ASC NULLS FIRST, s.updated_at DESC
-      LIMIT 50
-    `;
+          COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
+          COALESCE(
+            NULLIF(s.business_no,''),
+            regexp_replace(COALESCE(c.business_number::text,''), '[^0-9]', '', 'g'),
+            ''
+          ) AS business_no,
 
-    const { rows } = await pool.query(sql, [page, position]);
+          COALESCE(NULLIF(s.image_url,''), NULLIF(c.main_image_url,''), '') AS image_url,
+          s.link_url,
+          s.text_content,
+          s.created_at,
+          s.updated_at,
+          s.start_date,
+          s.end_date,
+          s.no_end,
+          s.start_at,
+          s.end_at,
+          s.store_type,
+
+          COALESCE(c.business_category, '') AS business_category
+        FROM ${SLOTS_TABLE} s
+        LEFT JOIN ${STORE_TABLE} c
+          ON c.id::text = s.store_id::text
+         AND (
+              s.table_source = 'combined_store_info'
+           OR s.table_source = 'combined'
+           OR s.table_source IS NULL
+           OR s.table_source = ''
+         )
+        WHERE s.page = $1
+          AND s.position = $2
+        ORDER BY s.priority ASC NULLS FIRST, s.updated_at DESC
+        LIMIT 50
+      `;
+      params = [page, position];
+    }
+
+    const { rows } = await pool.query(sql, params);
     rows.forEach(r => {
       r.image_url = toPublicImageUrl(r.image_url);
     });
