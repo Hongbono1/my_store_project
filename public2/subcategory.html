@@ -181,6 +181,12 @@
             return "기타";
         }
 
+        // ✅ 가게가 특정 카테고리에 속하는지 확인
+        function isInCategory(store, targetCategory) {
+            const cat = (store.category ?? store.business_category ?? store.businessCategory ?? "").toString().trim();
+            return cat === targetCategory;
+        }
+
         async function loadData() {
             try {
                 DATA = { ...DEFAULT_DATA };
@@ -217,17 +223,22 @@
                     } catch (_) { }
 
                 } else if (TYPE === "beauty" || TYPE === "combined") {
-                    // ✅ 서버 조회는 “미용/이발” 통합 키로 호출 (필요시 category 그대로도 동작)
-                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
-                    ALL_STORES = json.stores || [];
 
-                    // ✅ 미용/이발이면 필터 제공 + business_type 기준 분리
+                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
+
+                    let stores = json.stores || [];
+
+                    // ✅ (근본) 어떤 카테고리든 "요청 카테고리만" 남긴다
+                    stores = stores.filter(s => isInCategory(s, CATEGORY));
+
+                    ALL_STORES = stores;
+
                     if (CATEGORY === "미용/이발") {
                         DATA.filters = BEAUTY_SUBS.slice();
                         setBeautyHero(CURRENT_SUB);
-                        applySubFilter(CURRENT_SUB, false);
+                        applySubFilter(CURRENT_SUB, false);  // 여기서 2차(미용/이발) 분리
                     } else {
-                        // 다른 뷰티 카테고리 확장 대비: 그대로 출력
+                        // 다른 뷰티 카테고리면 그냥 해당 카테고리만 보여줌(이미 1차 필터 끝)
                         DATA.filters = [];
                         DATA.stores = ALL_STORES.slice();
                         DATA.hero = {
