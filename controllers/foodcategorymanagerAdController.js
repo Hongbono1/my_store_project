@@ -680,3 +680,18 @@ export async function checkLinks(req, res) {
     return res.status(500).json({ success: false, error: e.message || "server error" });
   }
 }
+
+export async function debugStoreInfo(req, res) {
+  try {
+    const { rows } = await pool.query(`
+      select
+        count(*)::int as cnt,
+        (select business_name from public.store_info order by id desc limit 1) as latest_name
+      from public.store_info
+    `);
+    return res.json({ ok: true, ...rows[0] });
+  } catch (e) {
+    console.error("❌ debugStoreInfo error:", e);
+    return res.status(500).json({ ok: false, error: e.message || "server error" });
+  }
+}

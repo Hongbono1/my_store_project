@@ -40,6 +40,8 @@ const uploadSlot = upload.fields([
 ]);
 
 router.get("/slot", getSlot);
+router.get("/debug-store-info", debugStoreInfo);
+
 
 router.post(
   "/slot",
