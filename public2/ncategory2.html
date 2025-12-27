@@ -805,10 +805,20 @@
                 if (!page || !posRaw) continue;
 
                 const { base, suffix } = splitPos(posRaw);
-                const pri = cleanStr(it.priority ?? it.rank ?? it.order ?? suffix ?? "");
+                // ✅ priority를 문자열로 통일 (DB에서 숫자로 오더라도)
+                const pri = String(it.priority ?? it.rank ?? it.order ?? suffix ?? "");
 
+                // ✅ 다양한 키 패턴 저장
                 map.set(`${page}|${posRaw}|${pri}`, it);
                 map.set(`${page}|${base}|${pri}`, it);
+                
+                // ✅ priority 없이도 매칭 (priority=null 또는 1)
+                if (!pri || pri === "null" || pri === "undefined") {
+                    map.set(`${page}|${posRaw}|1`, it);
+                    map.set(`${page}|${base}|1`, it);
+                }
+                
+                console.log(`🗺️ 인덱스 추가: ${page}|${posRaw}|${pri}`, it);
             }
 
             return map;
@@ -836,19 +846,30 @@
                 for (const a of nodes) {
                     const p = cleanStr(a.getAttribute("data-page"));
                     const pos = cleanStr(a.getAttribute("data-position"));
-                    const pri = cleanStr(a.getAttribute("data-priority"));
+                    const pri = String(a.getAttribute("data-priority") || "1");
 
-                    const key1 = `${p}|${pos}|${pri}`;
-                    let ad = map.get(key1);
+                    // ✅ 다양한 키 패턴 시도
+                    const keys = [
+                        `${p}|${pos}|${pri}`,
+                        `${p}|${pos}_${pri}|${pri}`,
+                        `${p}|${pos}_${pri}|1`,
+                        `${p}|${pos}|1`  // priority 기본값
+                    ];
 
-                    if (!ad) {
-                        const key2 = `${p}|${pos}_${pri}|1`;
-                        ad = map.get(key2);
+                    let ad = null;
+                    for (const key of keys) {
+                        ad = map.get(key);
+                        if (ad) {
+                            console.log(`✅ 슬롯 [${pos}#${pri}] 매칭 성공: ${key}`, ad);
+                            break;
+                        }
                     }
 
-                    console.log(`🎯 슬롯 [${pos}#${pri}] → ${ad ? '데이터 있음' : '데이터 없음'}`, ad);
-
-                    if (!ad) continue;
+                    if (!ad) {
+                        console.log(`⚠️ 슬롯 [${pos}#${pri}] 데이터 없음 - 시도한 키:`, keys);
+                        continue;
+                    }
+                    
                     applyItemToCard(a, ad);
                 }
 
