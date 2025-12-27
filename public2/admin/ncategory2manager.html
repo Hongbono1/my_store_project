@@ -207,8 +207,8 @@
 
                 <!-- 슬롯 이미지(있으면 표시) -->
                 <img data-role="img"
-                     data-default-src="/uploads/sample-main-banner.jpg"
-                     src="/uploads/sample-main-banner.jpg"
+                     data-default-src="/uploads/no-image.png"
+                     src="/uploads/no-image.png"
                      class="absolute inset-0 w-full h-full object-cover"
                      alt="Premium Banner">
 
@@ -248,8 +248,10 @@
                             <a href="#"
                                 class="neo-card p-0 overflow-hidden relative rounded-2xl h-full border-2 border-blue-500 admin-slot"
                                 data-position="ncategory2_mvp" data-label="MVP">
-                                <img data-role="img" src="/uploads/sample-left-top.jpg"
-                                    class="w-full h-full object-cover" alt="MVP">
+                                <img data-role="img"
+                                     data-default-src="/uploads/no-image.png"
+                                     src="/uploads/no-image.png"
+                                     class="w-full h-full object-cover" alt="MVP">
                                 <div
                                     class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
                                     <div class="font-bold text-lg leading-tight" data-role="name">상호명 Top</div>
@@ -263,8 +265,10 @@
                             <a href="#"
                                 class="neo-card p-0 overflow-hidden relative rounded-2xl h-full border-2 border-yellow-500 admin-slot"
                                 data-position="ncategory2_highlight" data-label="HIGHLIGHT">
-                                <img data-role="img" src="/uploads/sample-left-bottom.jpg"
-                                    class="w-full h-full object-cover" alt="HIGHLIGHT">
+                                <img data-role="img"
+                                     data-default-src="/uploads/no-image.png"
+                                     src="/uploads/no-image.png"
+                                     class="w-full h-full object-cover" alt="HIGHLIGHT">
                                 <div
                                     class="absolute left-3 right-3 bottom-3 bg-white/70 backdrop-blur-md rounded-xl shadow px-4 py-2 text-center">
                                     <div class="font-bold text-lg leading-tight" data-role="name">상호명 Bottom</div>
@@ -865,22 +869,20 @@
                     const category = slotEl.querySelector('[data-role="category"]');
                     const desc = slotEl.querySelector('[data-role="desc"]');
 
-                    const imageUrl = clean(slot?.image_url || slot?.imageUrl || "");
-                    const businessName =
-                        clean(slot?.business_name || slot?.businessName || "") ||
-                        clean(slotEl.getAttribute("data-label") || "");
+                    const label = clean(slotEl.getAttribute("data-label") || "");
+                    const hasSlot = !!slot;
 
-                    const cat = pickCategory(slot);
-                    const textContent = clean(slot?.text_content || slot?.textContent || "");
+                    const imageUrl = hasSlot ? clean(slot?.image_url || slot?.imageUrl || "") : "";
+                    const businessName = hasSlot
+                        ? (clean(slot?.business_name || slot?.businessName || "") || label)
+                        : label;
 
-                    console.log("🖼️ 이미지 표시:", { position: slotEl.getAttribute("data-position"), imageUrl, slot });
+                    const cat = hasSlot ? pickCategory(slot) : "";
+                    const textContent = hasSlot ? clean(slot?.text_content || slot?.textContent || "") : "";
 
+                    // ✅ 이미지 처리: "현재 src"를 default로 쓰지 말고, data-default-src만 default로 사용
                     if (img) {
-                        const defaultSrc =
-                            clean(img.getAttribute("data-default-src")) ||
-                            clean(img.getAttribute("src")) ||
-                            "";
-
+                        const defaultSrc = clean(img.getAttribute("data-default-src") || ""); // ✅ 여기만 사용
                         const finalSrc = imageUrl || defaultSrc;
 
                         if (finalSrc) {
@@ -903,8 +905,12 @@
                     if (category) category.textContent = cat ? `업종: ${cat}` : "업종:";
                     if (desc) desc.textContent = textContent || desc.textContent || "";
 
+                    // ✅ 링크도 삭제 시 즉시 #로 초기화
                     const a = slotEl.closest("a");
-                    if (a) a.href = clean(slot?.link_url || slot?.linkUrl || "") || "#";
+                    if (a) {
+                        const link = hasSlot ? clean(slot?.link_url || slot?.linkUrl || "") : "";
+                        a.href = link || "#";
+                    }
                 }
 
                 async function loadAndRender() {
