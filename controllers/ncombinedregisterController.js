@@ -9,8 +9,7 @@ const s = (v) => (v == null ? "" : String(v).trim());
 const n = (v) => {
   const num = Number(String(v ?? "").replace(/[^\d]/g, ""));
   if (!Number.isFinite(num)) return 0;
-  // ✅ PostgreSQL integer 최대치 제한 (2147483647)
-  return Math.min(num, 2147483647);
+  return Math.min(num, 2147483647); // PostgreSQL integer max
 };
 
 /** boolean 보정 */
@@ -23,7 +22,6 @@ const b = (v) => {
 const toWeb = (file) => {
   if (!file?.path) return null;
 
-  // Windows 경로 대응
   const p = String(file.path).replace(/\\/g, "/");
 
   // ✅ 프로덕션: /data/uploads/... -> /uploads/...
@@ -42,7 +40,6 @@ const toWeb = (file) => {
     return `/uploads/${rel}`;
   }
 
-  // fallback: 파일명만
   return `/uploads/${path.basename(p)}`;
 };
 
@@ -68,7 +65,6 @@ function pickBusinessNumber(body) {
     if (digits) return digits;
   }
 
-  // 키가 애매하게 오는 경우도 방어
   for (const [k, v] of Object.entries(body || {})) {
     const key = String(k || "").toLowerCase();
     if (!/(biz|business)/.test(key)) continue;
@@ -97,15 +93,11 @@ export async function createCombinedStore(req, res) {
       ? req.files
       : Object.values(req.files || {}).flat();
 
-    const businessNumberDigits = pickBusinessNumber(raw); // ✅ digits-only
+    const businessNumberDigits = pickBusinessNumber(raw);
     console.log("==== [createCombinedStore] incoming ====");
     console.log("businessNumberDigits:", businessNumberDigits);
     console.log("mainImageIndex:", raw.mainImageIndex);
-    console.log("menuName[]:", raw["menuName[]"]);
-    console.log("menuPrice[]:", raw["menuPrice[]"]);
-    console.log("menuCategory[]:", raw["menuCategory[]"]);
 
-    // ✅ 사업자번호 없거나 길이 이상하면 등록 막기 (빈값 저장 방지)
     if (!businessNumberDigits) {
       return res.status(200).json({ ok: false, error: "business_number_required" });
     }
@@ -119,12 +111,11 @@ export async function createCombinedStore(req, res) {
 
     await client.query("BEGIN");
 
-    // ✅ 같은 사업자번호 중복 등록 차단 (combined_store_info 기준)
+    // ✅ 중복 등록 차단
     const dup = await client.query(
       `SELECT id FROM public.combined_store_info WHERE business_number = $1 LIMIT 1`,
       [businessNumberDigits]
     );
-
     if (dup.rows.length) {
       await client.query("ROLLBACK");
       return res.status(200).json({
@@ -195,12 +186,11 @@ export async function createCombinedStore(req, res) {
     const storeResult = await client.query(storeSql, storeVals);
     const storeId = storeResult.rows[0].id;
 
-    // ✅ 대표/갤러리 이미지 저장 (storeImages / storeImages[] 둘 다)
+    // ✅ storeImages 저장 (sort_order 저장)
     const storeImageFiles = allFiles.filter(
       (f) => f.fieldname === "storeImages" || f.fieldname === "storeImages[]"
     );
 
-    // ✅ 프론트 mainImageIndex 반영 (0~2)
     const rawMainIdx = raw.mainImageIndex ?? raw["mainImageIndex"];
     let mainIdx = Number.parseInt(String(rawMainIdx ?? "0"), 10);
     if (!Number.isFinite(mainIdx) || mainIdx < 0) mainIdx = 0;
@@ -213,7 +203,6 @@ export async function createCombinedStore(req, res) {
 
       storeImageUrls.push(url);
 
-      // ✅ sort_order 저장 (너 schema에 있음)
       await client.query(
         `INSERT INTO combined_store_images (store_id, url, sort_order) VALUES ($1, $2, $3)`,
         [storeId, url, i]
@@ -244,7 +233,6 @@ export async function createCombinedStore(req, res) {
     const menus = [];
 
     if (catsByRow) {
-      // 행별 1:1 매칭
       const len = Math.max(names.length, prices.length, catsByRow.length);
       for (let i = 0; i < len; i++) {
         const name = s(names[i]);
@@ -258,7 +246,6 @@ export async function createCombinedStore(req, res) {
         });
       }
     } else {
-      // 구방식 fallback: categoryName[] + menuCount_x
       const catNames = arr(raw["categoryName[]"] ?? raw.categoryName);
       let k = 0;
       for (let ci = 0; ci < catNames.length; ci++) {
@@ -293,7 +280,7 @@ export async function createCombinedStore(req, res) {
       );
     }
 
-    // ✅ 이벤트 저장 (events[]/events 형태 모두)
+    // ✅ 이벤트 저장
     const eventsArr = arr(raw["events[]"] ?? raw.events);
     for (let i = 0; i < eventsArr.length; i++) {
       const content = s(eventsArr[i]);
@@ -305,11 +292,8 @@ export async function createCombinedStore(req, res) {
     }
 
     await client.query("COMMIT");
-    console.log("[createCombinedStore] 성공:", storeId, "biz:", businessNumberDigits);
 
-    // ✅ link_url 강제 포함 (서버가 이동 경로 보장)
     const link_url = `/ndetail.html?id=${storeId}&type=combined`;
-
     return res.json({
       ok: true,
       id: storeId,
@@ -322,9 +306,11 @@ export async function createCombinedStore(req, res) {
       await client.query("ROLLBACK");
     } catch {}
     console.error("[createCombinedStore] error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: "DB insert failed", message: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "DB insert failed",
+      message: err.message,
+    });
   } finally {
     client.release();
   }
@@ -336,12 +322,8 @@ export async function createCombinedStore(req, res) {
 export async function getCombinedStoreByBusinessNumber(req, res) {
   try {
     const businessNumber = String(req.params.businessNumber ?? "").replace(/[^\d]/g, "");
-    if (!businessNumber) {
-      return res.status(400).json({ ok: false, error: "business_number_required" });
-    }
-    if (!isBizLenOk(businessNumber)) {
-      return res.status(400).json({ ok: false, error: "invalid_business_number" });
-    }
+    if (!businessNumber) return res.status(400).json({ ok: false, error: "business_number_required" });
+    if (!isBizLenOk(businessNumber)) return res.status(400).json({ ok: false, error: "invalid_business_number" });
 
     const { rows: storeRows } = await pool.query({
       text: `
@@ -355,9 +337,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       values: [businessNumber],
     });
 
-    if (!storeRows.length) {
-      return res.status(404).json({ ok: false, error: "not_found" });
-    }
+    if (!storeRows.length) return res.status(404).json({ ok: false, error: "not_found" });
 
     const base = storeRows[0];
     const storeId = base.id;
@@ -379,7 +359,6 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       pets_allowed: base.pets_allowed ?? null,
       parking: base.parking ?? "-",
       address: base.address ?? "-",
-      // ✅ 필요하면 대표이미지도 내려줄 수 있음
       main_image_url: base.main_image_url ?? "",
     };
 
@@ -425,11 +404,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
     return res.json({ ok: true, store, images, menus, events });
   } catch (err) {
     console.error("[getCombinedStoreByBusinessNumber] error:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "DB fetch failed",
-      message: err.message,
-    });
+    return res.status(500).json({ ok: false, error: "DB fetch failed", message: err.message });
   }
 }
 
@@ -439,9 +414,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
 export async function getCombinedStoreFull(req, res) {
   try {
     const storeId = Number.parseInt(req.params.id, 10);
-    if (!Number.isFinite(storeId)) {
-      return res.status(400).json({ ok: false, error: "invalid_id" });
-    }
+    if (!Number.isFinite(storeId)) return res.status(400).json({ ok: false, error: "invalid_id" });
 
     const { rows: storeRows } = await pool.query({
       text: `
@@ -453,9 +426,7 @@ export async function getCombinedStoreFull(req, res) {
       values: [storeId],
     });
 
-    if (!storeRows.length) {
-      return res.status(404).json({ ok: false, error: "not_found" });
-    }
+    if (!storeRows.length) return res.status(404).json({ ok: false, error: "not_found" });
 
     const base = storeRows[0];
     const store = {
@@ -520,10 +491,6 @@ export async function getCombinedStoreFull(req, res) {
     return res.json({ ok: true, store, images, menus, events });
   } catch (err) {
     console.error("[getCombinedStoreFull] error:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "DB fetch failed",
-      message: err.message,
-    });
+    return res.status(500).json({ ok: false, error: "DB fetch failed", message: err.message });
   }
 }
