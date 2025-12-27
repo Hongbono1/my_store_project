@@ -1408,6 +1408,74 @@
                     return false;
                 }
 
+                // ✅ 모달 내용이 "완전 비어있는 상태"인지 체크 (저장 대신 삭제 처리용)
+                function isModalEmptyForDelete() {
+                    const mode = getMode();
+
+                    const textContent = clean(el("fieldTextContent")?.value);
+                    const linkUrl = clean(el("fieldLinkUrl")?.value);
+                    const storeId = clean(el("fieldStoreId")?.value);
+
+                    const file = el("fieldImageFile")?.files?.[0];
+                    const currentImage = clean(el("slotModal")?.dataset.currentImage || "");
+
+                    const startAt = clean(el("fieldStartAt")?.value);
+                    const endAt = clean(el("fieldEndAt")?.value);
+                    const noEnd = el("fieldNoEnd")?.checked ? true : false;
+
+                    // 완전 빈 상태 정의 (텍스트/링크/가게/이미지/기간 전부 비어있으면)
+                    const empty =
+                        !textContent &&
+                        !linkUrl &&
+                        !storeId &&
+                        !file &&
+                        !currentImage &&
+                        !startAt &&
+                        !endAt &&
+                        !noEnd;
+
+                    // mode 상관없이 "완전 빈 상태"면 삭제 처리
+                    return empty;
+                }
+
+                // ✅ 입력 초기화 = 즉시 DB에서 삭제 + UI 초기화 + 화면 갱신
+                async function resetAndDeleteCurrentSlot() {
+                    const position = clean(state.current.position);
+                    const priority = clean(el("adPriority")?.value || state.current.priority || "1") || "1";
+
+                    if (!position) {
+                        alert("슬롯(position)이 없어 초기화를 진행할 수 없습니다.");
+                        return;
+                    }
+
+                    const ok = confirm("입력 초기화 시, 이 우선순위 데이터가 DB에서 삭제됩니다. 진행할까요?");
+                    if (!ok) return;
+
+                    try {
+                        setModalStatus("초기화(삭제) 중...");
+
+                        // ✅ 서버에서 실제 삭제 (없어도 성공/실패는 서버 동작에 따름)
+                        await apiDeleteSlot({ page: PAGE, position, priority });
+
+                        // ✅ 모달 UI 초기화 (키는 유지)
+                        clearModalFields(true);
+
+                        // ✅ 화면도 즉시 갱신
+                        await loadAndRender();
+                        await refreshCandidateList();
+
+                        // ✅ 현재 편집 컨텍스트 유지
+                        state.current.priority = priority;
+
+                        setModalStatus("초기화(삭제) 완료 ✅ 이제 닫기 누르면 됩니다.");
+                        alert("초기화(삭제) 완료 ✅");
+                    } catch (e) {
+                        console.error(e);
+                        setModalStatus(`❌ 초기화(삭제) 실패: ${e.message || e}`);
+                        alert(`초기화(삭제) 실패: ${e.message || e}`);
+                    }
+                }
+
                 // ✅ 저장
                 async function saveSlotFromModal() {
                     try {
@@ -1415,6 +1483,21 @@
 
                         const position = clean(state.current.position);
                         if (!position) throw new Error("position(슬롯)이 비어있음");
+
+                        // ✅ 완전 빈 상태면 저장이 아니라 "삭제"로 처리 (초기화 후 저장 눌러도 경고 안 뜨게)
+                        if (isModalEmptyForDelete()) {
+                            const priority = clean(el("adPriority")?.value || "1") || "1";
+
+                            setModalStatus("빈 값 감지 → 삭제 처리 중...");
+                            await apiDeleteSlot({ page: PAGE, position, priority });
+                            await loadAndRender();
+                            await refreshCandidateList();
+                            clearModalFields(true);
+
+                            setModalStatus("삭제 완료 ✅");
+                            alert("삭제 완료 ✅");
+                            return;
+                        }
 
                         const mode = getMode();
                         if (mode === "store") {
@@ -1624,9 +1707,14 @@
                     const btnSave = el("btnSaveSlot");
                     if (btnSave) btnSave.addEventListener("click", (e) => { e.preventDefault(); saveSlotFromModal(); });
 
-                    // 초기화
+                    // 초기화(=DB 삭제까지)
                     const btnReset = el("btnResetModal");
-                    if (btnReset) btnReset.addEventListener("click", (e) => { e.preventDefault(); clearModalFields(true); applyModeUI(getMode()); });
+                    if (btnReset) btnReset.addEventListener("click", async (e) => {
+                        e.preventDefault();
+                        await resetAndDeleteCurrentSlot();
+                        // 삭제 후 mode UI는 기본값으로 보여주고 싶으면 아래 유지
+                        applyModeUI(getMode());
+                    });
 
                     // 우선순위 불러오기
                     const btnLoadP = el("btnLoadPriority");
