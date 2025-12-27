@@ -8,11 +8,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const UPLOAD_SUBDIR = "manager_ad";
-// ✅ 로컬/프로덕션 환경 모두 지원
-const isProduction = process.env.NODE_ENV === "production";
-export const UPLOAD_ABS_DIR = isProduction
-  ? path.join("/data/uploads", UPLOAD_SUBDIR)
+
+// ✅ /data/uploads가 있으면 무조건 그쪽을 우선 사용 (NODE_ENV 의존 제거)
+const PERSIST_ROOT = process.env.UPLOAD_ROOT || "/data/uploads";
+const hasPersistentRoot = fs.existsSync(PERSIST_ROOT);
+
+export const UPLOAD_ABS_DIR = hasPersistentRoot
+  ? path.join(PERSIST_ROOT, UPLOAD_SUBDIR)
   : path.join(__dirname, "..", "public2", "uploads", UPLOAD_SUBDIR);
+
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
 const SLOTS_TABLE = "public.admin_ad_slots";
