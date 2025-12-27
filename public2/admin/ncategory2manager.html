@@ -907,12 +907,34 @@
                 }
 
                 async function loadAndRender() {
-                    const rows = await apiListSlots(); // ✅ 이미 priority=1만 들어옴
-                    state.slots.clear();
-                    rows.forEach((r) => state.slots.set(r.position, r));
+                    // ✅ 화면에 실제 존재하는 position들을 기준으로 렌더링 (서버 /slots 묶임/누락 이슈 우회)
+                    const els = Array.from(document.querySelectorAll("[data-position]"));
+                    const positions = [...new Set(els.map(x => clean(x.getAttribute("data-position"))).filter(Boolean))];
 
-                    document.querySelectorAll("[data-position]").forEach((slotEl) => {
-                        const pos = slotEl.getAttribute("data-position");
+                    // position별로 priority=1을 정확히 가져와서 적용
+                    const settled = await Promise.allSettled(
+                        positions.map(async (pos) => {
+                            try {
+                                const data = await apiGetSlot({ page: PAGE, position: pos, priority: 1 });
+                                const slot = data?.slot ?? data ?? null;
+                                return { pos, slot };
+                            } catch (_) {
+                                return { pos, slot: null };
+                            }
+                        })
+                    );
+
+                    state.slots.clear();
+                    for (const r of settled) {
+                        if (r.status === "fulfilled") {
+                            const { pos, slot } = r.value;
+                            if (slot) state.slots.set(pos, slot);
+                        }
+                    }
+
+                    // ✅ DOM에 적용
+                    els.forEach((slotEl) => {
+                        const pos = clean(slotEl.getAttribute("data-position"));
                         applySlotToEl(slotEl, state.slots.get(pos));
                     });
                 }
