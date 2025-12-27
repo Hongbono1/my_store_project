@@ -1,10 +1,18 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 import pool from "../db.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export const UPLOAD_SUBDIR = "manager_ad";
-export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
+// ✅ 로컬/프로덕션 환경 모두 지원
+const isProduction = process.env.NODE_ENV === "production";
+export const UPLOAD_ABS_DIR = isProduction
+  ? path.join("/data/uploads", UPLOAD_SUBDIR)
+  : path.join(__dirname, "..", "public2", "uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
 const SLOTS_TABLE = "public.admin_ad_slots";
