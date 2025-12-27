@@ -30,6 +30,7 @@ const uploadAny = upload.any();
 function multerErrorHandler(err, _req, res, _next) {
   return res.status(400).json({
     success: false,
+    ok: false,
     error: err?.message || "upload error",
   });
 }
@@ -41,9 +42,10 @@ router.get("/slot-items", listSlotItems);
 
 router.get("/search-store", searchStore);
 
-router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
-router.delete("/slot", deleteSlot);
+// ✅ 이 라인이 에러 주범이었음 (import가 없으면 바로 ReferenceError)
 router.get("/category-tree", getCategoryTree);
 
+router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
+router.delete("/slot", deleteSlot);
 
 export default router;
