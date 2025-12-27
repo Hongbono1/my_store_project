@@ -125,9 +125,13 @@ async function initPerformingArtsTables() {
 initPerformingArtsTables();
 
 // ------------------------------------------------------------
-// 2. 업로드 폴더 구성 (영구 저장용 /data/uploads)
+// 2. 업로드 폴더 구성 (영구 저장용)
 // ------------------------------------------------------------
-const UPLOAD_ROOT = "/data/uploads"; // ★★★ 영구 저장 A 방식 ★★★
+// ✅ Windows 로컬 개발: public2/uploads, 프로덕션: /data/uploads
+const isProduction = process.env.NODE_ENV === "production";
+const UPLOAD_ROOT = isProduction 
+  ? "/data/uploads" 
+  : path.join(__dirname, "public2/uploads");
 
 const uploadDirs = [
   UPLOAD_ROOT,
