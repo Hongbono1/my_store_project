@@ -113,12 +113,14 @@
                 <li class="text-center text-sm text-gray-500 py-8">카테고리 불러오는 중...</li>
             </ul>
 
-            <!-- ✅ 광고 박스 -->
-            <div class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300">
-                <h3 class="font-bold text-lg mb-2">광고 영역</h3>
-                <p class="text-sm text-gray-600">이곳은 광고 배너/이미지가 들어갈 박스입니다.</p>
-                <img src="/uploads/no-image.png" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl">
-            </div>
+            <!-- ✅ 광고 박스 (✅ 슬롯 연결) -->
+            <a href="#" class="neo-card mt-6 p-4 text-center border-2 border-dashed border-blue-300 block" data-ad-slot
+                data-page="ncategory2" data-position="ncategory2_left_bottom" data-priority="1">
+                <h3 class="font-bold text-lg mb-2" data-ad-title>광고 영역</h3>
+                <p class="text-sm text-gray-600" data-ad-cat>이곳은 광고 배너/이미지가 들어갈 박스입니다.</p>
+                <img src="/uploads/no-image.png" alt="광고 이미지" class="mt-3 w-full h-[30px] object-cover rounded-xl"
+                    data-ad-img>
+            </a>
         </aside>
 
         <!-- 중앙 메인 -->
@@ -349,7 +351,6 @@
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                            <!-- 1~6 (기존) -->
                             <a href="#" class="block group" data-ad-slot data-page="ncategory2"
                                 data-position="ncategory2_best_1" data-priority="1">
                                 <div class="neo-card p-0 overflow-hidden relative rounded-2xl transition-transform">
@@ -440,7 +441,6 @@
                                 </div>
                             </a>
 
-                            <!-- ✅ 7~9 (추가) -->
                             <a href="#" class="block group" data-ad-slot data-page="ncategory2"
                                 data-position="ncategory2_best_7" data-priority="1">
                                 <div class="neo-card p-0 overflow-hidden relative rounded-2xl transition-transform">
@@ -582,7 +582,6 @@
 
         // ===============================
         // ✅ 사이드바 카테고리 동적 생성 (DB에서 생성)
-        // ✅ 개선: 서브카테고리 없는 항목은 "바로 링크"(2번 클릭 제거)
         // ===============================
         async function fetchCategoryTreeFromStores() {
             const url = `${AD_API_BASE}/search-store?q=__all__`;
@@ -731,14 +730,48 @@
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) throw new Error(`slot-items HTTP ${res.status}`);
             const json = await res.json();
-            // ✅ ok 또는 success 체크
             if (json && (json.ok === false || json.success === false)) {
                 throw new Error(json.error || "slot-items fail");
             }
             return normalizeItems(json);
         }
 
-        // ✅ 슬롯 카드 초기화 (빈칸인데 업종/상호 남는 문제 해결)
+        function splitPos(pos) {
+            const p = cleanStr(pos);
+            const m = p.match(/^(.*)_([0-9]+)$/);
+            if (!m) return { raw: p, base: p, suffix: "" };
+            return { raw: p, base: cleanStr(m[1]), suffix: cleanStr(m[2]) };
+        }
+
+        function indexByPositionPriority(items) {
+            const map = new Map();
+
+            for (const it of items) {
+                const page = cleanStr(it.page || it.slot_page || it.ad_page || "");
+                const posRaw = cleanStr(it.position || it.slot_position || it.pos || "");
+                if (!page || !posRaw) continue;
+
+                const { base, suffix } = splitPos(posRaw);
+                const pri = String(it.priority ?? it.rank ?? it.order ?? suffix ?? "1");
+
+                // raw + base 모두 등록
+                map.set(`${page}|${posRaw}|${pri}`, it);
+                map.set(`${page}|${base}|${pri}`, it);
+            }
+
+            return map;
+        }
+
+        function isOverlayBox(el) {
+            if (!el) return false;
+            try {
+                return window.getComputedStyle(el).position === "absolute";
+            } catch {
+                return false;
+            }
+        }
+
+        // ✅ 슬롯 카드 초기화
         function resetCard(anchorEl) {
             if (!anchorEl) return;
             const imgEl = anchorEl.querySelector("[data-ad-img]");
@@ -752,8 +785,8 @@
             if (titleEl) titleEl.textContent = "";
             if (catEl) catEl.textContent = "";
 
-            // 하단 텍스트 박스(오버레이)도 숨김 (텍스트 없는데 바만 보이는 현상 최소화)
-            if (infoEl) infoEl.style.display = "none";
+            // 오버레이(absolute)만 숨김 (하단 텍스트 영역은 숨기지 않음)
+            if (infoEl && isOverlayBox(infoEl)) infoEl.style.display = "none";
         }
 
         function applyItemToCard(anchorEl, item) {
@@ -775,53 +808,17 @@
             if (href && href !== "#") anchorEl.href = href;
 
             if (imgEl) {
-                if (image_url) imgEl.src = image_url;
-                else imgEl.src = "/uploads/no-image.png";
+                imgEl.src = image_url || "/uploads/no-image.png";
             }
 
             if (titleEl) titleEl.textContent = business_name || "";
             if (catEl) catEl.textContent = business_category ? `업종: ${business_category}` : "";
 
-            // 텍스트가 하나라도 있으면 info 표시
-            if (infoEl) {
-                if ((business_name || business_category)) infoEl.style.display = "";
+            // 오버레이면: 내용 있을 때만 표시
+            if (infoEl && isOverlayBox(infoEl)) {
+                if (business_name || business_category) infoEl.style.display = "";
                 else infoEl.style.display = "none";
             }
-        }
-
-        function splitPos(pos) {
-            const p = cleanStr(pos);
-            const m = p.match(/^(.*)_([0-9]+)$/);
-            if (!m) return { raw: p, base: p, suffix: "" };
-            return { raw: p, base: cleanStr(m[1]), suffix: cleanStr(m[2]) };
-        }
-
-        function indexByPositionPriority(items) {
-            const map = new Map();
-
-            for (const it of items) {
-                const page = cleanStr(it.page || it.slot_page || it.ad_page || "");
-                const posRaw = cleanStr(it.position || it.slot_position || it.pos || "");
-                if (!page || !posRaw) continue;
-
-                const { base, suffix } = splitPos(posRaw);
-                // ✅ priority를 문자열로 통일 (DB에서 숫자로 오더라도)
-                const pri = String(it.priority ?? it.rank ?? it.order ?? suffix ?? "");
-
-                // ✅ 다양한 키 패턴 저장
-                map.set(`${page}|${posRaw}|${pri}`, it);
-                map.set(`${page}|${base}|${pri}`, it);
-                
-                // ✅ priority 없이도 매칭 (priority=null 또는 1)
-                if (!pri || pri === "null" || pri === "undefined") {
-                    map.set(`${page}|${posRaw}|1`, it);
-                    map.set(`${page}|${base}|1`, it);
-                }
-                
-                console.log(`🗺️ 인덱스 추가: ${page}|${posRaw}|${pri}`, it);
-            }
-
-            return map;
         }
 
         async function hydrateAds() {
@@ -834,42 +831,47 @@
 
             try {
                 const items = await fetchSlotItems(page);
-                console.log("✅ [hydrateAds] 슬롯 데이터 로드:", items.length, "개", items);
-
                 for (const it of items) {
                     if (!it.page && !it.slot_page && !it.ad_page) it.page = page;
                 }
 
                 const map = indexByPositionPriority(items);
-                console.log("✅ [hydrateAds] 매핑된 슬롯:", map.size, "개");
 
                 for (const a of nodes) {
                     const p = cleanStr(a.getAttribute("data-page"));
                     const pos = cleanStr(a.getAttribute("data-position"));
                     const pri = String(a.getAttribute("data-priority") || "1");
 
-                    // ✅ 다양한 키 패턴 시도
-                    const keys = [
-                        `${p}|${pos}|${pri}`,
-                        `${p}|${pos}_${pri}|${pri}`,
-                        `${p}|${pos}_${pri}|1`,
-                        `${p}|${pos}|1`  // priority 기본값
-                    ];
+                    const domPos = splitPos(pos); // DOM 기준 base 추출
+
+                    // ✅ 핵심: priority가 1이 아닌데 |1로 떨어지는 fallback 제거
+                    // - 1) 정확히 (pos, pri)
+                    // - 2) 서버가 pos_pri(=suffix)로 저장 + priority=1 형태일 때를 위해 (pos_pri, 1)
+                    // - 3) DOM pos가 best_1 처럼 suffix인데 서버가 best(=base)로 저장한 경우 (base, pri) / (base,1 only if pri==1)
+                    const keys = [];
+
+                    // exact
+                    keys.push(`${p}|${pos}|${pri}`);
+
+                    // server pos suffix pattern: pos_pri with priority=1
+                    keys.push(`${p}|${pos}_${pri}|1`);
+
+                    // DOM base fallback
+                    if (domPos.base && domPos.base !== pos) {
+                        keys.push(`${p}|${domPos.base}|${pri}`);
+                        if (pri === "1") keys.push(`${p}|${domPos.base}|1`);
+                    }
+
+                    // 마지막으로 pri==1일 때만 안전 fallback
+                    if (pri === "1") keys.push(`${p}|${pos}|1`);
 
                     let ad = null;
                     for (const key of keys) {
                         ad = map.get(key);
-                        if (ad) {
-                            console.log(`✅ 슬롯 [${pos}#${pri}] 매칭 성공: ${key}`, ad);
-                            break;
-                        }
+                        if (ad) break;
                     }
 
-                    if (!ad) {
-                        console.log(`⚠️ 슬롯 [${pos}#${pri}] 데이터 없음 - 시도한 키:`, keys);
-                        continue;
-                    }
-                    
+                    if (!ad) continue;
                     applyItemToCard(a, ad);
                 }
 
