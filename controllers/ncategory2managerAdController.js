@@ -9,7 +9,7 @@ export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
 const SLOTS_TABLE = "public.admin_ad_slots";
 
-// ✅ ncategory2는 combined_store_info 기준(표시용 업종 JOIN)
+// ✅ ncategory2는 combined_store_info 기준
 const STORE_TABLE = "public.combined_store_info";
 
 function ensureUploadDir() {
@@ -42,22 +42,15 @@ function toPublicImageUrl(v) {
   const s = clean(v);
   if (!s) return "";
 
-  // 이미 http(s)면 그대로
   if (/^https?:\/\//i.test(s)) return s;
 
-  // 로컬 절대 경로(/data/uploads/...)면 /uploads로 바꿔야 함
-  // 예: /data/uploads/combined_store/abc.jpg -> /uploads/combined_store/abc.jpg
   if (s.startsWith("/data/uploads/")) {
     return s.replace("/data/uploads/", "/uploads/");
   }
 
-  // /uploads 로 시작하면 OK
   if (s.startsWith("/uploads/")) return s;
-
-  // uploads/ 로 들어오면 앞에 / 붙여줌
   if (s.startsWith("uploads/")) return `/${s}`;
 
-  // 그 외에는 안전하게 /uploads/ 밑으로 붙인다
   return `/uploads/${s.replace(/^\/+/, "")}`;
 }
 
@@ -66,11 +59,9 @@ function normalizeSlotType(slot_type, slot_mode) {
   const st = clean(slot_type).toLowerCase();
   const sm = clean(slot_mode).toLowerCase();
 
-  // 프론트에서 image 라고 보내도 DB는 banner
   if (st === "image") return "banner";
   if (st === "banner" || st === "text") return st;
 
-  // slot_mode 기준으로 추론
   if (sm === "text") return "text";
   return "banner";
 }
@@ -93,6 +84,43 @@ export function fileFilter(_req, file, cb) {
   const ok = /^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.mimetype || "");
   if (!ok) return cb(new Error("Only image files are allowed"));
   cb(null, true);
+}
+
+/** ✅ GET /category-tree : ncategory2 사이드바 카테고리 트리 (DB에서 바로 생성) */
+export async function getCategoryTree(req, res) {
+  try {
+    const sql = `
+      SELECT
+        NULLIF(TRIM(business_category), '') AS category,
+        NULLIF(TRIM(business_subcategory), '') AS subcategory
+      FROM ${STORE_TABLE}
+      WHERE COALESCE(TRIM(business_category), '') <> ''
+      GROUP BY 1,2
+      ORDER BY 1 ASC, 2 ASC
+    `;
+    const { rows } = await pool.query(sql);
+
+    const map = new Map();
+    for (const r of rows) {
+      const cat = clean(r.category);
+      if (!cat) continue;
+      if (!map.has(cat)) map.set(cat, new Set());
+      const sub = clean(r.subcategory);
+      if (sub) map.get(cat).add(sub);
+    }
+
+    const tree = [...map.entries()]
+      .map(([category, set]) => ({
+        category,
+        subcategories: [...set].sort((a, b) => a.localeCompare(b, "ko")),
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category, "ko"));
+
+    return res.json({ success: true, tree });
+  } catch (e) {
+    console.error("❌ [ncategory2/category-tree] error:", e);
+    return res.status(500).json({ success: false, error: e.message || "server error" });
+  }
 }
 
 /** GET /slots?page=ncategory2 */
@@ -153,7 +181,7 @@ export async function getSlot(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
-    const priority = safeIntOrNull(req.query.priority); // "" -> null
+    const priority = safeIntOrNull(req.query.priority);
 
     if (!position) return res.json({ success: true, slot: null });
 
@@ -168,7 +196,6 @@ export async function getSlot(req, res) {
         s.store_id,
         s.table_source,
 
-        -- ✅ 슬롯에 저장된 값이 비어있으면 가게 테이블 값으로 보강
         COALESCE(NULLIF(s.business_name,''), c.business_name, '') AS business_name,
         COALESCE(
           NULLIF(s.business_no,''),
@@ -216,13 +243,12 @@ export async function getSlot(req, res) {
   }
 }
 
-/** ✅ GET /slot-items?page=...&position=... : 프론트가 호출하는 후보 목록 */
+/** ✅ GET /slot-items?page=...&position=... */
 export async function listSlotItems(req, res) {
   try {
     const page = clean(req.query.page) || "ncategory2";
     const position = clean(req.query.position);
 
-    // ✅ position이 없으면 해당 page의 모든 슬롯 반환
     let sql, params;
 
     if (!position) {
@@ -330,8 +356,8 @@ export async function listSlotItems(req, res) {
   }
 }
 
-// -------------------- GET /foodcategorymanager/ad/search-store --------------------
-// ✅ foodcategorymanager는 "store_info"만 조회 + q=__all__ 전체조회 지원
+// -------------------- ✅ GET /ncategory2manager/ad/search-store --------------------
+// ✅ ncategory2manager는 combined_store_info 조회 + q=__all__ 전체조회 지원
 export async function searchStore(req, res) {
   try {
     const qRaw = clean(req.query.q);
@@ -357,41 +383,42 @@ export async function searchStore(req, res) {
           OR COALESCE(s.business_number::text,'') ILIKE $${idx}
           OR COALESCE(s.business_type,'') ILIKE $${idx}
           OR COALESCE(s.business_category,'') ILIKE $${idx}
-          OR COALESCE(s.detail_category,'') ILIKE $${idx}
+          OR COALESCE(s.business_subcategory,'') ILIKE $${idx}
         )
       `);
     }
 
     const where = cond.length ? `WHERE ${cond.join(" AND ")}` : "";
 
-    // ⚠️ store_images 컬럼/정렬 컬럼이 환경마다 다를 수 있어서
-    //    안전하게 id 기준으로 1장만 가져오게 함
     const sql = `
       SELECT
         s.id::text AS id,
-        'store_info' AS table_source,
+        'combined_store_info' AS table_source,
         regexp_replace(COALESCE(s.business_number::text,''), '[^0-9]', '', 'g') AS business_no,
-        s.business_name,
+        COALESCE(s.business_name, '') AS business_name,
+        COALESCE(s.business_type, '') AS business_type,
         COALESCE(s.business_category, '') AS business_category,
-        COALESCE(s.detail_category, '') AS detail_category,
-        COALESCE(img.url, '') AS image_url
-      FROM public.store_info s
-      LEFT JOIN LATERAL (
-        SELECT url
-        FROM public.store_images
-        WHERE store_id::text = s.id::text
-        ORDER BY id DESC
-        LIMIT 1
-      ) img ON TRUE
+        COALESCE(s.business_subcategory, '') AS business_subcategory,
+        COALESCE(s.business_category, '') AS category,
+        COALESCE(s.main_image_url, '') AS image_url
+      FROM ${STORE_TABLE} s
       ${where}
       ORDER BY s.id DESC
       LIMIT 2000;
     `;
 
     const { rows } = await pool.query(sql, params);
-    return res.json({ ok: true, version: "foodcategory-search-store-store_info-only", stores: rows || [] });
+    (rows || []).forEach(r => {
+      r.image_url = toPublicImageUrl(r.image_url);
+    });
+
+    return res.json({
+      ok: true,
+      version: "ncategory2-search-store-combined_store_info",
+      stores: rows || []
+    });
   } catch (e) {
-    console.error("❌ [foodcategorymanager/search-store] error:", e);
+    console.error("❌ [ncategory2manager/search-store] error:", e);
     return res.status(500).json({ ok: false, error: e.message || "server error" });
   }
 }
@@ -403,10 +430,8 @@ export async function upsertSlot(req, res) {
     const position = clean(req.body.position);
     const priority = safeIntOrNull(req.body.priority);
 
-    // ✅ slot_mode 기본값은 image가 안전
     const slot_mode = clean(req.body.slot_mode || req.body.slotMode) || "image";
 
-    // ✅ DB 제약 대응: banner/text만 저장
     const raw_slot_type = clean(req.body.slot_type || req.body.slotType);
     const slot_type = normalizeSlotType(raw_slot_type, slot_mode);
 
@@ -423,12 +448,10 @@ export async function upsertSlot(req, res) {
 
     if (!position) return res.status(400).json({ success: false, error: "position required" });
 
-    // ✅ store 모드인데 store_id 없으면 막기
     if (slot_mode === "store" && !store_id) {
       return res.status(400).json({ success: false, error: "store mode requires store_id" });
     }
 
-    // ✅ store 모드가 아니면 가게 필드는 비움
     if (slot_mode !== "store") {
       store_type = "";
       table_source = "";
@@ -437,7 +460,6 @@ export async function upsertSlot(req, res) {
       business_name = "";
     }
 
-    // ✅ 이미지 처리
     let image_url = clean(req.body.image_url || req.body.imageUrl);
     image_url = image_url ? image_url : null;
 
@@ -498,7 +520,7 @@ export async function upsertSlot(req, res) {
       store_type || null, table_source || null,
       store_id, business_no || null, business_name || null,
       image_url, link_url || null, text_content || null,
-      clearImage, // $14
+      clearImage,
     ];
 
     const { rows } = await pool.query(sql, values);

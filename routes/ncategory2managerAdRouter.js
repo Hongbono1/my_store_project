@@ -42,5 +42,7 @@ router.get("/search-store", searchStore);
 
 router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
 router.delete("/slot", deleteSlot);
+router.get("/category-tree", getCategoryTree);
+
 
 export default router;
