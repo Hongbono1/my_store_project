@@ -19,8 +19,32 @@ const b = (v) => {
   return ["가능", "true", "1", "yes", "on"].includes(t.toLowerCase());
 };
 
-/** 업로드 파일 → 웹경로 */
-const toWeb = (file) => (file?.path ? `/uploads/${path.basename(file.path)}` : null);
+/** ✅ 업로드 파일 → 웹경로 (subdir 보존) */
+const toWeb = (file) => {
+  if (!file?.path) return null;
+
+  // Windows 경로 대응
+  const p = String(file.path).replace(/\\/g, "/");
+
+  // ✅ 프로덕션: /data/uploads/... -> /uploads/...
+  const prodPrefix = "/data/uploads/";
+  const prodIdx = p.lastIndexOf(prodPrefix);
+  if (prodIdx >= 0) {
+    const rel = p.slice(prodIdx + prodPrefix.length);
+    return `/uploads/${rel}`;
+  }
+
+  // ✅ 로컬: .../public2/uploads/... -> /uploads/...
+  const localPrefix = "/public2/uploads/";
+  const localIdx = p.lastIndexOf(localPrefix);
+  if (localIdx >= 0) {
+    const rel = p.slice(localIdx + localPrefix.length);
+    return `/uploads/${rel}`;
+  }
+
+  // fallback: 파일명만
+  return `/uploads/${path.basename(p)}`;
+};
 
 /** 배열화 유틸 */
 const arr = (v) => (Array.isArray(v) ? v : v != null ? [v] : []);
@@ -76,6 +100,7 @@ export async function createCombinedStore(req, res) {
     const businessNumberDigits = pickBusinessNumber(raw); // ✅ digits-only
     console.log("==== [createCombinedStore] incoming ====");
     console.log("businessNumberDigits:", businessNumberDigits);
+    console.log("mainImageIndex:", raw.mainImageIndex);
     console.log("menuName[]:", raw["menuName[]"]);
     console.log("menuPrice[]:", raw["menuPrice[]"]);
     console.log("menuCategory[]:", raw["menuCategory[]"]);
@@ -138,33 +163,33 @@ export async function createCombinedStore(req, res) {
     const certPath = certFile ? toWeb(certFile) : null;
 
     const storeVals = [
-      businessNumberDigits,                 // $1 ✅ digits-only 강제 저장 (필수)
-      s(raw.businessName),                  // $2
-      s(raw.businessType),                  // $3
-      s(raw.mainCategory ?? raw.businessCategory ?? raw.business_category),  // $4
+      businessNumberDigits, // $1
+      s(raw.businessName), // $2
+      s(raw.businessType), // $3
+      s(raw.mainCategory ?? raw.businessCategory ?? raw.business_category), // $4
       s(raw.subCategory ?? raw.detailCategory ?? raw.businessSubcategory ?? raw.business_subcategory), // $5
-      s(raw.businessHours),                 // $6
-      s(raw.deliveryOption),                // $7
-      s(raw.serviceDetails),                // $8
-      s(raw.event1),                        // $9
-      s(raw.event2),                        // $10
-      s(raw.facilities),                    // $11
-      b(raw.petsAllowed),                   // $12
-      s(raw.parking),                       // $13
-      s(raw.phone ?? raw.phoneNumber),      // $14
-      s(raw.homepage),                      // $15
-      s(raw.instagram),                     // $16
-      s(raw.facebook),                      // $17
-      s(raw.additionalDesc),                // $18
-      s(raw.postalCode),                    // $19
-      s(raw.roadAddress),                   // $20
-      s(raw.detailAddress),                 // $21
-      s(raw.ownerName),                     // $22
+      s(raw.businessHours), // $6
+      s(raw.deliveryOption), // $7
+      s(raw.serviceDetails), // $8
+      s(raw.event1), // $9
+      s(raw.event2), // $10
+      s(raw.facilities), // $11
+      b(raw.petsAllowed), // $12
+      s(raw.parking), // $13
+      s(raw.phone ?? raw.phoneNumber), // $14
+      s(raw.homepage), // $15
+      s(raw.instagram), // $16
+      s(raw.facebook), // $17
+      s(raw.additionalDesc), // $18
+      s(raw.postalCode), // $19
+      s(raw.roadAddress), // $20
+      s(raw.detailAddress), // $21
+      s(raw.ownerName), // $22
       raw.birthDate ? new Date(raw.birthDate) : null, // $23
-      s(raw.ownerEmail),                    // $24
+      s(raw.ownerEmail), // $24
       [s(raw.ownerAddress), s(raw.ownerAddressDetail)].filter(Boolean).join(" "), // $25
-      s(raw.ownerPhone),                    // $26
-      certPath                              // $27
+      s(raw.ownerPhone), // $26
+      certPath, // $27
     ];
 
     const storeResult = await client.query(storeSql, storeVals);
@@ -174,12 +199,35 @@ export async function createCombinedStore(req, res) {
     const storeImageFiles = allFiles.filter(
       (f) => f.fieldname === "storeImages" || f.fieldname === "storeImages[]"
     );
-    for (const f of storeImageFiles) {
+
+    // ✅ 프론트 mainImageIndex 반영 (0~2)
+    const rawMainIdx = raw.mainImageIndex ?? raw["mainImageIndex"];
+    let mainIdx = Number.parseInt(String(rawMainIdx ?? "0"), 10);
+    if (!Number.isFinite(mainIdx) || mainIdx < 0) mainIdx = 0;
+
+    const storeImageUrls = [];
+    for (let i = 0; i < storeImageFiles.length; i++) {
+      const f = storeImageFiles[i];
       const url = toWeb(f);
       if (!url) continue;
+
+      storeImageUrls.push(url);
+
+      // ✅ sort_order 저장 (너 schema에 있음)
       await client.query(
-        `INSERT INTO combined_store_images (store_id, url) VALUES ($1, $2)`,
-        [storeId, url]
+        `INSERT INTO combined_store_images (store_id, url, sort_order) VALUES ($1, $2, $3)`,
+        [storeId, url, i]
+      );
+    }
+
+    // ✅ 대표 이미지(main_image_url) 업데이트
+    if (storeImageUrls.length > 0) {
+      if (mainIdx >= storeImageUrls.length) mainIdx = 0;
+      const mainUrl = storeImageUrls[mainIdx] || storeImageUrls[0];
+
+      await client.query(
+        `UPDATE combined_store_info SET main_image_url = $1 WHERE id = $2`,
+        [mainUrl, storeId]
       );
     }
 
@@ -272,7 +320,7 @@ export async function createCombinedStore(req, res) {
   } catch (err) {
     try {
       await client.query("ROLLBACK");
-    } catch { }
+    } catch {}
     console.error("[createCombinedStore] error:", err);
     return res
       .status(500)
@@ -331,6 +379,8 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
       pets_allowed: base.pets_allowed ?? null,
       parking: base.parking ?? "-",
       address: base.address ?? "-",
+      // ✅ 필요하면 대표이미지도 내려줄 수 있음
+      main_image_url: base.main_image_url ?? "",
     };
 
     const { rows: imageRows } = await pool.query({
@@ -338,7 +388,7 @@ export async function getCombinedStoreByBusinessNumber(req, res) {
         SELECT url
         FROM combined_store_images
         WHERE store_id=$1
-        ORDER BY sort_order, id
+        ORDER BY sort_order NULLS LAST, id
       `,
       values: [storeId],
     });
@@ -425,6 +475,7 @@ export async function getCombinedStoreFull(req, res) {
       pets_allowed: base.pets_allowed ?? null,
       parking: base.parking ?? "-",
       address: base.address ?? "-",
+      main_image_url: base.main_image_url ?? "",
     };
 
     const { rows: imageRows } = await pool.query({
@@ -432,7 +483,7 @@ export async function getCombinedStoreFull(req, res) {
         SELECT url
         FROM combined_store_images
         WHERE store_id=$1
-        ORDER BY sort_order, id
+        ORDER BY sort_order NULLS LAST, id
       `,
       values: [storeId],
     });
