@@ -235,7 +235,7 @@ export async function getSlot(req, res) {
        )
       WHERE s.page = $1
         AND s.position = $2
-        AND (s.priority IS NOT DISTINCT FROM $3)
+        AND ($3::int IS NULL OR s.priority IS NOT DISTINCT FROM $3)
       ORDER BY s.position ASC, s.priority ASC NULLS FIRST
       LIMIT 1
     `;
