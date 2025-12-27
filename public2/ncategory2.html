@@ -745,40 +745,14 @@
             return normalizeItems(json);
         }
 
-        function splitPos(pos) {
-            const p = cleanStr(pos);
-            const m = p.match(/^(.*)_([0-9]+)$/);
-            if (!m) return { raw: p, base: p, suffix: "" };
-            return { raw: p, base: cleanStr(m[1]), suffix: cleanStr(m[2]) };
+        function withCacheBust(url) {
+            const u = cleanStr(url);
+            if (!u) return "";
+            const sep = u.includes("?") ? "&" : "?";
+            return `${u}${sep}v=${Date.now()}`;
         }
 
-        function indexByPositionPriority(items) {
-            const map = new Map();
-
-            for (const it of items) {
-                const page = cleanStr(it.page || it.slot_page || it.ad_page || "");
-                const posRaw = cleanStr(it.position || it.slot_position || it.pos || "");
-                if (!page || !posRaw) continue;
-
-                const pri = String(it.priority ?? it.rank ?? it.order ?? "1");
-
-                // ✅ raw만 저장 (base 저장 X)
-                map.set(`${page}|${posRaw}|${pri}`, it);
-            }
-
-            return map;
-        }
-
-        function isOverlayBox(el) {
-            if (!el) return false;
-            try {
-                return window.getComputedStyle(el).position === "absolute";
-            } catch {
-                return false;
-            }
-        }
-
-        // ✅ 슬롯 카드 초기화
+        // ✅ 슬롯 카드 초기화 (네가 이미 있으면 이걸로 통일)
         function resetCard(anchorEl) {
             if (!anchorEl) return;
             const imgEl = anchorEl.querySelector("[data-ad-img]");
@@ -792,10 +766,10 @@
             if (titleEl) titleEl.textContent = "";
             if (catEl) catEl.textContent = "";
 
-            // 오버레이(absolute)만 숨김 (하단 텍스트 영역은 숨기지 않음)
-            if (infoEl && isOverlayBox(infoEl)) infoEl.style.display = "none";
+            if (infoEl) infoEl.style.display = "none";
         }
 
+        // ✅ 카드에 아이템 적용 (네가 이미 있으면 이걸로 통일)
         function applyItemToCard(anchorEl, item) {
             if (!anchorEl) return;
 
@@ -810,22 +784,54 @@
 
             const href =
                 cleanStr(item?.link_url) ||
-                buildStoreLink(item?.store_type || item?.store_table || item?.detail_type, item?.store_id || item?.id);
+                buildStoreLink(
+                    item?.store_type || item?.store_table || item?.detail_type,
+                    item?.store_id || item?.id
+                );
 
             if (href && href !== "#") anchorEl.href = href;
 
             if (imgEl) {
-                imgEl.src = image_url || "/uploads/no-image.png";
+                imgEl.src = image_url ? withCacheBust(image_url) : "/uploads/no-image.png";
             }
 
             if (titleEl) titleEl.textContent = business_name || "";
             if (catEl) catEl.textContent = business_category ? `업종: ${business_category}` : "";
 
-            // 오버레이면: 내용 있을 때만 표시
-            if (infoEl && isOverlayBox(infoEl)) {
+            if (infoEl) {
                 if (business_name || business_category) infoEl.style.display = "";
                 else infoEl.style.display = "none";
             }
+        }
+
+        // ✅ 핵심: page|position 정확 매칭 인덱스
+        function indexByPagePosition(items) {
+            const map = new Map();
+            for (const it of items) {
+                const page = cleanStr(it.page || it.slot_page || it.ad_page || "");
+                const pos = cleanStr(it.position || it.slot_position || it.pos || "");
+                if (!page || !pos) continue;
+                map.set(`${page}|${pos}`, it);
+            }
+            return map;
+        }
+
+        // ✅ DOM(포지션/프라이어리티) → 서버 포지션 보정
+        // - best_1, bottom_2 처럼 DOM에 suffix 포함이면 그대로 사용
+        // - power처럼 DOM이 base(ncategory2_power) + priority(2..9)이면 suffix 붙여서 ncategory2_power_2 로 매칭
+        function normalizeDomToServerPosition(domPos, domPri) {
+            const pos = cleanStr(domPos);
+            const pri = cleanStr(domPri || "1");
+            if (!pos) return "";
+
+            // 이미 suffix 포함 (best_1, bottom_2 등)
+            if (/_\d+$/.test(pos)) return pos;
+
+            // power 전용: priority가 1이 아니면 suffix 붙임
+            if (pri && pri !== "1") return `${pos}_${pri}`;
+
+            // premium/mvp/highlight/sidebar_ad 등은 그대로
+            return pos;
         }
 
         async function hydrateAds() {
@@ -833,35 +839,34 @@
             const nodes = Array.from(document.querySelectorAll("[data-ad-slot]"));
             if (!nodes.length) return;
 
-            // ✅ 먼저 전부 리셋
+            // 전부 초기화
             nodes.forEach(resetCard);
 
             try {
                 const items = await fetchSlotItems(page);
+
+                // 혹시 page 누락 아이템 대비
                 for (const it of items) {
                     if (!it.page && !it.slot_page && !it.ad_page) it.page = page;
                 }
 
-                const map = indexByPositionPriority(items);
+                const map = indexByPagePosition(items);
 
                 for (const a of nodes) {
                     const p = cleanStr(a.getAttribute("data-page"));
-                    const pos = cleanStr(a.getAttribute("data-position"));
-                    const pri = String(a.getAttribute("data-priority") || "1");
+                    const domPos = cleanStr(a.getAttribute("data-position"));
+                    const domPri = cleanStr(a.getAttribute("data-priority") || "1");
 
-                    // ✅ 가장 안전: 정확히 이 키만 본다
-                    const key = `${p}|${pos}|${pri}`;
-                    let ad = map.get(key);
+                    const serverPos = normalizeDomToServerPosition(domPos, domPri);
+                    const key = `${p}|${serverPos}`;
 
-                    // (선택) 혹시 DB가 pos_1 형태로 저장되는 레거시가 있으면 이것만 추가
-                    if (!ad) ad = map.get(`${p}|${pos}_${pri}|1`);
-
+                    const ad = map.get(key);
                     if (!ad) continue;
+
                     applyItemToCard(a, ad);
                 }
-
             } catch (err) {
-                console.error("❌ [hydrateAds] category slot hydrate 실패:", err?.message || err);
+                console.error("❌ [hydrateAds] slot hydrate 실패:", err?.message || err);
             }
         }
 
