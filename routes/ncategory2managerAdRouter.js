@@ -8,6 +8,7 @@ import {
   upsertSlot,
   deleteSlot,
   searchStore,
+  getCategoryTree,
   makeMulterStorage,
   fileFilter,
 } from "../controllers/ncategory2managerAdController.js";
