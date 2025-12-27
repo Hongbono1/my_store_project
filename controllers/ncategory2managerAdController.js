@@ -128,10 +128,10 @@ export async function getCategoryTree(req, res) {
       }))
       .sort((a, b) => a.category.localeCompare(b.category, "ko"));
 
-    return res.json({ success: true, tree });
+    return res.json({ ok: true, success: true, tree });
   } catch (e) {
     console.error("❌ [ncategory2/category-tree] error:", e);
-    return res.status(500).json({ success: false, error: e.message || "server error" });
+    return res.status(500).json({ ok: false, success: false, error: e.message || "server error" });
   }
 }
 
@@ -182,9 +182,9 @@ export async function listSlots(req, res) {
     rows.forEach(r => {
       r.image_url = toPublicImageUrl(r.image_url);
     });
-    return res.json({ success: true, slots: rows });
+    return res.json({ ok: true, success: true, slots: rows });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ ok: false, success: false, error: e.message });
   }
 }
 
@@ -195,7 +195,7 @@ export async function getSlot(req, res) {
     const position = clean(req.query.position);
     const priority = safeIntOrNull(req.query.priority);
 
-    if (!position) return res.json({ success: true, slot: null });
+    if (!position) return res.json({ ok: true, success: true, slot: null });
 
     const sql = `
       SELECT
@@ -249,9 +249,9 @@ export async function getSlot(req, res) {
     if (slot) {
       slot.image_url = toPublicImageUrl(slot.image_url);
     }
-    return res.json({ success: true, slot });
+    return res.json({ ok: true, success: true, slot });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ ok: false, success: false, error: e.message });
   }
 }
 
@@ -362,9 +362,9 @@ export async function listSlotItems(req, res) {
     rows.forEach(r => {
       r.image_url = toPublicImageUrl(r.image_url);
     });
-    return res.json({ success: true, items: rows });
+    return res.json({ ok: true, success: true, items: rows });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ ok: false, success: false, error: e.message });
   }
 }
 
@@ -426,12 +426,13 @@ export async function searchStore(req, res) {
 
     return res.json({
       ok: true,
+      success: true,
       version: "ncategory2-search-store-combined_store_info",
       stores: rows || []
     });
   } catch (e) {
     console.error("❌ [ncategory2manager/search-store] error:", e);
-    return res.status(500).json({ ok: false, error: e.message || "server error" });
+    return res.status(500).json({ ok: false, success: false, error: e.message || "server error" });
   }
 }
 
@@ -458,10 +459,10 @@ export async function upsertSlot(req, res) {
 
     const clearImage = toBool(req.body.clearImage || req.body.clear_image);
 
-    if (!position) return res.status(400).json({ success: false, error: "position required" });
+    if (!position) return res.status(400).json({ ok: false, success: false, error: "position required" });
 
     if (slot_mode === "store" && !store_id) {
-      return res.status(400).json({ success: false, error: "store mode requires store_id" });
+      return res.status(400).json({ ok: false, success: false, error: "store mode requires store_id" });
     }
 
     if (slot_mode !== "store") {
@@ -536,9 +537,9 @@ export async function upsertSlot(req, res) {
     ];
 
     const { rows } = await pool.query(sql, values);
-    return res.json({ success: true, slot: rows[0] || null });
+    return res.json({ ok: true, success: true, slot: rows[0] || null });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ ok: false, success: false, error: e.message });
   }
 }
 
@@ -549,7 +550,7 @@ export async function deleteSlot(req, res) {
     const position = clean(req.query.position);
     const priority = safeIntOrNull(req.query.priority);
 
-    if (!position) return res.status(400).json({ success: false, error: "position required" });
+    if (!position) return res.status(400).json({ ok: false, success: false, error: "position required" });
 
     const sql = `
       DELETE FROM ${SLOTS_TABLE}
@@ -559,8 +560,8 @@ export async function deleteSlot(req, res) {
     `;
     await pool.query(sql, [page, position, priority]);
 
-    return res.json({ success: true });
+    return res.json({ ok: true, success: true });
   } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ ok: false, success: false, error: e.message });
   }
 }
