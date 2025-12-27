@@ -707,12 +707,12 @@
                 cleanStr(item.link_url) ||
                 buildStoreLink(item.store_type || item.store_table || item.detail_type, item.store_id || item.id);
 
-            console.log("🎴 카드 적용:", { 
-                position: anchorEl.getAttribute("data-position"), 
+            console.log("🎴 카드 적용:", {
+                position: anchorEl.getAttribute("data-position"),
                 priority: anchorEl.getAttribute("data-priority"),
-                image_url, 
-                business_name, 
-                item 
+                image_url,
+                business_name,
+                item
             });
 
             if (href && href !== "#") anchorEl.href = href;
@@ -731,13 +731,50 @@
 
         function indexByPositionPriority(items) {
             const map = new Map();
-            for (const it of items) {
-                const page = cleanStr(it.page || it.slot_page || it.ad_page || "");
-                const position = cleanStr(it.position || it.slot_position || it.pos || "");
-                const priority = cleanStr(it.priority ?? it.rank ?? it.order ?? "");
-                const key = `${page}|${position}|${priority}`;
-                map.set(key, it);
+
+            // ✅ position 별칭(프론트 자리명 ↔ DB 자리명)
+            const POSITION_ALIASES = {
+                // DB: ncategory2_premium  → 프론트: ncategory2_highlight 자리로도 꽂기
+                "ncategory2_premium": ["ncategory2_highlight"],
+                // (필요하면 반대도 추가 가능)
+                "ncategory2_highlight": ["ncategory2_premium"],
+            };
+
+            function put(page, pos, pr, it) {
+                const key = `${page}|${pos}|${pr}`;
+                if (!map.has(key)) map.set(key, it);
             }
+
+            for (const it of items) {
+                const page = cleanStr(it.page || it.slot_page || it.ad_page || "ncategory2");
+                const positionRaw = cleanStr(it.position || it.slot_position || it.pos || "");
+                const priorityRaw = cleanStr(it.priority ?? it.rank ?? it.order ?? "");
+
+                if (!positionRaw) continue;
+
+                // 1) 원본 키
+                put(page, positionRaw, priorityRaw, it);
+
+                // 2) _숫자 패턴이면 base + 숫자(priority)로도 매칭되게
+                //    예: ncategory2_power_7  → ncategory2_power + 7
+                const m = positionRaw.match(/^(.*)_(\d+)$/);
+                if (m) {
+                    const base = m[1];
+                    const num = m[2];
+                    put(page, base, num, it);
+                }
+
+                // 3) premium ↔ highlight 같은 별칭도 같이 매칭되게
+                const aliases = POSITION_ALIASES[positionRaw] || [];
+                for (const aliasPos of aliases) {
+                    put(page, aliasPos, priorityRaw, it);
+
+                    // aliasPos도 _숫자 패턴이면 동일 처리(안전)
+                    const m2 = aliasPos.match(/^(.*)_(\d+)$/);
+                    if (m2) put(page, m2[1], m2[2], it);
+                }
+            }
+
             return map;
         }
 
