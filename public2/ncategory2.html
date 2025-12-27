@@ -447,7 +447,6 @@
 
             <!-- ✅ 하단 박스 두 개 (광고 슬롯 연결) -->
             <div class="grid grid-cols-2 gap-6">
-                <!-- 하단 박스 1 : DB(ncategory2_bottom_1, priority=1) 매칭 -->
                 <a href="#" class="neo-card p-0 overflow-hidden relative rounded-2xl block" data-ad-slot
                     data-page="ncategory2" data-position="ncategory2_bottom" data-priority="1">
                     <img src="/uploads/no-image.png" alt="하단 박스 1" class="w-full h-32 object-cover" data-ad-img>
@@ -457,7 +456,6 @@
                     </div>
                 </a>
 
-                <!-- 하단 박스 2 : (현재 DB에 ncategory2_bottom_2가 없으면 샘플 그대로 유지됨) -->
                 <a href="#" class="neo-card p-0 overflow-hidden relative rounded-2xl block" data-ad-slot
                     data-page="ncategory2" data-position="ncategory2_bottom" data-priority="2">
                     <img src="/uploads/no-image.png" alt="하단 박스 2" class="w-full h-32 object-cover" data-ad-img>
@@ -470,7 +468,6 @@
 
             <!-- 오른쪽 하단 세로 네비게이션 -->
             <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
-
                 <div class="flex flex-col items-center">
                     <button onclick="goBack()"
                         class="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 shadow hover:from-gray-200 hover:to-gray-300 transition">
@@ -514,19 +511,12 @@
             .then(r => r.text())
             .then(d => document.getElementById("footer-placeholder").innerHTML = d);
 
-        // ✅ 서브카테고리 토글
-        function toggleSub(btn) {
-            const ul = btn.nextElementSibling;
-            if (!ul) return;
-            ul.classList.toggle("hidden");
-        }
-
         // ✅ 모든 이미지에 onerror 핸들러 추가 (404 에러 방지)
         document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll("img").forEach(img => {
                 if (!img.onerror) {
                     img.onerror = function () {
-                        this.onerror = null; // 무한 루프 방지
+                        this.onerror = null;
                         this.src = "/uploads/no-image.png";
                     };
                 }
@@ -535,14 +525,17 @@
 
         // =========================================================
         // ✅ (푸드 아님) 카테고리 페이지 슬롯 연결 로직
-        //    - 기존 샘플 카드 유지(연결 실패 시 그대로)
-        //    - ncategory2 쪽(통합가게) 라우터 기준으로 기본값 설정
         // =========================================================
-        const AD_API_BASE = "/ncategory2manager/ad"; // 필요 시 너 라우터에 맞게 변경
+        const AD_API_BASE = "/ncategory2manager/ad";
+
+        function cleanStr(v) {
+            if (v === undefined || v === null) return "";
+            return String(v).trim();
+        }
 
         // ===============================
-        // ✅ 사이드바 카테고리 동적 생성
-        // - 기존 search-store?q=__all__ API 사용 (서버 수정 없음)
+        // ✅ 사이드바 카테고리 동적 생성 (DB에서 생성)
+        // ✅ 개선: 서브카테고리 없는 항목은 "바로 링크"(2번 클릭 제거)
         // ===============================
         async function fetchCategoryTreeFromStores() {
             const url = `${AD_API_BASE}/search-store?q=__all__`;
@@ -550,10 +543,9 @@
             if (!res.ok) throw new Error(`category HTTP ${res.status}`);
 
             const json = await res.json();
-            const stores = json.stores || json.items || json.rows || [];
+            const stores = json.stores || json.items || json.rows || json.data || [];
 
-            // category -> Set(subcategory)
-            const map = new Map();
+            const map = new Map(); // category -> Set(subcategory)
 
             for (const s of stores) {
                 const cat = cleanStr(s.business_category || s.category);
@@ -565,7 +557,7 @@
                 if (sub) map.get(cat).add(sub);
             }
 
-            // 정렬해서 반환
+            // ✅ 기본은 정렬 유지(원하면 정렬 빼도 됨)
             const list = [...map.entries()]
                 .map(([category, set]) => ({
                     category,
@@ -577,8 +569,6 @@
         }
 
         function buildSubcategoryLink(category, subcategory) {
-            // ✅ 여기 링크 규칙은 subcategory.html 로직에 맞춰서 쓰면 됨
-            // 지금은 표준 형태로: type=combined, category/subcategory 전달
             const c = encodeURIComponent(category);
             const s = subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : "";
             return `/subcategory.html?type=combined&category=${c}${s}`;
@@ -600,38 +590,49 @@
                 const subs = item.subcategories || [];
 
                 const li = document.createElement("li");
-                li.className = "mb-5";
+                li.className = "mb-2";
 
-                // 토글 버튼(서브 있으면 펼춨)
-                const btn = document.createElement("button");
-                btn.className =
-                    "w-full text-left px-4 py-2 neo-card flex justify-between items-center font-bold text-lg";
-                btn.innerHTML = `
-                      <span class="truncate">${cat}</span>
-                      <span class="shrink-0">▼</span>
-                    `;
-
-                // 서브 리스트
-                const ul = document.createElement("ul");
-                ul.className = "ml-4 mt-2 space-y-3 hidden";
-
-                if (subs.length) {
-                    for (const sub of subs) {
-                        const a = document.createElement("a");
-                        a.href = buildSubcategoryLink(cat, sub);
-                        a.className = "block px-3 py-2 neo-card text-center";
-                        a.textContent = sub;
-                        const subLi = document.createElement("li");
-                        subLi.appendChild(a);
-                        ul.appendChild(subLi);
-                    }
-                } else {
-                    // 서브카테고리 없는 업종은 "전체"로 연결
+                // ✅ 서브카테고리 없으면: 바로 링크 (푸드 느낌)
+                if (!subs.length) {
                     const a = document.createElement("a");
                     a.href = buildSubcategoryLink(cat, "");
-                    a.className = "block px-3 py-2 neo-card text-center";
-                    a.textContent = "전체";
+                    a.className = "block w-full text-left px-4 py-2 neo-card font-bold text-lg";
+                    a.textContent = cat;
+                    li.appendChild(a);
+                    listEl.appendChild(li);
+                    continue;
+                }
+
+                // ✅ 서브카테고리 있으면: 토글
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "w-full text-left px-4 py-2 neo-card flex justify-between items-center font-bold text-lg";
+                btn.innerHTML = `
+                    <span class="truncate">${cat}</span>
+                    <span class="shrink-0 select-none">▼</span>
+                `;
+
+                const ul = document.createElement("ul");
+                ul.className = "ml-4 mt-2 space-y-2 hidden";
+
+                // ✅ 첫 줄: 전체(카테고리 전체 보기)
+                {
                     const subLi = document.createElement("li");
+                    const a = document.createElement("a");
+                    a.href = buildSubcategoryLink(cat, "");
+                    a.className = "block px-3 py-2 neo-card text-center text-sm";
+                    a.textContent = "전체";
+                    subLi.appendChild(a);
+                    ul.appendChild(subLi);
+                }
+
+                // ✅ 나머지: 서브카테고리
+                for (const sub of subs) {
+                    const subLi = document.createElement("li");
+                    const a = document.createElement("a");
+                    a.href = buildSubcategoryLink(cat, sub);
+                    a.className = "block px-3 py-2 neo-card text-center text-sm";
+                    a.textContent = sub;
                     subLi.appendChild(a);
                     ul.appendChild(subLi);
                 }
@@ -659,28 +660,18 @@
             }
         }
 
-        function cleanStr(v) {
-            if (v === undefined || v === null) return "";
-            return String(v).trim();
-        }
-
         function buildStoreLink(store_type, store_id) {
             const t = cleanStr(store_type);
             const id = cleanStr(store_id);
             if (!id) return "#";
 
-            // ✅ 통합 가게 상세 페이지(너가 쓰는 ndetail 기준)
-            // store_type 값이 "combined" / "combined_store_info" / "combined_store" 등으로 와도 대응
             if (t.includes("combined")) return `/ndetail.html?id=${encodeURIComponent(id)}&type=combined`;
             if (t === "store_info") return `/ndetail.html?id=${encodeURIComponent(id)}&type=store_info`;
-
-            // 그 외는 일단 type 없이(필요하면 여기에 매핑 추가)
             return `/ndetail.html?id=${encodeURIComponent(id)}`;
         }
 
         function normalizeItems(payload) {
             if (!payload) return [];
-            // 가능한 케이스들 전부 흡수
             const arr =
                 payload.items ||
                 payload.rows ||
@@ -692,7 +683,6 @@
         }
 
         async function fetchSlotItems(page) {
-            // 1순위: slot-items로 한번에 받기
             const url = `${AD_API_BASE}/slot-items?page=${encodeURIComponent(page)}`;
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) throw new Error(`slot-items HTTP ${res.status}`);
@@ -712,7 +702,6 @@
             const business_name = cleanStr(item.business_name || item.store_name || item.title || item.text_content);
             const business_category = cleanStr(item.business_category || item.category || item.store_category);
 
-            // 링크 우선순위: link_url > store_type+store_id 조합
             const href =
                 cleanStr(item.link_url) ||
                 buildStoreLink(item.store_type || item.store_table || item.detail_type, item.store_id || item.id);
@@ -738,24 +727,17 @@
 
         async function hydrateAds() {
             const page = "ncategory2";
-
-            // DOM에 박혀있는 슬롯 카드들
             const nodes = Array.from(document.querySelectorAll("[data-ad-slot]"));
-            console.log(`🔍 [hydrateAds] 슬롯 카드 ${nodes.length}개 발견`);
             if (!nodes.length) return;
 
             try {
                 const items = await fetchSlotItems(page);
-                console.log(`📦 [hydrateAds] API 응답: ${items.length}개 광고 데이터`, items);
 
-                // page 값이 없고 position/priority만 오는 케이스도 많아서 보정
-                // (page가 비어있으면 여기서 강제로 page=ncategory2로 취급)
                 for (const it of items) {
                     if (!it.page && !it.slot_page && !it.ad_page) it.page = page;
                 }
 
                 const map = indexByPositionPriority(items);
-                console.log(`🗺️ [hydrateAds] 매핑된 광고:`, map);
 
                 for (const a of nodes) {
                     const p = cleanStr(a.getAttribute("data-page"));
@@ -770,27 +752,12 @@
                         ad = map.get(key2);
                     }
 
-                    if (!ad) continue; // 없는 슬롯은 스킵(기본 카드 유지)
-
+                    if (!ad) continue;
                     applyItemToCard(a, ad);
-                }
-
-                // 파워 슬라이더는 이미지 변경 후 리사이즈 한번
-                const viewport = document.getElementById("powerViewport");
-                const track = document.getElementById("powerAdTrack");
-                if (viewport && track) {
-                    const slideWidth = viewport.clientWidth;
-                    // 현재 transform이 있으면 유지하면서 "정렬"만 다시
-                    // (강제로 0으로 보내면 랜덤 시작이 깨질 수 있어서 여기선 건드리지 않음)
-                    // 대신 레이아웃 계산만 유도
-                    track.style.willChange = "transform";
-                    track.getBoundingClientRect();
-                    track.style.willChange = "transform";
                 }
 
             } catch (err) {
                 console.error("❌ [hydrateAds] category slot hydrate 실패:", err?.message || err);
-                // 실패해도 샘플 카드 그대로 유지(요구사항)
             }
         }
 
@@ -802,15 +769,11 @@
             const track = document.getElementById("powerAdTrack");
             if (!viewport || !track) return;
 
-            // ✅ 먼저 슬롯 연결 시도(샘플 유지 + 덮어쓰기 방식)
             hydrateAds();
-
-            // ✅ 사이드바 카테고리 동적 생성
             initDynamicSidebar();
 
             let groups = track.querySelectorAll(".power-group").length;
             let index = Math.floor(Math.random() * groups);
-            console.log(`🎲 파워 슬라이더 랜덤 시작: ${index + 1}번째 그룹`);
 
             let dir = 1;
 
@@ -866,9 +829,7 @@
             updateSlider();
             startAuto();
         });
-    </script>
 
-    <script>
         function goBack() {
             if (document.referrer && document.referrer !== location.href) {
                 window.history.back();
