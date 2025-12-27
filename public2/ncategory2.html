@@ -731,7 +731,10 @@
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) throw new Error(`slot-items HTTP ${res.status}`);
             const json = await res.json();
-            if (json && json.success === false) throw new Error(json.error || "slot-items fail");
+            // ✅ ok 또는 success 체크
+            if (json && (json.ok === false || json.success === false)) {
+                throw new Error(json.error || "slot-items fail");
+            }
             return normalizeItems(json);
         }
 
@@ -754,20 +757,20 @@
         }
 
         function applyItemToCard(anchorEl, item) {
-            if (!anchorEl || !item) return;
+            if (!anchorEl) return;
 
             const imgEl = anchorEl.querySelector("[data-ad-img]");
             const titleEl = anchorEl.querySelector("[data-ad-title]");
             const catEl = anchorEl.querySelector("[data-ad-cat]");
             const infoEl = (titleEl && titleEl.parentElement) || (catEl && catEl.parentElement);
 
-            const image_url = cleanStr(item.image_url || item.image || item.img_url);
-            const business_name = cleanStr(item.business_name || item.store_name || item.title || item.text_content);
-            const business_category = cleanStr(item.business_category || item.category || item.store_category);
+            const image_url = cleanStr(item?.image_url || item?.image || item?.img_url);
+            const business_name = cleanStr(item?.business_name || item?.store_name || item?.title || item?.text_content);
+            const business_category = cleanStr(item?.business_category || item?.category || item?.store_category);
 
             const href =
-                cleanStr(item.link_url) ||
-                buildStoreLink(item.store_type || item.store_table || item.detail_type, item.store_id || item.id);
+                cleanStr(item?.link_url) ||
+                buildStoreLink(item?.store_type || item?.store_table || item?.detail_type, item?.store_id || item?.id);
 
             if (href && href !== "#") anchorEl.href = href;
 
@@ -821,12 +824,14 @@
 
             try {
                 const items = await fetchSlotItems(page);
+                console.log("✅ [hydrateAds] 슬롯 데이터 로드:", items.length, "개", items);
 
                 for (const it of items) {
                     if (!it.page && !it.slot_page && !it.ad_page) it.page = page;
                 }
 
                 const map = indexByPositionPriority(items);
+                console.log("✅ [hydrateAds] 매핑된 슬롯:", map.size, "개");
 
                 for (const a of nodes) {
                     const p = cleanStr(a.getAttribute("data-page"));
@@ -840,6 +845,8 @@
                         const key2 = `${p}|${pos}_${pri}|1`;
                         ad = map.get(key2);
                     }
+
+                    console.log(`🎯 슬롯 [${pos}#${pri}] → ${ad ? '데이터 있음' : '데이터 없음'}`, ad);
 
                     if (!ad) continue;
                     applyItemToCard(a, ad);
