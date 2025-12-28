@@ -129,8 +129,8 @@ initPerformingArtsTables();
 // ------------------------------------------------------------
 // ✅ Windows 로컬 개발: public2/uploads, 프로덕션: /data/uploads
 const isProduction = process.env.NODE_ENV === "production";
-const UPLOAD_ROOT = isProduction 
-  ? "/data/uploads" 
+const UPLOAD_ROOT = isProduction
+  ? "/data/uploads"
   : path.join(__dirname, "public2/uploads");
 
 const uploadDirs = [
@@ -357,6 +357,39 @@ app.use("/upload", uploadRouter);
 
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
+
+// ✅ [A 방식] 통합(combined) 서브카테고리 조회 API 추가
+// 예) /api/subcategory/combined?category=반려동물
+app.get("/api/subcategory/combined", async (req, res) => {
+  try {
+    const category = (req.query.category || "").toString().trim();
+    if (!category) return res.json({ success: true, stores: [] });
+
+    const sql = `
+      SELECT
+        id,
+        business_no,
+        business_name,
+        business_type,
+        business_category,
+        business_subcategory,
+        COALESCE(NULLIF(image_url,''), NULLIF(main_image_url,''), '') AS image_url,
+        created_at,
+        click_count
+      FROM public.combined_store_info
+      WHERE TRIM(business_category) = TRIM($1)
+      ORDER BY id DESC
+    `;
+
+    const { rows } = await pool.query(sql, [category]);
+
+    // 프론트가 json.stores를 기대하니까 stores로 내려줌
+    return res.json({ success: true, stores: rows });
+  } catch (err) {
+    console.error("❌ /api/subcategory/combined error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
 
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
