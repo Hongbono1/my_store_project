@@ -126,10 +126,23 @@
 
                 <!-- 선택 정보 -->
                 <div class="mt-4 flex flex-wrap gap-2 text-sm">
-                    <!-- ✅ (추가) 현재 모드 표시 -->
-                    <div class="chip px-3 py-1.5">
+                    <!-- ✅ 모드 토글 (칩 버튼) -->
+                    <div class="chip px-3 py-1.5 flex items-center gap-2">
                         <span class="text-gray-500">모드:</span>
-                        <span id="currentMode" class="font-semibold text-gray-800 ml-1">통합</span>
+
+                        <button id="modeCombinedBtn" type="button"
+                            class="chip px-3 py-1 text-xs font-extrabold text-gray-800">
+                            통합
+                        </button>
+
+                        <button id="modeFoodBtn" type="button"
+                            class="chip px-3 py-1 text-xs font-extrabold text-gray-800">
+                            푸드
+                        </button>
+
+                        <!-- (표시용) 현재 모드 텍스트 유지 -->
+                        <span class="text-gray-400 ml-1 text-xs">현재:</span>
+                        <span id="currentMode" class="font-semibold text-gray-800 text-xs">통합</span>
                     </div>
 
                     <div class="chip px-3 py-1.5">
@@ -194,9 +207,10 @@
         // =========================
         async function loadLayoutPart(id, url) {
             try {
+                const el = document.getElementById(id);
+                if (!el) return;
                 const res = await fetch(url, { cache: "no-store" });
-                const html = await res.text();
-                document.getElementById(id).innerHTML = html;
+                el.innerHTML = await res.text();
             } catch (e) {
                 console.error("layout load fail:", url, e);
             }
@@ -204,12 +218,18 @@
         loadLayoutPart("header-placeholder", "/components/header.html");
         loadLayoutPart("footer-placeholder", "/components/footer.html");
 
-        // ✅ 더보기 12개
+        // ✅ 요구사항: 더보기 12개
         const PAGE_SIZE = 12;
+
+        // ✅ 통합/푸드 API
+        const API_BY_MODE = {
+            combined: "/api/subcategory/combined",
+            food: "/api/subcategory/food"
+        };
 
         // 상태
         const state = {
-            mode: "combined",          // ✅ (추가) 현재 모드 저장
+            mode: "combined",
             category: "",
             subcategory: "전체",
             raw: [],
@@ -223,7 +243,7 @@
         // DOM
         const $pageTitle = document.getElementById("pageTitle");
         const $pageDesc = document.getElementById("pageDesc");
-        const $currentMode = document.getElementById("currentMode"); // ✅ (추가)
+        const $currentMode = document.getElementById("currentMode");
         const $currentCategory = document.getElementById("currentCategory");
         const $currentSubcategory = document.getElementById("currentSubcategory");
         const $countInfo = document.getElementById("countInfo");
@@ -236,6 +256,10 @@
         const $searchInput = document.getElementById("searchInput");
         const $sortSelect = document.getElementById("sortSelect");
         const $resetBtn = document.getElementById("resetBtn");
+
+        // ✅ 모드 토글 버튼 DOM
+        const $modeCombinedBtn = document.getElementById("modeCombinedBtn");
+        const $modeFoodBtn = document.getElementById("modeFoodBtn");
 
         // 유틸
         function qs(name) { return new URLSearchParams(location.search).get(name) || ""; }
@@ -261,9 +285,31 @@
             return (mode === "food") ? "푸드" : "통합";
         }
 
+        // ✅ 쿼리 유지한 채 mode만 바꿔서 이동
+        function goMode(nextMode) {
+            const params = new URLSearchParams(location.search);
+            params.set("mode", nextMode);
+            // category, sub 등 나머지는 그대로 유지
+            location.href = `${location.pathname}?${params.toString()}`;
+        }
+
+        // ✅ 모드 토글 UI 활성화 표시
+        function paintModeButtons() {
+            if (!$modeCombinedBtn || !$modeFoodBtn) return;
+
+            $modeCombinedBtn.classList.remove("chip-active");
+            $modeFoodBtn.classList.remove("chip-active");
+
+            if (state.mode === "food") {
+                $modeFoodBtn.classList.add("chip-active");
+            } else {
+                $modeCombinedBtn.classList.add("chip-active");
+            }
+        }
+
         // 데이터 로드
         async function fetchStores() {
-            // ✅ (추가) mode/category 읽고 상태 초기화
+            // mode/category 읽고 상태 초기화
             const mode = (qs("mode") || "combined").toLowerCase() === "food" ? "food" : "combined";
             state.mode = mode;
 
@@ -275,25 +321,19 @@
             $searchInput.value = "";
             $sortSelect.value = "nameAsc";
 
-            // category는 쿼리로 받음
             const category = qs("category") || qs("cat") || "";
             state.category = category;
 
-            // 화면 표시
             const titleCategory = category ? category : "카테고리 미지정";
             $currentMode.textContent = modeLabel(state.mode);
+            paintModeButtons();
+
             $pageTitle.textContent = `서브카테고리 매니저 · ${modeLabel(state.mode)} · ${titleCategory}`;
             $pageDesc.textContent = "더보기 클릭 시 12개씩 추가 표시됩니다.";
             $currentCategory.textContent = titleCategory;
 
-            // ✅ 통합/푸드 API 분기
-            const baseApi = (state.mode === "food")
-                ? "/api/subcategory/food"
-                : "/api/subcategory/combined";
-
-            const url = category
-                ? `${baseApi}?category=${encodeURIComponent(category)}`
-                : `${baseApi}`;
+            const baseApi = (state.mode === "food") ? API_BY_MODE.food : API_BY_MODE.combined;
+            const url = category ? `${baseApi}?category=${encodeURIComponent(category)}` : `${baseApi}`;
 
             try {
                 $skeletonWrap.classList.remove("hidden");
@@ -306,7 +346,7 @@
 
                 state.raw = (data && data.success === true && Array.isArray(data.stores)) ? data.stores : [];
 
-                // 서브카테고리 목록 구성
+                // 서브카테고리 목록
                 const subSet = new Set();
                 for (const s of state.raw) {
                     const sub = normalizeKey(getStoreSub(s));
@@ -314,18 +354,17 @@
                 }
                 state.subs = ["전체", ...Array.from(subSet).sort((a, b) => a.localeCompare(b, "ko"))];
 
-                // 초기 서브(쿼리 지정 가능)
                 const initSub = qs("subcategory") || qs("sub") || "";
                 if (initSub && state.subs.includes(initSub)) state.subcategory = initSub;
 
                 buildSubcategoryChips();
-                applyFilterAndRender(true);
+                applyFilterAndRender();
             } catch (e) {
                 console.error("fetchStores fail:", e);
                 state.raw = [];
                 state.subs = ["전체"];
                 buildSubcategoryChips();
-                applyFilterAndRender(true);
+                applyFilterAndRender();
             } finally {
                 $skeletonWrap.classList.add("hidden");
             }
@@ -343,9 +382,9 @@
 
                 btn.addEventListener("click", () => {
                     state.subcategory = sub;
-                    state.visibleCount = PAGE_SIZE; // ✅ 서브 바꾸면 다시 12개부터
+                    state.visibleCount = PAGE_SIZE;
                     buildSubcategoryChips();
-                    applyFilterAndRender(true);
+                    applyFilterAndRender();
                 });
 
                 $subcategoryChips.appendChild(btn);
@@ -420,7 +459,9 @@
                     im.alt = name;
                     im.className = "w-full h-full object-cover";
                     im.loading = "lazy";
-                    im.onerror = () => { imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`; };
+                    im.onerror = () => {
+                        imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
+                    };
                     imgWrap.appendChild(im);
                 } else {
                     imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
@@ -454,7 +495,7 @@
 
         // 이벤트
         $loadMoreBtn.addEventListener("click", () => {
-            state.visibleCount += PAGE_SIZE; // ✅ 12개씩
+            state.visibleCount += PAGE_SIZE;
             applyFilterAndRender();
         });
 
@@ -481,9 +522,14 @@
             applyFilterAndRender();
         });
 
+        // ✅ 모드 토글 이벤트
+        if ($modeCombinedBtn) $modeCombinedBtn.addEventListener("click", () => goMode("combined"));
+        if ($modeFoodBtn) $modeFoodBtn.addEventListener("click", () => goMode("food"));
+
         // 시작
         fetchStores();
     </script>
+
 </body>
 
 </html>
