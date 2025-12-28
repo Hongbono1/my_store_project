@@ -11,6 +11,7 @@
 <body class="bg-white text-gray-800 min-h-screen flex flex-col">
     <div id="header-placeholder"></div>
 
+    <!-- HERO -->
     <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
         <div class="flex-1 flex justify-center">
             <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
@@ -22,10 +23,12 @@
         </div>
     </section>
 
+    <!-- All of the items -->
     <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
         <div class="flex items-center justify-center relative mb-6">
             <h2 class="text-xl md:text-2xl font-bold text-center">All of the items</h2>
 
+            <!-- ✅ 더보기 = 다음 페이지로(이동/모달 X) -->
             <div class="absolute right-0">
                 <button id="btnMoreItems"
                     class="px-4 py-2 rounded-full bg-black text-white text-sm font-semibold hover:opacity-90 transition">
@@ -38,6 +41,7 @@
 
         <div id="lineGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
 
+        <!-- ✅ 페이지네이션 -->
         <div class="mt-8 flex flex-col items-center gap-3">
             <div id="pageInfo" class="text-sm text-gray-600 font-semibold"></div>
 
@@ -57,11 +61,13 @@
         </div>
     </section>
 
+    <!-- Best Seller -->
     <section class="max-w-6xl mx-auto py-12 px-4">
         <h2 class="text-xl md:text-2xl font-bold text-center mb-8">Best Seller</h2>
         <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </section>
 
+    <!-- New registration -->
     <section class="max-w-6xl mx-auto py-12 px-4">
         <h2 class="text-xl md:text-2xl font-bold text-center mb-8">New registration</h2>
         <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
@@ -69,6 +75,7 @@
 
     <div id="footer-placeholder"></div>
 
+    <!-- 우측 하단 네비 -->
     <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
         <div class="flex flex-col items-center">
             <button onclick="goBack()"
@@ -90,29 +97,37 @@
     </div>
 
     <script>
+        // header/footer
         fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById("header-placeholder").innerHTML = d));
         fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
+        // URL params
         const params = new URLSearchParams(window.location.search);
-        const TYPE = (params.get("type") || "combined").toLowerCase(); // ✅ 기본은 통합
+        const TYPE = (params.get("type") || "food").toLowerCase();  // food / combined
         const CATEGORY = (params.get("category") || "").trim();
         const RAW_SUB = (params.get("sub") || "").trim();
 
-        const ITEMS_PER_PAGE = 12;
-        const FALLBACK_SUB = "기타";
+        // ✅ 한식 하위구분(고정)
+        const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
 
+        // ✅ 12개 페이지네이션
+        const ITEMS_PER_PAGE = 12;
+
+        // ✅ New registration: 60일(1~2달)
+        const NEW_DAYS = 60;
+
+        // 전역 상태
         let ALL_STORES = [];
         let CURRENT_SUB = RAW_SUB;
         let CURRENT_PAGE = 1;
 
-        const DEFAULT_DATA = {
+        let DATA = {
             hero: { title: "카테고리", subtitle: "카테고리별 가게를 확인하세요.", image: "/uploads/sample-banner-product.png" },
             filters: [],
             stores: [],
             best: [],
             new: []
         };
-        let DATA = { ...DEFAULT_DATA };
 
         function escapeHtml(input) {
             const s = input == null ? "" : String(input);
@@ -131,34 +146,34 @@
             return await res.json();
         }
 
-        // ✅ 핵심: “등록값 기반” 통합 필드 읽기
-        function getStoreCategory(store) {
-            return (store.business_category ?? store.category ?? store.businessCategory ?? "").toString().trim();
-        }
-
-        function getStoreSubcategory(store) {
-            const sub = (
-                store.business_subcategory ??
-                store.businessSubcategory ??
-                store.subcategory ??
-                store.business_sub ??
-                store.detail_category ??
-                store.detailCategory ??
-                ""
-            ).toString().trim();
-
-            return sub ? sub : FALLBACK_SUB;
-        }
-
-        function getStoreDisplayName(store) {
+        function getStoreName(store) {
             return (store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-").toString().trim() || "-";
+        }
+
+        function getStoreCategory(store) {
+            return (store.category ?? store.business_category ?? store.businessCategory ?? "").toString().trim();
         }
 
         function getStoreImage(store) {
             const imgSrc = store.image ?? store.image_url ?? store.url ?? store.main_image_url ?? "";
-            return normalizeSrc(imgSrc);
+            return normalizeSrc(imgSrc || "/uploads/no-image.png");
         }
 
+        // ✅ Best Seller용 클릭/조회 수(서버 필드 다양 대응)
+        function getStoreClicks(store) {
+            const cand = [
+                store.click_count, store.clicks,
+                store.view_count, store.views,
+                store.hit, store.hits
+            ];
+            for (const v of cand) {
+                const n = Number(v);
+                if (Number.isFinite(n)) return n;
+            }
+            return 0;
+        }
+
+        // ✅ New registration용 등록일(서버 필드 다양 대응)
         function getStoreCreatedAt(store) {
             const v = store.created_at ?? store.createdAt ?? store.created_date ?? store.createdDate ?? store.reg_date ?? store.regDate ?? null;
             if (!v) return null;
@@ -166,139 +181,168 @@
             return Number.isFinite(d.getTime()) ? d : null;
         }
 
-        function getStoreScoreForBest(store) {
-            const cand = [
-                store.view_count, store.views, store.like_count, store.likes,
-                store.rating, store.score, store.sales, store.order_count, store.orders
-            ].map(x => {
-                const n = Number(x);
-                return Number.isFinite(n) ? n : null;
-            }).find(v => v !== null);
-
-            return cand ?? null;
+        // ✅ 한식 detail_category
+        function getDetailCategory(store) {
+            const raw = (store.detail_category ?? store.detailCategory ?? "").toString().trim();
+            return raw ? raw : "기타한식";
         }
 
-        function shuffle(arr) {
-            const a = arr.slice();
-            for (let i = a.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [a[i], a[j]] = [a[j], a[i]];
+        // ✅ 통합/푸드 공통 sub(한식 제외는 business_subcategory)
+        function getBusinessSubcategory(store) {
+            const raw = (
+                store.business_subcategory ??
+                store.businessSubcategory ??
+                store.subcategory ??
+                store.business_sub ??
+                ""
+            ).toString().trim();
+            return raw ? raw : "기타";
+        }
+
+        function setHero() {
+            if (TYPE === "food" && CATEGORY === "한식") {
+                setHansikHero(CURRENT_SUB || "");
+                return;
             }
-            return a;
+            DATA.hero = {
+                title: CATEGORY || "카테고리",
+                subtitle: "카테고리별 가게를 확인하세요.",
+                image: "/uploads/sample-banner-product.png"
+            };
         }
 
-        function pickBestSeller(stores, limit = 8) {
-            if (!stores || !stores.length) return [];
-            const withScore = stores.map(s => ({ s, sc: getStoreScoreForBest(s) })).filter(x => x.s);
-            const hasAnyScore = withScore.some(x => x.sc !== null);
+        function setHansikHero(subVal) {
+            const titleBase = "한식";
+            const subLabel = subVal ? ` · ${subVal}` : "";
 
-            if (hasAnyScore) {
-                return withScore.sort((a, b) => (b.sc ?? -1) - (a.sc ?? -1)).slice(0, limit).map(x => x.s);
-            }
-            return shuffle(stores).slice(0, limit);
-        }
-
-        function pickNewRegistration(stores, limit = 8) {
-            if (!stores || !stores.length) return [];
-            const now = new Date();
-            const cutoff = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-
-            const recent = stores
-                .map(s => ({ s, d: getStoreCreatedAt(s) }))
-                .filter(x => x.d && x.d >= cutoff)
-                .sort((a, b) => b.d - a.d)
-                .map(x => x.s);
-
-            if (recent.length) {
-                const picked = recent.slice(0, limit);
-                if (picked.length < limit) {
-                    const rest = stores.filter(s => !picked.includes(s));
-                    return picked.concat(shuffle(rest).slice(0, limit - picked.length));
-                }
-                return picked;
-            }
-            return shuffle(stores).slice(0, limit);
-        }
-
-        function buildDynamicFiltersFromStores(stores) {
-            const set = new Set();
-            (stores || []).forEach(s => set.add(getStoreSubcategory(s)));
-
-            let arr = Array.from(set);
-            arr.sort((a, b) => {
-                if (a === FALLBACK_SUB && b !== FALLBACK_SUB) return 1;
-                if (b === FALLBACK_SUB && a !== FALLBACK_SUB) return -1;
-                return a.localeCompare(b, "ko");
-            });
-            return arr;
+            DATA.hero = {
+                title: `${titleBase}${subLabel}`,
+                subtitle:
+                    subVal === "밥" ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
+                        : subVal === "찌개탕" ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
+                            : subVal === "고기구이" ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
+                                : subVal === "생선" ? "구이 · 조림 · 회 등 다양한 생선 요리"
+                                    : subVal === "족발보쌈" ? "족발 · 보쌈 · 수육까지 푸짐하게"
+                                        : subVal === "국밥" ? "뜨끈한 국밥 한 그릇으로 든든하게"
+                                            : subVal === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
+                                                : subVal === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
+                                                    : "우리동네 한식 맛집들을 모았습니다.",
+                image: "/uploads/sample-banner-product.png"
+            };
         }
 
         function bindHero() {
-            const title = CATEGORY ? CATEGORY : (DATA.hero?.title || "카테고리");
-            document.getElementById("heroTitle").innerHTML = escapeHtml(title).replace(/\n/g, "<br>");
-            document.getElementById("heroSubtitle").textContent = (DATA.hero?.subtitle || "카테고리별 가게를 확인하세요.");
-            document.getElementById("heroImage").src = (DATA.hero?.image || "/uploads/sample-banner-product.png");
+            document.getElementById("heroTitle").innerHTML = escapeHtml(DATA.hero?.title || "카테고리").replace(/\n/g, "<br>");
+            document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "카테고리별 가게를 확인하세요.";
+            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
         }
 
-        // ✅ 서버 “통합” 조회: 우선 unified 엔드포인트를 먼저 시도하고, 없으면 기존 API로 폴백
-        async function fetchUnifiedStores() {
-            // 1) 통합 API가 있으면 제일 좋음
-            try {
-                const q = new URLSearchParams();
-                q.set("category", CATEGORY);
-                q.set("type", TYPE);
-                const json = await fetchJson(`/api/subcategory/unified?${q.toString()}`);
-                if (json && Array.isArray(json.stores)) return json.stores;
-            } catch (_) { }
-
-            // 2) 폴백: 기존 방식 (너 서버에 있는 엔드포인트)
-            //    ※ 여기서도 결국 “등록된 모든 데이터가 다 나오려면” 서버 쪽 통합이 필요함
-            if (TYPE === "food") {
-                const q = new URLSearchParams();
-                q.set("category", CATEGORY);
-                const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
-                return json.stores || [];
-            } else {
-                const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
-                return (json.stores || []).filter(s => getStoreCategory(s) === CATEGORY);
-            }
+        function uniqueNonEmpty(arr) {
+            const set = new Set();
+            arr.forEach(v => {
+                const s = (v ?? "").toString().trim();
+                if (s) set.add(s);
+            });
+            return Array.from(set);
         }
 
-        function applySubFilter(subVal, updateHistory = true) {
-            CURRENT_PAGE = 1;
-            const sub = (subVal || "").trim();
-            CURRENT_SUB = sub;
-
-            if (!sub) {
-                DATA.stores = ALL_STORES.slice();
-                if (updateHistory) {
-                    const q = new URLSearchParams(location.search);
-                    q.delete("sub");
-                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                }
+        // ✅ 필터 버튼 목록 만들기
+        function buildFilters() {
+            // 한식이면 고정
+            if (TYPE === "food" && CATEGORY === "한식") {
+                DATA.filters = HANSIK_SUBS.slice();
                 return;
             }
 
-            const filtered = ALL_STORES.filter(s => getStoreSubcategory(s) === sub);
+            // 그 외(푸드 다른 카테고리 + 통합)는 business_subcategory로 자동 생성
+            const subs = uniqueNonEmpty(ALL_STORES.map(s => getBusinessSubcategory(s)));
 
+            // "기타"는 맨 뒤로
+            subs.sort((a, b) => {
+                if (a === "기타" && b !== "기타") return 1;
+                if (b === "기타" && a !== "기타") return -1;
+                return a.localeCompare(b, "ko");
+            });
+
+            // ✅ subcategory가 의미 있게 존재할 때만 필터 표시
+            // (전부 "기타" 하나 뿐이면 버튼 안 보여도 됨)
+            if (subs.length <= 1) {
+                DATA.filters = [];
+            } else {
+                DATA.filters = subs;
+            }
+        }
+
+        function applyFilter(subVal, updateHistory = true) {
+            CURRENT_PAGE = 1;
+            CURRENT_SUB = (subVal || "").trim();
+
+            // 기본은 ALL (필터 없음)
+            let filtered = ALL_STORES.slice();
+
+            // 한식: detail_category로 분리
+            if (TYPE === "food" && CATEGORY === "한식") {
+                if (CURRENT_SUB) {
+                    filtered = ALL_STORES.filter(s => getDetailCategory(s) === CURRENT_SUB);
+                }
+            } else {
+                // 통합/기타: business_subcategory로 분리(필터가 있을 때만)
+                if (DATA.filters.length && CURRENT_SUB) {
+                    filtered = ALL_STORES.filter(s => getBusinessSubcategory(s) === CURRENT_SUB);
+                }
+            }
+
+            // ✅ sub로 걸렀는데 0개면 All 복구(빈 화면 방지)
             if (!filtered.length && ALL_STORES.length) {
                 CURRENT_SUB = "";
-                DATA.stores = ALL_STORES.slice();
+                filtered = ALL_STORES.slice();
                 if (updateHistory) {
                     const q = new URLSearchParams(location.search);
                     q.delete("sub");
                     history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
                 }
-                return;
+            } else {
+                if (updateHistory) {
+                    const q = new URLSearchParams(location.search);
+                    if (CURRENT_SUB) q.set("sub", CURRENT_SUB);
+                    else q.delete("sub");
+                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+                }
             }
 
             DATA.stores = filtered;
 
-            if (updateHistory) {
-                const q = new URLSearchParams(location.search);
-                q.set("sub", sub);
-                history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-            }
+            // ✅ 현재 필터 기준으로 Best/New 재계산
+            rebuildBestAndNew();
+            setHero();
+            bindHero();
+
+            renderFilters();
+            renderPagedStores();
+            renderPagination();
+            renderSmallGrid("bestGrid", DATA.best);
+            renderSmallGrid("newGrid", DATA.new);
+        }
+
+        function rebuildBestAndNew() {
+            const base = (DATA.stores || []).slice();
+
+            // Best Seller: 클릭/조회 수 높은 순
+            DATA.best = base
+                .slice()
+                .sort((a, b) => getStoreClicks(b) - getStoreClicks(a))
+                .slice(0, 8);
+
+            // New registration: 최근 60일
+            const now = new Date();
+            const cutoff = new Date(now.getTime() - NEW_DAYS * 24 * 60 * 60 * 1000);
+
+            DATA.new = base
+                .map(s => ({ s, d: getStoreCreatedAt(s) }))
+                .filter(x => x.d && x.d >= cutoff)
+                .sort((a, b) => b.d - a.d)
+                .map(x => x.s)
+                .slice(0, 8);
         }
 
         function makeFilterBtn(label, tagVal) {
@@ -312,12 +356,7 @@
 
             btn.textContent = label;
 
-            btn.onclick = () => {
-                applySubFilter(tagVal || "", true);
-                renderFilters();
-                renderPagedAdStores(DATA.stores || []);
-                renderPagination();
-            };
+            btn.onclick = () => applyFilter(tagVal || "", true);
             return btn;
         }
 
@@ -325,11 +364,18 @@
             const wrap = document.getElementById("filterContainer");
             wrap.innerHTML = "";
 
-            const list = DATA.filters || [];
-            if (!list.length) return;
+            // ✅ 한식이면 항상 버튼
+            if (TYPE === "food" && CATEGORY === "한식") {
+                wrap.appendChild(makeFilterBtn("All", ""));
+                HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
+                return;
+            }
+
+            // ✅ 통합/기타 카테고리: sub가 유의미할 때만 버튼
+            if (!DATA.filters.length) return;
 
             wrap.appendChild(makeFilterBtn("All", ""));
-            list.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
+            DATA.filters.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
         }
 
         function goDetail(store) {
@@ -340,51 +386,13 @@
             window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`;
         }
 
-        function makeStoreCard(store) {
-            const card = document.createElement("div");
-            card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col bg-white";
-
-            const dispName = getStoreDisplayName(store);
-            const dispCategory = getStoreCategory(store);
-            const imgNorm = getStoreImage(store);
-
-            card.innerHTML = `
-        <div class="relative h-[260px]">
-          <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
-          <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
-            <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
-            <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
-          </div>
-        </div>
-      `;
-            card.addEventListener("click", () => goDetail(store));
-            return card;
-        }
-
-        function getTotalPages() {
-            const len = (DATA.stores || []).length;
-            return Math.max(1, Math.ceil(len / ITEMS_PER_PAGE));
-        }
-
-        function clampPage(p) {
-            const total = getTotalPages();
-            if (p < 1) return 1;
-            if (p > total) return total;
-            return p;
-        }
-
-        function setPage(page) {
-            CURRENT_PAGE = clampPage(page);
-            renderPagedAdStores(DATA.stores || []);
-            renderPagination();
-            document.getElementById("aboutSection").scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-
-        function renderPagedAdStores(stores) {
+        function renderPagedStores() {
             const grid = document.getElementById("lineGrid");
             grid.innerHTML = "";
 
-            if (!stores || !stores.length) {
+            const stores = DATA.stores || [];
+
+            if (!stores.length) {
                 grid.innerHTML = `
           <div class="col-span-full flex justify-center items-center py-16">
             <div class="p-8 text-center max-w-md">
@@ -396,8 +404,9 @@
                 return;
             }
 
-            const totalPages = getTotalPages();
-            CURRENT_PAGE = clampPage(CURRENT_PAGE);
+            const totalPages = Math.max(1, Math.ceil(stores.length / ITEMS_PER_PAGE));
+            if (CURRENT_PAGE < 1) CURRENT_PAGE = 1;
+            if (CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
 
             const start = (CURRENT_PAGE - 1) * ITEMS_PER_PAGE;
             const end = start + ITEMS_PER_PAGE;
@@ -406,7 +415,28 @@
             const wrapper = document.createElement("div");
             wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
 
-            pageItems.forEach(store => wrapper.appendChild(makeStoreCard(store)));
+            pageItems.forEach(store => {
+                const card = document.createElement("div");
+                card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col bg-white";
+
+                const name = getStoreName(store);
+                const cat = getStoreCategory(store);
+                const img = getStoreImage(store);
+
+                card.innerHTML = `
+          <div class="relative h-[260px]">
+            <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover rounded-t-2xl">
+            <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
+              <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(name)}</div>
+              <div class="text-sm text-gray-600">${escapeHtml(cat)}</div>
+            </div>
+          </div>
+        `;
+
+                card.addEventListener("click", () => goDetail(store));
+                wrapper.appendChild(card);
+            });
+
             grid.appendChild(wrapper);
 
             const totalCount = stores.length;
@@ -416,7 +446,8 @@
         }
 
         function renderPagination() {
-            const totalPages = getTotalPages();
+            const stores = DATA.stores || [];
+            const totalPages = Math.max(1, Math.ceil(stores.length / ITEMS_PER_PAGE));
 
             const btnPrev = document.getElementById("btnPrevPage");
             const btnNext = document.getElementById("btnNextPage");
@@ -433,8 +464,8 @@
                 ? "px-3 py-2 rounded-lg bg-gray-100 text-gray-300 font-semibold cursor-not-allowed"
                 : "px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition";
 
-            btnPrev.onclick = () => setPage(CURRENT_PAGE - 1);
-            btnNext.onclick = () => setPage(CURRENT_PAGE + 1);
+            btnPrev.onclick = () => { CURRENT_PAGE -= 1; renderPagedStores(); renderPagination(); };
+            btnNext.onclick = () => { CURRENT_PAGE += 1; renderPagedStores(); renderPagination(); };
 
             nums.innerHTML = "";
 
@@ -446,7 +477,7 @@
                 b.className = isActive
                     ? "min-w-[40px] px-3 py-2 rounded-lg bg-black text-white font-bold"
                     : "min-w-[40px] px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition";
-                b.onclick = () => setPage(p);
+                b.onclick = () => { CURRENT_PAGE = p; renderPagedStores(); renderPagination(); };
                 return b;
             };
 
@@ -463,6 +494,7 @@
             }
 
             nums.appendChild(makeNumBtn(1));
+
             const left = Math.max(2, CURRENT_PAGE - 2);
             const right = Math.min(totalPages - 1, CURRENT_PAGE + 2);
 
@@ -483,7 +515,7 @@
             }
 
             items.forEach(item => {
-                const name = getStoreDisplayName(item);
+                const name = getStoreName(item);
                 const img = getStoreImage(item);
 
                 const card = document.createElement("div");
@@ -501,56 +533,78 @@
 
         async function loadData() {
             try {
-                DATA = { ...DEFAULT_DATA };
+                ALL_STORES = [];
+                DATA.stores = [];
+                DATA.best = [];
+                DATA.new = [];
                 CURRENT_PAGE = 1;
 
-                ALL_STORES = await fetchUnifiedStores();
+                if (TYPE === "food") {
+                    const q = new URLSearchParams();
+                    q.set("category", CATEGORY);
+                    const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
+                    ALL_STORES = (json.stores || []);
+                } else {
+                    // ✅ 통합: 우선 /api/subcategory/combined 시도 → 없으면 기존(beauty)로 폴백
+                    try {
+                        const json = await fetchJson(`/api/subcategory/combined?category=${encodeURIComponent(CATEGORY)}`);
+                        ALL_STORES = (json.stores || []);
+                    } catch (e) {
+                        const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
+                        ALL_STORES = (json.stores || []);
+                    }
 
-                // ✅ 카테고리 방어 필터(서버가 완벽히 필터 못하면 여기서 한 번 더)
-                if (CATEGORY) {
+                    // ✅ 요청 카테고리만 남기기(서버가 덜 걸러주면 방어)
                     ALL_STORES = ALL_STORES.filter(s => getStoreCategory(s) === CATEGORY);
                 }
 
-                DATA.filters = buildDynamicFiltersFromStores(ALL_STORES);
-                applySubFilter(CURRENT_SUB, false);
+                buildFilters();
+                setHero();
+                bindHero();
 
-                // ✅ Best/New: “현재 카테고리 범위(ALL_STORES)” 안에서만
-                DATA.best = pickBestSeller(ALL_STORES, 8);
-                DATA.new = pickNewRegistration(ALL_STORES, 8);
+                // ✅ 최초 렌더: sub가 있으면 해당 조건으로 바로 필터 적용
+                applyFilter(CURRENT_SUB || "", false);
 
             } catch (e) {
                 console.error("데이터 불러오기 실패:", e);
                 ALL_STORES = [];
-                DATA = { ...DEFAULT_DATA };
+                DATA.filters = [];
+                DATA.stores = [];
+                DATA.best = [];
+                DATA.new = [];
+                setHero();
+                bindHero();
+                renderFilters();
+                renderPagedStores();
+                renderPagination();
+                renderSmallGrid("bestGrid", []);
+                renderSmallGrid("newGrid", []);
             }
-
-            init();
         }
 
-        function init() {
-            bindHero();
-            renderFilters();
-            renderPagedAdStores(DATA.stores || []);
-            renderPagination();
-            renderSmallGrid("bestGrid", DATA.best || []);
-            renderSmallGrid("newGrid", DATA.new || []);
+        document.addEventListener("DOMContentLoaded", () => {
+            loadData();
 
+            // ✅ HERO MORE VIEW = All items로 스크롤
             document.getElementById("btnMore").onclick = () => {
                 document.getElementById("aboutSection").scrollIntoView({ behavior: "smooth", block: "start" });
             };
 
+            // ✅ 더보기 = 다음 페이지(끝이면 1페이지로)
             document.getElementById("btnMoreItems").onclick = () => {
-                const totalPages = getTotalPages();
-                if (CURRENT_PAGE < totalPages) setPage(CURRENT_PAGE + 1);
-                else setPage(1);
-            };
-        }
+                const totalPages = Math.max(1, Math.ceil((DATA.stores || []).length / ITEMS_PER_PAGE));
+                if (totalPages <= 1) return;
 
-        document.addEventListener("DOMContentLoaded", loadData);
+                CURRENT_PAGE = (CURRENT_PAGE < totalPages) ? (CURRENT_PAGE + 1) : 1;
+                renderPagedStores();
+                renderPagination();
+                document.getElementById("aboutSection").scrollIntoView({ behavior: "smooth", block: "start" });
+            };
+        });
 
         function goBack() {
             if (document.referrer && document.referrer !== location.href) window.history.back();
-            else window.location.href = "/category.html";
+            else window.location.href = "/foodcategory.html";
         }
         function goNext() { window.history.forward(); }
     </script>
