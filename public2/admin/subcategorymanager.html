@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MALL HANKOOK | SubCategory Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        /* 네오모피즘 카드(기존 매니저 느낌 유지) */
+        .neo-card {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 1.2rem;
+            box-shadow:
+                6px 6px 16px #d9e0ec,
+                -6px -6px 16px #ffffff;
+            backdrop-filter: blur(16px) saturate(120%);
+            transition: all .25s ease;
+            border: 1px solid rgba(59, 130, 246, 0.10);
+        }
+
+        .neo-card:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                4px 4px 12px #cfd8e6,
+                -4px -4px 12px #ffffff,
+                0 10px 28px rgba(80, 130, 255, 0.14);
+            border-color: rgba(59, 130, 246, 0.18);
+        }
+
+        .chip {
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 999px;
+            transition: all .18s ease;
+            user-select: none;
+        }
+
+        .chip:hover {
+            transform: translateY(-1px);
+            border-color: rgba(59, 130, 246, 0.28);
+            box-shadow: 0 10px 18px rgba(59, 130, 246, 0.08);
+        }
+
+        .chip-active {
+            border-color: rgba(59, 130, 246, 0.55) !important;
+            box-shadow: 0 10px 18px rgba(59, 130, 246, 0.12);
+        }
+
+        .btn-soft {
+            border-radius: 999px;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all .18s ease;
+        }
+
+        .btn-soft:hover {
+            transform: translateY(-1px);
+            border-color: rgba(59, 130, 246, 0.35);
+            box-shadow: 0 12px 22px rgba(59, 130, 246, 0.10);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, rgba(229, 231, 235, 0.65), rgba(243, 244, 246, 0.95), rgba(229, 231, 235, 0.65));
+            background-size: 200% 100%;
+            animation: shimmer 1.2s infinite linear;
+            border-radius: 1rem;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-white text-gray-800 min-h-screen flex flex-col">
+    <div id="header-placeholder"></div>
+
+    <!-- 상단 히어로 -->
+    <section class="relative w-full bg-gradient-to-b from-blue-50 to-white">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-10">
+            <div class="neo-card p-5 md:p-7">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <h1 id="pageTitle" class="text-2xl md:text-3xl font-extrabold tracking-tight">
+                            서브카테고리 매니저
+                        </h1>
+                        <p id="pageDesc" class="mt-1 text-sm md:text-base text-gray-600">
+                            카테고리/서브카테고리별 가게 목록 표시 (더보기: 12개씩)
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-600 whitespace-nowrap">정렬</label>
+                            <select id="sortSelect" class="btn-soft px-4 py-2 text-sm outline-none">
+                                <option value="nameAsc">상호명 (가→하)</option>
+                                <option value="nameDesc">상호명 (하→가)</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <input id="searchInput" type="text" placeholder="검색 (상호/업종)"
+                                class="btn-soft px-4 py-2 text-sm outline-none w-full sm:w-64" />
+                            <button id="resetBtn" class="btn-soft px-4 py-2 text-sm font-semibold">
+                                초기화
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 선택 정보 -->
+                <div class="mt-4 flex flex-wrap gap-2 text-sm">
+                    <div class="chip px-3 py-1.5">
+                        <span class="text-gray-500">카테고리:</span>
+                        <span id="currentCategory" class="font-semibold text-gray-800 ml-1">-</span>
+                    </div>
+                    <div class="chip px-3 py-1.5">
+                        <span class="text-gray-500">서브:</span>
+                        <span id="currentSubcategory" class="font-semibold text-gray-800 ml-1">전체</span>
+                    </div>
+                    <div class="chip px-3 py-1.5">
+                        <span class="text-gray-500">표시:</span>
+                        <span id="countInfo" class="font-semibold text-gray-800 ml-1">0</span>
+                    </div>
+                </div>
+
+                <!-- 서브카테고리 칩 영역 -->
+                <div class="mt-4">
+                    <div class="text-sm font-semibold text-gray-700 mb-2">서브카테고리</div>
+                    <div id="subcategoryChips" class="flex flex-wrap gap-2">
+                        <!-- chips -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 리스트 -->
+    <main class="flex-1">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 pb-12">
+            <!-- 로딩 스켈레톤 -->
+            <div id="skeletonWrap" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+                <div class="skeleton h-28"></div>
+                <div class="skeleton h-28"></div>
+                <div class="skeleton h-28"></div>
+                <div class="skeleton h-28"></div>
+                <div class="skeleton h-28"></div>
+                <div class="skeleton h-28"></div>
+            </div>
+
+            <!-- 결과 -->
+            <div id="grid" class="hidden grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5"></div>
+
+            <!-- 빈 상태 -->
+            <div id="emptyState" class="hidden neo-card p-8 mt-6 text-center">
+                <div class="text-xl font-extrabold">표시할 데이터가 없습니다</div>
+                <div class="mt-2 text-gray-600 text-sm">조건(검색/서브카테고리)을 바꿔서 다시 시도해보세요.</div>
+            </div>
+
+            <!-- 더보기 -->
+            <div id="loadMoreWrap" class="hidden mt-8 flex justify-center">
+                <button id="loadMoreBtn" class="btn-soft px-6 py-3 font-extrabold">
+                    더보기 (12개)
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script>
+        // =========================
+        // ✅ 공통: 헤더/푸터 로드
+        // =========================
+        async function loadLayoutPart(id, url) {
+            try {
+                const res = await fetch(url, { cache: "no-store" });
+                const html = await res.text();
+                document.getElementById(id).innerHTML = html;
+            } catch (e) {
+                console.error("layout load fail:", url, e);
+            }
+        }
+        loadLayoutPart("header-placeholder", "/components/header.html");
+        loadLayoutPart("footer-placeholder", "/components/footer.html");
+
+        // =========================
+        // ✅ 핵심 변경점: 더보기 12개씩
+        // =========================
+        const PAGE_SIZE = 12; // ✅ 여기만 "12" 고정 (요구사항)
+
+        // =========================
+        // ✅ 상태
+        // =========================
+        const state = {
+            category: "",
+            subcategory: "전체",
+            raw: [],
+            filtered: [],
+            visibleCount: PAGE_SIZE,
+            search: "",
+            sort: "nameAsc",
+            subs: []
+        };
+
+        // =========================
+        // ✅ DOM
+        // =========================
+        const $pageTitle = document.getElementById("pageTitle");
+        const $pageDesc = document.getElementById("pageDesc");
+        const $currentCategory = document.getElementById("currentCategory");
+        const $currentSubcategory = document.getElementById("currentSubcategory");
+        const $countInfo = document.getElementById("countInfo");
+        const $subcategoryChips = document.getElementById("subcategoryChips");
+        const $grid = document.getElementById("grid");
+        const $skeletonWrap = document.getElementById("skeletonWrap");
+        const $emptyState = document.getElementById("emptyState");
+        const $loadMoreWrap = document.getElementById("loadMoreWrap");
+        const $loadMoreBtn = document.getElementById("loadMoreBtn");
+        const $searchInput = document.getElementById("searchInput");
+        const $sortSelect = document.getElementById("sortSelect");
+        const $resetBtn = document.getElementById("resetBtn");
+
+        // =========================
+        // ✅ 유틸
+        // =========================
+        function qs(name) {
+            return new URLSearchParams(location.search).get(name) || "";
+        }
+        function clean(v) {
+            return (v ?? "").toString().trim();
+        }
+        function normalizeKey(v) {
+            return clean(v).replace(/\s+/g, " ");
+        }
+        function safeText(v, fallback = "-") {
+            const t = clean(v);
+            return t ? t : fallback;
+        }
+
+        function getStoreName(s) {
+            return clean(s.business_name || s.store_name || s.name || "");
+        }
+        function getStoreType(s) {
+            return clean(s.business_type || s.type || s.kind || "");
+        }
+        function getStoreSub(s) {
+            // API에서 business_subcategory/ business_sub_cat 등 여러 가능성 대비
+            return clean(s.business_subcategory || s.business_sub_cat || s.subcategory || s.sub_category || "");
+        }
+        function getStoreImage(s) {
+            // image_url / main_image_url 등 대비
+            const img = clean(s.image_url || s.main_image_url || s.image || "");
+            return img;
+        }
+
+        // =========================
+        // ✅ 데이터 로드
+        // =========================
+        async function fetchStores() {
+            // category는 쿼리로 받는 걸 기본으로 함: ?category=미용/이발
+            const category = qs("category") || qs("cat") || "";
+            state.category = category;
+
+            // 화면 표시
+            const titleCategory = category ? category : "카테고리 미지정";
+            $pageTitle.textContent = `서브카테고리 매니저 · ${titleCategory}`;
+            $pageDesc.textContent = "더보기 클릭 시 12개씩 추가 표시됩니다.";
+            $currentCategory.textContent = titleCategory;
+
+            const mode = (qs("mode") || "combined").toLowerCase();
+
+            // ✅ 통합/푸드 API 분기
+            // ⚠️ food 엔드포인트는 "푸드 매니저에서 실제로 쓰는 경로"로 맞춰줘야 함
+            const baseApi = (mode === "food")
+                ? "/api/subcategory/food"       // <-- 여기만 너희 푸드 실제 API로 바꾸면 끝
+                : "/api/subcategory/combined";
+
+            const url = category
+                ? `${baseApi}?category=${encodeURIComponent(category)}`
+                : `${baseApi}`;
+
+            // 제목도 살짝 구분
+            const modeLabel = (mode === "food") ? "푸드" : "통합";
+            $pageTitle.textContent = `서브카테고리 매니저 · ${modeLabel} · ${titleCategory}`;
+
+            try {
+                $skeletonWrap.classList.remove("hidden");
+                $grid.classList.add("hidden");
+                $emptyState.classList.add("hidden");
+                $loadMoreWrap.classList.add("hidden");
+
+                const res = await fetch(url, { cache: "no-store" });
+                const data = await res.json();
+
+                if (!data || data.success !== true) {
+                    state.raw = [];
+                } else {
+                    state.raw = Array.isArray(data.stores) ? data.stores : [];
+                }
+
+                // 서브카테고리 목록 구성
+                const subSet = new Set();
+                for (const s of state.raw) {
+                    const sub = normalizeKey(getStoreSub(s));
+                    if (sub) subSet.add(sub);
+                }
+                state.subs = ["전체", ...Array.from(subSet).sort((a, b) => a.localeCompare(b, "ko"))];
+
+                // 초기 서브 지정(쿼리로 subcategory 받을 수도 있게)
+                const initSub = qs("subcategory") || qs("sub") || "";
+                if (initSub && state.subs.includes(initSub)) state.subcategory = initSub;
+
+                buildSubcategoryChips();
+                applyFilterAndRender(true);
+            } catch (e) {
+                console.error("fetchStores fail:", e);
+                state.raw = [];
+                state.subs = ["전체"];
+                buildSubcategoryChips();
+                applyFilterAndRender(true);
+            } finally {
+                $skeletonWrap.classList.add("hidden");
+            }
+        }
+
+        // =========================
+        // ✅ 칩 렌더
+        // =========================
+        function buildSubcategoryChips() {
+            $subcategoryChips.innerHTML = "";
+            for (const sub of state.subs) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "chip px-3 py-2 text-sm font-semibold";
+                btn.textContent = sub;
+                if (sub === state.subcategory) btn.classList.add("chip-active");
+
+                btn.addEventListener("click", () => {
+                    state.subcategory = sub;
+                    state.visibleCount = PAGE_SIZE; // ✅ 서브 바꾸면 다시 12개부터
+                    buildSubcategoryChips();
+                    applyFilterAndRender(true);
+                });
+
+                $subcategoryChips.appendChild(btn);
+            }
+        }
+
+        // =========================
+        // ✅ 필터/정렬
+        // =========================
+        function applyFilterAndRender(scrollTop = false) {
+            const q = normalizeKey(state.search).toLowerCase();
+
+            // 1) 서브 필터
+            let arr = state.raw.slice();
+            if (state.subcategory !== "전체") {
+                arr = arr.filter(s => normalizeKey(getStoreSub(s)) === normalizeKey(state.subcategory));
+            }
+
+            // 2) 검색
+            if (q) {
+                arr = arr.filter(s => {
+                    const name = normalizeKey(getStoreName(s)).toLowerCase();
+                    const type = normalizeKey(getStoreType(s)).toLowerCase();
+                    const sub = normalizeKey(getStoreSub(s)).toLowerCase();
+                    return name.includes(q) || type.includes(q) || sub.includes(q);
+                });
+            }
+
+            // 3) 정렬
+            if (state.sort === "nameAsc") {
+                arr.sort((a, b) => getStoreName(a).localeCompare(getStoreName(b), "ko"));
+            } else if (state.sort === "nameDesc") {
+                arr.sort((a, b) => getStoreName(b).localeCompare(getStoreName(a), "ko"));
+            }
+
+            state.filtered = arr;
+
+            // 표시 정보
+            $currentSubcategory.textContent = state.subcategory;
+            const shown = Math.min(state.visibleCount, state.filtered.length);
+            $countInfo.textContent = `${shown} / ${state.filtered.length}`;
+
+            renderGrid();
+
+            if (scrollTop) {
+                // 필요시 화면 살짝 위로 정렬(선택)
+                // window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+        }
+
+        // =========================
+        // ✅ 카드 렌더 (12개씩)
+        // =========================
+        function renderGrid() {
+            $grid.innerHTML = "";
+
+            if (!state.filtered.length) {
+                $grid.classList.add("hidden");
+                $emptyState.classList.remove("hidden");
+                $loadMoreWrap.classList.add("hidden");
+                return;
+            }
+
+            $emptyState.classList.add("hidden");
+            $grid.classList.remove("hidden");
+            $grid.classList.add("grid");
+
+            const visible = state.filtered.slice(0, state.visibleCount);
+
+            for (const s of visible) {
+                const name = safeText(getStoreName(s));
+                const type = safeText(getStoreType(s));
+                const sub = safeText(getStoreSub(s), "서브 미지정");
+                const img = getStoreImage(s);
+
+                const card = document.createElement("div");
+                card.className = "neo-card p-4 flex gap-4 items-center";
+
+                const imgWrap = document.createElement("div");
+                imgWrap.className = "w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center border border-blue-100";
+
+                if (img) {
+                    const im = document.createElement("img");
+                    im.src = img;
+                    im.alt = name;
+                    im.className = "w-full h-full object-cover";
+                    im.loading = "lazy";
+                    im.onerror = () => {
+                        imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
+                    };
+                    imgWrap.appendChild(im);
+                } else {
+                    imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
+                }
+
+                const info = document.createElement("div");
+                info.className = "min-w-0 flex-1";
+
+                info.innerHTML = `
+          <div class="flex items-center gap-2">
+            <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+            <span class="chip px-2 py-0.5 text-xs font-bold text-blue-700">서브</span>
+          </div>
+          <div class="mt-1 text-sm text-gray-600 font-semibold truncate">${escapeHtml(type)}</div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <span class="chip px-2 py-1 text-xs font-bold text-gray-700">${escapeHtml(sub)}</span>
+          </div>
+        `;
+
+                card.appendChild(imgWrap);
+                card.appendChild(info);
+                $grid.appendChild(card);
+            }
+
+            // 더보기 버튼 표시 여부
+            if (state.filtered.length > state.visibleCount) {
+                $loadMoreWrap.classList.remove("hidden");
+                $loadMoreBtn.textContent = `더보기 (${PAGE_SIZE}개)`;
+            } else {
+                $loadMoreWrap.classList.add("hidden");
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // =========================
+        // ✅ 이벤트
+        // =========================
+        $loadMoreBtn.addEventListener("click", () => {
+            // ✅ 요구사항: 더보기 누르면 12개씩 늘어나야 함
+            state.visibleCount += PAGE_SIZE;
+            applyFilterAndRender(false);
+        });
+
+        $searchInput.addEventListener("input", (e) => {
+            state.search = e.target.value || "";
+            state.visibleCount = PAGE_SIZE; // 검색 바꾸면 12개부터
+            applyFilterAndRender(false);
+        });
+
+        $sortSelect.addEventListener("change", (e) => {
+            state.sort = e.target.value;
+            state.visibleCount = PAGE_SIZE; // 정렬 바꾸면 12개부터
+            applyFilterAndRender(false);
+        });
+
+        $resetBtn.addEventListener("click", () => {
+            state.search = "";
+            state.sort = "nameAsc";
+            state.subcategory = "전체";
+            state.visibleCount = PAGE_SIZE;
+            $searchInput.value = "";
+            $sortSelect.value = "nameAsc";
+            buildSubcategoryChips();
+            applyFilterAndRender(true);
+        });
+
+        // =========================
+        // ✅ 시작
+        // =========================
+        fetchStores();
+    </script>
+</body>
+
+</html>
