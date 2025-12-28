@@ -189,6 +189,12 @@
         function getStoreCategory(store) {
             return (store.category ?? store.business_category ?? store.businessCategory ?? "").toString().trim();
         }
+        function normCat(v) {
+            return (v ?? "").toString().trim();
+        }
+        function sameCat(a, b) {
+            return normCat(a) === normCat(b);
+        }
         function getStoreImage(store) {
             const imgSrc = store.image ?? store.image_url ?? store.url ?? store.main_image_url ?? "";
             return normalizeSrc(imgSrc || "/uploads/no-image.png");
@@ -648,7 +654,19 @@
                         const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
                         ALL_STORES = (json.stores || []);
                     }
-                    ALL_STORES = ALL_STORES.filter(s => getStoreCategory(s) === CATEGORY);
+                    
+                    const targetCat = normCat(CATEGORY);
+
+                    // ✅ 디버그(콘솔에서 바로 확인 가능)
+                    console.log("[subcategory] TYPE=", TYPE, "CATEGORY=", CATEGORY);
+                    console.log("[subcategory] combined raw stores =", ALL_STORES.length);
+                    console.log("[subcategory] sample categories =", (ALL_STORES.slice(0, 10).map(s => getStoreCategory(s))));
+
+                    if (targetCat) {
+                        const before = ALL_STORES.length;
+                        ALL_STORES = ALL_STORES.filter(s => sameCat(getStoreCategory(s), targetCat));
+                        console.log("[subcategory] combined filtered stores =", ALL_STORES.length, "(before:", before + ")");
+                    }
                 }
 
                 buildFilters();
