@@ -100,7 +100,6 @@
       <h2 class="text-3xl font-bold text-center mb-8 drop-shadow">정보 등록</h2>
       <form id="businessForm" class="space-y-7" enctype="multipart/form-data" autocomplete="off">
         <input type="hidden" id="storeId" name="storeId">
-        <input type="hidden" id="businessCategoryCombined" name="businessCategory">
         <input type="hidden" id="addressCombined" name="address">
 
         <!-- 1. 사업자 인증 -->
@@ -253,6 +252,10 @@
             <label class="w-32 font-medium">서브카테고리</label>
             <select id="subCategory" name="subCategory" class="flex-1 input-neo px-3 py-2" required></select>
           </div>
+
+          <!-- ✅ 서버 저장용(표준 필드) -->
+          <input type="hidden" id="businessCategoryCombined" name="businessCategory">
+          <input type="hidden" id="businessSubcategory" name="businessSubcategory">
         </section>
 
         <!-- 메뉴 입력 토글 버튼(처음만 노출) -->
@@ -527,17 +530,75 @@
       }
     });
 
-    // [2] 메인 카테고리 선택 시 서브카테고리 변경
+    // ✅ 카테고리 문자열 표준화 (통신 / 인터넷 / TV  vs  통신/인터넷/TV 문제 해결)
+    function canonicalizeLabel(v) {
+      const s = (v ?? "").toString().trim();
+      if (!s) return "";
+
+      // 1) 슬래시 앞뒤 공백 제거: "통신 / 인터넷 / TV" -> "통신/인터넷/TV"
+      let out = s.replace(/\s*\/\s*/g, "/");
+
+      // 2) 연속 공백 정리
+      out = out.replace(/\s+/g, " ");
+
+      return out.trim();
+    }
+
+    // ✅ 선택값 → 서버 저장용 hidden 동기화 + 업종(businessType) 자동 보정
+    function syncTaxonomyToHidden() {
+      const mainSel = document.getElementById("mainCategory");
+      const subSel = document.getElementById("subCategory");
+
+      const mainRaw = mainSel?.value ?? "";
+      const subRaw = subSel?.value ?? "";
+
+      const main = canonicalizeLabel(mainRaw);
+      const sub = canonicalizeLabel(subRaw);
+
+      const catHidden = document.getElementById("businessCategoryCombined"); // name="businessCategory"
+      const subHidden = document.getElementById("businessSubcategory");     // name="businessSubcategory"
+
+      if (catHidden) catHidden.value = main;
+      if (subHidden) subHidden.value = sub;
+
+      // ✅ 업종(businessType)은 "기본=메인카테고리"로 통일 (사용자 임의 입력으로 깨지는 것 방지)
+      const btInput = document.getElementById("businessType");
+      if (btInput) {
+        // 미용/이발만 예외: 미용실/이발소면 businessType을 미용/이발로 자동 세팅
+        if (main === "미용/이발") {
+          if (sub === "이발소") btInput.value = "이발";
+          else if (sub === "미용실") btInput.value = "미용";
+          else btInput.value = "미용/이발";
+        } else {
+          // 그 외 통합은 메인카테고리명을 업종으로 통일
+          btInput.value = main || btInput.value;
+        }
+      }
+    }
+
+    // ✅ 메인/서브 선택 시 즉시 동기화
     mainCatSel.addEventListener("change", function () {
       const subSel = document.getElementById("subCategory");
       subSel.innerHTML = `<option value="">서브카테고리 선택</option>`;
+
       const val = this.value;
       if (categoryData[val]) {
-        categoryData[val].forEach(c =>
-          subSel.innerHTML += `<option value="${c}">${c}</option>`
-        );
+        categoryData[val].forEach(c => {
+          // ✅ 옵션도 표준화된 값으로 넣어두면 더 안정적
+          const v = canonicalizeLabel(c);
+          subSel.innerHTML += `<option value="${v}">${v}</option>`;
+        });
       }
+
+      syncTaxonomyToHidden();
     });
+
+    document.getElementById("subCategory").addEventListener("change", () => {
+      syncTaxonomyToHidden();
+    });
+
+    // ✅ 최초 로딩 시에도 1회 반영
+    syncTaxonomyToHidden();
 
     // --- 1. 사업자 인증만 담당! ---
     async function verifyBizNumber() {
@@ -834,26 +895,12 @@
       e.preventDefault();
 
       try {
+        // ✅ 최종 동기화 (마지막 순간 값 확정)
+        syncTaxonomyToHidden();
+
         // ★ 제출 직전 값 보정
-        const main = document.getElementById('mainCategory')?.value?.trim() || '';
-        const sub = document.getElementById('subCategory')?.value?.trim() || '';
         const road = document.getElementById('roadAddress')?.value?.trim() || '';
         const detail = document.getElementById('detailAddress')?.value?.trim() || '';
-
-        // ✅ 업종/세부 분리 전송
-        const catHidden = document.getElementById('businessCategoryCombined'); // name="businessCategory"
-        if (catHidden) catHidden.value = main; // ✅ 업종만
-
-        const subHidden = document.getElementById('businessSubcategory'); // name="businessSubcategory"
-        if (subHidden) subHidden.value = sub; // ✅ 세부만
-
-        // ✅ 미용/이발이면 businessType도 자동 설정
-        if (main === '미용/이발') {
-          const bt = (sub === '이발소') ? '이발'
-                   : (sub === '미용실') ? '미용'
-                   : '';
-          if (bt) document.getElementById('businessType').value = bt;
-        }
 
         // 주소 결합
         const addrHidden = document.getElementById('addressCombined'); // name="address"
