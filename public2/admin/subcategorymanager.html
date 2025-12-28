@@ -126,6 +126,12 @@
 
                 <!-- 선택 정보 -->
                 <div class="mt-4 flex flex-wrap gap-2 text-sm">
+                    <!-- ✅ (추가) 현재 모드 표시 -->
+                    <div class="chip px-3 py-1.5">
+                        <span class="text-gray-500">모드:</span>
+                        <span id="currentMode" class="font-semibold text-gray-800 ml-1">통합</span>
+                    </div>
+
                     <div class="chip px-3 py-1.5">
                         <span class="text-gray-500">카테고리:</span>
                         <span id="currentCategory" class="font-semibold text-gray-800 ml-1">-</span>
@@ -143,9 +149,7 @@
                 <!-- 서브카테고리 칩 영역 -->
                 <div class="mt-4">
                     <div class="text-sm font-semibold text-gray-700 mb-2">서브카테고리</div>
-                    <div id="subcategoryChips" class="flex flex-wrap gap-2">
-                        <!-- chips -->
-                    </div>
+                    <div id="subcategoryChips" class="flex flex-wrap gap-2"></div>
                 </div>
             </div>
         </div>
@@ -200,15 +204,12 @@
         loadLayoutPart("header-placeholder", "/components/header.html");
         loadLayoutPart("footer-placeholder", "/components/footer.html");
 
-        // =========================
-        // ✅ 핵심 변경점: 더보기 12개씩
-        // =========================
-        const PAGE_SIZE = 12; // ✅ 여기만 "12" 고정 (요구사항)
+        // ✅ 더보기 12개
+        const PAGE_SIZE = 12;
 
-        // =========================
-        // ✅ 상태
-        // =========================
+        // 상태
         const state = {
+            mode: "combined",          // ✅ (추가) 현재 모드 저장
             category: "",
             subcategory: "전체",
             raw: [],
@@ -219,11 +220,10 @@
             subs: []
         };
 
-        // =========================
-        // ✅ DOM
-        // =========================
+        // DOM
         const $pageTitle = document.getElementById("pageTitle");
         const $pageDesc = document.getElementById("pageDesc");
+        const $currentMode = document.getElementById("currentMode"); // ✅ (추가)
         const $currentCategory = document.getElementById("currentCategory");
         const $currentSubcategory = document.getElementById("currentSubcategory");
         const $countInfo = document.getElementById("countInfo");
@@ -237,68 +237,63 @@
         const $sortSelect = document.getElementById("sortSelect");
         const $resetBtn = document.getElementById("resetBtn");
 
-        // =========================
-        // ✅ 유틸
-        // =========================
-        function qs(name) {
-            return new URLSearchParams(location.search).get(name) || "";
-        }
-        function clean(v) {
-            return (v ?? "").toString().trim();
-        }
-        function normalizeKey(v) {
-            return clean(v).replace(/\s+/g, " ");
-        }
-        function safeText(v, fallback = "-") {
-            const t = clean(v);
-            return t ? t : fallback;
+        // 유틸
+        function qs(name) { return new URLSearchParams(location.search).get(name) || ""; }
+        function clean(v) { return (v ?? "").toString().trim(); }
+        function normalizeKey(v) { return clean(v).replace(/\s+/g, " "); }
+        function safeText(v, fallback = "-") { const t = clean(v); return t ? t : fallback; }
+
+        function getStoreName(s) { return clean(s.business_name || s.store_name || s.name || ""); }
+        function getStoreType(s) { return clean(s.business_type || s.type || s.kind || ""); }
+        function getStoreSub(s) { return clean(s.business_subcategory || s.business_sub_cat || s.subcategory || s.sub_category || ""); }
+        function getStoreImage(s) { return clean(s.image_url || s.main_image_url || s.image || ""); }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
         }
 
-        function getStoreName(s) {
-            return clean(s.business_name || s.store_name || s.name || "");
-        }
-        function getStoreType(s) {
-            return clean(s.business_type || s.type || s.kind || "");
-        }
-        function getStoreSub(s) {
-            // API에서 business_subcategory/ business_sub_cat 등 여러 가능성 대비
-            return clean(s.business_subcategory || s.business_sub_cat || s.subcategory || s.sub_category || "");
-        }
-        function getStoreImage(s) {
-            // image_url / main_image_url 등 대비
-            const img = clean(s.image_url || s.main_image_url || s.image || "");
-            return img;
+        function modeLabel(mode) {
+            return (mode === "food") ? "푸드" : "통합";
         }
 
-        // =========================
-        // ✅ 데이터 로드
-        // =========================
+        // 데이터 로드
         async function fetchStores() {
-            // category는 쿼리로 받는 걸 기본으로 함: ?category=미용/이발
+            // ✅ (추가) mode/category 읽고 상태 초기화
+            const mode = (qs("mode") || "combined").toLowerCase() === "food" ? "food" : "combined";
+            state.mode = mode;
+
+            state.search = "";
+            state.sort = "nameAsc";
+            state.subcategory = "전체";
+            state.visibleCount = PAGE_SIZE;
+
+            $searchInput.value = "";
+            $sortSelect.value = "nameAsc";
+
+            // category는 쿼리로 받음
             const category = qs("category") || qs("cat") || "";
             state.category = category;
 
             // 화면 표시
             const titleCategory = category ? category : "카테고리 미지정";
-            $pageTitle.textContent = `서브카테고리 매니저 · ${titleCategory}`;
+            $currentMode.textContent = modeLabel(state.mode);
+            $pageTitle.textContent = `서브카테고리 매니저 · ${modeLabel(state.mode)} · ${titleCategory}`;
             $pageDesc.textContent = "더보기 클릭 시 12개씩 추가 표시됩니다.";
             $currentCategory.textContent = titleCategory;
 
-            const mode = (qs("mode") || "combined").toLowerCase();
-
             // ✅ 통합/푸드 API 분기
-            // ⚠️ food 엔드포인트는 "푸드 매니저에서 실제로 쓰는 경로"로 맞춰줘야 함
-            const baseApi = (mode === "food")
-                ? "/api/subcategory/food"       // <-- 여기만 너희 푸드 실제 API로 바꾸면 끝
+            const baseApi = (state.mode === "food")
+                ? "/api/subcategory/food"
                 : "/api/subcategory/combined";
 
             const url = category
                 ? `${baseApi}?category=${encodeURIComponent(category)}`
                 : `${baseApi}`;
-
-            // 제목도 살짝 구분
-            const modeLabel = (mode === "food") ? "푸드" : "통합";
-            $pageTitle.textContent = `서브카테고리 매니저 · ${modeLabel} · ${titleCategory}`;
 
             try {
                 $skeletonWrap.classList.remove("hidden");
@@ -309,11 +304,7 @@
                 const res = await fetch(url, { cache: "no-store" });
                 const data = await res.json();
 
-                if (!data || data.success !== true) {
-                    state.raw = [];
-                } else {
-                    state.raw = Array.isArray(data.stores) ? data.stores : [];
-                }
+                state.raw = (data && data.success === true && Array.isArray(data.stores)) ? data.stores : [];
 
                 // 서브카테고리 목록 구성
                 const subSet = new Set();
@@ -323,7 +314,7 @@
                 }
                 state.subs = ["전체", ...Array.from(subSet).sort((a, b) => a.localeCompare(b, "ko"))];
 
-                // 초기 서브 지정(쿼리로 subcategory 받을 수도 있게)
+                // 초기 서브(쿼리 지정 가능)
                 const initSub = qs("subcategory") || qs("sub") || "";
                 if (initSub && state.subs.includes(initSub)) state.subcategory = initSub;
 
@@ -340,9 +331,7 @@
             }
         }
 
-        // =========================
-        // ✅ 칩 렌더
-        // =========================
+        // 칩 렌더
         function buildSubcategoryChips() {
             $subcategoryChips.innerHTML = "";
             for (const sub of state.subs) {
@@ -363,19 +352,15 @@
             }
         }
 
-        // =========================
-        // ✅ 필터/정렬
-        // =========================
-        function applyFilterAndRender(scrollTop = false) {
+        // 필터/정렬
+        function applyFilterAndRender() {
             const q = normalizeKey(state.search).toLowerCase();
 
-            // 1) 서브 필터
             let arr = state.raw.slice();
             if (state.subcategory !== "전체") {
                 arr = arr.filter(s => normalizeKey(getStoreSub(s)) === normalizeKey(state.subcategory));
             }
 
-            // 2) 검색
             if (q) {
                 arr = arr.filter(s => {
                     const name = normalizeKey(getStoreName(s)).toLowerCase();
@@ -385,7 +370,6 @@
                 });
             }
 
-            // 3) 정렬
             if (state.sort === "nameAsc") {
                 arr.sort((a, b) => getStoreName(a).localeCompare(getStoreName(b), "ko"));
             } else if (state.sort === "nameDesc") {
@@ -394,22 +378,14 @@
 
             state.filtered = arr;
 
-            // 표시 정보
             $currentSubcategory.textContent = state.subcategory;
             const shown = Math.min(state.visibleCount, state.filtered.length);
             $countInfo.textContent = `${shown} / ${state.filtered.length}`;
 
             renderGrid();
-
-            if (scrollTop) {
-                // 필요시 화면 살짝 위로 정렬(선택)
-                // window.scrollTo({ top: 0, behavior: "smooth" });
-            }
         }
 
-        // =========================
-        // ✅ 카드 렌더 (12개씩)
-        // =========================
+        // 카드 렌더 (12개씩)
         function renderGrid() {
             $grid.innerHTML = "";
 
@@ -444,9 +420,7 @@
                     im.alt = name;
                     im.className = "w-full h-full object-cover";
                     im.loading = "lazy";
-                    im.onerror = () => {
-                        imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
-                    };
+                    im.onerror = () => { imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`; };
                     imgWrap.appendChild(im);
                 } else {
                     imgWrap.innerHTML = `<div class="text-xs text-gray-400 font-semibold">NO IMG</div>`;
@@ -454,24 +428,22 @@
 
                 const info = document.createElement("div");
                 info.className = "min-w-0 flex-1";
-
                 info.innerHTML = `
-          <div class="flex items-center gap-2">
-            <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
-            <span class="chip px-2 py-0.5 text-xs font-bold text-blue-700">서브</span>
-          </div>
-          <div class="mt-1 text-sm text-gray-600 font-semibold truncate">${escapeHtml(type)}</div>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <span class="chip px-2 py-1 text-xs font-bold text-gray-700">${escapeHtml(sub)}</span>
-          </div>
-        `;
+                    <div class="flex items-center gap-2">
+                        <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+                        <span class="chip px-2 py-0.5 text-xs font-bold text-blue-700">서브</span>
+                    </div>
+                    <div class="mt-1 text-sm text-gray-600 font-semibold truncate">${escapeHtml(type)}</div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <span class="chip px-2 py-1 text-xs font-bold text-gray-700">${escapeHtml(sub)}</span>
+                    </div>
+                `;
 
                 card.appendChild(imgWrap);
                 card.appendChild(info);
                 $grid.appendChild(card);
             }
 
-            // 더보기 버튼 표시 여부
             if (state.filtered.length > state.visibleCount) {
                 $loadMoreWrap.classList.remove("hidden");
                 $loadMoreBtn.textContent = `더보기 (${PAGE_SIZE}개)`;
@@ -480,34 +452,22 @@
             }
         }
 
-        function escapeHtml(str) {
-            return String(str)
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#039;");
-        }
-
-        // =========================
-        // ✅ 이벤트
-        // =========================
+        // 이벤트
         $loadMoreBtn.addEventListener("click", () => {
-            // ✅ 요구사항: 더보기 누르면 12개씩 늘어나야 함
-            state.visibleCount += PAGE_SIZE;
-            applyFilterAndRender(false);
+            state.visibleCount += PAGE_SIZE; // ✅ 12개씩
+            applyFilterAndRender();
         });
 
         $searchInput.addEventListener("input", (e) => {
             state.search = e.target.value || "";
-            state.visibleCount = PAGE_SIZE; // 검색 바꾸면 12개부터
-            applyFilterAndRender(false);
+            state.visibleCount = PAGE_SIZE;
+            applyFilterAndRender();
         });
 
         $sortSelect.addEventListener("change", (e) => {
             state.sort = e.target.value;
-            state.visibleCount = PAGE_SIZE; // 정렬 바꾸면 12개부터
-            applyFilterAndRender(false);
+            state.visibleCount = PAGE_SIZE;
+            applyFilterAndRender();
         });
 
         $resetBtn.addEventListener("click", () => {
@@ -518,12 +478,10 @@
             $searchInput.value = "";
             $sortSelect.value = "nameAsc";
             buildSubcategoryChips();
-            applyFilterAndRender(true);
+            applyFilterAndRender();
         });
 
-        // =========================
-        // ✅ 시작
-        // =========================
+        // 시작
         fetchStores();
     </script>
 </body>
