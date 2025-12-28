@@ -2,54 +2,36 @@ import express from "express";
 import multer from "multer";
 
 import {
+  listStores,
+  searchStore,
   getSlot,
-  listSlots,
-  listSlotItems,
   upsertSlot,
   deleteSlot,
-  searchStore,
+  listCandidates,
   makeMulterStorage,
   fileFilter,
-} from "../controllers/subcategorymanagerAdController.js";
+} from "../controllers/adminSubcategoryController.js";
 
 const router = express.Router();
 
-// ✅ diskStorage
 const storage = multer.diskStorage(makeMulterStorage());
-
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  limits: { fileSize: 20 * 1024 * 1024 },
 });
 
-// ✅ Unexpected field 방지 (필드명 자유)
-const uploadAny = upload.any();
+// ✅ 프론트가 field 이름을 image 로 보냄
+const uploadSingleImage = upload.single("image");
 
-function multerErrorHandler(err, _req, res, _next) {
-  return res.status(400).json({
-    success: false,
-    error: err?.message || "upload error",
-  });
-}
+// 목록/검색
+router.get("/stores", listStores);
+router.get("/search", searchStore);
 
-// =========================
-// ✅ 조회
-// =========================
+// 슬롯 읽기/저장/삭제/후보
 router.get("/slot", getSlot);
-router.get("/slots", listSlots);
-router.get("/slot-items", listSlotItems);
-
-// =========================
-// ✅ 저장/삭제
-// =========================
-router.post("/slot", uploadAny, upsertSlot, multerErrorHandler);
-router.delete("/slot", deleteSlot);
-
-// =========================
-// ✅ 가게 검색(모달)
-/// search-store?q=__all__&mode=combined|food
-// =========================
-router.get("/search-store", searchStore);
+router.get("/candidates", listCandidates);
+router.post("/update", uploadSingleImage, upsertSlot);
+router.delete("/delete", deleteSlot);
 
 export default router;
