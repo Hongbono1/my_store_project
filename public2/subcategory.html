@@ -22,12 +22,10 @@
         </div>
     </section>
 
-    <!-- All of the items -->
     <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
         <div class="flex items-center justify-center relative mb-6">
             <h2 class="text-xl md:text-2xl font-bold text-center">All of the items</h2>
 
-            <!-- ✅ 더보기 = 다음 페이지로 이동 -->
             <div class="absolute right-0">
                 <button id="btnMoreItems"
                     class="px-4 py-2 rounded-full bg-black text-white text-sm font-semibold hover:opacity-90 transition">
@@ -38,10 +36,8 @@
 
         <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
 
-        <!-- ✅ 12개만 표시 -->
         <div id="lineGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
 
-        <!-- ✅ 페이지네이션 -->
         <div class="mt-8 flex flex-col items-center gap-3">
             <div id="pageInfo" class="text-sm text-gray-600 font-semibold"></div>
 
@@ -61,13 +57,11 @@
         </div>
     </section>
 
-    <!-- Best Seller -->
     <section class="max-w-6xl mx-auto py-12 px-4">
         <h2 class="text-xl md:text-2xl font-bold text-center mb-8">Best Seller</h2>
         <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </section>
 
-    <!-- New registration -->
     <section class="max-w-6xl mx-auto py-12 px-4">
         <h2 class="text-xl md:text-2xl font-bold text-center mb-8">New registration</h2>
         <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
@@ -75,7 +69,6 @@
 
     <div id="footer-placeholder"></div>
 
-    <!-- 우측 하단 네비 -->
     <div class="fixed bottom-6 right-6 flex flex-col items-center gap-4 z-50">
         <div class="flex flex-col items-center">
             <button onclick="goBack()"
@@ -97,49 +90,29 @@
     </div>
 
     <script>
-        // header/footer
         fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById("header-placeholder").innerHTML = d));
         fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
-        // URL params
         const params = new URLSearchParams(window.location.search);
-        const TYPE = (params.get("type") || "food").toLowerCase();
-
-        // ✅ 원본 category/sub
-        const RAW_CATEGORY = (params.get("category") || "").trim();
+        const TYPE = (params.get("type") || "combined").toLowerCase(); // ✅ 기본은 통합
+        const CATEGORY = (params.get("category") || "").trim();
         const RAW_SUB = (params.get("sub") || "").trim();
 
-        // ✅ “미용/이발” 구분 유지
-        const BEAUTY_SPLIT_SET = new Set(["미용", "이발", "네일", "피부관리", "왁싱"]);
-        let CATEGORY = RAW_CATEGORY;
-        let SUB = RAW_SUB;
+        const ITEMS_PER_PAGE = 12;
+        const FALLBACK_SUB = "기타";
 
-        if ((TYPE === "beauty" || TYPE === "combined") && BEAUTY_SPLIT_SET.has(CATEGORY)) {
-            SUB = SUB || CATEGORY;
-            CATEGORY = "미용/이발";
-        }
-
-        // 한식 소제목(고정)
-        const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
-        // ✅ 미용/이발 소제목(필터)
-        const BEAUTY_SUBS = ["미용", "이발", "기타"];
-
-        // 전체 데이터를 1번만 받아두고, 화면은 여기서 필터링
         let ALL_STORES = [];
-        let CURRENT_SUB = SUB;
+        let CURRENT_SUB = RAW_SUB;
+        let CURRENT_PAGE = 1;
 
         const DEFAULT_DATA = {
-            hero: { title: "샘플 카테고리", subtitle: "기본 설명 텍스트", image: "/uploads/sample-banner-product.png" },
+            hero: { title: "카테고리", subtitle: "카테고리별 가게를 확인하세요.", image: "/uploads/sample-banner-product.png" },
             filters: [],
             stores: [],
             best: [],
             new: []
         };
         let DATA = { ...DEFAULT_DATA };
-
-        // ✅ 페이지네이션 설정
-        const ITEMS_PER_PAGE = 12;
-        let CURRENT_PAGE = 1;
 
         function escapeHtml(input) {
             const s = input == null ? "" : String(input);
@@ -153,70 +126,32 @@
             return src.startsWith("/") ? src : "/" + src;
         }
 
-        function getDetailCategory(store) {
-            const raw = (store.detail_category ?? store.detailCategory ?? "").toString().trim();
-            return raw ? raw : "기타한식";
-        }
-
-        function setHansikHero(subVal) {
-            const titleBase = "한식";
-            const subLabel = subVal ? ` · ${subVal}` : "";
-
-            DATA.hero = {
-                title: `${titleBase}${subLabel}`,
-                subtitle:
-                    subVal === "밥" ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
-                        : subVal === "찌개탕" ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
-                            : subVal === "고기구이" ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
-                                : subVal === "생선" ? "구이 · 조림 · 회 등 다양한 생선 요리"
-                                    : subVal === "족발보쌈" ? "족발 · 보쌈 · 수육까지 푸짐하게"
-                                        : subVal === "국밥" ? "뜨끈한 국밥 한 그릇으로 든든하게"
-                                            : subVal === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
-                                                : subVal === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
-                                                    : "우리동네 한식 맛집들을 모았습니다.",
-                image: "/uploads/sample-banner-product.png"
-            };
-        }
-
-        function setBeautyHero(subVal) {
-            const titleBase = "미용/이발";
-            const subLabel = subVal ? ` · ${subVal}` : "";
-            DATA.hero = {
-                title: `${titleBase}${subLabel}`,
-                subtitle:
-                    subVal === "미용" ? "헤어/미용 서비스를 제공하는 가게를 모았어요."
-                        : subVal === "이발" ? "이발/바버 서비스를 제공하는 가게를 모았어요."
-                            : subVal === "기타" ? "미용/이발 분류가 비어있는 가게를 모았어요."
-                                : "미용/이발 카테고리 가게를 확인하세요.",
-                image: "/uploads/sample-banner-product.png"
-            };
-        }
-
         async function fetchJson(url) {
             const res = await fetch(url);
             return await res.json();
         }
 
-        // ✅ 미용/이발 구분: business_subcategory 직접 매핑
-        function getBeautyType(store) {
-            const sub = (store.business_subcategory ?? "").toString().trim();
-            if (sub === "이발소") return "이발";
-            if (sub === "미용실") return "미용";
-            return "기타";
+        // ✅ 핵심: “등록값 기반” 통합 필드 읽기
+        function getStoreCategory(store) {
+            return (store.business_category ?? store.category ?? store.businessCategory ?? "").toString().trim();
         }
 
-        // ✅ 특정 카테고리에 속하는지(business_category 기준)
-        function isInCategory(store, targetCategory) {
-            const cat = (store.business_category ?? store.category ?? "").toString().trim();
-            return cat === targetCategory;
+        function getStoreSubcategory(store) {
+            const sub = (
+                store.business_subcategory ??
+                store.businessSubcategory ??
+                store.subcategory ??
+                store.business_sub ??
+                store.detail_category ??
+                store.detailCategory ??
+                ""
+            ).toString().trim();
+
+            return sub ? sub : FALLBACK_SUB;
         }
 
         function getStoreDisplayName(store) {
             return (store.name ?? store.business_name ?? store.businessName ?? store.title ?? "-").toString().trim() || "-";
-        }
-
-        function getStoreDisplayCategory(store) {
-            return (store.business_category ?? store.category ?? store.businessCategory ?? "").toString().trim();
         }
 
         function getStoreImage(store) {
@@ -252,7 +187,6 @@
             return a;
         }
 
-        // ✅ Best Seller: "동종업계" = 현재 카테고리(ALL_STORES) 안에서만 뽑기
         function pickBestSeller(stores, limit = 8) {
             if (!stores || !stores.length) return [];
             const withScore = stores.map(s => ({ s, sc: getStoreScoreForBest(s) })).filter(x => x.s);
@@ -264,7 +198,6 @@
             return shuffle(stores).slice(0, limit);
         }
 
-        // ✅ New registration: 최근 30일 우선, 없으면 랜덤
         function pickNewRegistration(stores, limit = 8) {
             if (!stores || !stores.length) return [];
             const now = new Date();
@@ -287,166 +220,123 @@
             return shuffle(stores).slice(0, limit);
         }
 
-        async function loadData() {
+        function buildDynamicFiltersFromStores(stores) {
+            const set = new Set();
+            (stores || []).forEach(s => set.add(getStoreSubcategory(s)));
+
+            let arr = Array.from(set);
+            arr.sort((a, b) => {
+                if (a === FALLBACK_SUB && b !== FALLBACK_SUB) return 1;
+                if (b === FALLBACK_SUB && a !== FALLBACK_SUB) return -1;
+                return a.localeCompare(b, "ko");
+            });
+            return arr;
+        }
+
+        function bindHero() {
+            const title = CATEGORY ? CATEGORY : (DATA.hero?.title || "카테고리");
+            document.getElementById("heroTitle").innerHTML = escapeHtml(title).replace(/\n/g, "<br>");
+            document.getElementById("heroSubtitle").textContent = (DATA.hero?.subtitle || "카테고리별 가게를 확인하세요.");
+            document.getElementById("heroImage").src = (DATA.hero?.image || "/uploads/sample-banner-product.png");
+        }
+
+        // ✅ 서버 “통합” 조회: 우선 unified 엔드포인트를 먼저 시도하고, 없으면 기존 API로 폴백
+        async function fetchUnifiedStores() {
+            // 1) 통합 API가 있으면 제일 좋음
             try {
-                DATA = { ...DEFAULT_DATA };
-                ALL_STORES = [];
-                CURRENT_PAGE = 1;
+                const q = new URLSearchParams();
+                q.set("category", CATEGORY);
+                q.set("type", TYPE);
+                const json = await fetchJson(`/api/subcategory/unified?${q.toString()}`);
+                if (json && Array.isArray(json.stores)) return json.stores;
+            } catch (_) { }
 
-                if (TYPE === "food") {
-                    const q = new URLSearchParams();
-                    q.set("category", CATEGORY);
-                    const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
-                    ALL_STORES = json.stores || [];
-
-                    if (CATEGORY === "한식") {
-                        DATA.filters = HANSIK_SUBS.slice();
-                        setHansikHero(CURRENT_SUB);
-                    } else {
-                        DATA.filters = [];
-                        DATA.hero = {
-                            title: CATEGORY || "카테고리",
-                            subtitle: "카테고리별 가게를 확인하세요.",
-                            image: "/uploads/sample-banner-product.png"
-                        };
-                    }
-
-                    applySubFilter(CURRENT_SUB, false);
-
-                } else if (TYPE === "beauty" || TYPE === "combined") {
-                    const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
-                    let stores = json.stores || [];
-                    stores = stores.filter(s => isInCategory(s, CATEGORY));
-                    ALL_STORES = stores;
-
-                    if (CATEGORY === "미용/이발") {
-                        DATA.filters = BEAUTY_SUBS.slice();
-                        setBeautyHero(CURRENT_SUB);
-                        applySubFilter(CURRENT_SUB, false);
-                    } else {
-                        DATA.filters = [];
-                        DATA.stores = ALL_STORES.slice();
-                        DATA.hero = {
-                            title: CATEGORY || "카테고리",
-                            subtitle: "카테고리별 가게를 확인하세요.",
-                            image: "/uploads/sample-banner-product.png"
-                        };
-                    }
-
-                } else {
-                    ALL_STORES = [];
-                    DATA = { ...DEFAULT_DATA };
-                }
-
-                DATA.best = pickBestSeller(ALL_STORES, 8);
-                DATA.new = pickNewRegistration(ALL_STORES, 8);
-
-            } catch (e) {
-                console.error("데이터 불러오기 실패:", e);
-                ALL_STORES = [];
-                DATA = { ...DEFAULT_DATA };
-                CURRENT_PAGE = 1;
+            // 2) 폴백: 기존 방식 (너 서버에 있는 엔드포인트)
+            //    ※ 여기서도 결국 “등록된 모든 데이터가 다 나오려면” 서버 쪽 통합이 필요함
+            if (TYPE === "food") {
+                const q = new URLSearchParams();
+                q.set("category", CATEGORY);
+                const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
+                return json.stores || [];
+            } else {
+                const json = await fetchJson(`/api/subcategory/beauty?category=${encodeURIComponent(CATEGORY)}`);
+                return (json.stores || []).filter(s => getStoreCategory(s) === CATEGORY);
             }
-
-            init();
         }
 
         function applySubFilter(subVal, updateHistory = true) {
+            CURRENT_PAGE = 1;
             const sub = (subVal || "").trim();
             CURRENT_SUB = sub;
 
-            // ✅ 필터 변경 시 페이지는 1페이지로
-            CURRENT_PAGE = 1;
-
-            // ✅ 한식은 detail_category로 분리
-            if (TYPE === "food" && CATEGORY === "한식") {
-                if (!sub) {
-                    DATA.stores = ALL_STORES.slice();
-                    setHansikHero("");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-
-                const filtered = ALL_STORES.filter(s => getDetailCategory(s) === sub);
-
-                // ✅ 0개면 자동 All 복구(빈화면 방지)
-                if (!filtered.length && ALL_STORES.length) {
-                    CURRENT_SUB = "";
-                    DATA.stores = ALL_STORES.slice();
-                    setHansikHero("");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-
-                DATA.stores = filtered;
-                setHansikHero(sub);
-
+            if (!sub) {
+                DATA.stores = ALL_STORES.slice();
                 if (updateHistory) {
                     const q = new URLSearchParams(location.search);
-                    q.set("sub", sub);
+                    q.delete("sub");
                     history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
                 }
                 return;
             }
 
-            // ✅ 미용/이발은 business_subcategory 기반 분리
-            if ((TYPE === "beauty" || TYPE === "combined") && CATEGORY === "미용/이발") {
-                if (!sub) {
-                    DATA.stores = ALL_STORES.slice();
-                    setBeautyHero("");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
+            const filtered = ALL_STORES.filter(s => getStoreSubcategory(s) === sub);
 
-                const filtered = ALL_STORES.filter(s => getBeautyType(s) === sub);
-
-                if (!filtered.length && ALL_STORES.length) {
-                    CURRENT_SUB = "";
-                    DATA.stores = ALL_STORES.slice();
-                    setBeautyHero("");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub");
-                        q.set("category", "미용/이발");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-
-                DATA.stores = filtered;
-                setBeautyHero(sub);
-
+            if (!filtered.length && ALL_STORES.length) {
+                CURRENT_SUB = "";
+                DATA.stores = ALL_STORES.slice();
                 if (updateHistory) {
                     const q = new URLSearchParams(location.search);
-                    q.set("sub", sub);
-                    q.set("category", "미용/이발");
+                    q.delete("sub");
                     history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
                 }
                 return;
             }
 
-            DATA.stores = ALL_STORES.slice();
+            DATA.stores = filtered;
+
+            if (updateHistory) {
+                const q = new URLSearchParams(location.search);
+                q.set("sub", sub);
+                history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
+            }
+        }
+
+        function makeFilterBtn(label, tagVal) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+
+            const isActive = (CURRENT_SUB || "") === (tagVal || "");
+            btn.className = isActive
+                ? "px-3 py-1.5 rounded-full bg-black text-white text-sm"
+                : "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
+
+            btn.textContent = label;
+
+            btn.onclick = () => {
+                applySubFilter(tagVal || "", true);
+                renderFilters();
+                renderPagedAdStores(DATA.stores || []);
+                renderPagination();
+            };
+            return btn;
+        }
+
+        function renderFilters() {
+            const wrap = document.getElementById("filterContainer");
+            wrap.innerHTML = "";
+
+            const list = DATA.filters || [];
+            if (!list.length) return;
+
+            wrap.appendChild(makeFilterBtn("All", ""));
+            list.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
         }
 
         function goDetail(store) {
             const bt = (store.business_type ?? store.businessType ?? "").toString().trim();
             const type = (bt === "음식점" || bt === "음식") ? "food" : "combined";
-
             const id = store.id ?? store.store_id ?? store.storeId ?? "";
             if (!id) return;
-
             window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`;
         }
 
@@ -455,7 +345,7 @@
             card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col bg-white";
 
             const dispName = getStoreDisplayName(store);
-            const dispCategory = getStoreDisplayCategory(store);
+            const dispCategory = getStoreCategory(store);
             const imgNorm = getStoreImage(store);
 
             card.innerHTML = `
@@ -467,7 +357,6 @@
           </div>
         </div>
       `;
-
             card.addEventListener("click", () => goDetail(store));
             return card;
         }
@@ -488,7 +377,6 @@
             CURRENT_PAGE = clampPage(page);
             renderPagedAdStores(DATA.stores || []);
             renderPagination();
-            // 스크롤을 items 영역으로 살짝 끌어주기(선택)
             document.getElementById("aboutSection").scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
@@ -504,6 +392,7 @@
               <p class="text-sm text-gray-500">빠른 시일 내에 새로운 가게가 추가될 예정입니다.</p>
             </div>
           </div>`;
+                document.getElementById("pageInfo").textContent = "";
                 return;
             }
 
@@ -520,12 +409,10 @@
             pageItems.forEach(store => wrapper.appendChild(makeStoreCard(store)));
             grid.appendChild(wrapper);
 
-            // 페이지 정보
-            const pageInfo = document.getElementById("pageInfo");
             const totalCount = stores.length;
             const from = start + 1;
             const to = Math.min(end, totalCount);
-            pageInfo.textContent = `${from} - ${to} / ${totalCount}개 · ${CURRENT_PAGE} / ${totalPages} 페이지`;
+            document.getElementById("pageInfo").textContent = `${from} - ${to} / ${totalCount}개 · ${CURRENT_PAGE} / ${totalPages} 페이지`;
         }
 
         function renderPagination() {
@@ -549,14 +436,13 @@
             btnPrev.onclick = () => setPage(CURRENT_PAGE - 1);
             btnNext.onclick = () => setPage(CURRENT_PAGE + 1);
 
-            // 페이지 번호는 너무 길면 줄여서 보여줌 (현재 기준 ±2, 양끝 표시)
             nums.innerHTML = "";
 
-            const makeNumBtn = (p, label) => {
+            const makeNumBtn = (p) => {
                 const b = document.createElement("button");
                 const isActive = (p === CURRENT_PAGE);
                 b.type = "button";
-                b.textContent = label ?? String(p);
+                b.textContent = String(p);
                 b.className = isActive
                     ? "min-w-[40px] px-3 py-2 rounded-lg bg-black text-white font-bold"
                     : "min-w-[40px] px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition";
@@ -576,19 +462,14 @@
                 return;
             }
 
-            // 1
             nums.appendChild(makeNumBtn(1));
-
             const left = Math.max(2, CURRENT_PAGE - 2);
             const right = Math.min(totalPages - 1, CURRENT_PAGE + 2);
 
             if (left > 2) addDots();
-
             for (let p = left; p <= right; p++) nums.appendChild(makeNumBtn(p));
-
             if (right < totalPages - 1) addDots();
 
-            // last
             nums.appendChild(makeNumBtn(totalPages));
         }
 
@@ -618,72 +499,50 @@
             });
         }
 
-        function bindHero() {
-            document.getElementById("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
-            document.getElementById("heroSubtitle").textContent = DATA.hero?.subtitle || "";
-            document.getElementById("heroImage").src = DATA.hero?.image || "/uploads/sample-banner-product.png";
-        }
+        async function loadData() {
+            try {
+                DATA = { ...DEFAULT_DATA };
+                CURRENT_PAGE = 1;
 
-        function makeFilterBtn(label, tagVal) {
-            const btn = document.createElement("button");
-            btn.type = "button";
+                ALL_STORES = await fetchUnifiedStores();
 
-            const isActive = (CURRENT_SUB || "") === (tagVal || "");
-            btn.className = isActive
-                ? "px-3 py-1.5 rounded-full bg-black text-white text-sm"
-                : "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
+                // ✅ 카테고리 방어 필터(서버가 완벽히 필터 못하면 여기서 한 번 더)
+                if (CATEGORY) {
+                    ALL_STORES = ALL_STORES.filter(s => getStoreCategory(s) === CATEGORY);
+                }
 
-            btn.textContent = label;
+                DATA.filters = buildDynamicFiltersFromStores(ALL_STORES);
+                applySubFilter(CURRENT_SUB, false);
 
-            btn.onclick = () => {
-                applySubFilter(tagVal || "", true);
-                bindHero();
-                renderFilters();
-                renderPagedAdStores(DATA.stores || []);
-                renderPagination();
-            };
-            return btn;
-        }
+                // ✅ Best/New: “현재 카테고리 범위(ALL_STORES)” 안에서만
+                DATA.best = pickBestSeller(ALL_STORES, 8);
+                DATA.new = pickNewRegistration(ALL_STORES, 8);
 
-        function renderFilters() {
-            const wrap = document.getElementById("filterContainer");
-            wrap.innerHTML = "";
-
-            if (TYPE === "food" && CATEGORY === "한식") {
-                wrap.appendChild(makeFilterBtn("All", ""));
-                HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-                return;
+            } catch (e) {
+                console.error("데이터 불러오기 실패:", e);
+                ALL_STORES = [];
+                DATA = { ...DEFAULT_DATA };
             }
 
-            if ((TYPE === "beauty" || TYPE === "combined") && CATEGORY === "미용/이발") {
-                wrap.appendChild(makeFilterBtn("All", ""));
-                BEAUTY_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-                return;
-            }
-
-            // 그 외는 필터 없음
+            init();
         }
 
         function init() {
             bindHero();
             renderFilters();
-
             renderPagedAdStores(DATA.stores || []);
             renderPagination();
-
             renderSmallGrid("bestGrid", DATA.best || []);
             renderSmallGrid("newGrid", DATA.new || []);
 
-            // ✅ MORE VIEW: items 섹션으로 이동
             document.getElementById("btnMore").onclick = () => {
                 document.getElementById("aboutSection").scrollIntoView({ behavior: "smooth", block: "start" });
             };
 
-            // ✅ 더보기 버튼 = 다음 페이지
             document.getElementById("btnMoreItems").onclick = () => {
                 const totalPages = getTotalPages();
                 if (CURRENT_PAGE < totalPages) setPage(CURRENT_PAGE + 1);
-                else setPage(1); // 마지막이면 1페이지로 순환(원치 않으면 이 줄 삭제)
+                else setPage(1);
             };
         }
 
