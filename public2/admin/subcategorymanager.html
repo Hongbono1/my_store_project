@@ -1,4 +1,4 @@
-<!-- BASE: subcategorymanager v2025-12-28-02 (admin prefix applied) -->
+<!-- BASE: subcategorymanager v2025-12-28-03 (admin + modal mode toggle + adMode buttons + modal scroll) -->
 <!DOCTYPE html>
 <html lang="ko">
 
@@ -56,11 +56,16 @@
 
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex flex-wrap items-center gap-2">
-                    <div class="inline-flex rounded-xl border bg-white p-1">
-                        <button id="modeFoodBtn" class="px-3 py-1.5 rounded-lg text-sm font-extrabold">푸드</button>
-                        <button id="modeCombinedBtn" class="px-3 py-1.5 rounded-lg text-sm font-extrabold">통합</button>
+
+                    <!-- ✅ 모드 표시(버튼은 모달로 이동) -->
+                    <div class="inline-flex items-center gap-2">
+                        <span class="px-3 py-2 rounded-xl border text-sm font-extrabold bg-white">
+                            모드: <span id="modeBadgeText">통합</span>
+                        </span>
+                        <span class="text-xs text-gray-500 font-semibold">※ 모드 변경은 모달에서</span>
                     </div>
 
+                    <!-- ✅ 정렬 -->
                     <label class="text-sm font-extrabold text-gray-700 ml-1">정렬</label>
                     <select id="sortSelect" class="h-10 rounded-xl border px-3 text-sm font-semibold">
                         <option value="name">이름순</option>
@@ -68,6 +73,7 @@
                         <option value="views">조회수</option>
                     </select>
 
+                    <!-- ✅ 초기화 -->
                     <button id="resetBtn"
                         class="h-10 rounded-xl border px-4 text-sm font-extrabold hover:bg-gray-50">초기화</button>
 
@@ -123,10 +129,11 @@
             <div id="howToPanel" class="mt-3 hidden rounded-2xl border bg-white p-4">
                 <h3 class="text-base font-extrabold text-gray-900 mb-2">사용방법 (검색/수정)</h3>
                 <div class="space-y-2 text-sm text-gray-700 leading-relaxed">
-                    <div><span class="font-extrabold">1) 모드 선택:</span> 푸드/통합 먼저 선택</div>
+                    <div><span class="font-extrabold">1) 모드 선택:</span> 모달 안에서 <span class="font-extrabold">푸드/통합</span>
+                        선택</div>
                     <div><span class="font-extrabold">2) 사업자번호만으로 검색 가능:</span> 숫자만 입력해도 됨</div>
                     <div><span class="font-extrabold">3) 상호명 검색:</span> 검색 결과에 “몇 페이지/몇 번째” 표시</div>
-                    <div><span class="font-extrabold">4) 수정:</span> 슬롯 클릭 → 엔카테고리 모달 그대로 열림 → 저장</div>
+                    <div><span class="font-extrabold">4) 수정:</span> 슬롯 클릭 → 모달에서 방식 선택(버튼) → 저장</div>
                     <div class="text-xs text-gray-500">
                         ※ 저장 API: <span class="font-semibold">/admin/subcategory/update</span> (404면 모달 상태에 에러 표시)
                     </div>
@@ -195,8 +202,8 @@
                 <div class="rounded-2xl border bg-white p-4">
                     <div class="text-sm font-extrabold text-gray-900">배너 안내</div>
                     <ul class="mt-2 text-sm text-gray-700 font-semibold space-y-1 list-disc pl-5">
-                        <li>배너도 “엔카테고리 모달”로 동일하게 수정합니다.</li>
-                        <li>파일 미선택 시 기존 이미지 유지 안내도 그대로 적용.</li>
+                        <li>배너도 모달로 동일하게 수정합니다.</li>
+                        <li>파일 미선택 시 기존 이미지 유지.</li>
                         <li>저장은 <span class="font-extrabold">/admin/subcategory/update</span>로 전송합니다.</li>
                     </ul>
                 </div>
@@ -231,13 +238,14 @@
 
     <div id="footer-placeholder"></div>
 
-    <!-- ✅ 모달 -->
+    <!-- ✅ 모달 (헤더/푸터 고정 + 본문 스크롤) -->
     <div id="slotModal" class="fixed inset-0 z-50 hidden">
         <div class="absolute inset-0 bg-black/40" id="modalBackdrop"></div>
 
         <div class="absolute inset-0 flex items-center justify-center p-4">
-            <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border overflow-hidden flex flex-col max-h-[85vh]">
-                <!-- 헤더(고정) -->
+            <div
+                class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border overflow-hidden flex flex-col max-h-[85vh]">
+                <!-- 헤더 -->
                 <div class="px-5 py-4 border-b flex items-center justify-between shrink-0">
                     <div>
                         <div class="text-sm text-gray-500 font-semibold">슬롯 수정</div>
@@ -250,23 +258,54 @@
                         class="rounded-xl border px-4 py-2 text-sm font-extrabold hover:bg-gray-50">닫기</button>
                 </div>
 
-                <!-- ✅ 본문만 스크롤 -->
+                <!-- 본문(스크롤) -->
                 <div class="p-5 space-y-5 flex-1 overflow-y-auto" style="-webkit-overflow-scrolling: touch;">
-                    <div class="rounded-2xl border bg-gray-50 p-4">
-                        <div class="text-sm font-extrabold text-gray-900">사용법</div>
-                        <div class="text-sm text-gray-700 font-semibold mt-2 leading-relaxed">
-                            광고 방식 선택 → 설정 → 우선순위/기간 → 슬롯 저장
+
+                    <!-- ✅ 푸드/통합 선택(모달로 이동) -->
+                    <div class="rounded-2xl border p-4">
+                        <div class="text-sm font-extrabold text-gray-900 mb-2">푸드 / 통합 선택</div>
+                        <div class="inline-flex rounded-xl border bg-white p-1">
+                            <button id="modalModeFoodBtn" type="button"
+                                class="px-4 py-2 rounded-lg text-sm font-extrabold">푸드</button>
+                            <button id="modalModeCombinedBtn" type="button"
+                                class="px-4 py-2 rounded-lg text-sm font-extrabold">통합</button>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500 font-semibold">
+                            모드 변경 시, 가게검색/가게목록 기준도 같이 바뀝니다.
                         </div>
                     </div>
 
+                    <!-- 사용법 -->
+                    <div class="rounded-2xl border bg-gray-50 p-4">
+                        <div class="text-sm font-extrabold text-gray-900">사용법</div>
+                        <div class="text-sm text-gray-700 font-semibold mt-2 leading-relaxed">
+                            광고 방식 선택(버튼) → 설정 → 우선순위/기간 → 슬롯 저장
+                        </div>
+                    </div>
+
+                    <!-- 광고 방식 -->
                     <div class="rounded-2xl border p-4">
                         <div class="text-sm font-extrabold text-gray-900 mb-2">광고 방식 선택</div>
-                        <select id="adModeSelect" class="w-full h-11 rounded-xl border px-3 text-sm font-semibold">
-                            <option value="image">이미지 배너</option>
-                            <option value="store">가게 연결</option>
-                            <option value="text">텍스트 전용</option>
-                        </select>
 
+                        <!-- ✅ select → 버튼 선택 -->
+                        <input id="adModeInput" type="hidden" value="image" />
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button type="button" data-ad-mode-btn="image" id="adModeBtnImage"
+                                class="h-11 rounded-xl border text-sm font-extrabold hover:bg-gray-50">
+                                이미지 배너
+                            </button>
+                            <button type="button" data-ad-mode-btn="store" id="adModeBtnStore"
+                                class="h-11 rounded-xl border text-sm font-extrabold hover:bg-gray-50">
+                                가게 연결
+                            </button>
+                            <button type="button" data-ad-mode-btn="text" id="adModeBtnText"
+                                class="h-11 rounded-xl border text-sm font-extrabold hover:bg-gray-50">
+                                텍스트 전용
+                            </button>
+                        </div>
+
+                        <!-- 링크 URL -->
                         <div class="mt-3">
                             <div class="text-sm font-extrabold text-gray-900">링크 URL (선택)</div>
                             <input id="linkUrlInput" type="text"
@@ -274,6 +313,7 @@
                                 class="mt-2 w-full h-11 rounded-xl border px-3 text-sm font-semibold" />
                         </div>
 
+                        <!-- 이미지 업로드 -->
                         <div class="mt-3" id="imageUploadBox">
                             <div class="text-sm font-extrabold text-gray-900">이미지 파일</div>
                             <input id="imageFileInput" type="file" accept="image/*"
@@ -290,6 +330,7 @@
                             </div>
                         </div>
 
+                        <!-- 가게 연결 -->
                         <div class="mt-3 hidden" id="storeConnectBox">
                             <div class="text-sm font-extrabold text-gray-900">가게 연결</div>
                             <div class="text-xs text-gray-500 mt-1">사업자번호/상호로 검색 후 선택</div>
@@ -303,6 +344,7 @@
                             <div id="modalStoreResultList" class="mt-3 space-y-2"></div>
                         </div>
 
+                        <!-- 텍스트 전용 -->
                         <div class="mt-3 hidden" id="textOnlyBox">
                             <div class="text-sm font-extrabold text-gray-900">텍스트 내용</div>
                             <input id="textTitleInput" type="text" placeholder="표시 문구"
@@ -310,6 +352,7 @@
                         </div>
                     </div>
 
+                    <!-- 우선순위 -->
                     <div class="rounded-2xl border p-4">
                         <div class="text-sm font-extrabold text-gray-900">우선순위</div>
                         <div class="text-xs text-gray-500 mt-1">1이 가장 먼저 노출</div>
@@ -335,6 +378,7 @@
                         </div>
                     </div>
 
+                    <!-- 기간 -->
                     <div class="rounded-2xl border p-4">
                         <div class="text-sm font-extrabold text-gray-900">광고 기간 설정</div>
                         <label class="mt-2 inline-flex items-center gap-2 text-sm font-extrabold text-gray-800">
@@ -355,6 +399,7 @@
                         </div>
                     </div>
 
+                    <!-- 선택 정보 -->
                     <div class="rounded-2xl border bg-gray-50 p-4">
                         <div class="text-sm font-extrabold text-gray-900">현재 선택 정보</div>
                         <div class="mt-2 text-sm text-gray-700 font-semibold space-y-1">
@@ -375,9 +420,10 @@
                             </button>
                         </div>
                     </div>
+
                 </div>
 
-                <!-- 푸터(고정) -->
+                <!-- 푸터 -->
                 <div class="px-5 py-4 border-t flex items-center justify-between shrink-0">
                     <div class="text-xs text-gray-500 font-semibold">저장 실패(404 등) 시 상태 메시지로 표시</div>
                     <button id="modalCloseBtn2"
@@ -387,8 +433,8 @@
         </div>
     </div>
 
+    <!-- header/footer fetch -->
     <script>
-        // header/footer fetch
         (function () {
             const headerEl = document.getElementById("header-placeholder");
             const footerEl = document.getElementById("footer-placeholder");
@@ -403,7 +449,7 @@
             const $ = (id) => document.getElementById(id);
 
             const state = {
-                mode: "combined",
+                mode: "combined", // ✅ 기본
                 sort: "name",
                 page: 1,
                 pageSize: 12,
@@ -415,11 +461,8 @@
                 subcategory: "",
 
                 modal: {
-                    page: "subcategorymanager", // ✅ admin 구분: page 명확히
+                    page: "subcategorymanager",
                     position: "",
-                    section: "",
-                    slotIndex: 0,
-                    banner: false,
                     selectedStore: null,
                 },
 
@@ -428,16 +471,8 @@
 
             function setStatus(msg) { $("managerStatus").textContent = msg; }
 
-            function applyModeUI() {
-                const food = $("modeFoodBtn");
-                const comb = $("modeCombinedBtn");
-                if (state.mode === "food") {
-                    food.className = "px-3 py-1.5 rounded-lg text-sm font-extrabold bg-blue-600 text-white";
-                    comb.className = "px-3 py-1.5 rounded-lg text-sm font-extrabold text-gray-700";
-                } else {
-                    comb.className = "px-3 py-1.5 rounded-lg text-sm font-extrabold bg-blue-600 text-white";
-                    food.className = "px-3 py-1.5 rounded-lg text-sm font-extrabold text-gray-700";
-                }
+            function applyModeBadge() {
+                $("modeBadgeText").textContent = (state.mode === "food") ? "푸드" : "통합";
             }
 
             function applyPageUI() {
@@ -601,11 +636,84 @@
                 }
             }
 
-            function openModal({ position }) {
+            // ✅ 핵심: admin prefix 포함 position
+            function buildPosition(section, idx) {
+                const cat = (state.category || "ALL").replace(/\s+/g, "_");
+                const sc = (state.subcategory || "ALL").replace(/\s+/g, "_");
+                return `admin_subcategorymanager_${state.mode}_${cat}_${sc}_${section}_${idx}`;
+            }
+
+            // -------------------------
+            // 모달: 모드 버튼 UI
+            // -------------------------
+            function applyModalModeUI() {
+                if (state.mode === "food") {
+                    $("modalModeFoodBtn").className = "px-4 py-2 rounded-lg text-sm font-extrabold bg-blue-600 text-white";
+                    $("modalModeCombinedBtn").className = "px-4 py-2 rounded-lg text-sm font-extrabold text-gray-700";
+                } else {
+                    $("modalModeCombinedBtn").className = "px-4 py-2 rounded-lg text-sm font-extrabold bg-blue-600 text-white";
+                    $("modalModeFoodBtn").className = "px-4 py-2 rounded-lg text-sm font-extrabold text-gray-700";
+                }
+            }
+
+            // -------------------------
+            // 모달: 광고 방식 버튼 UI
+            // -------------------------
+            function getAdMode() {
+                return $("adModeInput").value || "image";
+            }
+
+            function setAdMode(mode) {
+                $("adModeInput").value = mode;
+                applyAdModeButtonsUI();
+                applyAdModeUI();
+            }
+
+            function applyAdModeButtonsUI() {
+                const v = getAdMode();
+
+                const base = "h-11 rounded-xl border text-sm font-extrabold hover:bg-gray-50";
+                const active = "h-11 rounded-xl border text-sm font-extrabold bg-blue-600 text-white border-blue-600";
+
+                $("adModeBtnImage").className = (v === "image") ? active : base;
+                $("adModeBtnStore").className = (v === "store") ? active : base;
+                $("adModeBtnText").className = (v === "text") ? active : base;
+            }
+
+            function applyAdModeUI() {
+                const v = getAdMode();
+                $("imageUploadBox").classList.toggle("hidden", v !== "image");
+                $("storeConnectBox").classList.toggle("hidden", v !== "store");
+                $("textOnlyBox").classList.toggle("hidden", v !== "text");
+            }
+
+            function openModal(position) {
                 state.modal.position = position;
+                state.modal.selectedStore = null;
+
                 $("modalPageText").textContent = state.modal.page;
                 $("modalPositionText").textContent = position;
+
+                // 모달 기본값
                 $("modalStatus").textContent = "불러오기 완료";
+                $("selectedImageText").textContent = "없음";
+                $("selectedStoreText").textContent = "없음";
+                $("linkUrlInput").value = "";
+                $("priorityInput").value = "1";
+                $("noEndCheck").checked = true;
+                $("startAtInput").value = "";
+                $("endAtInput").value = "";
+                $("textTitleInput").value = "";
+                $("imageFileInput").value = "";
+                $("modalImagePreview").src = "/uploads/no-image.png";
+                $("modalStoreSearchInput").value = "";
+                $("modalStoreResultList").innerHTML = "";
+                $("modalStoreSearchStatus").textContent = "대기";
+
+                // ✅ 모드/광고방식 UI 적용
+                applyModalModeUI();
+                setAdMode("image"); // 기본
+
                 $("slotModal").classList.remove("hidden");
                 document.body.style.overflow = "hidden";
             }
@@ -615,23 +723,71 @@
                 document.body.style.overflow = "";
             }
 
-            function applyAdModeUI() {
-                const v = $("adModeSelect").value;
-                $("imageUploadBox").classList.toggle("hidden", v !== "image");
-                $("storeConnectBox").classList.toggle("hidden", v !== "store");
-                $("textOnlyBox").classList.toggle("hidden", v !== "text");
+            async function modalSearchStore() {
+                const q = $("modalStoreSearchInput").value.trim();
+                if (!q) { $("modalStoreSearchStatus").textContent = "검색어를 입력하세요."; return; }
+
+                const qs = new URLSearchParams({
+                    mode: state.mode,
+                    sort: state.sort,
+                    q,
+                    pageSize: String(state.pageSize),
+                });
+                if (state.category) qs.set("category", state.category);
+                if (state.subcategory) qs.set("subcategory", state.subcategory);
+
+                $("modalStoreSearchStatus").textContent = "검색 중...";
+                $("modalStoreResultList").innerHTML = "";
+
+                try {
+                    const data = await fetchJson("/admin/subcategory/search?" + qs.toString(), { credentials: "include" });
+                    const results = data.results || [];
+                    if (!results.length) {
+                        $("modalStoreSearchStatus").textContent = "검색 결과 없음";
+                        return;
+                    }
+
+                    $("modalStoreSearchStatus").textContent = `검색 결과 ${results.length}건 (상위 20개 표시)`;
+
+                    const html = results.slice(0, 20).map((r) => `
+            <div class="rounded-2xl border p-3 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-sm font-extrabold text-gray-900 truncate">${escapeHtml(r.business_name)}</div>
+                <div class="text-xs text-gray-600 font-semibold truncate">${escapeHtml(r.business_type || "")}</div>
+                <div class="text-xs text-gray-500 font-semibold mt-1">
+                  ${escapeHtml(r.business_number || "")}
+                  · ${r.page_number}페이지 ${r.index_in_page}번째
+                </div>
+              </div>
+              <button class="shrink-0 h-10 rounded-xl bg-blue-600 px-4 text-sm font-extrabold text-white hover:bg-blue-700"
+                      data-modal-pick-store="1"
+                      data-id="${escapeHtml(r.id)}"
+                      data-name="${escapeHtml(r.business_name)}"
+                      data-type="${escapeHtml(r.business_type || "")}"
+                      data-biz="${escapeHtml(r.business_number || "")}"
+                      data-img="${escapeHtml(r.image_url || "")}">
+                선택
+              </button>
+            </div>
+          `).join("");
+
+                    $("modalStoreResultList").innerHTML = html;
+                } catch (err) {
+                    $("modalStoreSearchStatus").textContent = "검색 실패: " + (err?.message || err);
+                }
             }
 
             async function saveSlot() {
                 const fd = new FormData();
-                fd.append("page", state.modal.page);          // ✅ page에 subcategorymanager
-                fd.append("position", state.modal.position);  // ✅ position에 admin_ prefix
+
+                fd.append("page", state.modal.page);
+                fd.append("position", state.modal.position);
 
                 fd.append("mode", state.mode);
                 fd.append("category", state.category || "");
                 fd.append("subcategory", state.subcategory || "");
 
-                fd.append("adMode", $("adModeSelect").value);
+                fd.append("adMode", getAdMode());
                 fd.append("linkUrl", $("linkUrlInput").value.trim());
                 fd.append("priority", String($("priorityInput").value || "1"));
                 fd.append("noEnd", $("noEndCheck").checked ? "1" : "0");
@@ -641,6 +797,14 @@
 
                 const file = $("imageFileInput").files && $("imageFileInput").files[0];
                 if (file) fd.append("image", file);
+
+                if (state.modal.selectedStore) {
+                    fd.append("storeId", String(state.modal.selectedStore.id || ""));
+                    fd.append("storeBusinessNumber", String(state.modal.selectedStore.business_number || ""));
+                    fd.append("storeName", String(state.modal.selectedStore.business_name || ""));
+                    fd.append("storeType", String(state.modal.selectedStore.business_type || ""));
+                    fd.append("storeImageUrl", String(state.modal.selectedStore.image_url || ""));
+                }
 
                 $("modalStatus").textContent = "저장 중...";
 
@@ -661,22 +825,12 @@
                 }
             }
 
-            // ✅ 핵심: admin 접두어 포함된 position 생성
-            function buildPosition(section, idx) {
-                const cat = (state.category || "ALL").replace(/\s+/g, "_");
-                const sc = (state.subcategory || "ALL").replace(/\s+/g, "_");
-                return `admin_subcategorymanager_${state.mode}_${cat}_${sc}_${section}_${idx}`;
-            }
-
             function bind() {
                 $("howToToggleBtn").addEventListener("click", () => $("howToPanel").classList.toggle("hidden"));
                 $("storePanelToggleBtn").addEventListener("click", () => {
                     $("storePanel").classList.toggle("hidden");
                     $("storePanelToggleBtn").textContent = $("storePanel").classList.contains("hidden") ? "가게목록" : "가게목록 닫기";
                 });
-
-                $("modeFoodBtn").addEventListener("click", () => { state.mode = "food"; applyModeUI(); loadStorePage(1); });
-                $("modeCombinedBtn").addEventListener("click", () => { state.mode = "combined"; applyModeUI(); loadStorePage(1); });
 
                 $("sortSelect").addEventListener("change", (e) => { state.sort = e.target.value; loadStorePage(1); });
 
@@ -694,7 +848,7 @@
                     $("storePanel").classList.add("hidden");
                     $("storePanelToggleBtn").textContent = "가게목록";
 
-                    applyModeUI();
+                    applyModeBadge();
                     applyPageUI();
                     renderAllSlots();
                     setStatus("초기화 완료");
@@ -713,27 +867,81 @@
                 $("moreBestBtn").addEventListener("click", () => { state.counts.best += 12; renderSection("best"); });
                 $("moreNewBtn").addEventListener("click", () => { state.counts.new += 12; renderSection("new"); });
 
-                $("bannerEditBtn").addEventListener("click", () => openModal({ position: buildPosition("banner", 1) }));
-                $("bannerSlotCard").addEventListener("click", () => openModal({ position: buildPosition("banner", 1) }));
+                // 배너 모달
+                $("bannerEditBtn").addEventListener("click", () => openModal(buildPosition("banner", 1)));
+                $("bannerSlotCard").addEventListener("click", () => openModal(buildPosition("banner", 1)));
 
+                // 슬롯 클릭(위임)
                 document.addEventListener("click", (e) => {
                     const slotEl = e.target.closest("[data-slot]");
                     if (slotEl) {
                         const section = slotEl.getAttribute("data-section");
                         const idx = Number(slotEl.getAttribute("data-index") || 0);
-                        openModal({ position: buildPosition(section, idx) });
+                        openModal(buildPosition(section, idx));
+                    }
+
+                    // 광고방식 버튼 선택
+                    const adBtn = e.target.closest("[data-ad-mode-btn]");
+                    if (adBtn) {
+                        const mode = adBtn.getAttribute("data-ad-mode-btn");
+                        setAdMode(mode);
+                    }
+
+                    // 모달 가게 선택
+                    const pickStoreBtn = e.target.closest("[data-modal-pick-store]");
+                    if (pickStoreBtn) {
+                        const store = {
+                            id: pickStoreBtn.getAttribute("data-id"),
+                            business_name: pickStoreBtn.getAttribute("data-name"),
+                            business_type: pickStoreBtn.getAttribute("data-type"),
+                            business_number: pickStoreBtn.getAttribute("data-biz"),
+                            image_url: pickStoreBtn.getAttribute("data-img"),
+                        };
+                        state.modal.selectedStore = store;
+                        $("selectedStoreText").textContent = store.business_name || "없음";
+                        $("modalImagePreview").src = store.image_url || "/uploads/no-image.png";
+                        $("modalStatus").textContent = "가게 선택 완료";
                     }
                 });
 
-                $("adModeSelect").addEventListener("change", applyAdModeUI);
+                // ✅ 모달 모드 버튼
+                $("modalModeFoodBtn").addEventListener("click", async () => {
+                    state.mode = "food";
+                    applyModeBadge();
+                    applyModalModeUI();
+                    $("modalStatus").textContent = "모드 변경: 푸드";
+                    // 모드 변경 시 가게목록/검색 기준도 바뀌므로 목록 갱신
+                    await loadStorePage(1);
+                });
+                $("modalModeCombinedBtn").addEventListener("click", async () => {
+                    state.mode = "combined";
+                    applyModeBadge();
+                    applyModalModeUI();
+                    $("modalStatus").textContent = "모드 변경: 통합";
+                    await loadStorePage(1);
+                });
+
+                // 모달 닫기
                 $("modalCloseBtn").addEventListener("click", closeModal);
                 $("modalCloseBtn2").addEventListener("click", closeModal);
                 $("modalBackdrop").addEventListener("click", closeModal);
+
+                // 모달 입력들
+                $("imageFileInput").addEventListener("change", () => {
+                    const f = $("imageFileInput").files && $("imageFileInput").files[0];
+                    if (!f) return;
+                    $("selectedImageText").textContent = f.name;
+                    $("modalImagePreview").src = URL.createObjectURL(f);
+                });
+
+                $("noEndCheck").addEventListener("change", () => {
+                    $("endAtInput").disabled = $("noEndCheck").checked;
+                    if ($("noEndCheck").checked) $("endAtInput").value = "";
+                });
+
                 $("showCandidatesBtn").addEventListener("click", () => $("candidateListBox").classList.toggle("hidden"));
-                $("modalSaveBtn").addEventListener("click", saveSlot);
 
                 $("modalResetBtn").addEventListener("click", () => {
-                    $("adModeSelect").value = "image";
                     $("linkUrlInput").value = "";
                     $("priorityInput").value = "1";
                     $("noEndCheck").checked = true;
@@ -743,19 +951,29 @@
                     $("imageFileInput").value = "";
                     $("modalImagePreview").src = "/uploads/no-image.png";
                     $("selectedImageText").textContent = "없음";
+                    state.modal.selectedStore = null;
                     $("selectedStoreText").textContent = "없음";
+                    $("modalStoreSearchInput").value = "";
+                    $("modalStoreResultList").innerHTML = "";
+                    $("modalStoreSearchStatus").textContent = "대기";
+
+                    setAdMode("image");
+                    applyModalModeUI();
+
                     $("modalStatus").textContent = "입력 초기화 완료";
-                    applyAdModeUI();
                 });
 
-                $("noEndCheck").addEventListener("change", () => {
-                    $("endAtInput").disabled = $("noEndCheck").checked;
-                    if ($("noEndCheck").checked) $("endAtInput").value = "";
+                $("modalSaveBtn").addEventListener("click", saveSlot);
+
+                $("modalStoreSearchBtn").addEventListener("click", modalSearchStore);
+                $("modalStoreSearchInput").addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") modalSearchStore();
                 });
             }
 
+            // 초기
             readCategoryFromUrl();
-            applyModeUI();
+            applyModeBadge();
             $("sortSelect").value = state.sort;
             applyPageUI();
             renderAllSlots();
