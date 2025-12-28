@@ -49,6 +49,7 @@ import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
 import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
+import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js";
 
 
 import pool from "./db.js";
@@ -430,6 +431,8 @@ app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
 
 // ✅ NCATEGORY2 관리자 API (추가만)
 app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
+
+app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
 
 
