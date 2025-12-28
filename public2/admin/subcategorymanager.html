@@ -4,1041 +4,868 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>서브카테고리 매니저</title>
+    <title>subcategorymanager</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        /* ✅ ncategory2 매니저 모달 스타일 그대로 */
-        .field {
-            width: 100%;
-            padding: .65rem .85rem;
-            border-radius: 1rem;
-            border: 1px solid rgba(148, 163, 184, .75);
+        body {
+            font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .neo-card {
             background: rgba(255, 255, 255, 0.92);
-            outline: none;
+            border: 2px solid rgba(59, 130, 246, 0.16);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            box-shadow:
+                10px 10px 22px rgba(0, 0, 0, 0.06),
+                -10px -10px 22px rgba(255, 255, 255, 0.9);
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
         }
 
-        .field:focus {
-            border-color: rgba(59, 130, 246, .85);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, .18);
+        .neo-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(59, 130, 246, 0.28);
+            box-shadow:
+                8px 8px 18px rgba(0, 0, 0, 0.07),
+                -8px -8px 18px rgba(255, 255, 255, 0.9),
+                0 12px 28px rgba(59, 130, 246, 0.14);
         }
 
-        .divider {
-            height: 1px;
-            background: rgba(148, 163, 184, 0.25);
-            margin: 10px 0;
-        }
-
-        #slotModal {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-        }
-
-        #slotModal .modal-backdrop {
-            position: absolute;
-            inset: 0;
-            background: rgba(15, 23, 42, .55);
-        }
-
-        #slotModal .modal-panel {
-            position: relative;
-            margin: 0 auto;
-            width: min(980px, calc(100% - 36px));
-            max-height: 88vh;
-            overflow: auto;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-
-        #slotModal .modal-card {
-            border-radius: 1.25rem;
-            background: rgba(255, 255, 255, .96);
-            border: 2px solid rgba(59, 130, 246, .18);
-            box-shadow: 0 18px 60px rgba(0, 0, 0, .25);
-            backdrop-filter: blur(14px);
-            overflow: hidden;
+        .kbd {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-bottom-width: 2px;
+            border-radius: .5rem;
+            padding: .15rem .45rem;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: .75rem;
         }
     </style>
 </head>
 
-<body class="bg-white text-gray-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+    <!-- 선택: 공용 헤더 쓰면 여기에 fetch로 꽂히게 -->
     <div id="header-placeholder"></div>
 
-    <!-- ✅ 매니저 상단바 -->
-    <section class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div class="max-w-6xl mx-auto px-4 py-4">
-            <div class="flex flex-col gap-3">
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <h1 id="mgrTitle" class="text-xl md:text-2xl font-extrabold text-slate-900">
-                            서브카테고리 매니저 · 통합 · 카테고리 미지정
-                        </h1>
-                        <p class="text-sm text-slate-500 mt-1">더보기 클릭 시 12개씩 추가 표시됩니다.</p>
+    <!-- 상단 매니저바 -->
+    <section class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <!-- 좌: 타이틀 + 토글 -->
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center shadow">
+                            <span class="font-black">SC</span>
+                        </div>
+                        <div>
+                            <div class="text-lg font-extrabold leading-tight">서브카테고리 매니저</div>
+                            <div class="text-xs text-slate-500">푸드/통합 토글 · 더보기(12개씩) · 모달 편집</div>
+                        </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
-                        <div class="text-sm font-semibold text-slate-600">정렬</div>
-                        <select id="mgrSort" class="field !py-2 !rounded-xl !w-[170px]">
-                            <option value="name_asc">상호명 (가→하)</option>
-                            <option value="name_desc">상호명 (하→가)</option>
-                        </select>
+                    <!-- 토글 -->
+                    <div class="flex items-center gap-2">
+                        <span id="modeBadge"
+                            class="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-bold">푸드</span>
 
-                        <div class="text-sm font-semibold text-slate-600 ml-2">검색</div>
-                        <input id="mgrSearch" class="field !py-2 !rounded-xl !w-[220px]" placeholder="상호/업종" />
-
-                        <button id="mgrReset"
-                            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold">
-                            초기화
-                        </button>
-
-                        <div class="ml-2 text-sm font-semibold text-slate-600">서브카테고리</div>
-                        <div id="mgrCurrentSub" class="text-sm font-extrabold text-blue-700">All</div>
+                        <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button id="btnModeFood"
+                                class="px-3 py-1.5 rounded-lg text-sm font-bold bg-white shadow-sm border border-slate-200">푸드</button>
+                            <button id="btnModeCombined"
+                                class="px-3 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-slate-800">통합</button>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 우: 정렬/검색/초기화 -->
+                <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-bold text-slate-600">정렬</label>
+                        <select id="sortSelect"
+                            class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200">
+                            <option value="posAsc">번호(오름차순)</option>
+                            <option value="filledFirst">채워진 슬롯 먼저</option>
+                            <option value="titleAsc">제목(A→Z)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <input id="searchInput" type="text" placeholder="검색(제목/링크값)"
+                                class="h-10 w-64 max-w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                            <button id="btnClearSearch"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                                title="검색 지우기">
+                                ✕
+                            </button>
+                        </div>
+
+                        <button id="btnReset"
+                            class="h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-extrabold hover:bg-slate-50">
+                            초기화
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 상단 상태바 -->
+            <div class="mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div class="text-xs text-slate-500">
+                    <span class="font-bold text-slate-700">표시 슬롯:</span>
+                    <span id="visibleCountText" class="font-extrabold">12</span>개
+                    <span class="mx-2 text-slate-300">|</span>
+                    <span class="font-bold text-slate-700">단축키:</span>
+                    <span class="kbd">ESC</span> 모달닫기
+                </div>
+                <div id="topStatus"
+                    class="text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hidden"></div>
             </div>
         </div>
     </section>
 
-    <!-- ✅ 서브카테고리 페이지 화면 그대로 -->
-    <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
-        <div class="flex-1 flex justify-center">
-            <img id="heroImage" src="/uploads/no-image.png" alt="배너" class="h-[280px] object-contain">
-        </div>
-        <div class="flex-1 text-left">
-            <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
-            <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
-            <button id="btnMoreHero" class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg">MORE VIEW</button>
-        </div>
-    </section>
-
-    <!-- All of the items -->
-    <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
+    <!-- 컨텐츠 -->
+    <main class="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl md:text-2xl font-bold">All of the items</h2>
-            <button id="btnMoreItems"
-                class="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">더보기</button>
+            <div class="text-sm text-slate-600">
+                슬롯은 데이터가 없어도 항상 보이게 유지돼.
+            </div>
+            <button id="btnMore"
+                class="px-4 py-2 rounded-xl bg-blue-600 text-white font-extrabold hover:bg-blue-700 shadow">
+                더보기 +12
+            </button>
         </div>
-        <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
-        <div id="lineGrid" class="grid grid-cols-1 gap-4"></div>
 
-        <div id="itemsPager" class="mt-8 flex justify-center items-center gap-3 hidden">
-            <button id="itemsPrev" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">이전</button>
-            <div id="itemsPageInfo" class="text-sm font-semibold text-gray-700"></div>
-            <button id="itemsNext" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">다음</button>
+        <!-- 슬롯 그리드 -->
+        <section id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        </section>
+
+        <div class="mt-6 flex justify-center">
+            <button id="btnMoreBottom"
+                class="px-5 py-2.5 rounded-2xl bg-white border border-slate-200 font-extrabold hover:bg-slate-50 shadow-sm">
+                더보기 +12
+            </button>
         </div>
-    </section>
+    </main>
 
-    <!-- Best Seller -->
-    <section class="max-w-6xl mx-auto py-12 px-4 w-full">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl md:text-2xl font-bold">Best Seller</h2>
-            <button id="btnMoreBest"
-                class="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">더보기</button>
-        </div>
-        <div id="bestGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+    <!-- 모달 -->
+    <div id="modalOverlay" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/45"></div>
 
-        <div id="bestPager" class="mt-8 flex justify-center items-center gap-3 hidden">
-            <button id="bestPrev" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">이전</button>
-            <div id="bestPageInfo" class="text-sm font-semibold text-gray-700"></div>
-            <button id="bestNext" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">다음</button>
-        </div>
-    </section>
-
-    <!-- New registration -->
-    <section class="max-w-6xl mx-auto py-12 px-4 w-full">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl md:text-2xl font-bold">New registration</h2>
-            <button id="btnMoreNew"
-                class="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">더보기</button>
-        </div>
-        <div id="newGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-
-        <div id="newPager" class="mt-8 flex justify-center items-center gap-3 hidden">
-            <button id="newPrev" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">이전</button>
-            <div id="newPageInfo" class="text-sm font-semibold text-gray-700"></div>
-            <button id="newNext" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">다음</button>
-        </div>
-    </section>
-
-    <div id="footer-placeholder"></div>
-
-    <!-- ✅ 모달 (ncategory2 스타일) : "서브카테고리 변경" -->
-    <div id="slotModal" class="hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-panel">
-            <div class="modal-card">
-
-                <div class="p-6 sticky top-0 bg-white/90 backdrop-blur border-b border-slate-100 z-10">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-xl sm:text-2xl font-extrabold">서브카테고리 수정</h3>
-                            <p class="text-xs text-gray-500 mt-1">
-                                table: <b id="mTable">combined_store_info</b> /
-                                store_id: <span id="mStoreId" class="font-semibold"></span>
-                            </p>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="w-full max-w-2xl neo-card overflow-hidden">
+                <!-- 헤더 -->
+                <div
+                    class="px-5 py-4 border-b border-slate-200 bg-white/70 backdrop-blur flex items-start justify-between">
+                    <div>
+                        <div class="text-lg font-extrabold">슬롯 설정</div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            모드: <span id="modalModeText" class="font-extrabold text-slate-700">푸드</span>
+                            <span class="mx-2 text-slate-300">|</span>
+                            슬롯번호: <span id="modalPosText" class="font-extrabold text-slate-700">-</span>
                         </div>
+                    </div>
+                    <button id="btnModalClose"
+                        class="w-10 h-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-black">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- 바디 -->
+                <div class="p-5 bg-white">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 제목 -->
+                        <div class="md:col-span-2">
+                            <label class="text-xs font-extrabold text-slate-600">제목</label>
+                            <input id="inpTitle" type="text" placeholder="예) 바버라인 / 왕돈가스 / 네일아트"
+                                class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                        </div>
+
+                        <!-- 이미지 URL -->
+                        <div class="md:col-span-2">
+                            <label class="text-xs font-extrabold text-slate-600">이미지 URL</label>
+                            <input id="inpImageUrl" type="text" placeholder="/uploads/xxx.jpg 또는 https://..."
+                                class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                            <div class="mt-2 flex items-center gap-3">
+                                <div
+                                    class="w-20 h-14 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                                    <img id="imgPreview" src="/uploads/no-image.png" alt="preview"
+                                        class="w-full h-full object-cover" />
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-xs font-extrabold text-slate-600">이미지 파일(선택)</label>
+                                    <input id="inpImageFile" type="file" accept="image/*"
+                                        class="mt-1 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-extrabold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                    <div class="text-xs text-slate-500 mt-1">
+                                        파일을 선택하면 저장 시 FormData로 업로드를 시도해.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 연결 방식 -->
+                        <div>
+                            <label class="text-xs font-extrabold text-slate-600">연결 방식(선택)</label>
+                            <select id="selLinkType"
+                                class="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200">
+                                <option value="store_id">가게 ID</option>
+                                <option value="subcategory">서브카테고리(문자)</option>
+                                <option value="url">URL</option>
+                                <option value="text">직접입력(텍스트)</option>
+                            </select>
+                        </div>
+
+                        <!-- 연결 값 -->
+                        <div>
+                            <label class="text-xs font-extrabold text-slate-600">연결 값(직접입력)</label>
+                            <input id="inpLinkValue" type="text" placeholder="예) 12 / 미용/이발 / https://..."
+                                class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                            <div id="linkHint" class="text-xs text-slate-500 mt-1">
+                                가게 ID는 숫자만 권장.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 모달 상태 -->
+                    <div id="modalStatus" class="mt-4 hidden text-sm px-4 py-3 rounded-xl border"></div>
+
+                    <!-- 푸터 버튼 -->
+                    <div class="mt-5 flex items-center justify-between gap-2">
+                        <button id="btnClearSlot"
+                            class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-extrabold hover:bg-slate-50">
+                            비우기
+                        </button>
+
                         <div class="flex items-center gap-2">
-                            <button id="btnCloseModal"
-                                class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
+                            <button id="btnModalCancel"
+                                class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-extrabold hover:bg-slate-50">
                                 닫기
+                            </button>
+                            <button id="btnModalSave"
+                                class="h-11 px-5 rounded-xl bg-blue-600 text-white font-extrabold hover:bg-blue-700 shadow">
+                                저장
                             </button>
                         </div>
                     </div>
                 </div>
-
-                <div class="p-6 space-y-6">
-                    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-sm font-semibold">상호명</label>
-                                <input id="mName" class="field mt-2" readonly />
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold">업종(카테고리)</label>
-                                <input id="mCategory" class="field mt-2" readonly />
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                            <div>
-                                <label class="text-sm font-semibold">현재 서브카테고리</label>
-                                <input id="mCurrentSub" class="field mt-2" readonly />
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold">변경할 서브카테고리</label>
-                                <select id="mSubSelect" class="field mt-2"></select>
-                                <input id="mSubCustom" class="field mt-2" placeholder="직접 입력(선택)" />
-                                <p class="text-xs text-gray-500 mt-1">드롭다운 선택 또는 직접 입력 둘 중 하나만 쓰면 됩니다.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="divider"></div>
-
-                    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                        <p class="text-sm font-semibold mb-2">현재 선택 정보</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500">선택 카테고리:</span>
-                                <span id="mSummaryCategory" class="font-semibold text-slate-800">-</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500">변경 서브카테고리:</span>
-                                <span id="mSummarySub" class="font-semibold text-slate-800">-</span>
-                            </div>
-                        </div>
-                        <div id="modalStatus" class="mt-3 text-xs text-slate-600"></div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                        <button id="btnResetModal"
-                            class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">
-                            입력 초기화
-                        </button>
-                        <button id="btnSaveSub"
-                            class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
-                            저장
-                        </button>
-                    </div>
-                </div>
-
+                <!-- /바디 -->
             </div>
         </div>
     </div>
 
     <script>
-        // =========================
-        // ✅ 공통 유틸/헤더푸터
-        // =========================
-        const el = (id) => document.getElementById(id);
-        const clean = (v) => (v == null ? "" : String(v).trim());
-
-        // header/footer
-        (async () => {
-            try {
-                const h = await fetch("/components/header.html").then((r) => r.text());
-                const hp = el("header-placeholder");
-                if (hp) hp.innerHTML = h;
-            } catch (_) { }
-            try {
-                const f = await fetch("/components/footer.html").then((r) => r.text());
-                const fp = el("footer-placeholder");
-                if (fp) fp.innerHTML = f;
-            } catch (_) { }
-        })();
-
-        // =========================
-        // ✅ URL params (subcategory.html과 동일)
-        // =========================
-        const params = new URLSearchParams(window.location.search);
-        const TYPE = (params.get("type") || "combined").toLowerCase(); // 매니저 기본은 combined
-        const RAW_CATEGORY = (params.get("category") || "").trim();
-        const RAW_SUB = (params.get("sub") || params.get("subcategory") || "").trim();
-
-        let CATEGORY = RAW_CATEGORY;
-        let SUB = RAW_SUB;
-        let CURRENT_SUB = SUB;
-
-        const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
-        const BEAUTY_TYPE_FILTERS = ["미용", "이발", "기타"];
-
-        // =========================
-        // ✅ 데이터/상태
-        // =========================
-        const DEFAULT_DATA = {
-            hero: { title: "샘플 카테고리", subtitle: "기본 설명 텍스트", image: "/uploads/no-image.png" },
-            filters: [],
-            stores: [],
-            best: [],
-            new: []
-        };
-        let DATA = { ...DEFAULT_DATA };
-        let ALL_STORES = [];
-
-        // ✅ 요구사항: 기본 8, 더보기는 12개 단위
-        const COLLAPSED_COUNT = 8;
+        /***********************
+         * 설정
+         ***********************/
         const PAGE_SIZE = 12;
 
-        const sectionState = {
-            items: { expanded: false, page: 1 },
-            best: { expanded: false, page: 1 },
-            newly: { expanded: false, page: 1 }
+        // 목록 불러오기(있으면 사용, 없으면 자동 빈칸)
+        const LIST_API = (mode) => `/admin/subcategory/list?mode=${encodeURIComponent(mode)}`;
+
+        // 저장 API(요청사항)
+        const UPDATE_API = `/admin/subcategory/update`;
+
+        /***********************
+         * 상태
+         ***********************/
+        const state = {
+            mode: "food",                 // food | combined
+            visibleCount: PAGE_SIZE,
+            slots: [],                    // length = visibleCount (빈칸 포함)
+            loadedMap: new Map(),         // position -> slotData (서버에서 받은 값)
+            search: "",
+            sort: "posAsc",
+            activePos: null
         };
 
-        // ✅ 매니저 상단바 상태(정렬/검색)
-        const mgrState = {
-            sort: "name_asc",
-            search: ""
-        };
+        /***********************
+         * 엘리먼트
+         ***********************/
+        const $ = (id) => document.getElementById(id);
 
-        // =========================
-        // ✅ 표시/가공 함수
-        // =========================
-        function escapeHtml(input) {
-            const s = input == null ? "" : String(input);
-            return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        const grid = $("grid");
+        const btnMore = $("btnMore");
+        const btnMoreBottom = $("btnMoreBottom");
+
+        const btnModeFood = $("btnModeFood");
+        const btnModeCombined = $("btnModeCombined");
+        const modeBadge = $("modeBadge");
+
+        const sortSelect = $("sortSelect");
+        const searchInput = $("searchInput");
+        const btnClearSearch = $("btnClearSearch");
+        const btnReset = $("btnReset");
+        const visibleCountText = $("visibleCountText");
+        const topStatus = $("topStatus");
+
+        // Modal
+        const modalOverlay = $("modalOverlay");
+        const btnModalClose = $("btnModalClose");
+        const btnModalCancel = $("btnModalCancel");
+        const btnModalSave = $("btnModalSave");
+        const btnClearSlot = $("btnClearSlot");
+
+        const modalModeText = $("modalModeText");
+        const modalPosText = $("modalPosText");
+        const inpTitle = $("inpTitle");
+        const inpImageUrl = $("inpImageUrl");
+        const inpImageFile = $("inpImageFile");
+        const imgPreview = $("imgPreview");
+        const selLinkType = $("selLinkType");
+        const inpLinkValue = $("inpLinkValue");
+        const linkHint = $("linkHint");
+        const modalStatus = $("modalStatus");
+
+        /***********************
+         * 유틸
+         ***********************/
+        function clean(v) {
+            if (v === undefined || v === null) return "";
+            return String(v).trim();
         }
 
-        function normalizeSrc(src) {
-            if (!src) return "/uploads/no-image.png";
-            if (/^https?:\/\//i.test(src)) return src;
-            return src.startsWith("/") ? src : "/" + src;
+        function showTopStatus(msg, type = "info") {
+            if (!msg) {
+                topStatus.classList.add("hidden");
+                topStatus.textContent = "";
+                return;
+            }
+            topStatus.classList.remove("hidden");
+            topStatus.textContent = msg;
+
+            topStatus.className = "text-xs px-3 py-2 rounded-xl border";
+            if (type === "error") {
+                topStatus.classList.add("bg-red-50", "text-red-700", "border-red-200");
+            } else if (type === "success") {
+                topStatus.classList.add("bg-emerald-50", "text-emerald-700", "border-emerald-200");
+            } else {
+                topStatus.classList.add("bg-white", "text-slate-600", "border-slate-200");
+            }
         }
 
-        function pickImage(store) {
-            const cand = store.main_image_url || store.image_url || store.image || store.url || "";
-            return normalizeSrc(cand);
+        function showModalStatus(msg, type = "info") {
+            if (!msg) {
+                modalStatus.classList.add("hidden");
+                modalStatus.textContent = "";
+                return;
+            }
+            modalStatus.classList.remove("hidden");
+            modalStatus.textContent = msg;
+
+            modalStatus.className = "mt-4 text-sm px-4 py-3 rounded-xl border";
+            if (type === "error") {
+                modalStatus.classList.add("bg-red-50", "text-red-700", "border-red-200");
+            } else if (type === "success") {
+                modalStatus.classList.add("bg-emerald-50", "text-emerald-700", "border-emerald-200");
+            } else {
+                modalStatus.classList.add("bg-slate-50", "text-slate-700", "border-slate-200");
+            }
         }
 
-        function getDetailCategory(store) {
-            const raw = (store.detail_category ?? store.detailCategory ?? "").toString().trim();
-            return raw ? raw : "기타한식";
+        function setModeUI() {
+            const isFood = state.mode === "food";
+            modeBadge.textContent = isFood ? "푸드" : "통합";
+            modeBadge.className = isFood
+                ? "text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-bold"
+                : "text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold";
+
+            if (isFood) {
+                btnModeFood.className = "px-3 py-1.5 rounded-lg text-sm font-bold bg-white shadow-sm border border-slate-200";
+                btnModeCombined.className = "px-3 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-slate-800";
+            } else {
+                btnModeCombined.className = "px-3 py-1.5 rounded-lg text-sm font-bold bg-white shadow-sm border border-slate-200";
+                btnModeFood.className = "px-3 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:text-slate-800";
+            }
         }
 
-        function getCombinedSubcategory(store) {
-            return (store.business_subcategory ?? store.businessSubcategory ?? "").toString().trim();
+        function updateVisibleCountUI() {
+            visibleCountText.textContent = String(state.visibleCount);
         }
 
-        function getBeautyType(store) {
-            const t = (store.business_type ?? store.businessType ?? "").toString().trim();
-            if (t === "미용") return "미용";
-            if (t === "이발") return "이발";
-            return "기타";
-        }
-
-        function setHero(title, subtitle) {
-            DATA.hero = {
-                title: title || "카테고리",
-                subtitle: subtitle || "카테고리별 가게를 확인하세요.",
-                image: "/uploads/no-image.png"
+        function buildEmptySlot(position) {
+            return {
+                position,
+                title: "",
+                image_url: "",
+                link_type: "store_id",
+                link_value: ""
             };
         }
 
-        function setHansikHero(subVal) {
-            const titleBase = "한식";
-            const subLabel = subVal ? ` · ${subVal}` : "";
-            DATA.hero = {
-                title: `${titleBase}${subLabel}`,
-                subtitle:
-                    subVal === "밥" ? "비빔밥 · 덮밥 · 백반 등 든든한 한 끼 모음"
-                        : subVal === "찌개탕" ? "따끈한 찌개와 얼큰한 탕 요리를 모았어요"
-                            : subVal === "고기구이" ? "삼겹살, 갈비, 숯불구이 등 고기 좋아하는 날에 딱!"
-                                : subVal === "생선" ? "구이 · 조림 · 회 등 다양한 생선 요리"
-                                    : subVal === "족발보쌈" ? "족발 · 보쌈 · 수육까지 푸짐하게"
-                                        : subVal === "국밥" ? "뜨끈한 국밥 한 그릇으로 든든하게"
-                                            : subVal === "반찬" ? "집밥 느낌 나는 반찬/도시락 가게 모음"
-                                                : subVal === "기타한식" ? "한식 분류에 들어가지 않는 다양한 메뉴 모음"
-                                                    : "우리동네 한식 맛집들을 모았습니다.",
-                image: "/uploads/no-image.png"
+        function getSlotByPosition(position) {
+            // 서버 데이터가 있으면 그걸 기반으로, 없으면 빈칸
+            const serverSlot = state.loadedMap.get(position);
+            if (!serverSlot) return buildEmptySlot(position);
+
+            return {
+                position,
+                title: clean(serverSlot.title),
+                image_url: clean(serverSlot.image_url),
+                link_type: clean(serverSlot.link_type) || "store_id",
+                link_value: clean(serverSlot.link_value)
             };
         }
 
-        async function fetchJson(url, opt) {
-            const res = await fetch(url, opt);
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) console.error("❌ fetchJson not ok:", res.status, url, json);
-            return json;
+        function ensureSlotsLength() {
+            const arr = [];
+            for (let pos = 1; pos <= state.visibleCount; pos++) {
+                arr.push(getSlotByPosition(pos));
+            }
+            state.slots = arr;
         }
 
-        function buildDynamicFiltersFromStores(stores) {
-            const set = new Set();
-            (stores || []).forEach(s => {
-                const sub = getCombinedSubcategory(s);
-                if (sub) set.add(sub);
-            });
-            const list = Array.from(set);
-            list.sort((a, b) => a.localeCompare(b, "ko"));
+        function applySortAndSearch(slots) {
+            let list = [...slots];
+
+            // 검색
+            const q = clean(state.search).toLowerCase();
+            if (q) {
+                list = list.filter(s => {
+                    const t = clean(s.title).toLowerCase();
+                    const lv = clean(s.link_value).toLowerCase();
+                    return t.includes(q) || lv.includes(q);
+                });
+            }
+
+            // 정렬
+            if (state.sort === "posAsc") {
+                list.sort((a, b) => a.position - b.position);
+            } else if (state.sort === "filledFirst") {
+                list.sort((a, b) => {
+                    const af = !!clean(a.title) || !!clean(a.image_url) || !!clean(a.link_value);
+                    const bf = !!clean(b.title) || !!clean(b.image_url) || !!clean(b.link_value);
+                    if (af === bf) return a.position - b.position;
+                    return bf - af;
+                });
+            } else if (state.sort === "titleAsc") {
+                list.sort((a, b) => clean(a.title).localeCompare(clean(b.title), "ko") || (a.position - b.position));
+            }
+
             return list;
         }
 
-        function buildBestFromStores(stores) {
-            const arr = (stores || []).slice();
-            arr.sort((a, b) => {
-                const av = Number(a.view_count ?? a.viewCount ?? 0);
-                const bv = Number(b.view_count ?? b.viewCount ?? 0);
-                return bv - av;
-            });
-            return arr;
+        function linkTypeLabel(v) {
+            if (v === "store_id") return "가게ID";
+            if (v === "subcategory") return "서브카테고리";
+            if (v === "url") return "URL";
+            if (v === "text") return "텍스트";
+            return v || "-";
         }
 
-        function buildNewFromStores(stores) {
-            const now = Date.now();
-            const limitMs = 60 * 24 * 60 * 60 * 1000;
-            const arr = (stores || []).filter(s => {
-                const t = Date.parse(s.created_at ?? s.createdAt ?? "");
-                if (!Number.isFinite(t)) return false;
-                return (now - t) <= limitMs;
-            });
-            arr.sort((a, b) => {
-                const at = Date.parse(a.created_at ?? a.createdAt ?? "") || 0;
-                const bt = Date.parse(b.created_at ?? b.createdAt ?? "") || 0;
-                return bt - at;
-            });
-            return arr;
+        function safeImg(url) {
+            const u = clean(url);
+            if (!u) return "/uploads/no-image.png";
+            return u;
         }
 
-        function resetPagingAll() {
-            sectionState.items.page = 1;
-            sectionState.best.page = 1;
-            sectionState.newly.page = 1;
+        function escapeHtml(s) {
+            return String(s || "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
         }
 
-        function applySubFilter(subVal, updateHistory = true) {
-            const sub = (subVal || "").trim();
-            CURRENT_SUB = sub;
+        /***********************
+         * 렌더
+         ***********************/
+        function render() {
+            updateVisibleCountUI();
+            setModeUI();
 
-            // 한식: detail_category
-            if (TYPE === "food" && CATEGORY === "한식") {
-                if (!sub) {
-                    DATA.stores = ALL_STORES.slice();
-                    setHansikHero("");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub"); q.delete("subcategory");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-                DATA.stores = ALL_STORES.filter(s => getDetailCategory(s) === sub);
-                setHansikHero(sub);
-                if (updateHistory) {
-                    const q = new URLSearchParams(location.search);
-                    q.set("subcategory", sub); q.delete("sub");
-                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                }
-                return;
-            }
+            const displayList = applySortAndSearch(state.slots);
 
-            // combined + 미용/이발: business_type
-            if (TYPE === "combined" && CATEGORY === "미용/이발") {
-                if (!sub) {
-                    DATA.stores = ALL_STORES.slice();
-                    setHero("미용/이발", "미용/이발 카테고리 가게를 확인하세요.");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub"); q.delete("subcategory");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-                DATA.stores = ALL_STORES.filter(s => getBeautyType(s) === sub);
-                setHero(`미용/이발 · ${sub}`, "선택한 분류의 가게를 확인하세요.");
-                if (updateHistory) {
-                    const q = new URLSearchParams(location.search);
-                    q.set("category", "미용/이발");
-                    q.set("subcategory", sub);
-                    q.delete("sub");
-                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                }
-                return;
-            }
+            grid.innerHTML = displayList.map(slot => {
+                const hasAny = !!clean(slot.title) || !!clean(slot.image_url) || !!clean(slot.link_value);
+                const title = clean(slot.title) || "빈 슬롯";
+                const img = safeImg(slot.image_url);
+                const lt = linkTypeLabel(slot.link_type);
+                const lv = clean(slot.link_value) || "-";
 
-            // combined: business_subcategory
-            if (TYPE === "combined" && DATA.filters && DATA.filters.length) {
-                if (!sub) {
-                    DATA.stores = ALL_STORES.slice();
-                    setHero(CATEGORY || "카테고리 미지정", "카테고리별 가게를 확인하세요.");
-                    if (updateHistory) {
-                        const q = new URLSearchParams(location.search);
-                        q.delete("sub"); q.delete("subcategory");
-                        history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                    }
-                    return;
-                }
-                DATA.stores = ALL_STORES.filter(s => getCombinedSubcategory(s) === sub);
-                setHero(`${CATEGORY || "카테고리 미지정"} · ${sub}`, "선택한 서브카테고리의 가게를 확인하세요.");
-                if (updateHistory) {
-                    const q = new URLSearchParams(location.search);
-                    q.set("subcategory", sub);
-                    q.delete("sub");
-                    history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-                }
-                return;
-            }
+                return `
+          <article class="neo-card p-4 relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-blue-500/10"></div>
 
-            DATA.stores = ALL_STORES.slice();
-            setHero(CATEGORY || "카테고리 미지정", "카테고리별 가게를 확인하세요.");
-        }
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm">
+                  ${slot.position}
+                </div>
+                <div>
+                  <div class="text-sm font-extrabold leading-tight">${escapeHtml(title)}</div>
+                  <div class="text-xs text-slate-500 mt-0.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full border border-slate-200 bg-white font-bold">
+                      ${escapeHtml(lt)}
+                    </span>
+                    <span class="ml-1">${escapeHtml(lv)}</span>
+                  </div>
+                </div>
+              </div>
 
-        function bindHero() {
-            el("heroTitle").innerHTML = (DATA.hero?.title || "").replace(/\n/g, "<br>");
-            el("heroSubtitle").textContent = DATA.hero?.subtitle || "";
-            el("heroImage").src = DATA.hero?.image || "/uploads/no-image.png";
-
-            // 매니저 타이틀
-            const ct = CATEGORY ? CATEGORY : "카테고리 미지정";
-            const tLabel = (TYPE === "food") ? "푸드" : "통합";
-            el("mgrTitle").textContent = `서브카테고리 매니저 · ${tLabel} · ${ct}`;
-            el("mgrCurrentSub").textContent = CURRENT_SUB ? CURRENT_SUB : "All";
-        }
-
-        function makeFilterBtn(label, tagVal) {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            const isActive = (CURRENT_SUB || "") === (tagVal || "");
-            btn.className = isActive
-                ? "px-3 py-1.5 rounded-full bg-black text-white text-sm"
-                : "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
-            btn.textContent = label;
-
-            btn.onclick = () => {
-                resetPagingAll();
-                applySubFilter(tagVal || "", true);
-                bindHero();
-                renderFilters();
-                renderItemsSection();
-                renderBestSection();
-                renderNewSection();
-            };
-            return btn;
-        }
-
-        function renderFilters() {
-            const wrap = el("filterContainer");
-            wrap.innerHTML = "";
-
-            if (TYPE === "food" && CATEGORY === "한식") {
-                wrap.appendChild(makeFilterBtn("All", ""));
-                HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-                return;
-            }
-
-            if (TYPE === "combined" && CATEGORY === "미용/이발") {
-                wrap.appendChild(makeFilterBtn("All", ""));
-                BEAUTY_TYPE_FILTERS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-                return;
-            }
-
-            if (TYPE === "combined" && DATA.filters && DATA.filters.length) {
-                wrap.appendChild(makeFilterBtn("All", ""));
-                DATA.filters.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
-                return;
-            }
-        }
-
-        function getVisible(list, stateObj) {
-            const listArr = (list || []);
-            if (!stateObj.expanded) return { slice: listArr.slice(0, COLLAPSED_COUNT), totalPages: 1 };
-            const totalPages = Math.max(1, Math.ceil(listArr.length / PAGE_SIZE));
-            const page = Math.min(Math.max(1, stateObj.page), totalPages);
-            stateObj.page = page;
-            const start = (page - 1) * PAGE_SIZE;
-            return { slice: listArr.slice(start, start + PAGE_SIZE), totalPages };
-        }
-
-        // ✅ 매니저 정렬/검색 적용 (All items 기준)
-        function applyManagerSearchSort(stores) {
-            let arr = (stores || []).slice();
-
-            const q = clean(mgrState.search).toLowerCase();
-            if (q) {
-                arr = arr.filter(s => {
-                    const name = clean(s.business_name ?? s.name ?? s.businessName ?? "").toLowerCase();
-                    const cat = clean(s.business_category ?? s.category ?? s.businessCategory ?? "").toLowerCase();
-                    const type = clean(s.business_type ?? s.businessType ?? "").toLowerCase();
-                    const sub = clean(s.business_subcategory ?? s.businessSubcategory ?? "").toLowerCase();
-                    return name.includes(q) || cat.includes(q) || type.includes(q) || sub.includes(q);
-                });
-            }
-
-            if (mgrState.sort === "name_desc") {
-                arr.sort((a, b) => clean(b.business_name ?? b.name ?? b.businessName ?? "-").localeCompare(
-                    clean(a.business_name ?? a.name ?? a.businessName ?? "-"), "ko"
-                ));
-            } else {
-                arr.sort((a, b) => clean(a.business_name ?? a.name ?? a.businessName ?? "-").localeCompare(
-                    clean(b.business_name ?? b.name ?? b.businessName ?? "-"), "ko"
-                ));
-            }
-
-            return arr;
-        }
-
-        // ✅ 카드 렌더(매니저: 클릭 시 모달)
-        function renderStoresGrid(stores, gridEl) {
-            gridEl.innerHTML = "";
-
-            if (!stores || !stores.length) {
-                gridEl.innerHTML = `
-          <div class="col-span-full flex justify-center items-center py-16">
-            <div class="p-8 text-center max-w-md">
-              <h3 class="text-lg font-semibold text-gray-700 mb-2">등록된 가게가 없습니다</h3>
-              <p class="text-sm text-gray-500">빠른 시일 내에 새로운 가게가 추가될 예정입니다.</p>
+              <span class="${hasAny
+                        ? "text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold"
+                        : "text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold"}">
+                ${hasAny ? "설정됨" : "비어있음"}
+              </span>
             </div>
-          </div>`;
-                return;
-            }
 
-            const wrapper = document.createElement("div");
-            wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
-
-            stores.forEach(store => {
-                const card = document.createElement("div");
-                card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white border border-slate-100";
-
-                const dispName = store.business_name ?? store.name ?? store.businessName ?? store.title ?? "-";
-                const dispCategory = store.business_category ?? store.category ?? store.businessCategory ?? "";
-                const imgNorm = pickImage(store);
-
-                card.innerHTML = `
-          <div class="relative h-[260px]">
-            <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
-            <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
-              <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
-              <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
+            <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+              <img src="${escapeHtml(img)}" alt="slot image"
+                class="w-full h-36 object-cover"
+                onerror="this.src='/uploads/no-image.png';" />
             </div>
-          </div>`;
 
-                // ✅ 매니저: 클릭하면 모달
-                card.addEventListener("click", () => openSubModal(store));
-                wrapper.appendChild(card);
-            });
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                class="flex-1 h-11 rounded-xl bg-blue-600 text-white font-extrabold hover:bg-blue-700 shadow"
+                data-action="open"
+                data-pos="${slot.position}">
+                설정
+              </button>
 
-            gridEl.appendChild(wrapper);
-        }
+              <button
+                class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-extrabold hover:bg-slate-50"
+                data-action="clearLocal"
+                data-pos="${slot.position}">
+                비우기
+              </button>
+            </div>
 
-        function renderSmallGrid(gridId, items) {
-            const grid = el(gridId);
-            grid.innerHTML = "";
-
-            if (!items || !items.length) {
-                grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
-                return;
-            }
-
-            items.forEach(item => {
-                const name = item.business_name ?? item.name ?? "-";
-                const img = pickImage(item);
-
-                const card = document.createElement("div");
-                card.className = "block rounded-2xl overflow-hidden bg-white hover:shadow-lg transition cursor-pointer border border-slate-100";
-                card.innerHTML = `
-          <div class="h-40">
-            <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover">
-          </div>
-          <div class="p-3 text-sm font-semibold truncate">${escapeHtml(name)}</div>
+            <div class="mt-2 text-[11px] text-slate-500">
+              * 데이터가 없어도 슬롯은 유지돼. (더보기로 12개씩 추가)
+            </div>
+          </article>
         `;
+            }).join("");
 
-                // ✅ 매니저: 클릭하면 모달
-                card.addEventListener("click", () => openSubModal(item));
-                grid.appendChild(card);
+            // 이벤트 위임
+            grid.querySelectorAll("[data-action]").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    const action = e.currentTarget.getAttribute("data-action");
+                    const pos = Number(e.currentTarget.getAttribute("data-pos"));
+
+                    if (action === "open") openModal(pos);
+                    if (action === "clearLocal") {
+                        // 로컬만 비우고(즉시 표시 반영) 저장은 모달에서 하게 유지
+                        state.loadedMap.set(pos, { position: pos, title: "", image_url: "", link_type: "store_id", link_value: "" });
+                        ensureSlotsLength();
+                        render();
+                        showTopStatus(`슬롯 ${pos} 로컬 비움(저장은 모달에서 저장 눌러야 반영됨)`, "info");
+                    }
+                });
             });
         }
 
-        function renderItemsSection() {
-            const grid = el("lineGrid");
-            const pager = el("itemsPager");
-            const prev = el("itemsPrev");
-            const next = el("itemsNext");
-            const info = el("itemsPageInfo");
+        /***********************
+         * 데이터 로드(있으면) - 없어도 빈칸 유지
+         ***********************/
+        async function loadList() {
+            showTopStatus("", "info");
+            state.loadedMap.clear();
 
-            // ✅ items는 매니저 정렬/검색 반영
-            const filtered = applyManagerSearchSort(DATA.stores || []);
-            const v = getVisible(filtered, sectionState.items);
+            try {
+                const res = await fetch(LIST_API(state.mode), { method: "GET" });
+                if (!res.ok) {
+                    // 서버 라우터 없으면 여기로
+                    showTopStatus(`목록 API 없음 또는 오류 (${res.status}) → 빈 슬롯만 표시`, "error");
+                    ensureSlotsLength();
+                    render();
+                    return;
+                }
 
-            renderStoresGrid(v.slice, grid);
+                const data = await res.json();
+                if (!data || data.success !== true || !Array.isArray(data.items)) {
+                    showTopStatus("목록 응답 형식이 예상과 달라 빈 슬롯만 표시", "error");
+                    ensureSlotsLength();
+                    render();
+                    return;
+                }
 
-            if (!sectionState.items.expanded || v.totalPages <= 1) {
-                pager.classList.add("hidden");
-            } else {
-                pager.classList.remove("hidden");
-                info.textContent = `${sectionState.items.page} / ${v.totalPages}`;
-                prev.disabled = sectionState.items.page <= 1;
-                next.disabled = sectionState.items.page >= v.totalPages;
+                // items: [{position,title,image_url,link_type,link_value}, ...] 가정
+                for (const it of data.items) {
+                    const pos = Number(it.position);
+                    if (!Number.isFinite(pos) || pos <= 0) continue;
+                    state.loadedMap.set(pos, {
+                        position: pos,
+                        title: clean(it.title),
+                        image_url: clean(it.image_url),
+                        link_type: clean(it.link_type) || "store_id",
+                        link_value: clean(it.link_value)
+                    });
+                }
+
+                ensureSlotsLength();
+                render();
+                showTopStatus("목록 로드 완료", "success");
+            } catch (err) {
+                console.error(err);
+                showTopStatus("목록 로드 실패 → 빈 슬롯만 표시", "error");
+                ensureSlotsLength();
+                render();
             }
         }
 
-        function renderBestSection() {
-            const pager = el("bestPager");
-            const prev = el("bestPrev");
-            const next = el("bestNext");
-            const info = el("bestPageInfo");
+        /***********************
+         * 더보기
+         ***********************/
+        async function more() {
+            state.visibleCount += PAGE_SIZE;
+            ensureSlotsLength();
+            render();
 
-            const v = getVisible(DATA.best || [], sectionState.best);
-            renderSmallGrid("bestGrid", v.slice);
-
-            if (!sectionState.best.expanded || v.totalPages <= 1) {
-                pager.classList.add("hidden");
-            } else {
-                pager.classList.remove("hidden");
-                info.textContent = `${sectionState.best.page} / ${v.totalPages}`;
-                prev.disabled = sectionState.best.page <= 1;
-                next.disabled = sectionState.best.page >= v.totalPages;
-            }
+            // 더보기 후에도 서버에 데이터가 있을 수 있으니 목록 재시도
+            await loadList();
         }
 
-        function renderNewSection() {
-            const pager = el("newPager");
-            const prev = el("newPrev");
-            const next = el("newNext");
-            const info = el("newPageInfo");
+        /***********************
+         * 모달
+         ***********************/
+        function openModal(position) {
+            state.activePos = position;
 
-            const v = getVisible(DATA.new || [], sectionState.newly);
-            renderSmallGrid("newGrid", v.slice);
+            const slot = getSlotByPosition(position);
 
-            if (!sectionState.newly.expanded || v.totalPages <= 1) {
-                pager.classList.add("hidden");
-            } else {
-                pager.classList.remove("hidden");
-                info.textContent = `${sectionState.newly.page} / ${v.totalPages}`;
-                prev.disabled = sectionState.newly.page <= 1;
-                next.disabled = sectionState.newly.page >= v.totalPages;
-            }
-        }
+            modalModeText.textContent = (state.mode === "food") ? "푸드" : "통합";
+            modalPosText.textContent = String(position);
 
-        function syncMoreButtonLabels() {
-            el("btnMoreItems").textContent = sectionState.items.expanded ? "접기" : "더보기";
-            el("btnMoreBest").textContent = sectionState.best.expanded ? "접기" : "더보기";
-            el("btnMoreNew").textContent = sectionState.newly.expanded ? "접기" : "더보기";
-            el("btnMoreHero").textContent = sectionState.items.expanded ? "CLOSE VIEW" : "MORE VIEW";
-        }
+            inpTitle.value = clean(slot.title);
+            inpImageUrl.value = clean(slot.image_url);
+            selLinkType.value = clean(slot.link_type) || "store_id";
+            inpLinkValue.value = clean(slot.link_value);
 
-        function bindMoreAndPagerEvents() {
-            // Items
-            el("btnMoreItems").onclick = () => {
-                sectionState.items.expanded = !sectionState.items.expanded;
-                sectionState.items.page = 1;
-                syncMoreButtonLabels();
-                renderItemsSection();
-            };
-            el("btnMoreHero").onclick = () => el("btnMoreItems").click();
-            el("itemsPrev").onclick = () => { sectionState.items.page = Math.max(1, sectionState.items.page - 1); renderItemsSection(); };
-            el("itemsNext").onclick = () => { sectionState.items.page += 1; renderItemsSection(); };
+            inpImageFile.value = "";
+            imgPreview.src = safeImg(slot.image_url);
 
-            // Best
-            el("btnMoreBest").onclick = () => {
-                sectionState.best.expanded = !sectionState.best.expanded;
-                sectionState.best.page = 1;
-                syncMoreButtonLabels();
-                renderBestSection();
-            };
-            el("bestPrev").onclick = () => { sectionState.best.page = Math.max(1, sectionState.best.page - 1); renderBestSection(); };
-            el("bestNext").onclick = () => { sectionState.best.page += 1; renderBestSection(); };
+            updateLinkHint();
+            showModalStatus("", "info");
 
-            // New
-            el("btnMoreNew").onclick = () => {
-                sectionState.newly.expanded = !sectionState.newly.expanded;
-                sectionState.newly.page = 1;
-                syncMoreButtonLabels();
-                renderNewSection();
-            };
-            el("newPrev").onclick = () => { sectionState.newly.page = Math.max(1, sectionState.newly.page - 1); renderNewSection(); };
-            el("newNext").onclick = () => { sectionState.newly.page += 1; renderNewSection(); };
-        }
-
-        // =========================
-        // ✅ 모달: 서브카테고리 변경
-        // =========================
-        const modalState = {
-            table: "combined_store_info",
-            store: null
-        };
-
-        function setModalStatus(msg) {
-            el("modalStatus").textContent = msg || "";
+            modalOverlay.classList.remove("hidden");
+            document.body.classList.add("overflow-hidden");
+            setTimeout(() => inpTitle.focus(), 0);
         }
 
         function closeModal() {
-            el("slotModal").classList.add("hidden");
+            modalOverlay.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
+            state.activePos = null;
+            showModalStatus("", "info");
         }
 
-        function openSubModal(store) {
-            modalState.store = store || null;
-
-            const id = clean(store?.id);
-            const name = clean(store?.business_name ?? store?.name ?? store?.businessName ?? "-");
-            const cat = clean(store?.business_category ?? store?.category ?? store?.businessCategory ?? "-");
-            const curSub = clean(store?.business_subcategory ?? store?.businessSubcategory ?? "");
-
-            el("mStoreId").textContent = id || "-";
-            el("mName").value = name || "-";
-            el("mCategory").value = cat || "-";
-            el("mCurrentSub").value = curSub || "(미지정)";
-
-            el("mSummaryCategory").textContent = cat || "-";
-            el("mSummarySub").textContent = "-";
-
-            // ✅ 옵션 구성: 미용/이발이면 고정(미용/이발/기타), 아니면 현재 필터 목록 + 커스텀
-            const sel = el("mSubSelect");
-            sel.innerHTML = "";
-            const opts = [];
-
-            if (TYPE === "combined" && CATEGORY === "미용/이발") {
-                opts.push(...BEAUTY_TYPE_FILTERS);
-            } else {
-                const dyn = buildDynamicFiltersFromStores(ALL_STORES);
-                if (dyn.length) opts.push(...dyn);
-            }
-
-            // 기본
-            sel.appendChild(new Option("선택(미지정)", ""));
-            opts.forEach(v => sel.appendChild(new Option(v, v)));
-
-            el("mSubSelect").value = "";
-            el("mSubCustom").value = "";
-
-            setModalStatus("");
-            el("slotModal").classList.remove("hidden");
+        function updateLinkHint() {
+            const t = selLinkType.value;
+            if (t === "store_id") linkHint.textContent = "가게 ID는 숫자만 권장.";
+            else if (t === "subcategory") linkHint.textContent = "예) 미용/이발, 한식, 카페 등(문자).";
+            else if (t === "url") linkHint.textContent = "예) https://www.hongbono1.com/...";
+            else if (t === "text") linkHint.textContent = "자유 텍스트(연결이 아니라 표시용일 수도 있음).";
+            else linkHint.textContent = "";
         }
 
-        function getNewSubValue() {
-            const custom = clean(el("mSubCustom").value);
-            if (custom) return custom;
-            return clean(el("mSubSelect").value);
-        }
+        // 이미지 URL 입력 시 프리뷰 갱신
+        inpImageUrl.addEventListener("input", () => {
+            imgPreview.src = safeImg(inpImageUrl.value);
+        });
 
-        async function saveSubcategory() {
-            const store = modalState.store;
-            const id = clean(store?.id);
-            if (!id) {
-                alert("store id가 없습니다.");
-                return;
-            }
+        // 파일 선택 시 프리뷰 갱신
+        inpImageFile.addEventListener("change", () => {
+            const f = inpImageFile.files && inpImageFile.files[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            imgPreview.src = url;
+        });
 
-            const newSub = getNewSubValue(); // "" 가능(미지정)
-            el("mSummarySub").textContent = newSub ? newSub : "(미지정)";
-            setModalStatus("저장 중...");
+        selLinkType.addEventListener("change", updateLinkHint);
 
-            // ✅ 서버 업데이트 API (여기만 서버에 맞춰주면 됨)
-            //    기대: { success: true }
+        btnModalClose.addEventListener("click", closeModal);
+        btnModalCancel.addEventListener("click", closeModal);
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) closeModal();
+        });
+
+        // 비우기(모달에서 즉시 로컬 반영 + 저장까지는 따로)
+        btnClearSlot.addEventListener("click", () => {
+            if (!state.activePos) return;
+            inpTitle.value = "";
+            inpImageUrl.value = "";
+            inpLinkValue.value = "";
+            selLinkType.value = "store_id";
+            inpImageFile.value = "";
+            imgPreview.src = "/uploads/no-image.png";
+            updateLinkHint();
+            showModalStatus("입력값을 비웠어. 저장을 누르면 서버에도 반영돼.", "info");
+        });
+
+        /***********************
+         * 저장 API 호출
+         * - 서버 라우터 없으면 404 → 모달 상태에 에러 표시
+         ***********************/
+        async function saveActiveSlot() {
+            const pos = state.activePos;
+            if (!pos) return;
+
+            const payload = {
+                mode: state.mode,
+                position: pos,
+                title: clean(inpTitle.value),
+                image_url: clean(inpImageUrl.value),
+                link_type: clean(selLinkType.value) || "store_id",
+                link_value: clean(inpLinkValue.value)
+            };
+
+            // 파일이 있으면 FormData로 전송(서버가 받도록 준비된 경우)
+            const hasFile = inpImageFile.files && inpImageFile.files[0];
+
             try {
-                const payload = {
-                    table: modalState.table,   // combined_store_info
-                    id: id,
-                    business_subcategory: newSub
-                };
+                showModalStatus("저장 중...", "info");
 
-                const json = await fetchJson("/subcategorymanager/api/update-subcategory", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                let res;
+                if (hasFile) {
+                    const fd = new FormData();
+                    fd.append("mode", payload.mode);
+                    fd.append("position", String(payload.position));
+                    fd.append("title", payload.title);
+                    fd.append("image_url", payload.image_url);   // 서버가 url/파일 중 택일 처리할 수 있게 같이 보냄
+                    fd.append("link_type", payload.link_type);
+                    fd.append("link_value", payload.link_value);
+                    fd.append("image", inpImageFile.files[0]);   // field name: image (서버에서 맞추면 됨)
+
+                    res = await fetch(UPDATE_API, { method: "POST", body: fd });
+                } else {
+                    res = await fetch(UPDATE_API, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => "");
+                    showModalStatus(`저장 실패: HTTP ${res.status} ${txt ? `- ${txt.slice(0, 200)}` : ""}`, "error");
+                    return;
+                }
+
+                const data = await res.json().catch(() => null);
+
+                // 성공 가정: {success:true, item:{...}} 또는 {success:true}
+                if (!data || data.success !== true) {
+                    showModalStatus("저장 응답이 예상과 다름(그래도 200 OK)", "error");
+                    return;
+                }
+
+                // 서버가 최신 item을 주면 반영
+                const newItem = data.item || payload;
+
+                // 로컬 반영
+                state.loadedMap.set(pos, {
+                    position: pos,
+                    title: clean(newItem.title),
+                    image_url: clean(newItem.image_url),
+                    link_type: clean(newItem.link_type) || payload.link_type,
+                    link_value: clean(newItem.link_value)
                 });
 
-                if (!json || json.success !== true) {
-                    throw new Error(json?.error || "저장 실패");
-                }
+                ensureSlotsLength();
+                render();
 
-                // ✅ 프론트 데이터 반영
-                const idx = ALL_STORES.findIndex(s => clean(s.id) === id);
-                if (idx >= 0) {
-                    ALL_STORES[idx].business_subcategory = newSub;
-                    ALL_STORES[idx].businessSubcategory = newSub;
-                }
+                showModalStatus("저장 완료 ✅", "success");
+                showTopStatus(`슬롯 ${pos} 저장 완료`, "success");
 
-                // filters 재구성(일반 카테고리인 경우)
-                if (TYPE === "combined" && CATEGORY !== "미용/이발") {
-                    DATA.filters = buildDynamicFiltersFromStores(ALL_STORES);
-                }
+                // 필요하면 자동 닫기(원하면 이 줄 지우면 됨)
+                // closeModal();
 
-                // 현재 필터 유지하며 목록 갱신
-                applySubFilter(CURRENT_SUB, false);
-                bindHero();
-                renderFilters();
-                renderItemsSection();
-                renderBestSection();
-                renderNewSection();
-
-                setModalStatus("저장 완료 ✅");
-                alert("저장 완료 ✅");
-                closeModal();
-            } catch (e) {
-                console.error(e);
-                setModalStatus(`❌ 저장 실패: ${e.message || e}`);
-                alert(`저장 실패: ${e.message || e}`);
+            } catch (err) {
+                console.error(err);
+                showModalStatus(`저장 중 오류: ${err?.message || err}`, "error");
             }
         }
 
-        // =========================
-        // ✅ 상단바 이벤트
-        // =========================
-        function bindManagerBar() {
-            el("mgrSort").addEventListener("change", () => {
-                mgrState.sort = el("mgrSort").value;
-                sectionState.items.page = 1;
-                renderItemsSection();
-            });
+        btnModalSave.addEventListener("click", saveActiveSlot);
 
-            el("mgrSearch").addEventListener("input", () => {
-                mgrState.search = el("mgrSearch").value;
-                sectionState.items.page = 1;
-                renderItemsSection();
-            });
-
-            el("mgrReset").addEventListener("click", () => {
-                mgrState.sort = "name_asc";
-                mgrState.search = "";
-                el("mgrSort").value = "name_asc";
-                el("mgrSearch").value = "";
-                sectionState.items.page = 1;
-                renderItemsSection();
-            });
-        }
-
-        // =========================
-        // ✅ 모달 이벤트
-        // =========================
-        function bindModalEvents() {
-            el("btnCloseModal").addEventListener("click", (e) => { e.preventDefault(); closeModal(); });
-            el("slotModal").querySelector(".modal-backdrop").addEventListener("click", () => closeModal());
-            document.addEventListener("keydown", (e) => {
-                if (e.key !== "Escape") return;
-                if (!el("slotModal").classList.contains("hidden")) closeModal();
-            });
-
-            el("btnResetModal").addEventListener("click", (e) => {
-                e.preventDefault();
-                el("mSubSelect").value = "";
-                el("mSubCustom").value = "";
-                el("mSummarySub").textContent = "-";
-                setModalStatus("");
-            });
-
-            // 요약 갱신
-            el("mSubSelect").addEventListener("change", () => {
-                const v = getNewSubValue();
-                el("mSummarySub").textContent = v ? v : "(미지정)";
-            });
-            el("mSubCustom").addEventListener("input", () => {
-                const v = getNewSubValue();
-                el("mSummarySub").textContent = v ? v : "(미지정)";
-            });
-
-            el("btnSaveSub").addEventListener("click", (e) => { e.preventDefault(); saveSubcategory(); });
-        }
-
-        // =========================
-        // ✅ 데이터 로드 (subcategory.html과 동일)
-        // =========================
-        async function loadData() {
-            try {
-                DATA = { ...DEFAULT_DATA };
-                ALL_STORES = [];
-
-                sectionState.items.expanded = false; sectionState.items.page = 1;
-                sectionState.best.expanded = false; sectionState.best.page = 1;
-                sectionState.newly.expanded = false; sectionState.newly.page = 1;
-
-                // food
-                if (TYPE === "food") {
-                    const q = new URLSearchParams();
-                    q.set("category", CATEGORY);
-
-                    const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
-                    ALL_STORES = json.stores || [];
-
-                    if (CATEGORY === "한식") {
-                        DATA.filters = HANSIK_SUBS.slice();
-                        applySubFilter(CURRENT_SUB, false);
-                    } else {
-                        DATA.filters = [];
-                        setHero(CATEGORY, "카테고리별 가게를 확인하세요.");
-                        DATA.stores = ALL_STORES.slice();
-                    }
-
-                    try {
-                        const best = await fetchJson(`/api/subcategory/food/best`);
-                        DATA.best = best.stores || [];
-                    } catch (_) { }
-                    try {
-                        const nw = await fetchJson(`/api/subcategory/food/new`);
-                        DATA.new = nw.stores || [];
-                    } catch (_) { }
-                }
-                // combined
-                else if (TYPE === "combined") {
-                    // category 미지정이면 전체를 받아올 수 있는 API가 없을 수도 있어서 방어
-                    if (!CATEGORY) {
-                        // category가 없으면 서버 API가 애매하니, 일단 빈 화면
-                        ALL_STORES = [];
-                        DATA = { ...DEFAULT_DATA };
-                        setHero("카테고리 미지정", "URL에 category=... 를 붙여주세요.");
-                    } else {
-                        const json = await fetchJson(`/api/subcategory/combined?category=${encodeURIComponent(CATEGORY)}`);
-                        ALL_STORES = json.stores || [];
-
-                        if (CATEGORY === "미용/이발") {
-                            DATA.filters = BEAUTY_TYPE_FILTERS.slice();
-                            applySubFilter(CURRENT_SUB, false);
-                        } else {
-                            DATA.filters = buildDynamicFiltersFromStores(ALL_STORES);
-                            applySubFilter(CURRENT_SUB, false);
-                            if (!CURRENT_SUB) setHero(CATEGORY, "카테고리별 가게를 확인하세요.");
-                        }
-
-                        DATA.best = buildBestFromStores(ALL_STORES);
-                        DATA.new = buildNewFromStores(ALL_STORES);
-                    }
-                } else {
-                    ALL_STORES = [];
-                    DATA = { ...DEFAULT_DATA };
-                }
-            } catch (e) {
-                console.error("데이터 불러오기 실패:", e);
-                ALL_STORES = [];
-                DATA = { ...DEFAULT_DATA };
-            }
-
-            init();
-        }
-
-        function init() {
-            bindHero();
-            renderFilters();
-            syncMoreButtonLabels();
-            bindMoreAndPagerEvents();
-
-            renderItemsSection();
-            renderBestSection();
-            renderNewSection();
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            bindManagerBar();
-            bindModalEvents();
-            loadData();
+        /***********************
+         * 매니저바 이벤트
+         ***********************/
+        sortSelect.addEventListener("change", () => {
+            state.sort = sortSelect.value;
+            render();
         });
+
+        searchInput.addEventListener("input", () => {
+            state.search = searchInput.value;
+            render();
+        });
+
+        btnClearSearch.addEventListener("click", () => {
+            searchInput.value = "";
+            state.search = "";
+            render();
+        });
+
+        btnReset.addEventListener("click", async () => {
+            // 초기화: 검색/정렬 리셋, 표시 12개로, 현재 모드 목록 다시 로드
+            sortSelect.value = "posAsc";
+            state.sort = "posAsc";
+            searchInput.value = "";
+            state.search = "";
+            state.visibleCount = PAGE_SIZE;
+            ensureSlotsLength();
+            render();
+            await loadList();
+        });
+
+        /***********************
+         * 모드 토글
+         ***********************/
+        async function setMode(mode) {
+            if (state.mode === mode) return;
+            state.mode = mode;
+
+            // 모드 바뀌면 12개로 리셋
+            state.visibleCount = PAGE_SIZE;
+            state.search = "";
+            searchInput.value = "";
+            state.sort = "posAsc";
+            sortSelect.value = "posAsc";
+
+            ensureSlotsLength();
+            render();
+            await loadList();
+        }
+
+        btnModeFood.addEventListener("click", () => setMode("food"));
+        btnModeCombined.addEventListener("click", () => setMode("combined"));
+
+        /***********************
+         * 더보기 버튼
+         ***********************/
+        btnMore.addEventListener("click", more);
+        btnMoreBottom.addEventListener("click", more);
+
+        /***********************
+         * 헤더 fetch (선택)
+         ***********************/
+        async function loadHeader() {
+            const el = $("header-placeholder");
+            if (!el) return;
+            try {
+                // 프로젝트에서 쓰는 경로에 맞춰 필요하면 수정
+                const res = await fetch("/components/header.html");
+                if (!res.ok) return;
+                el.innerHTML = await res.text();
+            } catch (_) { }
+        }
+
+        /***********************
+         * 시작
+         ***********************/
+        (async function init() {
+            setModeUI();
+            ensureSlotsLength();
+            render();
+            await loadHeader();
+            await loadList();
+        })();
     </script>
 </body>
 
