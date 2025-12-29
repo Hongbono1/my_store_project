@@ -279,8 +279,9 @@ export async function listStores(req, res) {
 }
 
 // ------------------------------
-// ✅ GET /search  (+ /search-store alias)
-//   - q="__all__" => 전체
+// ✅ GET /search  (+ /search-store alias는 router에서 처리)
+//   - q="__all__" => 전체(최대 10개)
+//   - 결과에 rn/page_number/index_in_page 포함
 // ------------------------------
 export async function searchStore(req, res) {
   try {
@@ -311,7 +312,6 @@ export async function searchStore(req, res) {
     );
 
     const hardLimit = isAll ? 10 : 200;
-
     const orderBy = buildOrderBy(sort, sel);
 
     const sql = `

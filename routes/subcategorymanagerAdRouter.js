@@ -14,26 +14,35 @@ import {
 
 const router = express.Router();
 
+// ✅ diskStorage
 const storage = multer.diskStorage(makeMulterStorage());
+
 const upload = multer({
   storage,
   fileFilter,
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
-// 프론트 field 이름: image
+// ✅ 프론트 field 이름: image
 const uploadSingleImage = upload.single("image");
 
+// ------------------------------
 // 목록/검색
+// ------------------------------
 router.get("/stores", listStores);
+
+// ✅ HTML이 /search 먼저 호출함
 router.get("/search", searchStore);
 
-// ✅ 프론트/기존 curl 호환용 alias
+// ✅ alias (HTML이 /search 실패 시 /search-store도 호출 가능)
 router.get("/search-store", searchStore);
 
-// 슬롯 읽기/저장/삭제/후보
+// ------------------------------
+// 슬롯 읽기/후보/저장/삭제
+// ------------------------------
 router.get("/slot", getSlot);
 router.get("/candidates", listCandidates);
+
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
 

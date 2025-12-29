@@ -438,6 +438,9 @@ app.use("/admin/subcategory", subcategorymanagerAdRouter);
 
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
+// ✅ 2) 너가 curl로 썼던 /admin/subcategory 도 같이 열어주기(프론트 호환)
+app.use("/admin/subcategory", subcategorymanagerAdRouter);
+
 // ✅ 프론트가 /subcategorymanager/ad 로 호출하는 경우를 위한 별칭
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
