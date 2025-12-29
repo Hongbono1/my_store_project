@@ -561,6 +561,7 @@ export async function deleteSlot(req, res) {
     const page = clean(req.query.page);
     const position = clean(req.query.position);
     const priority = safeIntOrNull(req.query.priority);
+    const mode = clean(req.query.mode); // ✅ mode 파라미터 추가(프론트에서 보냄)
 
     if (!page || !position || priority === null) {
       return res.status(400).json({ success: false, error: "page/position/priority 필요" });
@@ -571,8 +572,10 @@ export async function deleteSlot(req, res) {
       WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
       RETURNING *
     `;
-    const { rows } = await pool.query(sql, [page, position, priority]);
-    return res.json({ success: true, deleted: rows[0] || null });
+    const del = await pool.query(sql, [page, position, priority]);
+    
+    // ✅ rowCount를 반환하여 실제 삭제된 행 개수를 프론트에 전달
+    return res.json({ success: true, deleted: del.rowCount });
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || "deleteSlot 실패" });
   }
