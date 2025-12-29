@@ -625,21 +625,23 @@
             return [];
         }
 
-        async function apiSearchStore(q, bizNo, src) {
+        async function apiSearchStore(q, src, pageSize = 12) {
             const qs = new URLSearchParams();
-            if (q) qs.set("q", q);
-            if (bizNo) qs.set("bizNo", bizNo);
 
-            // 호환용(서버가 안 받아도 무시됨)
-            qs.set("source", src || CURRENT_SOURCE);
-            qs.set("tableSource", tableSourceFromSource(src || CURRENT_SOURCE));
+            // ✅ 서버가 읽는 키: q, mode, pageSize
+            qs.set("q", q);
+            qs.set("mode", src || CURRENT_SOURCE);
+            qs.set("pageSize", String(pageSize));
 
             const url = `${API_BASE}/search?${qs.toString()}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`검색 실패: HTTP ${res.status}`);
             const data = await res.json().catch(() => ({}));
+
+            // 컨트롤러 응답 형태 호환
             return data.stores || data.items || data.results || [];
         }
+
 
         // =========================
         // ✅ 페이지 슬롯 DOM (예시: power(9), best(9), more(12))
@@ -1163,22 +1165,30 @@
         }
 
         async function doStoreSearch() {
-            const qRaw = clean(el("fieldBizName")?.value);
-            const bizRaw = digitsOnly(clean(el("fieldBizNo")?.value));
-            const q = qRaw.length ? qRaw : "__all__";
-            const bizNo = qRaw ? "" : bizRaw;
+            const nameQ = clean(el("fieldBizName")?.value);
+            const bizDigits = digitsOnly(clean(el("fieldBizNo")?.value));
+
+            // ✅ 우선순위: 사업자번호 > 상호명 > (둘 다 없으면 10개만)
+            const q = bizDigits ? bizDigits : (nameQ ? nameQ : "__all__");
+            const pageSize = (q === "__all__") ? 10 : 12;
 
             const wrap = el("storeResultsBody");
             if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 중...</div>`;
 
             try {
-                const stores = await apiSearchStore(q, bizNo, CURRENT_SOURCE);
+                const storesRaw = await apiSearchStore(q, CURRENT_SOURCE, pageSize);
+
+                // ✅ 안전장치: __all__일 때는 프론트에서도 10개로 고정
+                const stores = (q === "__all__") ? (storesRaw || []).slice(0, 10) : (storesRaw || []);
+
                 if (!Array.isArray(stores) || stores.length === 0) {
                     if (wrap) wrap.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
                     setModalStatus("검색 결과 없음");
                     return;
                 }
+
                 renderStoreResults(stores);
+                setModalStatus(bizDigits ? "사업자번호 검색 완료" : (nameQ ? "상호명 검색 완료" : "통합 10개 표시"));
             } catch (e) {
                 setModalStatus(`검색 오류: ${e.message || "error"}`);
                 if (wrap) wrap.innerHTML = `<div class="text-sm text-rose-600">검색 오류: ${e.message || "error"}</div>`;
