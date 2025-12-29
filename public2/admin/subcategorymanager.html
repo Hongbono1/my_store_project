@@ -501,7 +501,19 @@
         $("btnPickStore").addEventListener("click", () => setPick("store"));
         $("btnPickText").addEventListener("click", () => setPick("text"));
 
-        $("mode").addEventListener("change", () => {
+        $("mode").addEventListener("change", async () => {
+            // 선택된 가게가 있으면 position도 같이 바꿔야 키가 안 꼬임
+            if (selectedStore) {
+                selectedTarget.mode = $("mode").value || "combined";
+                selectedTarget.pageNo = Number(selectedStore.page_number || 1);
+                selectedTarget.boxNo = Number(selectedStore.index_in_page || 1);
+                selectedTarget.position = buildPosition(selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+                syncChips();
+                setStatus("warn", "모드 변경됨", `position 재계산: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                await loadSlot(true);
+                return;
+            }
+
             syncChips();
             setStatus("warn", "모드 변경됨", `현재 모드: ${$("mode").value} / 시간: ${nowStr()}`);
         });
@@ -858,39 +870,47 @@
         })();
 
         function clearSlotUI() {
-            // 배너 미리보기 초기화(너가 쓰는 기본 이미지로)
-            setBannerPreview("/uploads/no-image.png"); // ← 너 기본 경로에 맞춰 바꿔도 됨
+            // ✅ 1) 배너 미리보기 초기화
+            setBannerPreview("/uploads/no-image.png");
 
-            // 파일 input 초기화
-            const f = document.getElementById("bannerFile");
-            if (f) f.value = "";
+            // ✅ 2) 파일 input 초기화
+            if ($("bannerFile")) $("bannerFile").value = "";
 
-            // 텍스트 입력 초기화
-            const t1 = document.getElementById("textTitle");
-            const t2 = document.getElementById("textDesc");
-            const link = document.getElementById("linkUrl");
-            if (t1) t1.value = "";
-            if (t2) t2.value = "";
-            if (link) link.value = "";
+            // ✅ 3) 공통 입력 초기화
+            if ($("linkUrl")) $("linkUrl").value = "";
+            if ($("textTitle")) $("textTitle").value = "";
+            if ($("textDesc")) $("textDesc").value = "";
+            if ($("startAt")) $("startAt").value = "";
+            if ($("endAt")) $("endAt").value = "";
+            if ($("noEnd")) $("noEnd").checked = false;
 
-            // 가게 연결 패널(선택된 가게) 초기화
-            // (너의 selectedTarget/state 변수명에 맞춰 아래는 유지)
-            if (window.selectedTarget) {
-                selectedTarget.store = null;
-                selectedTarget.storeId = "";
-                selectedTarget.storeBiz = "";
-                selectedTarget.storeName = "";
-                selectedTarget.storeType = "";
-                selectedTarget.storeImage = "";
-            }
+            // ✅ 4) 숨김값(서버로 보내는 값) 초기화  ← 이게 제일 중요
+            if ($("storeId")) $("storeId").value = "";
+            if ($("storeBusinessNumber")) $("storeBusinessNumber").value = "";
+            if ($("storeNameHidden")) $("storeNameHidden").value = "";
+            if ($("storeTypeHidden")) $("storeTypeHidden").value = "";
+            if ($("storeImageUrl")) $("storeImageUrl").value = "";
 
-            // 가게 연결 UI 표시 영역도 비우기 (있다면)
-            const box = document.getElementById("pickedStoreBox");
-            if (box) box.innerHTML = "";
+            // ✅ 5) 화면에 보이는 “가게 연결” 박스 초기화  ← 지금 이게 빠져있어서 안 사라진 거야
+            $("storeName").textContent = "선택된 가게 없음";
+            $("storeType").textContent = "-";
+            $("storeBiz").textContent = "-";
+            $("storeImage").src = "/uploads/no-image.png";
+            $("storeLocChip").textContent = "위치: -";
+            $("storeLocText").textContent = "위치: -";
 
-            // 삭제 버튼 비활성화(선택) — “현재 슬롯이 없을 때”
-            const btnDel = document.getElementById("btnDelete");
-            if (btnDel) btnDel.disabled = true;
+            // ✅ 6) 좌측 미니 정보도 초기화(선택된 가게 표시 제거)
+            setMiniStoreInfo(null);
+
+            // ✅ 7) selectedStore도 초기화 (다음 동작 꼬임 방지)
+            selectedStore = null;
+
+            // ✅ 8) “가게 이미지로 배너” 같은 경우를 대비해서 banner도 기본으로 고정
+            //     (storeImageUrl이 비었으니 위 setBannerPreview로 끝)
+
+            // ✅ 9) 삭제 버튼 비활성화는 선택사항
+            // const btnDel = $("btnDelete");
+            // if (btnDel) btnDel.disabled = true;
         }
     </script>
 </body>
