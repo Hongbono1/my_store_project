@@ -334,11 +334,8 @@
 
         async function safeJson(res) {
             const text = await res.text();
-            try {
-                return JSON.parse(text || "{}");
-            } catch {
-                return { success: false, error: "JSON parse failed", raw: text };
-            }
+            try { return JSON.parse(text || "{}"); }
+            catch { return { success: false, error: "JSON parse failed", raw: text }; }
         }
 
         async function apiGet(url) {
@@ -348,13 +345,8 @@
             return data;
         }
 
-        async function apiDelete(url, bodyObj = null) {
-            const res = await fetch(url, {
-                method: "DELETE",
-                headers: bodyObj ? { "Content-Type": "application/json" } : undefined,
-                body: bodyObj ? JSON.stringify(bodyObj) : undefined,
-                credentials: "include",
-            });
+        async function apiDelete(url) {
+            const res = await fetch(url, { method: "DELETE", credentials: "include" });
             const data = await safeJson(res);
             if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
             return data;
@@ -366,21 +358,24 @@
         let __eventsBound = false;
 
         const state = {
-            mode: "food", // food | combined
-            adMode: "image", // image | text  (UI용)
-            slotMode: "store", // store | custom
             page: "subcategorymanager",
-            modal: {
-                page: "subcategorymanager",
-                position: "",
-                selectedStore: null,
-                slotMeta: { section: "", idx: 0 }, // section: banner|slot , idx: 1~6 (priority)
-            },
+            mode: "food",            // food | combined
+            uiAdMode: "image",       // image | text  (UI용)
+            slotMode: "store",       // store | custom
             paging: { page: 1, limit: 12, lastQuery: "" },
+
+            modal: {
+                section: "",           // banner | slot
+                idx: 0,                // 1~6 (priority)
+                position: "",          // page:mode:section
+                selectedStore: null,
+            }
         };
 
         // =========================
-        // position 생성 (idx는 priority로 분리)
+        // position 규칙 (중요)
+        //  - position = page:mode:section
+        //  - priority = idx (1~6), banner는 1
         // =========================
         function buildPosition(section) {
             const s = clean(section) || "slot";
@@ -388,15 +383,39 @@
         }
 
         function applyModeBadge() {
-            $("modeBadgeText").textContent = state.mode === "food" ? "푸드" : "통합";
+            $("modeBadgeText").textContent = (state.mode === "food") ? "푸드" : "통합";
+        }
+
+        function applyModalModeUI() {
+            if (state.mode === "food") {
+                $("modalModeFoodBtn").classList.add("chip-on");
+                $("modalModeCombinedBtn").classList.remove("chip-on");
+            } else {
+                $("modalModeCombinedBtn").classList.add("chip-on");
+                $("modalModeFoodBtn").classList.remove("chip-on");
+            }
         }
 
         // =========================
-        // 모달 UI
+        // DB 제약 대응: slot_type 체크
+        //  - admin_ad_slots_slot_type_check: ['banner','text']
+        //  - 이미지 UI = banner 로 저장/표시
         // =========================
-        function setAdMode(mode) {
-            state.adMode = mode;
-            if (mode === "image") {
+        function uiAdModeToDbSlotType(uiMode) {
+            return (uiMode === "text") ? "text" : "banner";
+        }
+
+        function dbSlotTypeToUiAdMode(slotType) {
+            return (clean(slotType) === "text") ? "text" : "image";
+        }
+
+        // =========================
+        // UI 토글
+        // =========================
+        function setAdMode(uiMode) {
+            state.uiAdMode = uiMode;
+
+            if (uiMode === "image") {
                 $("adModeImageBtn").classList.add("btn-primary");
                 $("adModeTextBtn").classList.remove("btn-primary");
                 $("imageBox").classList.remove("hidden");
@@ -411,28 +430,22 @@
 
         function setSlotMode(mode) {
             state.slotMode = mode;
+
             if (mode === "store") {
                 $("slotModeStoreBtn").classList.add("btn-primary");
                 $("slotModeCustomBtn").classList.remove("btn-primary");
-                $("storeSearchBox").classList.remove("dim");
                 $("storeSearchBox").classList.remove("hidden");
+                $("storeSearchBox").classList.remove("dim");
             } else {
                 $("slotModeCustomBtn").classList.add("btn-primary");
                 $("slotModeStoreBtn").classList.remove("btn-primary");
-                $("storeSearchBox").classList.add("dim");
+                $("storeSearchBox").classList.add("dim"); // 참고용 유지
             }
         }
 
-        function applyModalModeUI() {
-            if (state.mode === "food") {
-                $("modalModeFoodBtn").classList.add("chip-on");
-                $("modalModeCombinedBtn").classList.remove("chip-on");
-            } else {
-                $("modalModeCombinedBtn").classList.add("chip-on");
-                $("modalModeFoodBtn").classList.remove("chip-on");
-            }
-        }
-
+        // =========================
+        // 모달 공통 초기화
+        // =========================
         function resetModalInputs() {
             state.modal.selectedStore = null;
             $("selectedStoreText").textContent = "없음";
@@ -449,50 +462,30 @@
             $("customLink").value = "";
         }
 
-        // ✅ 모달에서 모드 변경 시 position 재계산 + 화면 업데이트
-        function refreshModalPositionByMode() {
-            const meta = state.modal.slotMeta || { section: "", idx: 0 };
-            const { section, idx } = meta;
-
-            if (!section || !idx) return;
-
-            const newPos = buildPosition(section);
-            state.modal.position = newPos;
-            $("modalPositionText").textContent = newPos;
-
-            resetModalInputs();
-
-            $("modalStatus").textContent = "모드 변경됨 → position 재계산 완료";
-            $("slotMetaText").textContent = `${section} / ${idx}`;
-
-            loadSlotIntoModal().catch(() => { });
-            loadCandidates().catch(() => { });
-            loadStorePage(1).catch(() => { });
-        }
-
-        // =========================
-        // 모달 열기/닫기
-        // =========================
         function openModal(section, idx) {
-            state.modal.slotMeta = { section, idx: Number(idx || 0) };
+            state.modal.section = clean(section);
+            state.modal.idx = Number(idx || 0);
 
-            const position = buildPosition(section);
-            state.modal.position = position;
+            const pos = buildPosition(state.modal.section);
+            state.modal.position = pos;
 
-            $("modalPageText").textContent = state.modal.page;
-            $("modalPositionText").textContent = position;
-            $("slotMetaText").textContent = `${section} / ${idx}`;
+            $("modalPageText").textContent = state.page;
+            $("modalPositionText").textContent = pos;
+            $("slotMetaText").textContent = `${state.modal.section} / ${state.modal.idx}`;
 
-            resetModalInputs();
-
+            applyModeBadge();
             applyModalModeUI();
+
+            // 기본 모달 상태
             setAdMode("image");
             setSlotMode("store");
+            resetModalInputs();
 
             $("modalStatus").textContent = "불러오는 중...";
             $("slotModal").classList.remove("hidden");
             document.body.style.overflow = "hidden";
 
+            // 로드
             loadSlotIntoModal().catch(() => { });
             loadCandidates().catch(() => { });
             loadStorePage(1).catch(() => { });
@@ -503,8 +496,27 @@
             document.body.style.overflow = "";
         }
 
+        function refreshModalPositionByMode() {
+            const section = clean(state.modal.section);
+            const idx = Number(state.modal.idx || 0);
+            if (!section || !idx) return;
+
+            const pos = buildPosition(section);
+            state.modal.position = pos;
+            $("modalPositionText").textContent = pos;
+
+            resetModalInputs();
+
+            $("modalStatus").textContent = "모드 변경됨 → position 재계산 완료";
+
+            // 새 position 기준으로 다시 로드
+            loadSlotIntoModal().catch(() => { });
+            loadCandidates().catch(() => { });
+            loadStorePage(1).catch(() => { });
+        }
+
         // =========================
-        // 카드 UI
+        // 슬롯 카드 렌더
         // =========================
         function makeSlotCard(section, idx) {
             const el = document.createElement("div");
@@ -519,16 +531,19 @@
           <div class="text-lg font-black">슬롯 ${idx}</div>
           <div class="text-sm text-slate-500">section=${section} / idx=${idx}</div>
         </div>
-        <button class="btn btn-primary" data-edit-btn type="button">편집</button>
+        <button class="btn btn-primary" type="button">편집</button>
       </div>
+
       <div class="mt-3 aspect-[16/9] rounded-2xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
         <img data-preview-img src="/uploads/no-image.png" class="w-full h-full object-cover" alt="슬롯 미리보기"/>
       </div>
+
       <div class="mt-3 flex flex-wrap gap-2">
         <span class="chip">position: <b data-pos>-</b></span>
         <span class="chip">type: <b data-type>-</b></span>
         <span class="chip">mode: <b data-mode>-</b></span>
       </div>
+
       <div class="mt-3 text-sm text-slate-700 leading-relaxed">
         <div class="font-extrabold">제목: <span data-title class="font-semibold">-</span></div>
         <div class="mt-1">설명: <span data-desc class="text-slate-600">-</span></div>
@@ -550,47 +565,51 @@
             const position = buildPosition(section);
 
             cardEl.querySelector("[data-pos]").textContent = position;
-            cardEl.querySelector("[data-mode]").textContent = state.mode === "food" ? "푸드" : "통합";
+            cardEl.querySelector("[data-mode]").textContent = (state.mode === "food" ? "푸드" : "통합");
 
-            const type = clean(slotData?.slot_type || slotData?.type || "");
-            cardEl.querySelector("[data-type]").textContent = type || "-";
+            // DB slot_type: banner|text
+            const dbType = clean(slotData?.slot_type || slotData?.type || "");
+            const uiType = (dbType === "text") ? "text" : (dbType ? "image" : "");
+            cardEl.querySelector("[data-type]").textContent = uiType || "-";
 
-            const title = clean(slotData?.text_title || slotData?.title || slotData?.custom_title || "");
-            const desc = clean(slotData?.text_desc || slotData?.desc || slotData?.custom_desc || "");
-            const storeName = clean(slotData?.store_name || slotData?.business_name || slotData?.storeName || "");
+            const title = clean(slotData?.title || slotData?.text_title || slotData?.custom_title || "");
+            const desc = clean(slotData?.desc || slotData?.custom_desc || "");
+            const storeName = clean(slotData?.business_name || slotData?.store_name || "");
 
             cardEl.querySelector("[data-title]").textContent = title || "-";
             cardEl.querySelector("[data-desc]").textContent = desc || "-";
             cardEl.querySelector("[data-store]").textContent = storeName || "-";
 
             const img = clean(slotData?.image_url || slotData?.image || slotData?.img_url || "");
-            cardEl.querySelector("[data-preview-img]").src = img || "/uploads/no-image.png";
+            const imgEl = cardEl.querySelector("[data-preview-img]");
+            imgEl.src = img || "/uploads/no-image.png";
         }
 
         function applyBannerData(slotData) {
-            const type = clean(slotData?.slot_type || slotData?.type || "");
-            $("bannerTypeText").textContent = type || "-";
-            $("bannerModeText").textContent = state.mode === "food" ? "푸드" : "통합";
+            const pos = buildPosition("banner");
+            $("bannerPositionText").textContent = pos;
+            $("bannerModeText").textContent = (state.mode === "food" ? "푸드" : "통합");
 
-            const title = clean(slotData?.text_title || slotData?.title || slotData?.custom_title || "");
-            const desc = clean(slotData?.text_desc || slotData?.desc || slotData?.custom_desc || "");
-            const storeName = clean(slotData?.store_name || slotData?.business_name || "");
+            const dbType = clean(slotData?.slot_type || slotData?.type || "");
+            const uiType = (dbType === "text") ? "text" : (dbType ? "image" : "");
+            $("bannerTypeText").textContent = uiType || "-";
+
+            const title = clean(slotData?.title || slotData?.text_title || "");
+            const desc = clean(slotData?.desc || "");
+            const storeName = clean(slotData?.business_name || "");
 
             $("bannerTitleText").textContent = title || "-";
             $("bannerDescText").textContent = desc || "-";
             $("bannerStoreText").textContent = storeName || "-";
 
-            const img = clean(slotData?.image_url || slotData?.image || slotData?.img_url || "");
+            const img = clean(slotData?.image_url || slotData?.image || "");
             $("bannerPreviewImg").src = img || "/uploads/no-image.png";
         }
 
         async function hydrateAllSlots() {
             try {
-                // 배너
-                const bannerPos = buildPosition("banner");
-                $("bannerPositionText").textContent = bannerPos;
-                $("bannerModeText").textContent = state.mode === "food" ? "푸드" : "통합";
-                const banner = await getSlot(bannerPos, 1);
+                // 배너(priority=1)
+                const banner = await getSlot(buildPosition("banner"), 1);
                 applyBannerData(banner);
 
                 // 슬롯 1~6
@@ -598,8 +617,7 @@
                 for (const card of cards) {
                     const section = card.getAttribute("data-section");
                     const idx = Number(card.getAttribute("data-index") || 0);
-                    const pos = buildPosition(section);
-                    const slot = await getSlot(pos, idx);
+                    const slot = await getSlot(buildPosition(section), idx);
                     applySlotCardData(card, section, idx, slot);
                 }
             } catch (e) {
@@ -608,15 +626,11 @@
         }
 
         // =========================
-        // 서버: 슬롯 불러오기/저장/삭제
+        // API: slot get/save/delete
         // =========================
         async function getSlot(position, priority) {
             try {
-                const url =
-                    `/admin/subcategory/slot` +
-                    `?page=${encodeURIComponent(state.page)}` +
-                    `&position=${encodeURIComponent(position)}` +
-                    `&priority=${encodeURIComponent(priority)}`;
+                const url = `/admin/subcategory/slot?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
                 const data = await apiGet(url);
                 return data?.slot || {};
             } catch {
@@ -625,49 +639,43 @@
         }
 
         async function loadSlotIntoModal() {
-            const meta = state.modal.slotMeta || { section: "", idx: 0 };
-            const pos = state.modal.position;
-            const priority = Number(meta.idx || 0);
+            const position = clean(state.modal.position);
+            const priority = Number(state.modal.idx || 0);
+            if (!position || !priority) return;
 
-            if (!pos || !priority) return;
             $("modalStatus").textContent = "불러오는 중...";
 
-            const slot = await getSlot(pos, priority);
+            const slot = await getSlot(position, priority);
 
-            const slotType = clean(slot?.slot_type || slot?.type || "");
-            const slotMode = clean(slot?.slot_mode || slot?.mode || "");
+            // DB slot_type → UI adMode 변환
+            const uiMode = dbSlotTypeToUiAdMode(slot?.slot_type);
+            setAdMode(uiMode);
 
-            if (slotType === "text") setAdMode("text");
-            else setAdMode("image");
+            // slot_mode
+            const slotMode = clean(slot?.slot_mode || "");
+            setSlotMode(slotMode === "custom" ? "custom" : "store");
 
-            if (slotMode === "custom") setSlotMode("custom");
-            else setSlotMode("store");
-
-            const img = clean(slot?.image_url || slot?.image || "");
+            // 이미지
+            const img = clean(slot?.image_url || "");
             if (img) $("modalImagePreview").src = img;
 
-            $("customTitle").value = clean(slot?.text_title || slot?.title || slot?.custom_title || "");
-            $("customDesc").value = clean(slot?.text_desc || slot?.desc || slot?.custom_desc || "");
-            $("customLink").value = clean(slot?.link_url || slot?.custom_link || "");
+            // 텍스트 (컨트롤러 쪽에 맞춰 title/desc/link_url 사용)
+            $("customTitle").value = clean(slot?.title || slot?.text_title || "");
+            $("customDesc").value = clean(slot?.desc || "");
+            $("customLink").value = clean(slot?.link_url || "");
 
-            const businessNumber = clean(
-                slot?.store_business_number ||
-                slot?.business_number ||
-                slot?.business_no ||
-                ""
-            );
-            const businessName = clean(slot?.store_name || slot?.business_name || "");
+            // 가게 연결
+            const businessNumber = clean(slot?.business_number || slot?.store_business_number || "");
+            const businessName = clean(slot?.business_name || slot?.store_name || "");
             const storeId = clean(slot?.store_id || "");
-            const storeType = clean(slot?.store_type || slot?.business_type || "");
-            const storeImage = clean(slot?.store_image_url || slot?.store_image || "");
 
             if (businessNumber || businessName || storeId) {
                 state.modal.selectedStore = {
-                    id: storeId || null,
+                    id: storeId || "",
                     business_number: businessNumber,
                     business_name: businessName,
-                    business_type: storeType,
-                    image_url: storeImage,
+                    business_type: clean(slot?.business_type || slot?.store_type || ""),
+                    image_url: clean(slot?.store_image_url || ""),
                 };
                 $("selectedStoreText").textContent =
                     businessName
@@ -682,44 +690,53 @@
         }
 
         async function saveSlot() {
-            const meta = state.modal.slotMeta || { section: "", idx: 0 };
-            const position = buildPosition(meta.section);
-            const priority = Number(meta.idx || 0);
-            if (!position || !priority) return;
+            const section = clean(state.modal.section);
+            const priority = Number(state.modal.idx || 0);
+            const position = buildPosition(section);
+
+            if (!section || !priority || !position) return;
 
             const fd = new FormData();
             fd.append("page", state.page);
             fd.append("position", position);
             fd.append("priority", String(priority));
 
-            // ✅ 컨트롤러는 adMode를 보고 slot_type을 banner/text로 변환
-            fd.append("adMode", state.adMode);       // image|text
-            fd.append("slotMode", state.slotMode);  // store|custom
+            // ✅ DB 제약 대응: 이미지=banner / 텍스트=text 로 저장되게 컨트롤러에서 처리
+            // 컨트롤러가 adMode를 받아서 slot_type으로 바꾼다면 adMode를 보내고,
+            // 컨트롤러가 slot_type을 직접 받는다면 slot_type을 보내면 됨.
+            //
+            // 지금 너가 올린 컨트롤러는 req.body.adMode를 읽음.
+            fd.append("adMode", state.uiAdMode); // image|text (컨트롤러가 banner|text로 매핑해야 함)
+            fd.append("slotMode", state.slotMode);
 
-            // ✅ 컨트롤러가 읽는 키에 맞춤 (linkUrl/textTitle/noEnd/startAt/endAt/storeBusinessNumber 등)
-            fd.append("linkUrl", clean($("customLink").value));
-            fd.append("textTitle", clean($("customTitle").value));
-
-            // (desc 컬럼이 없을 수도 있지만, 프론트 유지용으로 같이 보냄)
+            // 텍스트/링크
+            fd.append("title", clean($("customTitle").value));
             fd.append("desc", clean($("customDesc").value));
+            fd.append("linkUrl", clean($("customLink").value)); // 컨트롤러는 linkUrl 읽고 있음
 
+            // 가게 연결
             if (state.slotMode === "store" && state.modal.selectedStore) {
-                fd.append("storeId", clean(state.modal.selectedStore.id || ""));
-                fd.append("storeBusinessNumber", clean(state.modal.selectedStore.business_number || ""));
-                fd.append("storeName", clean(state.modal.selectedStore.business_name || ""));
-                fd.append("storeType", clean(state.modal.selectedStore.business_type || ""));
-                fd.append("storeImageUrl", clean(state.modal.selectedStore.image_url || ""));
+                fd.append("storeId", clean(state.modal.selectedStore.id));
+                fd.append("storeBusinessNumber", clean(state.modal.selectedStore.business_number));
+                fd.append("storeName", clean(state.modal.selectedStore.business_name));
+                fd.append("storeType", clean(state.modal.selectedStore.business_type));
+                fd.append("storeImageUrl", clean(state.modal.selectedStore.image_url));
             }
 
+            // 이미지 파일(필드명 image)
             const file = $("imageFileInput").files && $("imageFileInput").files[0];
-            if (state.adMode === "image" && file) fd.append("image", file);
+            if (state.uiAdMode === "image" && file) {
+                fd.append("image", file);
+            }
 
             $("modalStatus").textContent = "저장 중...";
+
             const res = await fetch(`/admin/subcategory/update`, {
                 method: "POST",
                 body: fd,
                 credentials: "include",
             });
+
             const data = await safeJson(res);
             if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
@@ -728,19 +745,15 @@
         }
 
         async function deleteSlot() {
-            const meta = state.modal.slotMeta || { section: "", idx: 0 };
-            const position = buildPosition(meta.section);
-            const priority = Number(meta.idx || 0);
-            if (!position || !priority) return;
+            const section = clean(state.modal.section);
+            const priority = Number(state.modal.idx || 0);
+            const position = buildPosition(section);
+
+            if (!section || !priority || !position) return;
 
             $("modalStatus").textContent = "삭제 중...";
 
-            const url =
-                `/admin/subcategory/delete` +
-                `?page=${encodeURIComponent(state.page)}` +
-                `&position=${encodeURIComponent(position)}` +
-                `&priority=${encodeURIComponent(priority)}`;
-
+            const url = `/admin/subcategory/delete?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
             await apiDelete(url);
 
             $("modalStatus").textContent = "삭제 완료";
@@ -749,48 +762,21 @@
         }
 
         // =========================
-        // 서버: 가게 리스트/검색/후보
+        // 후보 (주의: 이 API는 page+position 필수)
+        // 현재 컨트롤러(listCandidates)는 admin_ad_slots의 items를 내려줌
+        // => "스토어 후보" UI로 보여주려면 컨트롤러가 store list를 내려야 함.
+        //
+        // 일단: items를 그대로 받아서 화면에 "슬롯 후보(저장된 것)"로 표시(안전)
         // =========================
-        function normalizeStoreRow(s) {
-            // ✅ store 테이블 row + admin_ad_slots row 모두 대응
-            const businessNumber = clean(
-                s?.business_number ||
-                s?.business_no ||
-                s?.biz_no ||
-                s?.store_business_number ||
-                ""
-            );
-
-            const businessName = clean(
-                s?.business_name ||
-                s?.name ||
-                s?.store_name ||
-                ""
-            );
-
-            const businessType = clean(
-                s?.business_type ||
-                s?.type ||
-                s?.store_type ||
-                ""
-            );
-
-            const id = clean(
-                s?.id ||
-                s?.store_id ||
-                ""
-            );
-
-            const img = clean(
-                s?.image_url ||
-                s?.main_image_url ||
-                s?.img_url ||
-                s?.store_image_url ||
-                s?.store_image ||
-                ""
-            );
-
-            return { id, business_number: businessNumber, business_name: businessName, business_type: businessType, image_url: img };
+        function normalizeCandidateItem(item) {
+            // admin_ad_slots 레코드 형태
+            return {
+                id: clean(item?.store_id || ""),
+                business_number: clean(item?.business_number || item?.store_business_number || ""),
+                business_name: clean(item?.business_name || item?.store_name || ""),
+                business_type: clean(item?.business_type || item?.store_type || ""),
+                image_url: clean(item?.image_url || item?.store_image_url || ""),
+            };
         }
 
         function makeStoreCard(store, { isCandidate = false } = {}) {
@@ -824,6 +810,40 @@
             return el;
         }
 
+        async function loadCandidates() {
+            try {
+                const section = clean(state.modal.section);
+                const position = buildPosition(section);
+
+                const url = `/admin/subcategory/candidates?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}`;
+                const data = await apiGet(url);
+
+                // 컨트롤러(listCandidates): { success:true, items:[...] }
+                const items = data?.items || [];
+                const stores = items.map(normalizeCandidateItem);
+
+                const box = $("candidatesList");
+                box.innerHTML = "";
+                stores.forEach(s => box.appendChild(makeStoreCard(s, { isCandidate: true })));
+            } catch (e) {
+                console.error(e);
+                // page/position 에러는 여기서 대부분 발생했었음.
+                // 이제 position 포함했으니 정상이어야 함.
+            }
+        }
+
+        // =========================
+        // 스토어 리스트/검색 (listStores/searchStore)
+        // =========================
+        function normalizeStoreRow(s) {
+            const businessNumber = clean(s?.business_number || s?.business_no || s?.biz_no || "");
+            const businessName = clean(s?.business_name || s?.name || "");
+            const businessType = clean(s?.business_type || s?.type || "");
+            const id = clean(s?.id || s?.store_id || "");
+            const img = clean(s?.image_url || s?.main_image_url || s?.img_url || "");
+            return { id, business_number: businessNumber, business_name: businessName, business_type: businessType, image_url: img };
+        }
+
         async function loadStorePage(page) {
             if (state.slotMode !== "store") return;
 
@@ -832,74 +852,55 @@
             $("modalStoreSearchStatus").textContent = "불러오는 중...";
 
             const q = clean(state.paging.lastQuery);
-            const pageSize = state.paging.limit;
 
             try {
-                let stores = [];
+                // 컨트롤러 listStores는 page/pageSize 사용중
+                // 프론트는 page/limit로 보내고 있었으니 여기서 맞춰준다.
+                const pageSize = state.paging.limit;
 
+                let url = "";
                 if (q) {
-                    // ✅ searchStore는 results로 내려오고, 서버가 paginate 하지 않음
-                    const url =
-                        `/admin/subcategory/search` +
-                        `?mode=${encodeURIComponent(state.mode)}` +
-                        `&q=${encodeURIComponent(q)}` +
-                        `&pageSize=${encodeURIComponent(pageSize)}`;
-
+                    // searchStore는 results로 내려줌 (현재 컨트롤러 코드)
+                    url = `/admin/subcategory/search?mode=${encodeURIComponent(state.mode)}&q=${encodeURIComponent(q)}&pageSize=${pageSize}`;
                     const data = await apiGet(url);
-                    const results = data?.results || [];
+                    const rows = (data?.results || []);
+                    // 여기서는 "찾은 결과"만 보여주고, 페이지네이션은 단순하게 유지
+                    const stores = rows.slice(0, pageSize).map(normalizeStoreRow);
 
-                    const pageRows = results.filter((r) => Number(r.page_number) === Number(state.paging.page));
-                    stores = pageRows.map(normalizeStoreRow);
+                    const list = $("modalStoreResultList");
+                    list.innerHTML = "";
+                    stores.forEach(s => list.appendChild(makeStoreCard(s)));
 
-                    const maxPage = results.reduce((m, r) => Math.max(m, Number(r.page_number || 1)), 1);
-                    $("modalStoreSearchStatus").textContent = `완료 (${stores.length}) / 최대 ${maxPage}p`;
-                } else {
-                    const url =
-                        `/admin/subcategory/stores` +
-                        `?mode=${encodeURIComponent(state.mode)}` +
-                        `&page=${encodeURIComponent(state.paging.page)}` +
-                        `&pageSize=${encodeURIComponent(pageSize)}`;
-
-                    const data = await apiGet(url);
-                    const rows = data?.stores || [];
-                    stores = rows.map(normalizeStoreRow);
                     $("modalStoreSearchStatus").textContent = `완료 (${stores.length})`;
+                    return;
                 }
+
+                url = `/admin/subcategory/stores?mode=${encodeURIComponent(state.mode)}&page=${state.paging.page}&pageSize=${pageSize}`;
+                const data = await apiGet(url);
+                const rows = (data?.stores || []);
+                const stores = rows.map(normalizeStoreRow);
 
                 const list = $("modalStoreResultList");
                 list.innerHTML = "";
-                stores.forEach((s) => list.appendChild(makeStoreCard(s)));
+                stores.forEach(s => list.appendChild(makeStoreCard(s)));
 
+                $("modalStoreSearchStatus").textContent = `완료 (${stores.length})`;
             } catch (e) {
                 $("modalStoreSearchStatus").textContent = "실패";
                 console.error(e);
             }
         }
 
-        async function loadCandidates() {
-            $("candidatesList").innerHTML = "";
+        // =========================
+        // 헤더 로드
+        // =========================
+        async function loadHeader() {
             try {
-                const section = clean(state.modal?.slotMeta?.section);  // banner | slot
-                const position = buildPosition(section);                // 예: subcategorymanager:food:slot
-
-                // ✅ page + position 반드시 포함
-                const url =
-                    `/admin/subcategory/candidates` +
-                    `?page=${encodeURIComponent(state.page)}` +
-                    `&position=${encodeURIComponent(position)}` +
-                    `&mode=${encodeURIComponent(state.mode)}`;
-
-                const data = await apiGet(url);
-
-                // ✅ 서버(listCandidates)가 items로 내려주는 구조 우선
-                const rows = (data?.items || data?.candidates || data?.stores || data?.data || []);
-                const stores = rows.map(normalizeStoreRow);
-
-                const box = $("candidatesList");
-                box.innerHTML = "";
-                stores.forEach(s => box.appendChild(makeStoreCard(s, { isCandidate: true })));
+                const res = await fetch("/components/header.html");
+                if (!res.ok) throw new Error("header load failed");
+                $("header-placeholder").innerHTML = await res.text();
             } catch (e) {
-                console.error(e);
+                console.warn(e);
             }
         }
 
@@ -910,27 +911,33 @@
             if (__eventsBound) return;
             __eventsBound = true;
 
+            // 배너
             $("bannerEditBtn").addEventListener("click", () => openModal("banner", 1));
             $("bannerSlotCard").addEventListener("click", () => openModal("banner", 1));
 
+            // 슬롯 grid (위임)
             $("slotGrid").addEventListener("click", (e) => {
                 const slotEl = e.target.closest("[data-slot='1']");
                 if (!slotEl) return;
+
                 const section = slotEl.getAttribute("data-section");
                 const idx = Number(slotEl.getAttribute("data-index") || 0);
                 openModal(section, idx);
             });
 
+            // 닫기
             $("modalCloseBtn").addEventListener("click", closeModal);
             $("slotModal").addEventListener("click", (e) => {
                 if (e.target === $("modalBackdrop")) closeModal();
             });
 
+            // 모드 토글
             $("modalModeFoodBtn").addEventListener("click", () => {
                 state.mode = "food";
                 applyModeBadge();
                 applyModalModeUI();
                 refreshModalPositionByMode();
+                hydrateAllSlots().catch(() => { });
             });
 
             $("modalModeCombinedBtn").addEventListener("click", () => {
@@ -938,24 +945,28 @@
                 applyModeBadge();
                 applyModalModeUI();
                 refreshModalPositionByMode();
+                hydrateAllSlots().catch(() => { });
             });
 
+            // UI adMode
             $("adModeImageBtn").addEventListener("click", () => setAdMode("image"));
             $("adModeTextBtn").addEventListener("click", () => setAdMode("text"));
 
+            // slot mode
             $("slotModeStoreBtn").addEventListener("click", () => {
                 setSlotMode("store");
                 loadStorePage(1).catch(() => { });
             });
-
             $("slotModeCustomBtn").addEventListener("click", () => setSlotMode("custom"));
 
+            // 이미지 미리보기
             $("imageFileInput").addEventListener("change", () => {
                 const f = $("imageFileInput").files && $("imageFileInput").files[0];
                 $("selectedImageText").textContent = f ? f.name : "없음";
                 if (f) $("modalImagePreview").src = URL.createObjectURL(f);
             });
 
+            // 검색
             $("storeSearchBtn").addEventListener("click", () => {
                 state.paging.lastQuery = clean($("storeSearchInput").value);
                 loadStorePage(1);
@@ -967,11 +978,14 @@
                 loadStorePage(1);
             });
 
+            // 페이지 이동
             $("prevPageBtn").addEventListener("click", () => loadStorePage(state.paging.page - 1));
             $("nextPageBtn").addEventListener("click", () => loadStorePage(state.paging.page + 1));
 
+            // 후보 새로고침
             $("candidatesReloadBtn").addEventListener("click", loadCandidates);
 
+            // 저장/불러오기/삭제
             $("saveBtn").addEventListener("click", async () => {
                 try {
                     await saveSlot();
@@ -1005,18 +1019,8 @@
         }
 
         // =========================
-        // 헤더/초기화
+        // init
         // =========================
-        async function loadHeader() {
-            try {
-                const res = await fetch("/components/header.html");
-                if (!res.ok) throw new Error("header load failed");
-                $("header-placeholder").innerHTML = await res.text();
-            } catch (e) {
-                console.warn(e);
-            }
-        }
-
         async function init() {
             await loadHeader();
             applyModeBadge();
