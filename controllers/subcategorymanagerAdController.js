@@ -363,6 +363,7 @@ function buildSlotColumnMap(cols) {
     linkUrl: pickSlotCol(cols, ["link_url", "url"]),
     imageUrl: pickSlotCol(cols, ["image_url", "image_path", "image"]),
     textTitle: pickSlotCol(cols, ["text_title", "title", "text"]),
+    textDesc: pickSlotCol(cols, ["text_desc", "desc", "description"]),
     storeId: pickSlotCol(cols, ["store_id"]),
     storeBiz: pickSlotCol(cols, ["store_business_number", "store_business_no", "business_number"]),
     storeName: pickSlotCol(cols, ["store_name", "business_name"]),
@@ -501,6 +502,7 @@ export async function upsertSlot(req, res) {
 
     const linkUrl = clean(req.body.linkUrl || req.body.link_url);
     const textTitle = clean(req.body.textTitle || req.body.title || req.body.text_title);
+    const textDesc = clean(req.body.textDesc || req.body.desc || req.body.description || req.body.text_desc);
 
     const noEnd = toBool(req.body.noEnd);
     const startAt = parseDateTimeLocalToTs(req.body.startAt);
@@ -542,6 +544,7 @@ export async function upsertSlot(req, res) {
     if (imageUrl && m.imageUrl) add(m.imageUrl, imageUrl);
 
     add(m.textTitle, textTitle);
+    add(m.textDesc, textDesc);
 
     if (m.storeId && storeId !== null) add(m.storeId, storeId);
     add(m.storeBiz, storeBusinessNumber);
