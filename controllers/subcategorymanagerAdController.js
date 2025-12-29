@@ -529,19 +529,53 @@ export async function upsertSlot(req, res) {
 
     // ✅ 가게 연결(선택)
     const storeId = safeIntOrNull(req.body.storeId || req.body.store_id);
-    const storeBusinessNumber = clean(
+
+    let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
       req.body.business_number ||
       req.body.store_business_number ||
       req.body.business_no
     );
-    const storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
-    const storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
-    const storeImageUrl = clean(
+    let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
+    let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
+    let storeImageUrl = clean(
       req.body.storeImageUrl ||
       req.body.store_image_url ||
       req.body.image_url
     );
+
+    // ✅ 프론트가 store_id만 보내도 서버가 DB에서 가게정보 자동 채움
+    if (slot_mode === "store" && storeId !== null) {
+      const tableSource2 = inferTableSourceFromPosition(position);
+      const table =
+        tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
+
+      if (table) {
+        const tcols = await getColumns(table);
+        const sel2 = buildStoreSelect(table, tcols);
+
+        const sql2 = `
+          SELECT
+            "${sel2.idCol}"::text AS id,
+            ${sel2.bnCol ? `"${sel2.bnCol}"::text` : "''"} AS business_number,
+            "${sel2.nameCol}"::text AS business_name,
+            ${sel2.typeCol ? `"${sel2.typeCol}"::text` : "''"} AS business_type,
+            ${sel2.imgCol ? `"${sel2.imgCol}"::text` : "''"} AS image_url
+          FROM ${table}
+          WHERE "${sel2.idCol}" = $1
+          LIMIT 1
+        `;
+        const { rows: srows } = await pool.query(sql2, [storeId]);
+        const s = srows[0];
+
+        if (s) {
+          if (!storeBusinessNumber) storeBusinessNumber = clean(s.business_number);
+          if (!storeName) storeName = clean(s.business_name);
+          if (!storeType) storeType = clean(s.business_type);
+          if (!storeImageUrl) storeImageUrl = clean(s.image_url);
+        }
+      }
+    }
 
     // ✅ 업로드 이미지 없고 store 모드면 가게 이미지로 배너 자동 채우기
     if (!imageUrl && slot_mode === "store" && storeImageUrl) {
