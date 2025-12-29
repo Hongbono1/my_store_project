@@ -360,26 +360,31 @@ export async function listStores(req, res) {
 //   - q="__all__" => 전체(최대 10개)
 //   - 결과에 rn/page_number/index_in_page 포함
 // ------------------------------
+// ------------------------------
+// ✅ GET /search  (+ /search-store alias는 router에서 처리)
+//   - q="__all__" => 전체(일부)
+//   - 결과에 rn/page_number/index_in_page 포함
+// ------------------------------
 export async function searchStore(req, res) {
   try {
     const mode = clean(req.query.mode) || "combined"; // food|combined
-    const sort = clean(req.query.sort) || "name";
-    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
+    const qRaw = clean(req.query.q) || "__all__";
+    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 200);
 
-    const qRaw = clean(req.query.q);
     const isAll = qRaw === "__all__" || qRaw === "";
-    const q = isAll ? "" : qRaw;
+    const qDigits = digitsOnly(qRaw);
 
-    // ✅ mode별 테이블 선택(존재하는 food 테이블 자동 선택)
+    // ✅ mode별 테이블 선택 (하드코딩 금지)
     const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
     if (!table) {
       return res.status(400).json({ success: false, error: "food 테이블을 찾지 못했습니다." });
     }
 
+    // ✅ 테이블 컬럼 자동 탐색
     const cols = await getColumns(table);
-    const sel = buildStoreSelect(table, cols);
+    const sel = buildStoreSelect(table, cols); // { idCol, bnCol, nameCol, typeCol, ... }
 
-    // ✅ 대표 이미지(있으면)
+    // ✅ 대표 이미지 1장(가능하면 이미지 테이블에서 가져오기)
     const imgMeta = await pickImageMetaForMode(mode);
     const imgSub = buildImageSubquery(sel.idCol, imgMeta);
 
@@ -387,19 +392,42 @@ export async function searchStore(req, res) {
       ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
       : `COALESCE(${imgSub},'')`;
 
-    // ✅ 검색 where (사업자번호/상호/업종 자동 처리)
+    // ✅ WHERE 구성
     const values = [];
-    const where = buildFilterWhere(
-      { category: req.query.category, subcategory: req.query.subcategory, q },
-      sel,
-      values
-    );
+    const whereParts = [];
 
-    const orderBy = buildOrderBy(sort, sel);
+    if (!isAll) {
+      // 숫자 입력이면 사업자번호 우선(정확/부분 모두 대응)
+      if (qDigits && sel.bnCol) {
+        values.push(qDigits);
+        whereParts.push(`
+          (
+            regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}
+            OR ltrim(regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g'), '0') = ltrim($${values.length}, '0')
+          )
+        `);
 
-    // __all__이면 너무 많이 안주도록 제한
-    const hardLimit = isAll ? 10 : 200;
+        values.push(`%${qDigits}%`);
+        whereParts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
+      }
 
+      // 상호/업종도 같이 검색
+      values.push(`%${qRaw}%`);
+      whereParts.push(`"${sel.nameCol}"::text ILIKE $${values.length}`);
+
+      if (sel.typeCol) {
+        values.push(`%${qRaw}%`);
+        whereParts.push(`"${sel.typeCol}"::text ILIKE $${values.length}`);
+      }
+    }
+
+    const where = whereParts.length ? `WHERE (${whereParts.join(" OR ")})` : "";
+
+    // ✅ rn 기준 정렬(상호명 → id)
+    const orderBy = `"${sel.nameCol}" ASC NULLS LAST, "${sel.idCol}" ASC`;
+
+    // ✅ page_number/index_in_page는 "12칸 고정" 기준으로 계산(너 UI 규칙)
+    // pageSize는 가져오는 개수만 제한
     const sql = `
       WITH base AS (
         SELECT
@@ -413,19 +441,22 @@ export async function searchStore(req, res) {
         ${where}
       )
       SELECT
-        id, business_number, business_name, business_type, image_url, rn,
-        CEIL(rn::numeric / ${pageSize})::int AS page_number,
-        ((rn - 1) % ${pageSize} + 1)::int AS index_in_page
+        id, business_number, business_name, business_type, image_url,
+        ( (rn - 1) / 12 )::int + 1 AS page_number,
+        ( (rn - 1) % 12 )::int + 1 AS index_in_page,
+        rn::text AS rn
       FROM base
       ORDER BY rn
-      LIMIT ${hardLimit}
+      LIMIT $${values.length + 1};
     `;
+
+    values.push(pageSize);
 
     const { rows } = await pool.query(sql, values);
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e?.message || "searchStore 실패" });
   }
 }
 
