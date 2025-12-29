@@ -199,7 +199,7 @@ function buildFilterWhere(params, sel, values) {
 
     if (qDigits && sel.bnCol) {
       values.push(`%${qDigits}%`);
-      parts.push(`"${sel.bnCol}"::text LIKE $${values.length}`);
+      parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
     }
     values.push(`%${qRaw}%`);
     parts.push(`"${sel.nameCol}"::text ILIKE $${values.length}`);
