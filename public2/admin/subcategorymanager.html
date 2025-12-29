@@ -695,8 +695,8 @@
             fd.append("page", state.page);
             fd.append("position", position);
             fd.append("priority", String(meta.idx));
-            fd.append("slot_type", state.adMode);   // image|text
-            fd.append("slot_mode", state.slotMode); // store|custom
+            fd.append("adMode", state.adMode);      // image|text → 컨트롤러가 banner|text로 변환
+            fd.append("slotMode", state.slotMode);  // store|custom
             fd.append("link_url", clean($("customLink").value));
             fd.append("title", clean($("customTitle").value));
             fd.append("desc", clean($("customDesc").value));
@@ -836,9 +836,13 @@
         async function loadCandidates() {
             $("candidatesList").innerHTML = "";
             try {
-                const url = `/admin/subcategory/candidates?mode=${encodeURIComponent(state.mode)}&page=${encodeURIComponent(state.page)}`;
+                const section = clean(state.modal?.slotMeta?.section); // "banner" or "slot"
+                const position = buildPosition(section);               // ✅ position 필수
+                const url = `/admin/subcategory/candidates?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}`;
                 const data = await apiGet(url);
-                const rows = (data?.stores || data?.candidates || data?.data || []);
+
+                // 서버가 items/candidates/stores 중 뭐로 내려도 방어
+                const rows = (data?.candidates || data?.stores || data?.data || []);
                 const stores = rows.map(normalizeStoreRow);
 
                 const box = $("candidatesList");
