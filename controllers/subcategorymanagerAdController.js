@@ -287,10 +287,17 @@ export async function searchStore(req, res) {
   try {
     const mode = clean(req.query.mode) || "combined";
     const sort = clean(req.query.sort) || "name";
-    const q = clean(req.query.q);
+    const qRaw = clean(req.query.q);
+
+    // ✅ __all__이면 전체 조회 모드
+    const isAll = qRaw === "__all__";
+    const q = isAll ? "" : qRaw;
+
     const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
 
-    if (!q) return res.json({ success: true, results: [] });
+    // ✅ 기존: q 없으면 빈 배열 반환
+    // ✅ 변경: __all__이면 계속 진행
+    if (!qRaw && !isAll) return res.json({ success: true, results: [] });
 
     const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
     if (!table) {
@@ -302,7 +309,7 @@ export async function searchStore(req, res) {
 
     const values = [];
     const where = buildFilterWhere(
-      { category: req.query.category, subcategory: req.query.subcategory, q },
+      { category: req.query.category, subcategory: req.query.subcategory, q }, // ✅ q=""이면 필터 없음
       sel,
       values
     );
@@ -331,7 +338,7 @@ export async function searchStore(req, res) {
     `;
 
     const { rows } = await pool.query(sql, values);
-    return res.json({ success: true, mode, q, results: rows });
+    return res.json({ success: true, mode, q: qRaw, results: rows }); // ✅ q는 원래값 유지
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || "searchStore 실패" });
   }
