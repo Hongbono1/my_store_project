@@ -1,3 +1,4 @@
+// 파일: routes/subcategorymanagerAdRouter.js
 import express from "express";
 import multer from "multer";
 
@@ -10,7 +11,7 @@ import {
   listCandidates,
   makeMulterStorage,
   fileFilter,
-} from "../controllers/adminSubcategoryController.js";
+} from "../controllers/subcategorymanagerAdController.js";
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
-// ✅ 프론트가 field 이름을 image 로 보냄
+// 프론트가 field 이름을 image 로 보냄
 const uploadSingleImage = upload.single("image");
 
 // 목록/검색

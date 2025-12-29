@@ -381,12 +381,10 @@
         // =========================
         // position 생성
         // =========================
-        function buildPosition(section, idx) {
-            // ✅ 핵심: 모드가 position에 포함되어야 푸드/통합 저장키가 분리됨
-            // 형식은 서버와 맞춰야 하지만, 최소/안전하게 page+mode+section+idx 포함
+        function buildPosition(section) {
+            // ✅ position은 page+mode+section만 포함, 슬롯 번호는 priority로 분리
             const s = clean(section) || "slot";
-            const n = Number(idx || 0);
-            return `${state.page}:${state.mode}:${s}:${n}`;
+            return `${state.page}:${state.mode}:${s}`;
         }
 
         function applyModeBadge() {
@@ -444,7 +442,7 @@
 
             if (!section || !idx) return;
 
-            const newPos = buildPosition(section, idx);
+            const newPos = buildPosition(section);
             state.modal.position = newPos;
             $("modalPositionText").textContent = newPos;
 
@@ -479,7 +477,7 @@
             state.modal.slotMeta = { section, idx: Number(idx || 0) };
 
             // ✅ position 계산/세팅
-            const position = buildPosition(section, idx);
+            const position = buildPosition(section);
             state.modal.position = position;
 
             $("modalPageText").textContent = state.modal.page;
@@ -561,7 +559,7 @@
         }
 
         function applySlotCardData(cardEl, section, idx, slotData) {
-            const position = buildPosition(section, idx);
+            const position = buildPosition(section);
 
             cardEl.querySelector("[data-pos]").textContent = position;
             cardEl.querySelector("[data-mode]").textContent = (state.mode === "food" ? "푸드" : "통합");
@@ -586,10 +584,10 @@
             // 배너 + 슬롯1~6 모두 불러와서 카드 갱신
             try {
                 // 배너
-                const bannerPos = buildPosition("banner", 1);
+                const bannerPos = buildPosition("banner");
                 $("bannerPositionText").textContent = bannerPos;
                 $("bannerModeText").textContent = (state.mode === "food" ? "푸드" : "통합");
-                const banner = await getSlot(bannerPos);
+                const banner = await getSlot(bannerPos, 1);
                 applyBannerData(banner);
 
                 // 슬롯들
@@ -597,8 +595,8 @@
                 for (const card of cards) {
                     const section = card.getAttribute("data-section");
                     const idx = Number(card.getAttribute("data-index") || 0);
-                    const pos = buildPosition(section, idx);
-                    const slot = await getSlot(pos);
+                    const pos = buildPosition(section);
+                    const slot = await getSlot(pos, idx);
                     applySlotCardData(card, section, idx, slot);
                 }
             } catch (e) {
@@ -626,17 +624,13 @@
         // =========================
         // 서버: 슬롯 불러오기/저장/삭제
         // =========================
-        async function getSlot(position) {
-            // 캐시 사용(필요 시)
-            const key = position;
+        async function getSlot(position, priority) {
             try {
-                const url = `/admin/subcategory/slot?position=${encodeURIComponent(position)}&page=${encodeURIComponent(state.page)}&mode=${encodeURIComponent(state.mode)}`;
+                const url = `/admin/subcategory/slot?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
                 const data = await apiGet(url);
-                const slot = data?.slot || data?.data || data || {};
-                state.slotsCache.set(key, slot);
-                return slot;
-            } catch (e) {
-                // 슬롯 없는 경우도 정상: 빈 객체 반환
+                const slot = data?.slot || null;
+                return slot || {};
+            } catch {
                 return {};
             }
         }
@@ -693,22 +687,19 @@
         }
 
         async function saveSlot() {
-            const position = state.modal.position;
+            const meta = state.modal.slotMeta || { section: "", idx: 0 };
+            const position = buildPosition(meta.section);
             if (!position) return;
 
             const fd = new FormData();
             fd.append("page", state.page);
-            fd.append("mode", state.mode);
             fd.append("position", position);
-
-            // meta
-            const meta = state.modal.slotMeta || { section: "", idx: 0 };
-            fd.append("section", clean(meta.section));
-            fd.append("idx", String(meta.idx || 0));
-
-            // 타입/모드
-            fd.append("slot_type", state.adMode);   // image | text
-            fd.append("slot_mode", state.slotMode); // store | custom
+            fd.append("priority", String(meta.idx));
+            fd.append("slot_type", state.adMode);   // image|text
+            fd.append("slot_mode", state.slotMode); // store|custom
+            fd.append("link_url", clean($("customLink").value));
+            fd.append("title", clean($("customTitle").value));
+            fd.append("desc", clean($("customDesc").value));
 
             // 가게 연결
             if (state.slotMode === "store" && state.modal.selectedStore) {
@@ -718,11 +709,6 @@
                 fd.append("business_name", clean(state.modal.selectedStore.business_name || ""));
                 fd.append("business_type", clean(state.modal.selectedStore.business_type || ""));
             }
-
-            // 커스텀 텍스트/링크
-            fd.append("title", clean($("customTitle").value));
-            fd.append("desc", clean($("customDesc").value));
-            fd.append("link_url", clean($("customLink").value));
 
             // 이미지
             const file = $("imageFileInput").files && $("imageFileInput").files[0];
@@ -747,14 +733,15 @@
         }
 
         async function deleteSlot() {
-            const position = state.modal.position;
+            const meta = state.modal.slotMeta || { section: "", idx: 0 };
+            const position = buildPosition(meta.section);
+            const priority = meta.idx;
             if (!position) return;
 
             $("modalStatus").textContent = "삭제 중...";
 
-            // ✅ 다양한 서버 구현을 대비해 query + body 둘 다 전달
-            const url = `/admin/subcategory/delete?position=${encodeURIComponent(position)}&page=${encodeURIComponent(state.page)}&mode=${encodeURIComponent(state.mode)}`;
-            await apiDelete(url, { page: state.page, mode: state.mode, position });
+            const url = `/admin/subcategory/delete?page=${encodeURIComponent(state.page)}&position=${encodeURIComponent(position)}&priority=${encodeURIComponent(priority)}`;
+            await apiDelete(url);
 
             $("modalStatus").textContent = "삭제 완료";
 

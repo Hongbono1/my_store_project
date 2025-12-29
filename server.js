@@ -432,7 +432,8 @@ app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
 // ✅ NCATEGORY2 관리자 API (추가만)
 app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 
-app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
+// ✅ Subcategory 관리자 API (position + priority 기반)
+app.use("/admin/subcategory", subcategorymanagerAdRouter);
 
 
 
