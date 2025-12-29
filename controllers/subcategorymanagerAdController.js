@@ -215,8 +215,73 @@ function buildFilterWhere(params, sel, values) {
 return where.length ? `WHERE ${where.join(" AND ")}` : "";
 }
 
+// ------------------------------// ✅ 대표 이미지 1장 추출 (mode별 이미지 테이블)
 // ------------------------------
-// ✅ GET /stores
+const IMG_URL_COLS = ["image_url", "url", "path", "image_path", "file_url", "file_path"];
+const IMG_FK_COLS = [
+  "store_id",
+  "store_info_id",
+  "storeinfo_id",
+  "food_store_id",
+  "combined_store_id",
+  "parent_id",
+  "ref_store_id",
+];
+const IMG_ORDER_COLS = ["sort_order", "priority", "idx", "created_at", "id"];
+
+const imageMetaCache = new Map(); // key: mode|tableName -> meta
+
+async function pickImageMetaForMode(mode) {
+  const m = clean(mode) || "combined";
+
+  // ✅ mode별 우선 후보
+  const candidates =
+    m === "combined"
+      ? ["public.combined_store_images", "public.store_images", "public.food_store_images"]
+      : ["public.store_images", "public.food_store_images", "public.combined_store_images"];
+
+  for (const t of candidates) {
+    const cacheKey = `${m}|${t}`;
+    if (imageMetaCache.has(cacheKey)) return imageMetaCache.get(cacheKey);
+
+    // eslint-disable-next-line no-await-in-loop
+    if (!(await tableExists(t))) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const cols = await getColumns(t);
+
+    const fkCol = pickCol(cols, IMG_FK_COLS);
+    const urlCol = pickCol(cols, IMG_URL_COLS);
+    const orderCol = pickCol(cols, IMG_ORDER_COLS);
+
+    if (fkCol && urlCol) {
+      const meta = { table: t, fkCol, urlCol, orderCol };
+      imageMetaCache.set(cacheKey, meta);
+      return meta;
+    }
+  }
+  return null;
+}
+
+function buildImageSubquery(selIdCol, meta) {
+  if (!meta) return "NULL";
+  const order = meta.orderCol
+    ? `"${meta.orderCol}" ASC NULLS LAST`
+    : `"${meta.urlCol}" ASC NULLS LAST`;
+
+  // ✅ correlated subquery: outer row의 "${selIdCol}"과 fk 매칭
+  return `
+    (
+      SELECT NULLIF("${meta.urlCol}"::text,'')
+      FROM ${meta.table}
+      WHERE "${meta.fkCol}"::text = "${selIdCol}"::text
+      ORDER BY ${order}
+      LIMIT 1
+    )
+  `;
+}
+
+// ------------------------------// ✅ GET /stores
 // ------------------------------
 export async function listStores(req, res) {
   try {
@@ -232,6 +297,14 @@ export async function listStores(req, res) {
 
     const cols = await getColumns(table);
     const sel = buildStoreSelect(table, cols);
+
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+
+    // store 테이블 자체에 imgCol이 있으면 그걸 우선, 없거나 비면 이미지테이블에서 가져옴
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
 
     const values = [];
     const where = buildFilterWhere(
@@ -256,7 +329,7 @@ export async function listStores(req, res) {
         ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
         ${sel.catCol ? `"${sel.catCol}"::text` : "''"} AS business_category,
         ${sel.subCol ? `"${sel.subCol}"::text` : "''"} AS business_subcategory,
-        ${sel.imgCol ? `"${sel.imgCol}"::text` : "''"} AS image_url
+        ${imageExpr} AS image_url
       FROM ${table}
       ${where}
       ORDER BY ${orderBy}
@@ -308,6 +381,13 @@ export async function searchStore(req, res) {
     const cols = await getColumns(table);
     const sel = buildStoreSelect(table, cols);
 
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
+
     const values = [];
     const where = buildFilterWhere(
       { category: req.query.category, subcategory: req.query.subcategory, q },
@@ -325,7 +405,7 @@ export async function searchStore(req, res) {
           ${sel.bnCol ? `"${sel.bnCol}"::text` : "''"} AS business_number,
           "${sel.nameCol}"::text AS business_name,
           ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
-          ${sel.imgCol ? `"${sel.imgCol}"::text` : "''"} AS image_url,
+          ${imageExpr} AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
         FROM ${table}
         ${where}
@@ -566,14 +646,19 @@ export async function upsertSlot(req, res) {
       if (table) {
         const tcols = await getColumns(table);
         const sel2 = buildStoreSelect(table, tcols);
+        const imgMeta2 = await pickImageMetaForMode(inferTableSourceFromPosition(position) === "combined_store_info" ? "combined" : "food");
+        const imgSub2 = buildImageSubquery(sel2.idCol, imgMeta2);
 
+        const imageExpr2 = sel2.imgCol
+          ? `COALESCE(NULLIF("${sel2.imgCol}"::text,''), COALESCE(${imgSub2},''))`
+          : `COALESCE(${imgSub2},'')`;
         const sql2 = `
           SELECT
             "${sel2.idCol}"::text AS id,
             ${sel2.bnCol ? `"${sel2.bnCol}"::text` : "''"} AS business_number,
             "${sel2.nameCol}"::text AS business_name,
             ${sel2.typeCol ? `"${sel2.typeCol}"::text` : "''"} AS business_type,
-            ${sel2.imgCol ? `"${sel2.imgCol}"::text` : "''"} AS image_url
+            ${imageExpr2} AS image_url
           FROM ${table}
           WHERE "${sel2.idCol}" = $1
           LIMIT 1
