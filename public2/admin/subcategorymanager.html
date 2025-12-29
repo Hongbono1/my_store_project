@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -469,6 +469,7 @@
                                     <div id="storeResultsBody" class="p-4 text-sm text-gray-500">
                                         검색어를 입력하고 “가게 검색”을 눌러주세요.
                                     </div>
+                                    <div id="storeSearchResults" class="px-4 pb-4 space-y-2"></div>
                                 </div>
 
                                 <input id="fieldStoreId" type="hidden" />
@@ -597,6 +598,53 @@
             };
         }
 
+        // ✅ 검색 결과 클릭 시: 모달 열고 "가게연결" 후보에 이 가게를 1개로 주입
+        function onClickSearchResult(store) {
+            const pageNo = Number(store.page_number || 1);      // 1~
+            const indexNo = Number(store.index_in_page || 1);   // 1~12
+            const idx0 = Math.max(0, indexNo - 1);
+
+            // ✅ 기존 모달 열기 함수 그대로 사용
+            openModal("all", idx0);
+
+            // ✅ 모달 안에서 "가게연결" 탭/버튼을 여는 코드
+            const linkBtn = document.querySelector('[data-open-store-link]');
+            if (linkBtn) linkBtn.click();
+
+            // ✅ 그리고 후보 리스트 렌더 함수(기존)로 "이 가게 1개"만 보여주기
+            if (typeof renderStoreResults === "function") renderStoreResults([store]);
+        }
+
+        // ✅ 검색 결과 렌더링: 위치 뱃지 표시 + 클릭 시 onClickSearchResult 호출
+        function renderStoreSearchResults(results) {
+            const box = document.getElementById("storeSearchResults");
+            if (!box) return;
+
+            box.innerHTML = "";
+
+            if (!results || results.length === 0) {
+                box.innerHTML = `<div class="text-sm text-gray-500">검색 결과 없음</div>`;
+                return;
+            }
+
+            results.forEach((r) => {
+                const el = document.createElement("button");
+                el.type = "button";
+                el.className = "w-full text-left p-3 rounded-lg border hover:bg-gray-50";
+
+                el.innerHTML = `
+                    <div class="font-semibold">${(r.business_name || "")}</div>
+                    <div class="text-sm text-gray-600">${(r.business_type || "")}</div>
+                    <div class="text-xs text-blue-600 mt-1">
+                        All items: ${r.page_number}페이지 / ${r.index_in_page}번짘
+                    </div>
+                `;
+
+                el.addEventListener("click", () => onClickSearchResult(r));
+                box.appendChild(el);
+            });
+        }
+
         // =========================
         // ✅ API 설정
         // =========================
@@ -675,11 +723,11 @@
             qs.set("mode", src || CURRENT_SOURCE);
             qs.set("pageSize", String(pageSize));
 
-            const url = `${API_BASE}/search?${qs.toString()}`;
+            const url = `${API_BASE}/search-store?${qs.toString()}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`검색 실패: HTTP ${res.status}`);
             const data = await res.json().catch(() => ({}));
-            return data.stores || data.items || data.results || [];
+            return data.results || data.stores || data.items || [];
         }
 
         // =========================
