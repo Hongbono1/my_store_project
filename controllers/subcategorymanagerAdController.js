@@ -362,57 +362,66 @@ export async function listStores(req, res) {
 // ------------------------------
 export async function searchStore(req, res) {
   try {
-    const mode = String(req.query.mode || "combined").trim(); // food|combined
-    const qRaw = String(req.query.q || "__all__").trim();
-    const pageSize = Math.min(Number(req.query.pageSize || 12) || 12, 200);
+    const mode = clean(req.query.mode) || "combined"; // food|combined
+    const sort = clean(req.query.sort) || "name";
+    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
 
-    const qDigits = qRaw.replace(/[^\d]/g, "");
+    const qRaw = clean(req.query.q);
     const isAll = qRaw === "__all__" || qRaw === "";
+    const q = isAll ? "" : qRaw;
 
-    // ✅ 여기: mode별 테이블/컬럼 (너 기존 코드에 맞춰 유지)
-    const TABLE = mode === "food" ? "public.food_stores" : "public.combined_store_info";
-    const COL_BN = mode === "food" ? "business_no" : "business_number";
-
-    // ✅ 표시 컬럼명은 프론트가 business_number로 받게 alias 맞추기
-    let where = "";
-    const params = [];
-    let i = 1;
-
-    if (!isAll) {
-      // 숫자만이면 사업자번호 exact
-      if (qDigits && qDigits === qRaw) {
-        where = `WHERE ${COL_BN} = $${i++}`;
-        params.push(qDigits);
-      } else {
-        // ✅ 문자면 상호 ILIKE
-        where = `WHERE business_name ILIKE $${i++}`;
-        params.push(`%${qRaw}%`);
-      }
+    // ✅ mode별 테이블 선택(존재하는 food 테이블 자동 선택)
+    const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
+    if (!table) {
+      return res.status(400).json({ success: false, error: "food 테이블을 찾지 못했습니다." });
     }
+
+    const cols = await getColumns(table);
+    const sel = buildStoreSelect(table, cols);
+
+    // ✅ 대표 이미지(있으면)
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
+
+    // ✅ 검색 where (사업자번호/상호/업종 자동 처리)
+    const values = [];
+    const where = buildFilterWhere(
+      { category: req.query.category, subcategory: req.query.subcategory, q },
+      sel,
+      values
+    );
+
+    const orderBy = buildOrderBy(sort, sel);
+
+    // __all__이면 너무 많이 안주도록 제한
+    const hardLimit = isAll ? 10 : 200;
 
     const sql = `
       WITH base AS (
         SELECT
-          id,
-          ${COL_BN} AS business_number,
-          business_name,
-          business_type,
-          COALESCE(image_url, main_image_url, '') AS image_url,
-          ROW_NUMBER() OVER (ORDER BY business_name, id) AS rn
-        FROM ${TABLE}
+          "${sel.idCol}"::text AS id,
+          ${sel.bnCol ? `"${sel.bnCol}"::text` : "''"} AS business_number,
+          "${sel.nameCol}"::text AS business_name,
+          ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
+          ${imageExpr} AS image_url,
+          ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
+        FROM ${table}
         ${where}
       )
       SELECT
-        id, business_number, business_name, business_type, image_url,
-        ((rn - 1) / 12)::int + 1 AS page_number,
-        ((rn - 1) % 12)::int + 1 AS index_in_page
+        id, business_number, business_name, business_type, image_url, rn,
+        CEIL(rn::numeric / ${pageSize})::int AS page_number,
+        ((rn - 1) % ${pageSize} + 1)::int AS index_in_page
       FROM base
       ORDER BY rn
-      LIMIT $${i++};
+      LIMIT ${hardLimit}
     `;
-    params.push(pageSize);
 
-    const { rows } = await pool.query(sql, params);
+    const { rows } = await pool.query(sql, values);
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
     console.error(e);
