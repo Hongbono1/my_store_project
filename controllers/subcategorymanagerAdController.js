@@ -186,8 +186,15 @@ function buildFilterWhere(params, sel, values) {
 
     // ✅ 사업자번호는 숫자만 비교(공백/하이픈 있어도 검색되게)
     if (qDigits && sel.bnCol) {
-      values.push(`%${qDigits}%`);
-      parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
+      // ✅ 사업자번호(보통 10자리)는 "정확히 일치" 검색
+      if (qDigits.length >= 10) {
+        values.push(qDigits);
+        parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}`);
+      } else {
+        // 짧게 입력하면 부분검색 허용
+        values.push(`%${qDigits}%`);
+        parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
+      }
     }
 
     values.push(`%${qRaw}%`);
@@ -303,6 +310,8 @@ export async function searchStore(req, res) {
       values
     );
 
+    const hardLimit = isAll ? 10 : 200;
+
     const orderBy = buildOrderBy(sort, sel);
 
     const sql = `
@@ -323,7 +332,7 @@ export async function searchStore(req, res) {
         ((rn - 1) % ${pageSize} + 1)::int AS index_in_page
       FROM filtered
       ORDER BY rn
-      LIMIT 200
+      LIMIT ${hardLimit}
     `;
 
     const { rows } = await pool.query(sql, values);
