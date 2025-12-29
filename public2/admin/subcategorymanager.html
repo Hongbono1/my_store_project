@@ -161,7 +161,6 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="chip" id="chipApiBase">API: -</span>
                     <span class="chip" id="chipPosition">position: -</span>
-                    <span class="chip" id="chipPriority" style="display:none;">priority: 1</span>
                 </div>
             </div>
 
@@ -193,20 +192,22 @@
                     <div>
                         <div class="label">링크 URL (선택)</div>
                         <input class="input" id="linkUrl" placeholder="https://..." />
-                        <div class="hint mt-1">custom 모드에서 주로 사용</div>
                     </div>
                 </div>
             </div>
         </section>
 
         <!-- =========================
-      ✅ 하단: 검색 + 편집(모달 내용이 화면 주)
+      ✅ 하단: (좌)검색+가게정보  / (우)가게연결
+         - “가게 검색” 눌렀을 때만 가게 정보 목록이 아래에 뜸
     ========================== -->
         <section class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <!-- 좌측: 검색 -->
-            <aside class="lg:col-span-4 neo p-4">
-                <div class="font-extrabold">가게 검색 (사업자번호)</div>
-                <div class="hint mt-1">숫자만 입력해도 되고, 하이픈/공백은 자동 제거합니다.</div>
+            <!-- 좌측: 검색 + 가게정보 -->
+            <aside class="lg:col-span-6 neo p-4">
+                <div class="font-extrabold">가게 검색</div>
+                <div class="hint mt-1">
+                    사업자번호 입력 후 검색하면 해당 가게를 찾고, <b>비워둔 채 검색하면 가게 정보(전체/일부)</b>가 표시됩니다.
+                </div>
 
                 <div class="mt-3">
                     <div class="label">모드</div>
@@ -216,22 +217,26 @@
                     </select>
                 </div>
 
-                <!-- 검색 입력 + 옆 가게정보 박스 -->
-                <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                    <div class="md:col-span-7">
-                        <div class="label">사업자번호</div>
-                        <div class="flex gap-2">
-                            <input class="input" id="q" placeholder="예: 0000000003" inputmode="numeric" />
-                            <button class="btn btn-primary" id="btnSearch" type="button">검색</button>
-                        </div>
-                        <div class="hint mt-1">검색 버튼을 눌러야 아래에 결과가 표시됩니다.</div>
+                <div class="mt-3">
+                    <div class="label">사업자번호 (비우면 전체 보기)</div>
+                    <div class="flex gap-2">
+                        <input class="input" id="q" placeholder="예: 0000000003 (또는 비움)" inputmode="numeric" />
+                        <button class="btn btn-primary" id="btnSearch" type="button">가게 검색</button>
                     </div>
+                    <div class="hint mt-1">
+                        - 숫자만 비교(하이픈/공백 자동 제거)<br />
+                        - 비워두고 검색 → 서버에 <b>q=__all__</b>로 요청(최대 10개)
+                    </div>
+                </div>
 
+                <!-- ✅ “가게 검색” 눌렀을 때만 보이는 영역 -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3 hidden" id="storePanelWrap">
+                    <!-- 좌: 선택된 가게 정보(미니) -->
                     <div class="md:col-span-5 soft p-3">
                         <div class="text-sm font-black">가게 정보</div>
                         <div class="mt-2">
                             <img id="storeThumb" src="/uploads/no-image.png"
-                                class="w-full h-[110px] rounded-xl object-cover bg-white border" alt="thumb" />
+                                class="w-full h-[120px] rounded-xl object-cover bg-white border" alt="thumb" />
                         </div>
                         <div class="mt-2">
                             <div class="text-sm font-black" id="storeNameMini">선택된 가게 없음</div>
@@ -240,22 +245,22 @@
                             <div class="text-xs text-blue-700 font-black mt-2" id="storeLocMini">위치: -</div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 검색 결과 (초기 숨김, 검색 시 표시) -->
-                <div class="mt-3 soft p-3 hidden" id="searchResultsWrap">
-                    <div class="text-sm font-black mb-2">검색 결과</div>
-                    <div id="searchResults" class="space-y-2"></div>
+                    <!-- 우: 검색 결과 리스트 -->
+                    <div class="md:col-span-7 soft p-3">
+                        <div class="text-sm font-black mb-2">검색 결과</div>
+                        <div id="searchResults" class="space-y-2"></div>
+                    </div>
                 </div>
             </aside>
 
-            <!-- 우측: 편집 폼 -->
-            <section class="lg:col-span-8 neo p-4">
+            <!-- 우측: 가게연결 (너무 넓지 않게) -->
+            <section class="lg:col-span-6 neo p-4">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
                         <div class="font-extrabold">편집</div>
                         <div class="hint mt-1">
-                            선택한 가게의 “몇 페이지/몇 번째 박스” 위치를 기준으로 해당 슬롯을 불러오고 저장합니다.
+                            선택한 가게의 “몇 페이지/몇 번째 박스” 위치를 기준으로 슬롯을 불러오고 저장합니다.
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -272,35 +277,29 @@
                         <button type="button" id="btnPickStore" data-active="0">가게연결</button>
                         <button type="button" id="btnPickText" data-active="0">텍스트</button>
                     </div>
-                    <div class="hint mt-2">
-                        - 이미지: 배너 업로드/링크 입력<br />
-                        - 가게연결: 가게를 슬롯에 연결(가게 이미지 자동 적용 가능)<br />
-                        - 텍스트: 텍스트 슬롯 입력(이미지 업로드 숨김)
-                    </div>
                 </div>
 
-                <!-- ✅ 가게연결 입력(가게연결 모드에서만 표시) -->
-                <div class="mt-4 soft p-3 hidden" id="storeLinkInputs">
+                <!-- ✅ 가게연결 입력(좌우 배치 + 좁게) -->
+                <div class="mt-4 soft p-3" id="storeLinkInputs">
                     <div class="flex items-center justify-between gap-3">
                         <div class="font-black">가게 연결</div>
                         <span class="chip" id="storeLocChip">위치: -</span>
                     </div>
 
-                    <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                        <div class="md:col-span-4">
+                    <div class="mt-3 grid grid-cols-12 gap-3 items-start">
+                        <div class="col-span-5">
                             <img id="storeImage" src="/uploads/no-image.png"
-                                class="w-full h-[140px] object-cover rounded-xl bg-white border" alt="store" />
+                                class="w-full h-[120px] object-cover rounded-xl bg-white border" alt="store" />
                         </div>
-                        <div class="md:col-span-8">
-                            <div class="text-lg font-black" id="storeName">선택된 가게 없음</div>
+                        <div class="col-span-7">
+                            <div class="text-base font-black leading-tight" id="storeName">선택된 가게 없음</div>
                             <div class="text-sm text-slate-600 mt-1" id="storeType">-</div>
                             <div class="text-sm text-slate-500 mt-1" id="storeBiz">-</div>
+                            <div class="text-sm text-blue-700 font-black mt-2" id="storeLocText">위치: -</div>
+
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <button class="btn btn-ghost" id="btnUseStore" type="button">이 가게로 연결</button>
                                 <button class="btn btn-ghost" id="btnUseStoreImage" type="button">가게 이미지로 배너</button>
-                            </div>
-                            <div class="hint mt-2">
-                                “이 가게로 연결”을 누르면 storeId/상호/업종/이미지가 저장 데이터에 포함됩니다.
                             </div>
                         </div>
                     </div>
@@ -321,7 +320,7 @@
                     </div>
                 </div>
 
-                <!-- ✅ 공통 옵션 (선택: 기간/종료없음) -->
+                <!-- ✅ 공통 옵션 -->
                 <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <div class="label">기간 시작(선택)</div>
@@ -339,14 +338,12 @@
                     </div>
                 </div>
 
-                <!-- 숨김: 서버로 전송되는 값들 -->
                 <input type="hidden" id="storeId" />
                 <input type="hidden" id="storeBusinessNumber" />
                 <input type="hidden" id="storeNameHidden" />
                 <input type="hidden" id="storeTypeHidden" />
                 <input type="hidden" id="storeImageUrl" />
 
-                <!-- 내부 상태용(슬롯키) -->
                 <input type="hidden" id="positionHidden" />
                 <input type="hidden" id="priorityHidden" value="1" />
 
@@ -358,34 +355,17 @@
     <div id="footer-placeholder"></div>
 
     <script>
-        // =========================
-        // ✅ 기본 설정
-        // =========================
-        const PAGE_NAME = "subcategory";      // admin_ad_slots.page 값
-        const DEFAULT_PRIORITY = 1;           // 우선 1 고정 (필요하면 나중에 후보 UI 추가 가능)
+        const PAGE_NAME = "subcategory";
+        const DEFAULT_PRIORITY = 1;
 
-        // ✅ API 경로 (확실히 하나는 고정) + 별칭 후보
-        const API_BASE_CANDIDATES = [
-            "/subcategorymanager/ad",
-            "/admin/subcategory",
-        ];
+        const API_BASE_CANDIDATES = ["/subcategorymanager/ad", "/admin/subcategory"];
         let API_BASE = null;
 
-        // ✅ 선택 모드: image | store | text
         let uiPick = "image";
-
-        // ✅ 선택된 가게/타겟(= position 생성용)
         let selectedStore = null;
-        let selectedTarget = {
-            mode: "combined",
-            pageNo: 1,
-            boxNo: 1,
-            priority: DEFAULT_PRIORITY,
-            position: "",
-        };
+        let selectedTarget = { mode: "combined", pageNo: 1, boxNo: 1, priority: DEFAULT_PRIORITY, position: "" };
 
         function $(id) { return document.getElementById(id); }
-
         function toast(msg, ok = true) {
             const t = $("toast");
             t.classList.remove("hidden");
@@ -393,17 +373,11 @@
             t.style.borderColor = ok ? "rgba(34,197,94,.45)" : "rgba(239,68,68,.45)";
             setTimeout(() => t.classList.add("hidden"), 2200);
         }
-
-        function digitsOnly(v) {
-            return String(v ?? "").replace(/[^\d]/g, "");
-        }
-
+        function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
         function buildPosition(mode, pageNo, boxNo) {
-            // suffix는 서버 inferTableSourceFromPosition에 맞춰야 함
             const suffix = mode === "food" ? "__food" : "__combined";
             return `all_items__p${pageNo}__b${boxNo}${suffix}`;
         }
-
         function toIsoLocalInputValue(iso) {
             if (!iso) return "";
             const d = new Date(iso);
@@ -411,88 +385,58 @@
             const pad = (n) => String(n).padStart(2, "0");
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
-
         async function tryFetchJson(url, options) {
             const res = await fetch(url, options);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await res.json();
         }
-
         async function apiFetch(path, options) {
-            if (API_BASE) {
-                return await tryFetchJson(`${API_BASE}${path}`, options);
-            }
+            if (API_BASE) return await tryFetchJson(`${API_BASE}${path}`, options);
             for (const base of API_BASE_CANDIDATES) {
                 try {
                     const data = await tryFetchJson(`${base}${path}`, options);
                     API_BASE = base;
                     $("chipApiBase").textContent = `API: ${API_BASE}`;
                     return data;
-                } catch (e) { /* continue */ }
+                } catch (e) { }
             }
-            throw new Error("API_BASE 탐색 실패: server.js의 app.use 경로 확인 필요");
+            throw new Error("API_BASE 탐색 실패: server.js app.use 경로 확인 필요");
         }
-
         function syncChips() {
             $("chipPosition").textContent = `position: ${selectedTarget.position || "-"}`;
-            $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
             $("positionHidden").value = selectedTarget.position || "";
+            $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
         }
 
-        // =========================
-        // ✅ 선택(이미지/가게연결/텍스트) UI 토글
-        // =========================
         function setPick(next) {
             uiPick = next;
-
             $("btnPickImage").setAttribute("data-active", uiPick === "image" ? "1" : "0");
             $("btnPickStore").setAttribute("data-active", uiPick === "store" ? "1" : "0");
             $("btnPickText").setAttribute("data-active", uiPick === "text" ? "1" : "0");
 
-            // 이미지 업로드 입력은 image일 때만 노출 (텍스트면 숨김)
             $("imageInputs").classList.toggle("hidden", uiPick === "text");
-
-            // 가게연결 입력 노출
             $("storeLinkInputs").classList.toggle("hidden", uiPick !== "store");
-
-            // 텍스트 입력 노출
             $("textInputs").classList.toggle("hidden", uiPick !== "text");
 
-            // 텍스트 선택 시: 이미지 업로드 파일 초기화(원하면)
-            if (uiPick === "text") {
-                $("bannerFile").value = "";
-            }
+            if (uiPick === "text") $("bannerFile").value = "";
         }
-
         $("btnPickImage").addEventListener("click", () => setPick("image"));
         $("btnPickStore").addEventListener("click", () => setPick("store"));
         $("btnPickText").addEventListener("click", () => setPick("text"));
 
-        // =========================
-        // ✅ 배너 미리보기
-        // =========================
-        function setBannerPreview(src) {
-            $("bannerPreview").src = src || "/uploads/no-image.png";
-        }
-
+        function setBannerPreview(src) { $("bannerPreview").src = src || "/uploads/no-image.png"; }
         $("bannerFile").addEventListener("change", (e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            const url = URL.createObjectURL(f);
-            setBannerPreview(url);
+            setBannerPreview(URL.createObjectURL(f));
         });
-
         $("btnClearImage").addEventListener("click", () => {
             $("bannerFile").value = "";
-            // 가게 이미지가 있으면 그걸로 미리보기 유지, 없으면 no-image
             const storeImg = $("storeImageUrl").value;
             setBannerPreview(storeImg || "/uploads/no-image.png");
             toast("업로드 이미지 제거됨", true);
         });
 
-        // =========================
-        // ✅ 가게 박스(우측/좌측 정보) 세팅
-        // =========================
         function setMiniStoreInfo(store) {
             if (!store) {
                 $("storeThumb").src = "/uploads/no-image.png";
@@ -508,7 +452,6 @@
             $("storeBizMini").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
             $("storeLocMini").textContent = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
         }
-
         function setStoreBox(store) {
             if (!store) {
                 $("storeName").textContent = "선택된 가게 없음";
@@ -516,24 +459,21 @@
                 $("storeBiz").textContent = "-";
                 $("storeImage").src = "/uploads/no-image.png";
                 $("storeLocChip").textContent = "위치: -";
+                $("storeLocText").textContent = "위치: -";
                 return;
             }
             $("storeName").textContent = store.business_name || "-";
             $("storeType").textContent = store.business_type || "-";
             $("storeBiz").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
             $("storeImage").src = store.image_url || "/uploads/no-image.png";
-            $("storeLocChip").textContent = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
+            const loc = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
+            $("storeLocChip").textContent = loc;
+            $("storeLocText").textContent = loc;
         }
 
-        // =========================
-        // ✅ 슬롯 불러오기
-        // =========================
         async function loadSlot() {
             try {
-                if (!selectedTarget.position) {
-                    // 아직 검색으로 타겟이 안 정해졌으면 패스
-                    return;
-                }
+                if (!selectedTarget.position) return;
                 syncChips();
 
                 const qs = new URLSearchParams({
@@ -550,7 +490,6 @@
                     return;
                 }
 
-                // 기존 저장값 → 화면 반영
                 $("linkUrl").value = slot.link_url || "";
                 $("textTitle").value = slot.text_title || "";
                 $("textDesc").value = slot.text_desc || "";
@@ -558,25 +497,17 @@
                 $("startAt").value = toIsoLocalInputValue(slot.start_at);
                 $("endAt").value = toIsoLocalInputValue(slot.end_at);
 
-                // 이미지 미리보기
                 if (slot.image_url) setBannerPreview(slot.image_url);
 
-                // 가게 연결 값
                 $("storeId").value = slot.store_id ?? "";
                 $("storeBusinessNumber").value = slot.store_business_number ?? slot.business_number ?? "";
                 $("storeNameHidden").value = slot.store_name ?? slot.business_name ?? "";
                 $("storeTypeHidden").value = slot.store_type ?? slot.business_type ?? "";
                 $("storeImageUrl").value = slot.store_image_url ?? slot.store_image ?? "";
 
-                // 슬롯 타입/모드 기반으로 UI 선택을 자동 맞추고 싶으면 여기서 결정
-                // slot_type=text -> text, slot_mode=store -> store, 그 외 -> image
-                if (slot.slot_type === "text") {
-                    setPick("text");
-                } else if (slot.slot_mode === "store") {
-                    setPick("store");
-                } else {
-                    setPick("image");
-                }
+                if (slot.slot_type === "text") setPick("text");
+                else if (slot.slot_mode === "store") setPick("store");
+                else setPick("image");
 
                 toast("슬롯 불러오기 완료", true);
             } catch (e) {
@@ -584,21 +515,14 @@
             }
         }
 
-        // =========================
-        // ✅ 검색 결과 렌더 (검색 버튼 누른 뒤에만 보이게)
-        // =========================
         function renderSearchResults(results) {
-            const wrap = $("searchResultsWrap");
-            const box = $("searchResults");
-            box.innerHTML = "";
+            const list = $("searchResults");
+            list.innerHTML = "";
 
             if (!results || results.length === 0) {
-                wrap.classList.remove("hidden");
-                box.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
+                list.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
                 return;
             }
-
-            wrap.classList.remove("hidden");
 
             for (const r of results) {
                 const btn = document.createElement("button");
@@ -619,11 +543,9 @@
             </div>
           </div>
         `;
-
                 btn.addEventListener("click", async () => {
                     selectedStore = r;
 
-                    // ✅ 검색 결과로 “편집 대상 위치” 자동 결정
                     selectedTarget.mode = $("mode").value || "combined";
                     selectedTarget.pageNo = Number(r.page_number || 1);
                     selectedTarget.boxNo = Number(r.index_in_page || 1);
@@ -632,22 +554,18 @@
 
                     syncChips();
 
-                    // ✅ 좌측/우측 가게정보 박스 갱신
                     setMiniStoreInfo(r);
                     setStoreBox(r);
 
-                    // ✅ 가게연결 모드에서 바로 쓰기 좋게 hidden도 채워둠(버튼 누르면 확정)
                     $("storeId").value = r.id || "";
                     $("storeBusinessNumber").value = r.business_number || "";
                     $("storeNameHidden").value = r.business_name || "";
                     $("storeTypeHidden").value = r.business_type || "";
                     $("storeImageUrl").value = r.image_url || "";
 
-                    // ✅ 현재 슬롯 불러오기
                     await loadSlot();
                 });
-
-                box.appendChild(btn);
+                list.appendChild(btn);
             }
         }
 
@@ -657,18 +575,18 @@
                 const qRaw = $("q").value;
                 const qDigits = digitsOnly(qRaw);
 
-                if (!qDigits) {
-                    toast("사업자번호(숫자)를 입력", false);
-                    return;
-                }
+                // ✅ 검색 누르면 그때 가게정보 패널(가게정보+결과)을 보여줌
+                $("storePanelWrap").classList.remove("hidden");
+
+                // ✅ 사업자번호 비었으면 __all__ 로 전체(최대 10개) 보여주기
+                const qParam = qDigits ? qDigits : "__all__";
 
                 const qs = new URLSearchParams({
                     mode,
-                    q: qDigits,
+                    q: qParam,
                     pageSize: "12",
                 }).toString();
 
-                // /search 먼저 → 실패하면 /search-store
                 let data;
                 try {
                     data = await apiFetch(`/search?${qs}`);
@@ -677,6 +595,8 @@
                 }
 
                 if (!data.success) throw new Error(data.error || "검색 실패");
+
+                // __all__이면 results가 최대 10개만 오는 게 정상(서버 hardLimit=10)
                 renderSearchResults(data.results || []);
                 toast("검색 완료", true);
             } catch (e) {
@@ -692,25 +612,19 @@
             }
         });
 
-        // =========================
-        // ✅ 가게연결 버튼 동작
-        // =========================
         $("btnUseStore").addEventListener("click", () => {
             if (!selectedStore) return toast("가게를 먼저 선택", false);
             setPick("store");
 
-            // store 연결 값 확정(이미 hidden에 들어가 있지만 확실히)
             $("storeId").value = selectedStore.id || "";
             $("storeBusinessNumber").value = selectedStore.business_number || "";
             $("storeNameHidden").value = selectedStore.business_name || "";
             $("storeTypeHidden").value = selectedStore.business_type || "";
             $("storeImageUrl").value = selectedStore.image_url || "";
 
-            // 업로드 이미지가 없으면 배너 미리보기를 가게 이미지로
             if (!$("bannerFile").files?.length && $("storeImageUrl").value) {
                 setBannerPreview($("storeImageUrl").value);
             }
-
             toast("가게 연결 준비 완료(저장 시 반영)", true);
         });
 
@@ -726,16 +640,11 @@
             }
         });
 
-        // =========================
-        // ✅ 저장/삭제
-        // =========================
         function getSlotModeByPick() {
-            // image -> custom, store -> store, text -> custom
             if (uiPick === "store") return "store";
             return "custom";
         }
         function getSlotTypeByPick() {
-            // image/store -> banner, text -> text
             if (uiPick === "text") return "text";
             return "banner";
         }
@@ -754,11 +663,9 @@
                 fd.append("position", selectedTarget.position);
                 fd.append("priority", String(selectedTarget.priority || DEFAULT_PRIORITY));
 
-                // ✅ 선택에 따라 slot_type/slot_mode 결정
-                fd.append("adMode", getSlotTypeByPick());          // banner|text
-                fd.append("slotMode", getSlotModeByPick());        // store|custom
+                fd.append("adMode", getSlotTypeByPick());
+                fd.append("slotMode", getSlotModeByPick());
 
-                // 공통
                 fd.append("linkUrl", $("linkUrl").value || "");
                 fd.append("textTitle", $("textTitle").value || "");
                 fd.append("textDesc", $("textDesc").value || "");
@@ -767,7 +674,6 @@
                 fd.append("startAt", $("startAt").value || "");
                 fd.append("endAt", $("endAt").value || "");
 
-                // ✅ 선택: 가게연결인 경우만 store 값 포함
                 if (uiPick === "store") {
                     if ($("storeId").value) fd.append("storeId", $("storeId").value);
                     if ($("storeBusinessNumber").value) fd.append("storeBusinessNumber", $("storeBusinessNumber").value);
@@ -776,7 +682,6 @@
                     if ($("storeImageUrl").value) fd.append("storeImageUrl", $("storeImageUrl").value);
                 }
 
-                // ✅ 선택: 이미지/가게연결 모드일 때만 업로드 허용 (텍스트면 업로드 숨김)
                 const f = $("bannerFile").files?.[0];
                 if (uiPick !== "text" && f) fd.append("image", f);
 
@@ -818,42 +723,30 @@
         $("btnSave").addEventListener("click", saveSlot);
         $("btnDelete").addEventListener("click", deleteSlot);
 
-        // =========================
-        // ✅ header/footer fetch
-        // =========================
         async function hydrateLayout() {
             try {
                 const h = await fetch("/public2/components/header.html").then(r => r.text());
-                $("header-placeholder").innerHTML = h;
-            } catch (_e) { /* ignore */ }
-
+                document.getElementById("header-placeholder").innerHTML = h;
+            } catch (_e) { }
             try {
                 const f = await fetch("/public2/components/footer.html").then(r => r.text());
-                $("footer-placeholder").innerHTML = f;
-            } catch (_e) { /* ignore */ }
+                document.getElementById("footer-placeholder").innerHTML = f;
+            } catch (_e) { }
         }
 
-        // =========================
-        // ✅ 초기화
-        // =========================
         (async function init() {
             hydrateLayout();
-
-            // 기본 선택: 이미지
             setPick("image");
-
-            // API_BASE 표시만 먼저 잡기(가볍게 slot 호출 시도는 하지 않음)
-            try {
-                // searchResults는 “검색 버튼 누를 때만” 보여야 하므로 init에서 검색 호출은 안 함
-                // 대신 API_BASE는 첫 검색 때 자동 탐색
-            } catch (_e) { }
-
             $("chipApiBase").textContent = "API: -";
+            $("chipPosition").textContent = "position: -";
+            syncChips();
 
-            // 초기 미니 정보/가게 박스 초기화
+            // 초기엔 검색 패널 숨김(검색 눌러야 뜸)
+            $("storePanelWrap").classList.add("hidden");
+
             setMiniStoreInfo(null);
             setStoreBox(null);
-            syncChips();
+            setBannerPreview("/uploads/no-image.png");
         })();
     </script>
 </body>
