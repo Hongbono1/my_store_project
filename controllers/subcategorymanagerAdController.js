@@ -16,10 +16,10 @@ const COMBINED_TABLE = "public.combined_store_info";
 
 // food 후보 테이블(존재하는 것 중 첫 번째 사용)
 const FOOD_TABLE_CANDIDATES = [
+  "public.store_info",
   "public.food_stores",
   "public.food_store_info",
   "public.food_store",
-  "public.store_info",
 ];
 
 function ensureUploadDir() {
@@ -187,14 +187,18 @@ function buildFilterWhere(params, sel, values) {
     // ✅ 사업자번호는 숫자만 비교(공백/하이픈 있어도 검색되게)
     if (qDigits && sel.bnCol) {
       // ✅ 사업자번호(보통 10자리)는 "정확히 일치" 검색
-      if (qDigits.length >= 10) {
-        values.push(qDigits);
-        parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}`);
-      } else {
-        // 짧게 입력하면 부분검색 허용
-        values.push(`%${qDigits}%`);
-        parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
-      }
+      values.push(qDigits);
+      parts.push(`
+  (
+    regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}
+    OR
+    ltrim(regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g'), '0') = ltrim($${values.length}, '0')
+  )
+`);
+
+      // 짧게 입력하면 부분검색 허용
+      values.push(`%${qDigits}%`);
+      parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
     }
 
     values.push(`%${qRaw}%`);
@@ -208,7 +212,7 @@ function buildFilterWhere(params, sel, values) {
     if (parts.length) where.push(`(${parts.join(" OR ")})`);
   }
 
-  return where.length ? `WHERE ${where.join(" AND ")}` : "";
+return where.length ? `WHERE ${where.join(" AND ")}` : "";
 }
 
 // ------------------------------
