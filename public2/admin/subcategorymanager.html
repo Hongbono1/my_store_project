@@ -400,6 +400,24 @@
             $("statusSub").textContent = sub || "-";
         }
 
+        function setBusy(on, msg) {
+            const save = document.getElementById("btnSave");
+            const del = document.getElementById("btnDelete");
+            const search = document.getElementById("btnSearch");
+
+            save.disabled = !!on;
+            del.disabled = !!on;
+            search.disabled = !!on;
+
+            save.classList.toggle("opacity-60", !!on);
+            del.classList.toggle("opacity-60", !!on);
+            search.classList.toggle("opacity-60", !!on);
+
+            if (on && msg) {
+                setStatus("warn", msg, `시간: ${nowStr()}`);
+            }
+        }
+
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
         function buildPosition(mode, pageNo, boxNo) {
@@ -416,10 +434,17 @@
         }
 
         async function tryFetchJson(url, options) {
-            const res = await fetch(url, options);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return await res.json();
-        }
+  const res = await fetch(url, options);
+  let data = null;
+  try { data = await res.json(); } catch (_e) {}
+
+  if (!res.ok) {
+    const msg = data?.error || data?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 
         async function apiFetch(path, options) {
             if (API_BASE) return await tryFetchJson(`${API_BASE}${path}`, options);
@@ -707,8 +732,8 @@
                     return;
                 }
 
+                setBusy(true, "저장 중...");
                 syncChips();
-                setStatus("warn", "저장 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
 
                 const fd = new FormData();
                 fd.append("page", PAGE_NAME);
@@ -745,9 +770,15 @@
 
                 $("bannerFile").value = "";
 
-                setStatus("ok", "저장 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                setStatus(
+                    "ok",
+                    "저장 완료 ✅",
+                    `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`
+                );
             } catch (e) {
-                setStatus("bad", "저장 실패", `${e.message} / 시간: ${nowStr()}`);
+                setStatus("bad", "저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
             }
         }
 
@@ -758,8 +789,8 @@
                     return;
                 }
 
+                setBusy(true, "삭제 중...");
                 syncChips();
-                setStatus("warn", "삭제 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
@@ -770,9 +801,15 @@
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
                 if (!data.success) throw new Error(data.error || "삭제 실패");
 
-                setStatus("ok", "삭제 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                setStatus(
+                    "ok",
+                    "삭제 완료 ✅",
+                    `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`
+                );
             } catch (e) {
-                setStatus("bad", "삭제 실패", `${e.message} / 시간: ${nowStr()}`);
+                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
             }
         }
 
