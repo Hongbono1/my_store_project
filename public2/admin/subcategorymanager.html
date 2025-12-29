@@ -434,16 +434,16 @@
         }
 
         async function tryFetchJson(url, options) {
-  const res = await fetch(url, options);
-  let data = null;
-  try { data = await res.json(); } catch (_e) {}
+            const res = await fetch(url, options);
+            let data = null;
+            try { data = await res.json(); } catch (_e) { }
 
-  if (!res.ok) {
-    const msg = data?.error || data?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data;
-}
+            if (!res.ok) {
+                const msg = data?.error || data?.message || `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            return data;
+        }
 
 
         async function apiFetch(path, options) {
@@ -541,12 +541,14 @@
             $("storeLocText").textContent = loc;
         }
 
-        async function loadSlot() {
+        async function loadSlot(silent = false) {
             try {
                 if (!selectedTarget.position) return;
 
-                syncChips();
-                setStatus("warn", "슬롯 불러오는 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                if (!silent) {
+                    syncChips();
+                    setStatus("warn", "슬롯 불러오는 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                }
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
@@ -555,10 +557,13 @@
                 }).toString();
 
                 const data = await apiFetch(`/slot?${qs}`);
-                const slot = data.slot;
+                const slot = data?.slot || null;
 
                 if (!slot) {
-                    setStatus("warn", "슬롯 없음(새로 저장 가능)", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                    clearSlotUI();
+                    if (!silent) {
+                        setStatus("warn", "슬롯 비어있음", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                    }
                     return;
                 }
 
@@ -581,9 +586,12 @@
                 else if (slot.slot_mode === "store") setPick("store");
                 else setPick("image");
 
-                setStatus("ok", "슬롯 불러오기 완료", `시간: ${nowStr()}`);
+                const btnDel = $("btnDelete");
+                if (btnDel) btnDel.disabled = false;
+
+                if (!silent) setStatus("ok", "슬롯 불러오기 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
             } catch (e) {
-                setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
+                if (!silent) setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
@@ -801,6 +809,10 @@
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
                 if (!data.success) throw new Error(data.error || "삭제 실패");
 
+                // ✅ 핵심: UI 즉시 초기화 + 서버 상태 재확인(슬롯 없음으로)
+                clearSlotUI();
+                await loadSlot(true);
+
                 setStatus(
                     "ok",
                     "삭제 완료 ✅",
@@ -844,6 +856,42 @@
 
             setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
         })();
+
+        function clearSlotUI() {
+            // 배너 미리보기 초기화(너가 쓰는 기본 이미지로)
+            setBannerPreview("/uploads/no-image.png"); // ← 너 기본 경로에 맞춰 바꿔도 됨
+
+            // 파일 input 초기화
+            const f = document.getElementById("bannerFile");
+            if (f) f.value = "";
+
+            // 텍스트 입력 초기화
+            const t1 = document.getElementById("textTitle");
+            const t2 = document.getElementById("textDesc");
+            const link = document.getElementById("linkUrl");
+            if (t1) t1.value = "";
+            if (t2) t2.value = "";
+            if (link) link.value = "";
+
+            // 가게 연결 패널(선택된 가게) 초기화
+            // (너의 selectedTarget/state 변수명에 맞춰 아래는 유지)
+            if (window.selectedTarget) {
+                selectedTarget.store = null;
+                selectedTarget.storeId = "";
+                selectedTarget.storeBiz = "";
+                selectedTarget.storeName = "";
+                selectedTarget.storeType = "";
+                selectedTarget.storeImage = "";
+            }
+
+            // 가게 연결 UI 표시 영역도 비우기 (있다면)
+            const box = document.getElementById("pickedStoreBox");
+            if (box) box.innerHTML = "";
+
+            // 삭제 버튼 비활성화(선택) — “현재 슬롯이 없을 때”
+            const btnDel = document.getElementById("btnDelete");
+            if (btnDel) btnDel.disabled = true;
+        }
     </script>
 </body>
 
