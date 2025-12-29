@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>서브카테고리 매니저 (모달 중심)</title>
+    <title>서브카테고리 매니저</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -43,7 +43,7 @@
         .btn {
             border-radius: .85rem;
             padding: .6rem .85rem;
-            font-weight: 800;
+            font-weight: 900;
             transition: .15s;
         }
 
@@ -96,7 +96,7 @@
             font-size: .85rem;
             color: rgb(71 85 105);
             margin-bottom: .35rem;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         .hint {
@@ -139,6 +139,26 @@
         .result-item:hover {
             background: rgba(59, 130, 246, .06);
         }
+
+        /* ✅ 상태바 */
+        .statusbar {
+            border-radius: 1rem;
+            padding: .85rem 1rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .75);
+        }
+
+        .status-ok {
+            border-color: rgba(34, 197, 94, .45);
+        }
+
+        .status-bad {
+            border-color: rgba(239, 68, 68, .45);
+        }
+
+        .status-warn {
+            border-color: rgba(245, 158, 11, .45);
+        }
     </style>
 </head>
 
@@ -146,20 +166,19 @@
     <div id="header-placeholder"></div>
 
     <main class="max-w-7xl mx-auto px-4 py-6">
-        <!-- =========================
-      ✅ 상단 배너(이미지) 영역
-    ========================== -->
+        <!-- ✅ 상단 배너 -->
         <section class="banner-box p-4 md:p-5">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                     <div class="text-lg md:text-xl font-black tracking-tight">서브카테고리 매니저</div>
                     <div class="text-sm text-slate-600 mt-1">
-                        선택(이미지/가게연결/텍스트)에 따라 입력창이 자동 전환됩니다.
+                        이미지/가게연결/텍스트 선택에 따라 입력창이 전환됩니다.
                     </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="chip" id="chipApiBase">API: -</span>
+                    <span class="chip" id="chipMode">모드: -</span>
                     <span class="chip" id="chipPosition">position: -</span>
                 </div>
             </div>
@@ -168,13 +187,9 @@
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <div class="font-extrabold">배너 미리보기</div>
-                        <div class="hint mt-1">
-                            이미지/가게연결 모드에서 사용. (텍스트 모드면 업로드 입력은 숨김)
-                        </div>
+                        <div class="hint mt-1">이미지/가게연결 모드에서 사용 (텍스트면 업로드 숨김)</div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button class="btn btn-ghost" id="btnClearImage" type="button">업로드 이미지 제거</button>
-                    </div>
+                    <button class="btn btn-ghost" id="btnClearImage" type="button">업로드 이미지 제거</button>
                 </div>
 
                 <div class="mt-3 soft p-3">
@@ -182,7 +197,7 @@
                         class="w-full h-[220px] md:h-[280px] object-cover rounded-xl bg-white" />
                 </div>
 
-                <!-- ✅ 이미지 모드에서만 보임 -->
+                <!-- 이미지 입력 -->
                 <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3" id="imageInputs">
                     <div>
                         <div class="label">배너 이미지 업로드</div>
@@ -197,24 +212,22 @@
             </div>
         </section>
 
-        <!-- =========================
-      ✅ 하단: (좌)검색+가게정보  / (우)가게연결
-         - “가게 검색” 눌렀을 때만 가게 정보 목록이 아래에 뜸
-    ========================== -->
+        <!-- ✅ 하단 -->
         <section class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <!-- 좌측: 검색 + 가게정보 -->
+            <!-- 좌: 검색 -->
             <aside class="lg:col-span-6 neo p-4">
                 <div class="font-extrabold">가게 검색</div>
                 <div class="hint mt-1">
-                    사업자번호 입력 후 검색하면 해당 가게를 찾고, <b>비워둔 채 검색하면 가게 정보(전체/일부)</b>가 표시됩니다.
+                    사업자번호로 검색 / 비워두고 검색하면 전체(일부) 표시
                 </div>
 
                 <div class="mt-3">
-                    <div class="label">모드</div>
+                    <div class="label">모드 선택 (통합 / 푸드)</div>
                     <select class="input" id="mode">
                         <option value="combined">통합</option>
                         <option value="food">푸드</option>
                     </select>
+                    <div class="hint mt-1">모드에 따라 position suffix가 달라집니다.</div>
                 </div>
 
                 <div class="mt-3">
@@ -225,13 +238,13 @@
                     </div>
                     <div class="hint mt-1">
                         - 숫자만 비교(하이픈/공백 자동 제거)<br />
-                        - 비워두고 검색 → 서버에 <b>q=__all__</b>로 요청(최대 10개)
+                        - 비워두고 검색 → q=__all__ (서버 제한 수 만큼)
                     </div>
                 </div>
 
-                <!-- ✅ “가게 검색” 눌렀을 때만 보이는 영역 -->
+                <!-- 검색 후 표시 -->
                 <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3 hidden" id="storePanelWrap">
-                    <!-- 좌: 선택된 가게 정보(미니) -->
+                    <!-- 가게 정보 -->
                     <div class="md:col-span-5 soft p-3">
                         <div class="text-sm font-black">가게 정보</div>
                         <div class="mt-2">
@@ -246,7 +259,7 @@
                         </div>
                     </div>
 
-                    <!-- 우: 검색 결과 리스트 -->
+                    <!-- 결과 -->
                     <div class="md:col-span-7 soft p-3">
                         <div class="text-sm font-black mb-2">검색 결과</div>
                         <div id="searchResults" class="space-y-2"></div>
@@ -254,22 +267,16 @@
                 </div>
             </aside>
 
-            <!-- 우측: 가게연결 (너무 넓지 않게) -->
-            <section class="lg:col-span-6 neo p-4">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div>
-                        <div class="font-extrabold">편집</div>
-                        <div class="hint mt-1">
-                            선택한 가게의 “몇 페이지/몇 번째 박스” 위치를 기준으로 슬롯을 불러오고 저장합니다.
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button class="btn btn-primary" id="btnSave" type="button">저장</button>
-                        <button class="btn btn-danger" id="btnDelete" type="button">삭제</button>
+            <!-- 우: 편집 -->
+            <section class="lg:col-span-6 neo p-4 flex flex-col">
+                <div>
+                    <div class="font-extrabold">편집</div>
+                    <div class="hint mt-1">
+                        선택한 가게의 “몇 페이지/몇 번째 박스” 위치 기준으로 슬롯을 불러오고 저장합니다.
                     </div>
                 </div>
 
-                <!-- ✅ 선택: 이미지/가게연결/텍스트 -->
+                <!-- 타입 선택 -->
                 <div class="mt-4">
                     <div class="label">작업 유형 선택</div>
                     <div class="seg">
@@ -279,7 +286,7 @@
                     </div>
                 </div>
 
-                <!-- ✅ 가게연결 입력(좌우 배치 + 좁게) -->
+                <!-- 가게연결 -->
                 <div class="mt-4 soft p-3" id="storeLinkInputs">
                     <div class="flex items-center justify-between gap-3">
                         <div class="font-black">가게 연결</div>
@@ -305,7 +312,7 @@
                     </div>
                 </div>
 
-                <!-- ✅ 텍스트 입력(텍스트 모드에서만 표시) -->
+                <!-- 텍스트 -->
                 <div class="mt-4 soft p-3 hidden" id="textInputs">
                     <div class="font-black">텍스트 입력</div>
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -320,7 +327,7 @@
                     </div>
                 </div>
 
-                <!-- ✅ 공통 옵션 -->
+                <!-- 공통 옵션 -->
                 <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <div class="label">기간 시작(선택)</div>
@@ -338,16 +345,27 @@
                     </div>
                 </div>
 
+                <!-- hidden -->
                 <input type="hidden" id="storeId" />
                 <input type="hidden" id="storeBusinessNumber" />
                 <input type="hidden" id="storeNameHidden" />
                 <input type="hidden" id="storeTypeHidden" />
                 <input type="hidden" id="storeImageUrl" />
-
                 <input type="hidden" id="positionHidden" />
                 <input type="hidden" id="priorityHidden" value="1" />
 
-                <div id="toast" class="mt-4 hidden soft p-3 text-sm"></div>
+                <!-- ✅ 하단 고정: 상태 문구 + 저장/삭제 버튼 -->
+                <div class="mt-6 space-y-3">
+                    <div id="statusBar" class="statusbar status-warn">
+                        <div class="text-sm font-black" id="statusText">대기 중: 가게를 검색하고 선택하세요.</div>
+                        <div class="text-xs text-slate-600 mt-1" id="statusSub">-</div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-2">
+                        <button class="btn btn-primary" id="btnSave" type="button">저장</button>
+                        <button class="btn btn-danger" id="btnDelete" type="button">삭제</button>
+                    </div>
+                </div>
             </section>
         </section>
     </main>
@@ -366,18 +384,29 @@
         let selectedTarget = { mode: "combined", pageNo: 1, boxNo: 1, priority: DEFAULT_PRIORITY, position: "" };
 
         function $(id) { return document.getElementById(id); }
-        function toast(msg, ok = true) {
-            const t = $("toast");
-            t.classList.remove("hidden");
-            t.textContent = msg;
-            t.style.borderColor = ok ? "rgba(34,197,94,.45)" : "rgba(239,68,68,.45)";
-            setTimeout(() => t.classList.add("hidden"), 2200);
+
+        function nowStr() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
+
+        function setStatus(type, text, sub = "") {
+            const bar = $("statusBar");
+            bar.classList.remove("status-ok", "status-bad", "status-warn");
+            bar.classList.add(type === "ok" ? "status-ok" : type === "bad" ? "status-bad" : "status-warn");
+
+            $("statusText").textContent = text;
+            $("statusSub").textContent = sub || "-";
+        }
+
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
+
         function buildPosition(mode, pageNo, boxNo) {
             const suffix = mode === "food" ? "__food" : "__combined";
             return `all_items__p${pageNo}__b${boxNo}${suffix}`;
         }
+
         function toIsoLocalInputValue(iso) {
             if (!iso) return "";
             const d = new Date(iso);
@@ -385,13 +414,16 @@
             const pad = (n) => String(n).padStart(2, "0");
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
+
         async function tryFetchJson(url, options) {
             const res = await fetch(url, options);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await res.json();
         }
+
         async function apiFetch(path, options) {
             if (API_BASE) return await tryFetchJson(`${API_BASE}${path}`, options);
+
             for (const base of API_BASE_CANDIDATES) {
                 try {
                     const data = await tryFetchJson(`${base}${path}`, options);
@@ -402,11 +434,30 @@
             }
             throw new Error("API_BASE 탐색 실패: server.js app.use 경로 확인 필요");
         }
+
         function syncChips() {
+            $("chipMode").textContent = `모드: ${$("mode").value}`;
             $("chipPosition").textContent = `position: ${selectedTarget.position || "-"}`;
             $("positionHidden").value = selectedTarget.position || "";
             $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
         }
+
+        function setBannerPreview(src) {
+            $("bannerPreview").src = src || "/uploads/no-image.png";
+        }
+
+        $("bannerFile").addEventListener("change", (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setBannerPreview(URL.createObjectURL(f));
+        });
+
+        $("btnClearImage").addEventListener("click", () => {
+            $("bannerFile").value = "";
+            const storeImg = $("storeImageUrl").value;
+            setBannerPreview(storeImg || "/uploads/no-image.png");
+            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
+        });
 
         function setPick(next) {
             uiPick = next;
@@ -420,21 +471,14 @@
 
             if (uiPick === "text") $("bannerFile").value = "";
         }
+
         $("btnPickImage").addEventListener("click", () => setPick("image"));
         $("btnPickStore").addEventListener("click", () => setPick("store"));
         $("btnPickText").addEventListener("click", () => setPick("text"));
 
-        function setBannerPreview(src) { $("bannerPreview").src = src || "/uploads/no-image.png"; }
-        $("bannerFile").addEventListener("change", (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            setBannerPreview(URL.createObjectURL(f));
-        });
-        $("btnClearImage").addEventListener("click", () => {
-            $("bannerFile").value = "";
-            const storeImg = $("storeImageUrl").value;
-            setBannerPreview(storeImg || "/uploads/no-image.png");
-            toast("업로드 이미지 제거됨", true);
+        $("mode").addEventListener("change", () => {
+            syncChips();
+            setStatus("warn", "모드 변경됨", `현재 모드: ${$("mode").value} / 시간: ${nowStr()}`);
         });
 
         function setMiniStoreInfo(store) {
@@ -452,6 +496,7 @@
             $("storeBizMini").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
             $("storeLocMini").textContent = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
         }
+
         function setStoreBox(store) {
             if (!store) {
                 $("storeName").textContent = "선택된 가게 없음";
@@ -474,7 +519,9 @@
         async function loadSlot() {
             try {
                 if (!selectedTarget.position) return;
+
                 syncChips();
+                setStatus("warn", "슬롯 불러오는 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
@@ -486,7 +533,7 @@
                 const slot = data.slot;
 
                 if (!slot) {
-                    toast("슬롯 없음(새로 저장 가능)", true);
+                    setStatus("warn", "슬롯 없음(새로 저장 가능)", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
                     return;
                 }
 
@@ -509,9 +556,9 @@
                 else if (slot.slot_mode === "store") setPick("store");
                 else setPick("image");
 
-                toast("슬롯 불러오기 완료", true);
+                setStatus("ok", "슬롯 불러오기 완료", `시간: ${nowStr()}`);
             } catch (e) {
-                toast(`불러오기 실패: ${e.message}`, false);
+                setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
@@ -543,6 +590,7 @@
             </div>
           </div>
         `;
+
                 btn.addEventListener("click", async () => {
                     selectedStore = r;
 
@@ -563,8 +611,11 @@
                     $("storeTypeHidden").value = r.business_type || "";
                     $("storeImageUrl").value = r.image_url || "";
 
+                    setStatus("warn", "가게 선택됨", `position 생성됨 / 시간: ${nowStr()}`);
+
                     await loadSlot();
                 });
+
                 list.appendChild(btn);
             }
         }
@@ -575,11 +626,13 @@
                 const qRaw = $("q").value;
                 const qDigits = digitsOnly(qRaw);
 
-                // ✅ 검색 누르면 그때 가게정보 패널(가게정보+결과)을 보여줌
                 $("storePanelWrap").classList.remove("hidden");
+                syncChips();
 
-                // ✅ 사업자번호 비었으면 __all__ 로 전체(최대 10개) 보여주기
+                // ✅ 비었으면 __all__
                 const qParam = qDigits ? qDigits : "__all__";
+
+                setStatus("warn", "검색 중...", `모드: ${mode} / q: ${qParam} / 시간: ${nowStr()}`);
 
                 const qs = new URLSearchParams({
                     mode,
@@ -596,11 +649,10 @@
 
                 if (!data.success) throw new Error(data.error || "검색 실패");
 
-                // __all__이면 results가 최대 10개만 오는 게 정상(서버 hardLimit=10)
                 renderSearchResults(data.results || []);
-                toast("검색 완료", true);
+                setStatus("ok", "검색 완료", `결과: ${(data.results || []).length}개 / 시간: ${nowStr()}`);
             } catch (e) {
-                toast(`검색 실패: ${e.message}`, false);
+                setStatus("bad", "검색 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
@@ -613,7 +665,7 @@
         });
 
         $("btnUseStore").addEventListener("click", () => {
-            if (!selectedStore) return toast("가게를 먼저 선택", false);
+            if (!selectedStore) return setStatus("bad", "가게 연결 실패", `가게를 먼저 선택하세요 / 시간: ${nowStr()}`);
             setPick("store");
 
             $("storeId").value = selectedStore.id || "";
@@ -625,46 +677,46 @@
             if (!$("bannerFile").files?.length && $("storeImageUrl").value) {
                 setBannerPreview($("storeImageUrl").value);
             }
-            toast("가게 연결 준비 완료(저장 시 반영)", true);
+
+            setStatus("ok", "가게 연결 준비 완료", `저장 버튼을 누르면 반영됩니다 / 시간: ${nowStr()}`);
         });
 
         $("btnUseStoreImage").addEventListener("click", () => {
-            if (!selectedStore) return toast("가게를 먼저 선택", false);
+            if (!selectedStore) return setStatus("bad", "적용 실패", `가게를 먼저 선택하세요 / 시간: ${nowStr()}`);
             if (selectedStore.image_url) {
                 $("bannerFile").value = "";
                 $("storeImageUrl").value = selectedStore.image_url;
                 setBannerPreview(selectedStore.image_url);
-                toast("가게 이미지를 배너 미리보기에 적용", true);
+                setStatus("ok", "가게 이미지로 배너 미리보기 적용", `시간: ${nowStr()}`);
             } else {
-                toast("가게 이미지가 없음", false);
+                setStatus("bad", "적용 실패", `가게 이미지가 없습니다 / 시간: ${nowStr()}`);
             }
         });
 
         function getSlotModeByPick() {
-            if (uiPick === "store") return "store";
-            return "custom";
+            return uiPick === "store" ? "store" : "custom";
         }
         function getSlotTypeByPick() {
-            if (uiPick === "text") return "text";
-            return "banner";
+            return uiPick === "text" ? "text" : "banner";
         }
 
         async function saveSlot() {
             try {
                 if (!selectedTarget.position) {
-                    toast("먼저 가게 검색 후 결과를 선택해서 위치를 정하세요.", false);
+                    setStatus("bad", "저장 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
                     return;
                 }
 
                 syncChips();
+                setStatus("warn", "저장 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
 
                 const fd = new FormData();
                 fd.append("page", PAGE_NAME);
                 fd.append("position", selectedTarget.position);
                 fd.append("priority", String(selectedTarget.priority || DEFAULT_PRIORITY));
 
-                fd.append("adMode", getSlotTypeByPick());
-                fd.append("slotMode", getSlotModeByPick());
+                fd.append("adMode", getSlotTypeByPick());   // banner|text
+                fd.append("slotMode", getSlotModeByPick()); // store|custom
 
                 fd.append("linkUrl", $("linkUrl").value || "");
                 fd.append("textTitle", $("textTitle").value || "");
@@ -692,18 +744,22 @@
                 if (slot?.image_url && uiPick !== "text") setBannerPreview(slot.image_url);
 
                 $("bannerFile").value = "";
-                toast("저장 완료", true);
+
+                setStatus("ok", "저장 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
             } catch (e) {
-                toast(`저장 실패: ${e.message}`, false);
+                setStatus("bad", "저장 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
         async function deleteSlot() {
             try {
                 if (!selectedTarget.position) {
-                    toast("삭제할 대상이 없습니다(먼저 검색 선택).", false);
+                    setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
                     return;
                 }
+
+                syncChips();
+                setStatus("warn", "삭제 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
@@ -714,9 +770,9 @@
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
                 if (!data.success) throw new Error(data.error || "삭제 실패");
 
-                toast("삭제 완료", true);
+                setStatus("ok", "삭제 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
             } catch (e) {
-                toast(`삭제 실패: ${e.message}`, false);
+                setStatus("bad", "삭제 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
@@ -726,27 +782,30 @@
         async function hydrateLayout() {
             try {
                 const h = await fetch("/public2/components/header.html").then(r => r.text());
-                document.getElementById("header-placeholder").innerHTML = h;
+                $("header-placeholder").innerHTML = h;
             } catch (_e) { }
             try {
                 const f = await fetch("/public2/components/footer.html").then(r => r.text());
-                document.getElementById("footer-placeholder").innerHTML = f;
+                $("footer-placeholder").innerHTML = f;
             } catch (_e) { }
         }
 
         (async function init() {
             hydrateLayout();
             setPick("image");
-            $("chipApiBase").textContent = "API: -";
-            $("chipPosition").textContent = "position: -";
-            syncChips();
 
-            // 초기엔 검색 패널 숨김(검색 눌러야 뜸)
+            $("chipApiBase").textContent = "API: -";
+            $("chipMode").textContent = `모드: ${$("mode").value}`;
+            $("chipPosition").textContent = "position: -";
+
             $("storePanelWrap").classList.add("hidden");
 
             setMiniStoreInfo(null);
             setStoreBox(null);
             setBannerPreview("/uploads/no-image.png");
+            syncChips();
+
+            setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
         })();
     </script>
 </body>
