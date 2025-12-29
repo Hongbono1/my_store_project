@@ -803,39 +803,52 @@
         }
 
         async function deleteSlot() {
-            try {
-                if (!selectedTarget.position) {
-                    setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
-                    return;
-                }
+  try {
+    if (!selectedTarget.position) {
+      setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
+      return;
+    }
 
-                setBusy(true, "삭제 중...");
-                syncChips();
+    setBusy(true, "삭제 중...");
+    syncChips();
 
-                const qs = new URLSearchParams({
-                    page: PAGE_NAME,
-                    position: selectedTarget.position,
-                    priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
-                }).toString();
+    const qs = new URLSearchParams({
+      page: PAGE_NAME,
+      position: selectedTarget.position,
+      priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
+      mode: $("mode").value, // ✅ mode도 같이 보냄(서버에서 쓰는 경우 대비)
+    }).toString();
 
-                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
-                if (!data.success) throw new Error(data.error || "삭제 실패");
+    const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+    if (!data.success) throw new Error(data.error || "삭제 실패");
 
-                // ✅ 핵심: UI 즉시 초기화 + 서버 상태 재확인(슬롯 없음으로)
-                clearSlotUI();
-                await loadSlot(true);
+    // ✅ deleted 값 먼저 검증 (UI 비우기 전에)
+    const delCount = Number(data.deleted);
+    
+    console.log("🔍 DELETE 응답:", { deleted: data.deleted, delCount, type: typeof data.deleted });
 
-                setStatus(
-                    "ok",
-                    "삭제 완료 ✅",
-                    `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`
-                );
-            } catch (e) {
-                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
-            } finally {
-                setBusy(false);
-            }
-        }
+    if (!Number.isFinite(delCount)) {
+      setStatus("warn", "삭제 요청은 성공(확정값 없음)", `서버가 deleted(rowCount)를 반환하지 않습니다. 서버 deleteSlot 수정 필요`);
+      return;
+    }
+
+    if (delCount === 0) {
+      setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). page=${PAGE_NAME}, position=${selectedTarget.position}, priority=${selectedTarget.priority}`);
+      return;
+    }
+
+    // ✅ delCount > 0일 때만 여기 도달 → UI 비우고 성공 표시
+    clearSlotUI();
+    await loadSlot(true);
+
+    setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
+  } catch (e) {
+    setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
 
         $("btnSave").addEventListener("click", saveSlot);
         $("btnDelete").addEventListener("click", deleteSlot);
