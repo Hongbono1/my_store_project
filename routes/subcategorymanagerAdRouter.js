@@ -8,6 +8,7 @@ import {
   upsertSlot,
   deleteSlot,
   listCandidates,
+  getGrid,
   makeMulterStorage,
   fileFilter,
 } from "../controllers/subcategorymanagerAdController.js";
@@ -42,6 +43,7 @@ router.get("/search-store", searchStore);
 // ------------------------------
 router.get("/slot", getSlot);
 router.get("/candidates", listCandidates);
+router.get("/grid", getGrid);
 
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);

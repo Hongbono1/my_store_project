@@ -799,3 +799,110 @@ export async function upsertSlot(req, res) {
     return res.status(500).json({ success: false, error: err?.message || "upsertSlot 실패" });
   }
 }
+
+// ------------------------------
+// ✅ GET /grid
+//   section(all_items|best_seller|new_registration)
+//   mode(food|combined)
+//   pageNo(1~)
+//   => 12칸(1~12) 배치현황 반환
+// ------------------------------
+export async function getGrid(req, res) {
+  try {
+    const cols = await getSlotCols();
+    const m = buildSlotColumnMap(cols);
+
+    if (!m.page || !m.position) {
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position 컬럼이 필요합니다.",
+      });
+    }
+
+    const page = clean(req.query.page);
+    const section = clean(req.query.section) || "all_items";
+    const mode = clean(req.query.mode) || "combined";
+    const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
+
+    if (!page) return res.status(400).json({ success: false, error: "page 필요" });
+
+    const suffix = mode === "food" ? "__food" : "__combined";
+    const like = `${section}__p${pageNo}__b%${suffix}`;
+
+    // 우선순위 1이 있으면 그걸 보여주고, 없으면 가장 낮은 priority를 대표로
+    const posCol = m.position;
+    const priCol = m.priority;
+    const slotTypeCol = m.slotType;
+    const slotModeCol = m.slotMode;
+    const storeNameCol = m.storeName;
+    const textTitleCol = m.textTitle;
+    const imageUrlCol = m.imageUrl;
+    const updatedAtCol = m.updatedAt;
+
+    const sql = `
+      SELECT DISTINCT ON ("${posCol}")
+        "${posCol}"::text AS position,
+        ${priCol ? `"${priCol}"::int` : `1`} AS priority,
+        ${slotTypeCol ? `"${slotTypeCol}"::text` : `''`} AS slot_type,
+        ${slotModeCol ? `"${slotModeCol}"::text` : `''`} AS slot_mode,
+        ${storeNameCol ? `COALESCE(NULLIF("${storeNameCol}"::text,''),'')` : `''`} AS store_name,
+        ${textTitleCol ? `COALESCE(NULLIF("${textTitleCol}"::text,''),'')` : `''`} AS text_title,
+        ${imageUrlCol ? `COALESCE(NULLIF("${imageUrlCol}"::text,''),'')` : `''`} AS image_url,
+        ${updatedAtCol ? `"${updatedAtCol}"` : `NULL`} AS updated_at
+      FROM ${SLOTS_TABLE}
+      WHERE "${m.page}"=$1
+        AND "${posCol}" LIKE $2
+      ${priCol ? `ORDER BY "${posCol}" ASC, "${priCol}" ASC` : `ORDER BY "${posCol}" ASC`}
+    `;
+
+    const { rows } = await pool.query(sql, [page, like]);
+
+    const map = new Map(); // boxNo -> row
+    for (const r of rows) {
+      const pos = String(r.position || "");
+      const mm = pos.match(/__b(\d+)__/);
+      if (!mm) continue;
+      const boxNo = Number(mm[1]);
+      if (!Number.isFinite(boxNo)) continue;
+      map.set(boxNo, r);
+    }
+
+    const items = [];
+    for (let b = 1; b <= 12; b += 1) {
+      const r = map.get(b) || null;
+      const occupied = !!r;
+
+      // 표시 라벨: store_name 우선, 아니면 text_title, 아니면 (이미지)
+      const label =
+        r?.store_name
+          ? r.store_name
+          : r?.text_title
+            ? r.text_title
+            : occupied
+              ? (r.slot_type === "text" ? "텍스트" : "이미지")
+              : "";
+
+      items.push({
+        boxNo: b,
+        occupied,
+        label,
+        position: `${section}__p${pageNo}__b${b}${suffix}`,
+        priority: r?.priority ?? null,
+        slot_type: r?.slot_type ?? "",
+        slot_mode: r?.slot_mode ?? "",
+        updated_at: r?.updated_at ?? null,
+      });
+    }
+
+    return res.json({
+      success: true,
+      page,
+      section,
+      mode,
+      pageNo,
+      items,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || "getGrid 실패" });
+  }
+}

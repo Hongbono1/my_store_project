@@ -288,7 +288,49 @@
                         선택한 가게의 “몇 페이지/몇 번째 박스” 위치 기준으로 슬롯을 불러오고 저장합니다.
                     </div>
                 </div>
+                <!-- ✅ 섹션/페이지 선택 + 배치 현황 -->
+                <div class="mt-4 soft p-3" id="placementPanel">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="font-black">배치 위치 선택</div>
+                        <button class="btn btn-ghost" id="btnLoadGrid" type="button">배치현황 새로고침</button>
+                    </div>
 
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <div class="label">섹션</div>
+                            <select class="input" id="section">
+                                <option value="all_items">All of the items</option>
+                                <option value="best_seller">Best Seller</option>
+                                <option value="new_registration">New registration</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <div class="label">페이지</div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-ghost" id="btnPrevPage" type="button">-</button>
+                                <input class="input" id="pageNo" type="number" min="1" value="1" />
+                                <button class="btn btn-ghost" id="btnNextPage" type="button">+</button>
+                            </div>
+                            <div class="hint mt-1">해당 섹션의 페이지 번호</div>
+                        </div>
+
+                        <div>
+                            <div class="label">선택된 박스</div>
+                            <div class="input flex items-center justify-between">
+                                <span id="pickedBoxText" class="font-black">-</span>
+                                <span class="text-xs text-slate-500" id="pickedBoxPos">position: -</span>
+                            </div>
+                            <div class="hint mt-1">아래 그리드에서 클릭하여 선택</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="label">배치 현황 (12칸)</div>
+                        <div id="grid" class="grid grid-cols-3 md:grid-cols-4 gap-2"></div>
+                        <div class="hint mt-2">빈칸은 회색, 사용중은 파란색 테두리로 표시됩니다.</div>
+                    </div>
+                </div>
                 <!-- 타입 선택 -->
                 <div class="mt-4">
                     <div class="label">작업 유형 선택</div>
@@ -433,9 +475,9 @@
 
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
-        function buildPosition(mode, pageNo, boxNo) {
+        function buildPosition(section, mode, pageNo, boxNo) {
             const suffix = mode === "food" ? "__food" : "__combined";
-            return `all_items__p${pageNo}__b${boxNo}${suffix}`;
+            return `${section}__p${pageNo}__b${boxNo}${suffix}`;
         }
 
         function toIsoLocalInputValue(iso) {
@@ -517,10 +559,11 @@
         $("mode").addEventListener("change", async () => {
             // 선택된 가게가 있으면 position도 같이 바꿔야 키가 안 꼬임
             if (selectedStore) {
+                selectedTarget.section = $("section")?.value || "all_items";
                 selectedTarget.mode = $("mode").value || "combined";
                 selectedTarget.pageNo = Number(selectedStore.page_number || 1);
                 selectedTarget.boxNo = Number(selectedStore.index_in_page || 1);
-                selectedTarget.position = buildPosition(selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+                selectedTarget.position = buildPosition(selectedTarget.section, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
                 syncChips();
                 setStatus("warn", "모드 변경됨", `position 재계산: ${selectedTarget.position} / 시간: ${nowStr()}`);
                 await loadSlot(true);
@@ -631,8 +674,9 @@
             }
 
             for (const r of results) {
+                const section = $("section")?.value || "all_items";
                 const mode = $("mode").value || "combined";
-                const position = buildPosition(mode, Number(r.page_number || 1), Number(r.index_in_page || 1));
+                const position = buildPosition(section, mode, Number(r.page_number || 1), Number(r.index_in_page || 1));
 
                 const btn = document.createElement("button");
                 btn.type = "button";
@@ -661,11 +705,12 @@
                 btn.addEventListener("click", async () => {
                     selectedStore = r;
 
+                    selectedTarget.section = $("section")?.value || "all_items";
                     selectedTarget.mode = $("mode").value || "combined";
                     selectedTarget.pageNo = Number(r.page_number || 1);
                     selectedTarget.boxNo = Number(r.index_in_page || 1);
                     selectedTarget.priority = DEFAULT_PRIORITY;
-                    selectedTarget.position = buildPosition(selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+                    selectedTarget.position = buildPosition(selectedTarget.section, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
 
                     syncChips();
 
@@ -814,6 +859,8 @@
 
                 $("bannerFile").value = "";
 
+                await loadGrid();
+
                 setStatus(
                     "ok",
                     "저장 완료 ✅",
@@ -864,6 +911,7 @@
                 // ✅ delCount > 0일 때만 여기 도달 → UI 비우고 성공 표시
                 clearSlotUI();
                 await loadSlot(true);
+                await loadGrid();
 
                 setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
             } catch (e) {
@@ -904,7 +952,100 @@
             syncChips();
 
             setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
+
+            await loadGrid();
         })();
+
+        async function loadGrid() {
+            const section = $("section").value || "all_items";
+            const mode = $("mode").value || "combined";
+            const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
+
+            const qs = new URLSearchParams({
+                page: PAGE_NAME,
+                section,
+                mode,
+                pageNo: String(pageNo),
+            }).toString();
+
+            const data = await apiFetch(`/grid?${qs}`);
+            const items = data.items || [];
+
+            const grid = $("grid");
+            grid.innerHTML = "";
+
+            for (const it of items) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+
+                // ✅ 색상: 빈칸/사용중
+                btn.className =
+                    "text-left soft p-2 rounded-xl border transition " +
+                    (it.occupied
+                        ? "border-blue-500 bg-white"
+                        : "border-slate-200 bg-white/60");
+
+                btn.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs text-slate-500 font-black">BOX ${it.boxNo}</div>
+              <div class="text-sm font-black mt-0.5">${it.occupied ? (it.label || "(사용중)") : "(비었음)"}</div>
+              <div class="text-[11px] text-slate-500 mt-1">priority: ${it.priority ?? "-"}</div>
+            </div>
+          </div>
+        `;
+
+                btn.addEventListener("click", async () => {
+                    const s = $("section").value || "all_items";
+                    const m = $("mode").value || "combined";
+                    const p = Math.max(Number($("pageNo").value || "1"), 1);
+                    const b = Number(it.boxNo);
+
+                    selectedTarget.mode = m;
+                    selectedTarget.pageNo = p;
+                    selectedTarget.boxNo = b;
+                    selectedTarget.section = s;
+                    selectedTarget.position = buildPosition(s, m, p, b);
+                    selectedTarget.priority = DEFAULT_PRIORITY;
+
+                    syncChips();
+
+                    $("pickedBoxText").textContent = `${s} / p${p} / box ${b}`;
+                    $("pickedBoxPos").textContent = `position: ${selectedTarget.position}`;
+
+                    setStatus("warn", "배치 위치 선택됨", `이제 저장하면 이 위치에 반영됩니다 / 시간: ${nowStr()}`);
+
+                    // ✅ 선택된 위치의 기존 슬롯 불러오기
+                    await loadSlot();
+                });
+
+                grid.appendChild(btn);
+            }
+        }
+
+        $("btnLoadGrid").addEventListener("click", loadGrid);
+
+        $("section").addEventListener("change", () => {
+            // 섹션 바꾸면 position도 다시 선택해야 함
+            selectedTarget.position = "";
+            $("pickedBoxText").textContent = "-";
+            $("pickedBoxPos").textContent = "position: -";
+            syncChips();
+            loadGrid();
+        });
+
+        $("pageNo").addEventListener("change", loadGrid);
+
+        $("btnPrevPage").addEventListener("click", () => {
+            const v = Math.max(Number($("pageNo").value || "1") - 1, 1);
+            $("pageNo").value = String(v);
+            loadGrid();
+        });
+        $("btnNextPage").addEventListener("click", () => {
+            const v = Math.max(Number($("pageNo").value || "1") + 1, 1);
+            $("pageNo").value = String(v);
+            loadGrid();
+        });
 
         function clearSlotFieldsOnly() {
             // 슬롯 입력만 초기화 (가게 선택/선택된 position은 유지)
