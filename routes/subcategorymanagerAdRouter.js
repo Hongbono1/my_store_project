@@ -28,7 +28,7 @@ const uploadSingleImage = upload.single("image");
 router.get("/stores", listStores);
 router.get("/search", searchStore);
 
-// ✅ 다른 매니저들과 동일한 엔드포인트 별칭(프론트가 /search-store를 쓰는 경우)
+// ✅ 프론트/기존 curl 호환용 alias
 router.get("/search-store", searchStore);
 
 // 슬롯 읽기/저장/삭제/후보
