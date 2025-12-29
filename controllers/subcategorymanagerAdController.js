@@ -212,7 +212,7 @@ function buildFilterWhere(params, sel, values) {
     if (parts.length) where.push(`(${parts.join(" OR ")})`);
   }
 
-return where.length ? `WHERE ${where.join(" AND ")}` : "";
+  return where.length ? `WHERE ${where.join(" AND ")}` : "";
 }
 
 // ------------------------------// ✅ 대표 이미지 1장 추출 (mode별 이미지 테이블)
@@ -362,67 +362,61 @@ export async function listStores(req, res) {
 // ------------------------------
 export async function searchStore(req, res) {
   try {
-    const mode = clean(req.query.mode) || "combined";
-    const sort = clean(req.query.sort) || "name";
-    const qRaw = clean(req.query.q);
+    const mode = String(req.query.mode || "combined").trim(); // food|combined
+    const qRaw = String(req.query.q || "__all__").trim();
+    const pageSize = Math.min(Number(req.query.pageSize || 12) || 12, 200);
 
-    const isAll = qRaw === "__all__";
-    const q = isAll ? "" : qRaw;
+    const qDigits = qRaw.replace(/[^\d]/g, "");
+    const isAll = qRaw === "__all__" || qRaw === "";
 
-    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
+    // ✅ 여기: mode별 테이블/컬럼 (너 기존 코드에 맞춰 유지)
+    const TABLE = mode === "food" ? "public.food_stores" : "public.combined_store_info";
+    const COL_BN = mode === "food" ? "business_no" : "business_number";
 
-    if (!qRaw && !isAll) return res.json({ success: true, results: [] });
+    // ✅ 표시 컬럼명은 프론트가 business_number로 받게 alias 맞추기
+    let where = "";
+    const params = [];
+    let i = 1;
 
-    const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-    if (!table) {
-      return res.status(400).json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    if (!isAll) {
+      // 숫자만이면 사업자번호 exact
+      if (qDigits && qDigits === qRaw) {
+        where = `WHERE ${COL_BN} = $${i++}`;
+        params.push(qDigits);
+      } else {
+        // ✅ 문자면 상호 ILIKE
+        where = `WHERE business_name ILIKE $${i++}`;
+        params.push(`%${qRaw}%`);
+      }
     }
 
-    const cols = await getColumns(table);
-    const sel = buildStoreSelect(table, cols);
-
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
-
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    const values = [];
-    const where = buildFilterWhere(
-      { category: req.query.category, subcategory: req.query.subcategory, q },
-      sel,
-      values
-    );
-
-    const hardLimit = isAll ? 10 : 200;
-    const orderBy = buildOrderBy(sort, sel);
-
     const sql = `
-      WITH filtered AS (
+      WITH base AS (
         SELECT
-          "${sel.idCol}"::text AS id,
-          ${sel.bnCol ? `"${sel.bnCol}"::text` : "''"} AS business_number,
-          "${sel.nameCol}"::text AS business_name,
-          ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
-          ${imageExpr} AS image_url,
-          ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${table}
+          id,
+          ${COL_BN} AS business_number,
+          business_name,
+          business_type,
+          COALESCE(image_url, main_image_url, '') AS image_url,
+          ROW_NUMBER() OVER (ORDER BY business_name, id) AS rn
+        FROM ${TABLE}
         ${where}
       )
       SELECT
-        id, business_number, business_name, business_type, image_url, rn,
-        CEIL(rn::numeric / ${pageSize})::int AS page_number,
-        ((rn - 1) % ${pageSize} + 1)::int AS index_in_page
-      FROM filtered
+        id, business_number, business_name, business_type, image_url,
+        ((rn - 1) / 12)::int + 1 AS page_number,
+        ((rn - 1) % 12)::int + 1 AS index_in_page
+      FROM base
       ORDER BY rn
-      LIMIT ${hardLimit}
+      LIMIT $${i++};
     `;
+    params.push(pageSize);
 
-    const { rows } = await pool.query(sql, values);
+    const { rows } = await pool.query(sql, params);
     return res.json({ success: true, mode, q: qRaw, results: rows });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "searchStore 실패" });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ success: false, error: e.message });
   }
 }
 
@@ -573,7 +567,7 @@ export async function deleteSlot(req, res) {
       RETURNING *
     `;
     const del = await pool.query(sql, [page, position, priority]);
-    
+
     // ✅ rowCount를 반환하여 실제 삭제된 행 개수를 프론트에 전달
     return res.json({ success: true, deleted: del.rowCount });
   } catch (err) {

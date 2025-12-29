@@ -216,7 +216,20 @@
         <section class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
             <!-- 좌: 검색 -->
             <aside class="lg:col-span-6 neo p-4">
+
+                <!-- ✅ 가게 검색 글자 위에 배치 -->
+                <div class="mb-3">
+                    <div class="label">검색 기준</div>
+                    <select class="input" id="searchType">
+                        <option value="auto" selected>자동</option>
+                        <option value="biz">사업자번호</option>
+                        <option value="name">상호</option>
+                    </select>
+                    <div class="hint mt-1">푸드/통합 모드에 따라 해당 모드에서만 검색됩니다.</div>
+                </div>
+
                 <div class="font-extrabold">가게 검색</div>
+
                 <div class="hint mt-1">
                     사업자번호로 검색 / 비워두고 검색하면 전체(일부) 표시
                 </div>
@@ -618,6 +631,9 @@
             }
 
             for (const r of results) {
+                const mode = $("mode").value || "combined";
+                const position = buildPosition(mode, Number(r.page_number || 1), Number(r.index_in_page || 1));
+
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "result-item w-full text-left soft p-3";
@@ -628,6 +644,11 @@
               <div class="text-sm text-slate-600 mt-0.5">${r.business_type || ""}</div>
               <div class="text-xs text-blue-700 font-black mt-1">
                 위치: ${r.page_number}페이지 / ${r.index_in_page}번째
+              </div>
+              
+              <!-- ✅ 추가: position 표시 -->
+              <div class="text-[11px] text-slate-500 mt-1 break-all">
+                position: <b>${position}</b>
               </div>
             </div>
             <div class="shrink-0">
@@ -804,51 +825,51 @@
         }
 
         async function deleteSlot() {
-  try {
-    if (!selectedTarget.position) {
-      setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
-      return;
-    }
+            try {
+                if (!selectedTarget.position) {
+                    setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
+                    return;
+                }
 
-    setBusy(true, "삭제 중...");
-    syncChips();
+                setBusy(true, "삭제 중...");
+                syncChips();
 
-    const qs = new URLSearchParams({
-      page: PAGE_NAME,
-      position: selectedTarget.position,
-      priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
-      mode: $("mode").value, // ✅ mode도 같이 보냄(서버에서 쓰는 경우 대비)
-    }).toString();
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    position: selectedTarget.position,
+                    priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
+                    mode: $("mode").value, // ✅ mode도 같이 보냄(서버에서 쓰는 경우 대비)
+                }).toString();
 
-    const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
-    if (!data.success) throw new Error(data.error || "삭제 실패");
+                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                if (!data.success) throw new Error(data.error || "삭제 실패");
 
-    // ✅ deleted 값 먼저 검증 (UI 비우기 전에)
-    const delCount = Number(data.deleted);
-    
-    console.log("🔍 DELETE 응답:", { deleted: data.deleted, delCount, type: typeof data.deleted });
+                // ✅ deleted 값 먼저 검증 (UI 비우기 전에)
+                const delCount = Number(data.deleted);
 
-    if (!Number.isFinite(delCount)) {
-      setStatus("warn", "삭제 요청은 성공(확정값 없음)", `서버가 deleted(rowCount)를 반환하지 않습니다. 서버 deleteSlot 수정 필요`);
-      return;
-    }
+                console.log("🔍 DELETE 응답:", { deleted: data.deleted, delCount, type: typeof data.deleted });
 
-    if (delCount === 0) {
-      setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). page=${PAGE_NAME}, position=${selectedTarget.position}, priority=${selectedTarget.priority}`);
-      return;
-    }
+                if (!Number.isFinite(delCount)) {
+                    setStatus("warn", "삭제 요청은 성공(확정값 없음)", `서버가 deleted(rowCount)를 반환하지 않습니다. 서버 deleteSlot 수정 필요`);
+                    return;
+                }
 
-    // ✅ delCount > 0일 때만 여기 도달 → UI 비우고 성공 표시
-    clearSlotUI();
-    await loadSlot(true);
+                if (delCount === 0) {
+                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). page=${PAGE_NAME}, position=${selectedTarget.position}, priority=${selectedTarget.priority}`);
+                    return;
+                }
 
-    setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
-  } catch (e) {
-    setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
-  } finally {
-    setBusy(false);
-  }
-}
+                // ✅ delCount > 0일 때만 여기 도달 → UI 비우고 성공 표시
+                clearSlotUI();
+                await loadSlot(true);
+
+                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
 
 
         $("btnSave").addEventListener("click", saveSlot);
