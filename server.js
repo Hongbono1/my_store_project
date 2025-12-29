@@ -435,6 +435,9 @@ app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 // ✅ Subcategory 관리자 API (position + priority 기반)
 app.use("/admin/subcategory", subcategorymanagerAdRouter);
 
+
+app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
+
 // ✅ 프론트가 /subcategorymanager/ad 로 호출하는 경우를 위한 별칭
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
