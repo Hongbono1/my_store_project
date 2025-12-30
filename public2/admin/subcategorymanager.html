@@ -192,9 +192,32 @@
                     <button class="btn btn-ghost" id="btnClearImage" type="button">업로드 이미지 제거</button>
                 </div>
 
+                <!-- ✅ 배너는 독립 모드 -->
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <div class="label">배너 모드(독립)</div>
+                        <select class="input" id="bannerMode">
+                            <option value="combined">통합 배너</option>
+                            <option value="food">푸드 배너</option>
+                        </select>
+                        <div class="hint mt-1">여기서 선택한 모드에만 상단 배너가 저장됩니다.</div>
+                    </div>
+
+                    <div>
+                        <div class="label">배너 position(고정)</div>
+                        <input class="input" id="bannerPositionView" readonly />
+                        <div class="hint mt-1">자동 생성됨(수정 불가)</div>
+                    </div>
+                </div>
+
                 <div class="mt-3 soft p-3">
                     <img id="bannerPreview" src="/uploads/no-image.png" alt="banner"
                         class="w-full h-[220px] md:h-[280px] object-cover rounded-xl bg-white" />
+                </div>
+
+                <div class="mt-3 flex items-center justify-end gap-2">
+                    <button class="btn btn-primary" id="btnBannerSave" type="button">배너 저장</button>
+                    <button class="btn btn-danger" id="btnBannerDelete" type="button">배너 삭제</button>
                 </div>
 
                 <!-- 이미지 입력 -->
@@ -513,6 +536,125 @@
             return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
         }
 
+        // ✅ 배너는 독립 position
+        function buildBannerPosition(mode) {
+            const suffix = mode === "food" ? "__food" : "__combined";
+            return `subcategory_top_banner${suffix}`;
+        }
+
+        let bannerTarget = { mode: "combined", position: buildBannerPosition("combined"), priority: 1 };
+
+        function syncBannerUI() {
+            bannerTarget.mode = $("bannerMode").value || "combined";
+            bannerTarget.position = buildBannerPosition(bannerTarget.mode);
+            $("bannerPositionView").value = bannerTarget.position;
+        }
+
+        // ✅ 배너 슬롯 불러오기
+        async function loadBannerSlot(silent = false) {
+            try {
+                syncBannerUI();
+
+                if (!silent) {
+                    setStatus("warn", "배너 불러오는 중...", `position: ${bannerTarget.position} / 시간: ${nowStr()}`);
+                }
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    position: bannerTarget.position,
+                    priority: String(bannerTarget.priority),
+                }).toString();
+
+                const data = await apiFetch(`/slot?${qs}`);
+                const slot = data?.slot || null;
+
+                if (!slot) {
+                    setBannerPreview("/uploads/no-image.png");
+                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `배너 모드: ${bannerTarget.mode} / 시간: ${nowStr()}`);
+                    return;
+                }
+
+                // 배너는 image_url + link_url만 쓰면 충분
+                if (slot.image_url) setBannerPreview(slot.image_url);
+                $("bannerFile").value = "";
+
+                // ⚠️ 네 기존 linkUrl 입력을 그대로 배너에서 쓰고 싶으면 아래 유지
+                if ($("linkUrl")) $("linkUrl").value = slot.link_url || "";
+
+                if (!silent) setStatus("ok", "배너 불러오기 완료", `position: ${bannerTarget.position} / 시간: ${nowStr()}`);
+            } catch (e) {
+                if (!silent) setStatus("bad", "배너 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
+            }
+        }
+
+        // ✅ 배너 저장
+        async function saveBannerSlot() {
+            try {
+                syncBannerUI();
+                setBusy(true, "배너 저장 중...");
+
+                const fd = new FormData();
+                fd.append("page", PAGE_NAME);
+                fd.append("position", bannerTarget.position);
+                fd.append("priority", "1");
+
+                fd.append("adMode", "banner");      // slot_type=banner
+                fd.append("slotMode", "custom");    // store 아님
+
+                // ⚠️ 배너 링크(현재 linkUrl을 그대로 재사용)
+                if ($("linkUrl")) fd.append("linkUrl", $("linkUrl").value || "");
+
+                const f = $("bannerFile").files?.[0];
+                if (f) fd.append("image", f);
+
+                const data = await apiFetch(`/update`, { method: "POST", body: fd });
+                if (!data.success) throw new Error(data.error || "배너 저장 실패");
+
+                const slot = data.slot || null;
+                if (slot?.image_url) setBannerPreview(slot.image_url);
+
+                $("bannerFile").value = "";
+
+                setStatus("ok", "배너 저장 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간:${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        // ✅ 배너 삭제(배너 이미지를 없애려면 삭제가 가장 확실함)
+        async function deleteBannerSlot() {
+            try {
+                syncBannerUI();
+                setBusy(true, "배너 삭제 중...");
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    position: bannerTarget.position,
+                    priority: "1",
+                }).toString();
+
+                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                if (!data.success) throw new Error(data.error || "배너 삭제 실패");
+
+                const delCount = Number(data.deleted || 0);
+                if (delCount === 0) {
+                    setStatus("bad", "배너 삭제 실패 ❌", `삭제된 행 0개(키 불일치) / position:${bannerTarget.position}`);
+                    return;
+                }
+
+                setBannerPreview("/uploads/no-image.png");
+                if ($("linkUrl")) $("linkUrl").value = "";
+
+                setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간:${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
         function toIsoLocalInputValue(iso) {
             if (!iso) return "";
             const d = new Date(iso);
@@ -630,6 +772,14 @@
             syncChips();
             setStatus("warn", "가게 선택이 필요합니다", "검색 결과에서 가게를 클릭하면 position이 자동 생성됩니다.");
         });
+
+        $("bannerMode").addEventListener("change", async () => {
+            syncBannerUI();
+            await loadBannerSlot();
+        });
+
+        $("btnBannerSave").addEventListener("click", saveBannerSlot);
+        $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
 
         function setMiniStoreInfo(store) {
             if (!store) {
@@ -1053,6 +1203,10 @@
             setStoreBox(null);
             setBannerPreview("/uploads/no-image.png");
             syncChips();
+
+            // ✅ 배너 초기 로드
+            syncBannerUI();
+            await loadBannerSlot(true);
 
             setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
 
