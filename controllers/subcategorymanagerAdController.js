@@ -32,7 +32,7 @@ function getStoreSource(mode) {
   if (m === "combined") {
     return {
       table: "public.combined_store_info",
-      subcol: "detail_category",      // ✅ 통합 하위카테고리
+      subcol: "business_subcategory", // ✅ 여기로
       idcol: "id",
       bno: "business_number",
       bname: "business_name",
@@ -177,6 +177,7 @@ function buildStoreSelect(tableFullName, cols) {
   const catCol = pickCol(cols, ["business_category", "category"]);
   const subCol = pickCol(cols, [
     "business_subcategory",
+    "detail_category",
     "subcategory",
     "sub_category",
   ]);
@@ -886,17 +887,30 @@ export async function getGrid(req, res) {
     const imageUrlCol = m.imageUrl;
     const updatedAtCol = m.updatedAt;
     const storeIdCol = m.storeId;
+    const storeBizCol = m.storeBiz;
 
     // subcategory 필터링을 위한 store 테이블 조인 (getStoreSource 사용)
     let storeJoin = "";
     let whereSubcategory = "";
     const params = [page, like];
 
-    if (subcategory && storeIdCol) {
+    if (subcategory && (storeIdCol || storeBizCol)) {
       const src = getStoreSource(mode);
-      storeJoin = `LEFT JOIN ${src.table} s ON s.${src.idcol}::text = slots."${storeIdCol}"::text`;
+
+      const joinConds = [];
+      if (storeIdCol) {
+        joinConds.push(`s.${src.idcol}::text = slots."${storeIdCol}"::text`);
+      }
+      if (storeBizCol) {
+        joinConds.push(`
+          regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g')
+          = regexp_replace(COALESCE(slots."${storeBizCol}"::text,''), '\\\\D', '', 'g')
+        `);
+      }
+
+      storeJoin = `LEFT JOIN ${src.table} s ON (${joinConds.join(" OR ")})`;
       params.push(subcategory);
-      whereSubcategory = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
+      whereSubcategory = `AND COALESCE(TRIM(s.${src.subcol}::text), '') = $${params.length}`;
     }
 
     const sql = `
