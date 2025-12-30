@@ -859,6 +859,7 @@ export async function getGrid(req, res) {
     const section = clean(req.query.section) || "all_items";
     const mode = clean(req.query.mode) || "combined";
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
+    const subcategory = clean(req.query.subcategory);
 
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
@@ -873,24 +874,47 @@ export async function getGrid(req, res) {
     const textTitleCol = m.textTitle;
     const imageUrlCol = m.imageUrl;
     const updatedAtCol = m.updatedAt;
+    const storeIdCol = m.storeId;
+
+    // subcategory 필터링을 위한 store 테이블 조인
+    let storeJoin = "";
+    let whereSubcategory = "";
+    const params = [page, like];
+
+    if (subcategory) {
+      const storeTable = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
+      if (storeTable) {
+        const storeCols = await getColumns(storeTable);
+        const storeIdField = storeCols.has("id") ? "id" : storeCols.has("store_id") ? "store_id" : null;
+        const subField = storeCols.has("business_subcategory") ? "business_subcategory" : storeCols.has("subcategory") ? "subcategory" : null;
+
+        if (storeIdCol && storeIdField && subField) {
+          storeJoin = `LEFT JOIN ${storeTable} s ON s."${storeIdField}"::text = slots."${storeIdCol}"::text`;
+          params.push(subcategory);
+          whereSubcategory = `AND COALESCE(s."${subField}"::text, '') = $${params.length}`;
+        }
+      }
+    }
 
     const sql = `
-      SELECT DISTINCT ON ("${posCol}")
-        "${posCol}"::text AS position,
-        ${priCol ? `"${priCol}"::int` : `1`} AS priority,
-        ${slotTypeCol ? `"${slotTypeCol}"::text` : `''`} AS slot_type,
-        ${slotModeCol ? `"${slotModeCol}"::text` : `''`} AS slot_mode,
-        ${storeNameCol ? `COALESCE(NULLIF("${storeNameCol}"::text,''),'')` : `''`} AS store_name,
-        ${textTitleCol ? `COALESCE(NULLIF("${textTitleCol}"::text,''),'')` : `''`} AS text_title,
-        ${imageUrlCol ? `COALESCE(NULLIF("${imageUrlCol}"::text,''),'')` : `''`} AS image_url,
-        ${updatedAtCol ? `"${updatedAtCol}"` : `NULL`} AS updated_at
-      FROM ${SLOTS_TABLE}
-      WHERE "${m.page}"=$1
-        AND "${posCol}" LIKE $2
-      ${priCol ? `ORDER BY "${posCol}" ASC, "${priCol}" ASC` : `ORDER BY "${posCol}" ASC`}
+      SELECT DISTINCT ON (slots."${posCol}")
+        slots."${posCol}"::text AS position,
+        ${priCol ? `slots."${priCol}"::int` : `1`} AS priority,
+        ${slotTypeCol ? `slots."${slotTypeCol}"::text` : `''`} AS slot_type,
+        ${slotModeCol ? `slots."${slotModeCol}"::text` : `''`} AS slot_mode,
+        ${storeNameCol ? `COALESCE(NULLIF(slots."${storeNameCol}"::text,''),'')` : `''`} AS store_name,
+        ${textTitleCol ? `COALESCE(NULLIF(slots."${textTitleCol}"::text,''),'')` : `''`} AS text_title,
+        ${imageUrlCol ? `COALESCE(NULLIF(slots."${imageUrlCol}"::text,''),'')` : `''`} AS image_url,
+        ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
+      FROM ${SLOTS_TABLE} slots
+      ${storeJoin}
+      WHERE slots."${m.page}"=$1
+        AND slots."${posCol}" LIKE $2
+        ${whereSubcategory}
+      ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
     `;
 
-    const { rows } = await pool.query(sql, [page, like]);
+    const { rows } = await pool.query(sql, params);
 
     const map = new Map();
     for (const r of rows) {

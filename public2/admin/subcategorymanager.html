@@ -338,6 +338,24 @@
                         <button class="btn btn-ghost" id="btnLoadGrid" type="button">배치현황 새로고침</button>
                     </div>
 
+                    <!-- 배치현황 상단 필터 (추가) -->
+                    <div class="flex items-center gap-2 mt-3 mb-2">
+                        <label class="text-sm text-gray-600 font-black">하위 카테고리</label>
+                        <select id="placementSubFilter" class="px-3 py-2 rounded-lg border border-gray-200 text-sm">
+                            <option value="">전체</option>
+                            <option value="밥">밥</option>
+                            <option value="찌개/탕">찌개/탕</option>
+                            <option value="국수/면">국수/면</option>
+                            <option value="찜/탕">찜/탕</option>
+                            <option value="구이">구이</option>
+                            <option value="볶음">볶음</option>
+                            <option value="튀김">튀김</option>
+                            <option value="전/빈대떡">전/빈대떡</option>
+                            <option value="찌개">찌개</option>
+                            <option value="기타">기타</option>
+                        </select>
+                    </div>
+
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                             <div class="label">섹션</div>
@@ -1402,13 +1420,19 @@
             const section = $("section").value || "all_items";
             const mode = $("mode").value || "food";
             const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
+            const subcategory = $("placementSubFilter")?.value || "";
 
-            const qs = new URLSearchParams({
+            const params = {
                 page: PAGE_NAME,
                 section,
                 mode,
                 pageNo: String(pageNo),
-            }).toString();
+            };
+            if (subcategory) {
+                params.subcategory = subcategory;
+            }
+
+            const qs = new URLSearchParams(params).toString();
 
             const data = await apiFetch(`/grid?${qs}`);
             const items = data.items || [];
@@ -1467,6 +1491,11 @@
         }
 
         $("btnLoadGrid").addEventListener("click", loadGrid);
+
+        // 하위 카테고리 필터 변경 시 재조회
+        $("placementSubFilter")?.addEventListener("change", () => {
+            loadGrid();
+        });
 
         $("section").addEventListener("change", () => {
             selectedTarget.position = "";
