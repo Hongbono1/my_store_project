@@ -374,8 +374,8 @@ app.get("/api/subcategory/combined", async (req, res) => {
         business_number,
         business_name,
         business_type,
-        business_category,
-        business_subcategory,
+        btrim(replace(business_category::text, chr(160), ' ')) AS business_category,
+        btrim(replace(business_subcategory::text, chr(160), ' ')) AS business_subcategory,
         business_hours,
         delivery_option,
         service_details,
@@ -402,7 +402,7 @@ app.get("/api/subcategory/combined", async (req, res) => {
         main_image_url,
         view_count
       FROM public.combined_store_info
-      WHERE TRIM(business_category) = TRIM($1)
+      WHERE btrim(replace(business_category::text, chr(160), ' ')) = btrim(replace($1::text, chr(160), ' '))
       ORDER BY id DESC
     `;
 
@@ -413,7 +413,6 @@ app.get("/api/subcategory/combined", async (req, res) => {
     return res.status(500).json({ success: false, error: "server_error" });
   }
 });
-
 
 app.use("/api/subcategory", subcategoryRouter);
 app.use("/api/hotblog", hotblogRouter);
@@ -437,14 +436,6 @@ app.use("/admin/subcategory", subcategorymanagerAdRouter);
 
 
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
-
-// ✅ 2) 너가 curl로 썼던 /admin/subcategory 도 같이 열어주기(프론트 호환)
-app.use("/admin/subcategory", subcategorymanagerAdRouter);
-
-// ✅ 프론트가 /subcategorymanager/ad 로 호출하는 경우를 위한 별칭
-app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
-
-
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
