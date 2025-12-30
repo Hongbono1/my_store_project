@@ -529,6 +529,7 @@ function buildSlotColumnMap(cols) {
     textDesc: pickSlotCol(cols, ["text_desc", "desc", "description"]),
     storeId: pickSlotCol(cols, ["store_id"]),
     storeBiz: pickSlotCol(cols, [
+      "business_no",
       "store_business_number",
       "store_business_no",
       "business_number",
@@ -715,8 +716,10 @@ export async function upsertSlot(req, res) {
 
     let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
-      req.body.business_number ||
       req.body.store_business_number ||
+      req.body.business_no ||           // ✅ admin_ad_slots 실제 컬럼명
+      req.body.business_number ||
+      req.body.store_business_no ||
       req.body.business_no
     );
     let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
@@ -1014,7 +1017,7 @@ export async function whereStore(req, res) {
       return res.status(500).json({
         success: false,
         error:
-          "admin_ad_slots에 store_business_number(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
+"admin_ad_slots에 business_no(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
       });
     }
 
