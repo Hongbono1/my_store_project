@@ -860,13 +860,18 @@ export async function upsertSlot(req, res) {
 // ------------------------------
 function buildAutoOrderBy(section, sel) {
   const s = clean(section).toLowerCase();
-  if (s === "new_registration" && sel.createdCol) {
+
+  // ✅ newly 별칭 지원
+  if ((s === "new_registration" || s === "newly" || s === "new") && sel.createdCol) {
     return `"${sel.createdCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
   }
-  if (s === "best_seller" && sel.viewsCol) {
+
+  // ✅ best 별칭 지원
+  if ((s === "best_seller" || s === "best") && sel.viewsCol) {
     return `"${sel.viewsCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
   }
-  // all_items 기본은 최신(id desc)
+
+  // all_items 기본
   return `"${sel.idCol}" DESC`;
 }
 
