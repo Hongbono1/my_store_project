@@ -139,20 +139,46 @@ function pickCol(cols, candidates) {
 
 function buildStoreSelect(tableFullName, cols) {
   const idCol = pickCol(cols, ["id"]);
-  const bnCol = pickCol(cols, ["business_number", "business_no", "biz_no", "biz_number"]);
+  const bnCol = pickCol(cols, [
+    "business_number",
+    "business_no",
+    "biz_no",
+    "biz_number",
+  ]);
   const nameCol = pickCol(cols, ["business_name", "store_name", "name"]);
   const typeCol = pickCol(cols, ["business_type", "store_type", "type"]);
   const catCol = pickCol(cols, ["business_category", "category"]);
-  const subCol = pickCol(cols, ["business_subcategory", "subcategory", "sub_category"]);
+  const subCol = pickCol(cols, [
+    "business_subcategory",
+    "subcategory",
+    "sub_category",
+  ]);
   const createdCol = pickCol(cols, ["created_at", "createdat", "created"]);
   const viewsCol = pickCol(cols, ["view_count", "views", "viewcount"]);
-  const imgCol = pickCol(cols, ["main_image_url", "image_url", "image1", "thumbnail_url"]);
+  const imgCol = pickCol(cols, [
+    "main_image_url",
+    "image_url",
+    "image1",
+    "thumbnail_url",
+  ]);
 
   if (!idCol || !nameCol) {
-    throw new Error(`스토어 테이블(${tableFullName})에서 id/name 컬럼을 찾지 못했습니다.`);
+    throw new Error(
+      `스토어 테이블(${tableFullName})에서 id/name 컬럼을 찾지 못했습니다.`
+    );
   }
 
-  return { idCol, bnCol, nameCol, typeCol, catCol, subCol, createdCol, viewsCol, imgCol };
+  return {
+    idCol,
+    bnCol,
+    nameCol,
+    typeCol,
+    catCol,
+    subCol,
+    createdCol,
+    viewsCol,
+    imgCol,
+  };
 }
 
 function buildOrderBy(sort, sel) {
@@ -194,7 +220,9 @@ function buildFilterWhere(params, sel, values) {
       `);
 
       values.push(`%${qDigits}%`);
-      parts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
+      parts.push(
+        `regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`
+      );
     }
 
     values.push(`%${qRaw}%`);
@@ -214,7 +242,14 @@ function buildFilterWhere(params, sel, values) {
 // ------------------------------
 // ✅ 대표 이미지 1장 추출 (mode별 이미지 테이블)
 // ------------------------------
-const IMG_URL_COLS = ["image_url", "url", "path", "image_path", "file_url", "file_path"];
+const IMG_URL_COLS = [
+  "image_url",
+  "url",
+  "path",
+  "image_path",
+  "file_url",
+  "file_path",
+];
 const IMG_FK_COLS = [
   "store_id",
   "store_info_id",
@@ -233,8 +268,16 @@ async function pickImageMetaForMode(mode) {
 
   const candidates =
     m === "combined"
-      ? ["public.combined_store_images", "public.store_images", "public.food_store_images"]
-      : ["public.store_images", "public.food_store_images", "public.combined_store_images"];
+      ? [
+        "public.combined_store_images",
+        "public.store_images",
+        "public.food_store_images",
+      ]
+      : [
+        "public.store_images",
+        "public.food_store_images",
+        "public.combined_store_images",
+      ];
 
   for (const t of candidates) {
     const cacheKey = `${m}|${t}`;
@@ -287,7 +330,11 @@ export async function listStores(req, res) {
     const page = Math.max(safeInt(req.query.page, 1), 1);
 
     const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-    if (!table) return res.status(400).json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    if (!table) {
+      return res
+        .status(400)
+        .json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    }
 
     const cols = await getColumns(table);
     const sel = buildStoreSelect(table, cols);
@@ -341,7 +388,9 @@ export async function listStores(req, res) {
       stores: rows,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "listStores 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "listStores 실패" });
   }
 }
 
@@ -358,7 +407,11 @@ export async function searchStore(req, res) {
     const qDigits = digitsOnly(qRaw);
 
     const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-    if (!table) return res.status(400).json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    if (!table) {
+      return res
+        .status(400)
+        .json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    }
 
     const cols = await getColumns(table);
     const sel = buildStoreSelect(table, cols);
@@ -384,7 +437,9 @@ export async function searchStore(req, res) {
         `);
 
         values.push(`%${qDigits}%`);
-        whereParts.push(`regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`);
+        whereParts.push(
+          `regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`
+        );
       }
 
       values.push(`%${qRaw}%`);
@@ -427,7 +482,9 @@ export async function searchStore(req, res) {
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ success: false, error: e?.message || "searchStore 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: e?.message || "searchStore 실패" });
   }
 }
 
@@ -500,7 +557,10 @@ export async function getSlot(req, res) {
     const m = buildSlotColumnMap(cols);
 
     if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({ success: false, error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다." });
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
+      });
     }
 
     const page = clean(req.query.page);
@@ -520,7 +580,9 @@ export async function getSlot(req, res) {
     const { rows } = await pool.query(sql, [page, position, priority]);
     return res.json({ success: true, slot: rows[0] || null });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "getSlot 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "getSlot 실패" });
   }
 }
 
@@ -534,7 +596,15 @@ export async function listCandidates(req, res) {
 
     const page = clean(req.query.page);
     const position = clean(req.query.position);
-    if (!page || !position) return res.status(400).json({ success: false, error: "page/position 필요" });
+    if (!page || !position) {
+      return res.status(400).json({ success: false, error: "page/position 필요" });
+    }
+    if (!m.page || !m.position || !m.priority) {
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
+      });
+    }
 
     const sql = `
       SELECT *
@@ -546,7 +616,9 @@ export async function listCandidates(req, res) {
     const { rows } = await pool.query(sql, [page, position]);
     return res.json({ success: true, items: rows });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "listCandidates 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "listCandidates 실패" });
   }
 }
 
@@ -565,6 +637,12 @@ export async function deleteSlot(req, res) {
     if (!page || !position || priority === null) {
       return res.status(400).json({ success: false, error: "page/position/priority 필요" });
     }
+    if (!m.page || !m.position || !m.priority) {
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
+      });
+    }
 
     const sql = `
       DELETE FROM ${SLOTS_TABLE}
@@ -575,7 +653,9 @@ export async function deleteSlot(req, res) {
 
     return res.json({ success: true, deleted: del.rowCount });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "deleteSlot 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "deleteSlot 실패" });
   }
 }
 
@@ -588,7 +668,10 @@ export async function upsertSlot(req, res) {
     const m = buildSlotColumnMap(cols);
 
     if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({ success: false, error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다." });
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
+      });
     }
 
     const page = clean(req.body.page);
@@ -605,7 +688,9 @@ export async function upsertSlot(req, res) {
 
     const linkUrl = clean(req.body.linkUrl || req.body.link_url);
     const textTitle = clean(req.body.textTitle || req.body.title || req.body.text_title);
-    const textDesc = clean(req.body.textDesc || req.body.desc || req.body.description || req.body.text_desc);
+    const textDesc = clean(
+      req.body.textDesc || req.body.desc || req.body.description || req.body.text_desc
+    );
 
     const noEnd = toBool(req.body.noEnd);
     const startAt = parseDateTimeLocalToTs(req.body.startAt);
@@ -625,21 +710,20 @@ export async function upsertSlot(req, res) {
     let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
     let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
     let storeImageUrl = clean(
-      req.body.storeImageUrl ||
-      req.body.store_image_url ||
-      req.body.image_url
+      req.body.storeImageUrl || req.body.store_image_url || req.body.image_url
     );
 
     // store 모드 + storeId만 있어도 DB에서 자동 채움
     if (slot_mode === "store" && storeId !== null) {
       const tableSource2 = inferTableSourceFromPosition(position);
-      const table = tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
+      const table =
+        tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
 
       if (table) {
         const tcols = await getColumns(table);
         const sel2 = buildStoreSelect(table, tcols);
 
-        const mode2 = (tableSource2 === "combined_store_info") ? "combined" : "food";
+        const mode2 = tableSource2 === "combined_store_info" ? "combined" : "food";
         const imgMeta2 = await pickImageMetaForMode(mode2);
         const imgSub2 = buildImageSubquery(sel2.idCol, imgMeta2);
 
@@ -694,7 +778,6 @@ export async function upsertSlot(req, res) {
     add(m.slotMode, slot_mode);
 
     add(m.linkUrl, linkUrl);
-
     if (m.imageUrl) add(m.imageUrl, imageUrl);
 
     add(m.textTitle, textTitle);
@@ -735,6 +818,7 @@ export async function upsertSlot(req, res) {
       const code = e?.code;
       if (code !== "42P10") throw e;
 
+      // unique index/constraint 없음(42P10) fallback
       const delSql = `
         DELETE FROM ${SLOTS_TABLE}
         WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
@@ -750,7 +834,9 @@ export async function upsertSlot(req, res) {
       return res.json({ success: true, slot: rows[0], note: "fallback-insert" });
     }
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "upsertSlot 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "upsertSlot 실패" });
   }
 }
 
@@ -763,7 +849,10 @@ export async function getGrid(req, res) {
     const m = buildSlotColumnMap(cols);
 
     if (!m.page || !m.position) {
-      return res.status(500).json({ success: false, error: "admin_ad_slots에 page/position 컬럼이 필요합니다." });
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 page/position 컬럼이 필요합니다.",
+      });
     }
 
     const page = clean(req.query.page);
@@ -818,14 +907,13 @@ export async function getGrid(req, res) {
       const r = map.get(b) || null;
       const occupied = !!r;
 
-      const label =
-        r?.store_name
-          ? r.store_name
-          : r?.text_title
-            ? r.text_title
-            : occupied
-              ? (r.slot_type === "text" ? "텍스트" : "이미지")
-              : "";
+      const label = r?.store_name
+        ? r.store_name
+        : r?.text_title
+          ? r.text_title
+          : occupied
+            ? (r.slot_type === "text" ? "텍스트" : "이미지")
+            : "";
 
       items.push({
         boxNo: b,
@@ -841,7 +929,9 @@ export async function getGrid(req, res) {
 
     return res.json({ success: true, page, section, mode, pageNo, items });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "getGrid 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "getGrid 실패" });
   }
 }
 
@@ -882,7 +972,8 @@ export async function whereStore(req, res) {
     if (!m.storeBiz || !m.position || !m.page || !m.priority) {
       return res.status(500).json({
         success: false,
-        error: "admin_ad_slots에 store_business_number(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
+        error:
+          "admin_ad_slots에 store_business_number(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
       });
     }
 
@@ -937,6 +1028,8 @@ export async function whereStore(req, res) {
       items,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err?.message || "whereStore 실패" });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || "whereStore 실패" });
   }
 }

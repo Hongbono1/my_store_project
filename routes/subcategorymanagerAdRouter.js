@@ -51,4 +51,8 @@ router.get("/grid", getGrid);
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
 
+router.get("/grid", getGrid);
+router.get("/where", whereStore);
+router.get("/search-store", searchStore); // alias
+
 export default router;
