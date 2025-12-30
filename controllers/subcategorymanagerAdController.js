@@ -917,26 +917,9 @@ export async function getGrid(req, res) {
 
     // --------------------------
     // 1) 오버라이드 슬롯 조회(저장된 칸)
-    //    - category/subcategory 필터가 있으면 store_id 조인으로 "해당 필터에 맞는 store 슬롯만" 보여줌
+    //    ✅ position LIKE만으로 조회 (category/subcategory 필터는 auto 배치에만 적용)
     // --------------------------
     const paramsSlots = [page, like];
-    let joinSlots = "";
-    const whereExtra = [];
-
-    if ((category || subcategory) && m.storeId && (sel.catCol || sel.subCol)) {
-      joinSlots = `LEFT JOIN ${storeTable} s ON s."${sel.idCol}"::text = slots."${m.storeId}"::text`;
-
-      if (category && sel.catCol) {
-        paramsSlots.push(category);
-        whereExtra.push(`COALESCE(s."${sel.catCol}"::text,'') = $${paramsSlots.length}`);
-      }
-      if (subcategory && sel.subCol) {
-        paramsSlots.push(subcategory);
-        whereExtra.push(`COALESCE(s."${sel.subCol}"::text,'') = $${paramsSlots.length}`);
-      }
-    }
-
-    const extraSql = whereExtra.length ? `AND (${whereExtra.join(" AND ")})` : "";
 
     const posCol = m.position;
     const priCol = m.priority;
@@ -964,10 +947,8 @@ export async function getGrid(req, res) {
         ${textContentCol ? `COALESCE(slots."${textContentCol}"::text,'')` : `''`} AS text_content,
         ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
       FROM ${SLOTS_TABLE} slots
-      ${joinSlots}
       WHERE slots."${m.page}"=$1
         AND slots."${posCol}" LIKE $2
-        ${extraSql}
       ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
     `;
 
@@ -1116,12 +1097,12 @@ export async function getGrid(req, res) {
 
     return res.json({
       success: true,
-      page,
-      section,
-      mode,
+      page: clean(page),
+      section: clean(section),
+      mode: clean(mode),
       pageNo,
-      category,
-      subcategory,
+      category: clean(category),
+      subcategory: clean(subcategory),
       total,
       totalPages,
       hasPrev,
