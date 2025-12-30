@@ -43,7 +43,7 @@ function getStoreSource(mode) {
   }
   return {
     table: "public.store_info",
-    subcol: "detail_category", // ✅ 푸드 하위카테고리 (수정됨)
+    subcol: "business_subcategory",
     idcol: "id",
     bno: "business_number",
     bname: "business_name",
@@ -298,15 +298,15 @@ async function pickImageMetaForMode(mode) {
   const candidates =
     m === "combined"
       ? [
-          "public.combined_store_images",
-          "public.store_images",
-          "public.food_store_images",
-        ]
+        "public.combined_store_images",
+        "public.store_images",
+        "public.food_store_images",
+      ]
       : [
-          "public.store_images",
-          "public.food_store_images",
-          "public.combined_store_images",
-        ];
+        "public.store_images",
+        "public.food_store_images",
+        "public.combined_store_images",
+      ];
 
   for (const t of candidates) {
     const cacheKey = `${m}|${t}`;
@@ -364,13 +364,13 @@ export async function listStores(req, res) {
     const params = [];
     let where = "WHERE 1=1";
 
-    if (category) {
+    if (category && src.bcat) {
       params.push(category);
-      where += ` AND s.${src.bcat} = $${params.length}`;
+      where += ` AND btrim(replace(COALESCE(s.${src.bcat}::text,''), chr(160), ' ')) = btrim(replace($${params.length}, chr(160), ' '))`;
     }
-    if (subcategory) {
+    if (subcategory && src.subcol) {
       params.push(subcategory);
-      where += ` AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
+      where += ` AND btrim(replace(COALESCE(s.${src.subcol}::text,''), chr(160), ' ')) = btrim(replace($${params.length}, chr(160), ' '))`;
     }
 
     const offset = (page - 1) * pageSize;
@@ -387,7 +387,7 @@ export async function listStores(req, res) {
         s.${src.bname}::text AS business_name,
         COALESCE(s.${src.btype}, '')::text AS business_type,
         COALESCE(s.${src.bcat}, '')::text AS business_category,
-        COALESCE(s.${src.subcol}, '')::text AS subcategory,
+        btrim(replace(COALESCE(s.${src.subcol}::text,''), chr(160), ' ')) AS subcategory,
         COALESCE(
           (SELECT si.url FROM store_images si WHERE si.store_id = s.${src.idcol} ORDER BY si.sort_order LIMIT 1),
           ''
@@ -704,13 +704,13 @@ export async function upsertSlot(req, res) {
     // ✅ text_content로 통일 (기존 필드 호환)
     const textContent = clean(
       req.body.textContent ||
-        req.body.text_content ||
-        req.body.textDesc ||
-        req.body.desc ||
-        req.body.description ||
-        req.body.textTitle ||
-        req.body.title ||
-        req.body.text_title
+      req.body.text_content ||
+      req.body.textDesc ||
+      req.body.desc ||
+      req.body.description ||
+      req.body.textTitle ||
+      req.body.title ||
+      req.body.text_title
     );
 
     const noEnd = toBool(req.body.noEnd);
@@ -724,9 +724,9 @@ export async function upsertSlot(req, res) {
 
     let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
-        req.body.business_no || // ✅ admin_ad_slots 실제 컬럼명
-        req.body.business_number ||
-        req.body.store_business_no
+      req.body.business_no || // ✅ admin_ad_slots 실제 컬럼명
+      req.body.business_number ||
+      req.body.store_business_no
     );
     let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
     let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
@@ -820,8 +820,7 @@ export async function upsertSlot(req, res) {
       INSERT INTO ${SLOTS_TABLE} (${insertCols.join(",")})
       VALUES (${insertVals.join(",")})
       ON CONFLICT (${conflictTarget})
-      DO UPDATE SET ${
-        updateSets.length ? updateSets.join(",") : `"${m.page}"=EXCLUDED."${m.page}"`
+      DO UPDATE SET ${updateSets.length ? updateSets.join(",") : `"${m.page}"=EXCLUDED."${m.page}"`
       }
       RETURNING *
     `;
@@ -1101,7 +1100,8 @@ export async function getGrid(req, res) {
     }
 
     // ✅ 응답 직전 최종 clean 처리
-    category = clean(category);
+    const categoryClean = clean(category);
+    const subcategoryClean = clean(subcategory);
 
     return res.json({
       success: true,
@@ -1110,8 +1110,8 @@ export async function getGrid(req, res) {
       section: clean(section),
       mode: clean(mode),
       pageNo,
-      category,
-      subcategory,
+      category: categoryClean,
+      subcategory: subcategoryClean,
       total,
       totalPages,
       hasPrev,
