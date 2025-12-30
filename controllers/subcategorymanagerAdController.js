@@ -1102,7 +1102,6 @@ export async function getGrid(req, res) {
 
     // ✅ 응답 직전 최종 clean 처리
     category = clean(category);
-    subcategory = clean(subcategory);
 
     return res.json({
       success: true,
