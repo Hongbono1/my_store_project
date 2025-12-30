@@ -477,10 +477,16 @@ export async function searchStore(req, res) {
 
     params.push(pageSize);
 
+    console.log("[searchStore] SQL:", sql);
+    console.log("[searchStore] Params:", params);
+
     const { rows } = await pool.query(sql, params);
+    console.log("[searchStore] Results count:", rows.length);
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
-    console.error(e);
+    console.error("[searchStore ERROR]", e);
+    console.error("[searchStore] mode:", req.query.mode);
+    console.error("[searchStore] q:", req.query.q);
     return res
       .status(500)
       .json({ success: false, error: e?.message || "searchStore 실패" });
