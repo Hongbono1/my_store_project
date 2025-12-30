@@ -887,6 +887,10 @@ export async function getGrid(req, res) {
       });
     }
 
+    console.log("[grid] raw.category:", JSON.stringify(req.query.category));
+    console.log("[grid] raw.subcategory:", JSON.stringify(req.query.subcategory));
+    console.log("[grid] raw.sub:", JSON.stringify(req.query.sub));
+
     const page = clean(req.query.page);
     const section = clean(req.query.section) || "all_items";
     const mode = clean(req.query.mode) || "food";
@@ -1095,14 +1099,19 @@ export async function getGrid(req, res) {
       });
     }
 
+    // ✅ 응답 직전 최종 clean 처리
+    category = clean(category);
+    subcategory = clean(subcategory);
+
     return res.json({
       success: true,
+      version: "grid-v-2025-12-31-01",
       page: clean(page),
       section: clean(section),
       mode: clean(mode),
       pageNo,
-      category: clean(category),
-      subcategory: clean(subcategory),
+      category,
+      subcategory,
       total,
       totalPages,
       hasPrev,
