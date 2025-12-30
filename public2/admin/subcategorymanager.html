@@ -396,9 +396,20 @@
                             <div class="label">선택된 박스</div>
                             <div class="input flex items-center justify-between">
                                 <span id="pickedBoxText" class="font-black">-</span>
-                                <span class="text-xs text-slate-500" id="pickedBoxPos">position: -</span>
+                                <span class="text-xs text-slate-500 hidden" id="pickedBoxPos">position: -</span>
                             </div>
                             <div class="hint mt-1">아래 그리드에서 클릭하여 선택</div>
+
+                            <div class="mt-2 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500">상호</span>
+                                    <span id="selectedBusinessName" class="font-semibold text-gray-900">-</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-gray-500">사업자</span>
+                                    <span id="selectedBusinessNo" class="font-mono text-gray-900">-</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1515,6 +1526,20 @@
         $("btnBannerSave").addEventListener("click", saveBannerSlot);
         $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
 
+        let _keepScrollY = 0;
+
+        function fillSelectedStoreInfo(item) {
+            const nameEl = document.getElementById("selectedBusinessName");
+            const bizEl = document.getElementById("selectedBusinessNo");
+            if (!nameEl || !bizEl) return;
+
+            const name = item?.business_name || item?.store_name || "";
+            const biz = item?.business_no || item?.business_number || "";
+
+            nameEl.textContent = name || (item?.occupied ? "(이름없음)" : "-");
+            bizEl.textContent = biz || (item?.occupied ? "(번호없음)" : "-");
+        }
+
         async function loadGrid() {
             const section = $("section").value || "all_items";
             const mode = $("mode").value || "food";
@@ -1560,7 +1585,12 @@
           </div>
         `;
 
-                btn.addEventListener("click", async () => {
+                btn.addEventListener("click", async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    _keepScrollY = window.scrollY;
+
                     const s = $("section").value || "all_items";
                     const m = $("mode").value || "food";
                     const p = Math.max(Number($("pageNo").value || "1"), 1);
@@ -1578,10 +1608,16 @@
                     $("pickedBoxText").textContent = `${s} / p${p} / box ${b}`;
                     $("pickedBoxPos").textContent = `position: ${selectedTarget.position}`;
 
+                    fillSelectedStoreInfo(it);
+
                     setStatus("warn", "배치 위치 선택됨", `이제 저장하면 이 위치에 반영됩니다 / 시간: ${nowStr()}`);
 
                     scheduleDraftSave();
                     await loadSlot();
+
+                    requestAnimationFrame(() => {
+                        window.scrollTo(0, _keepScrollY);
+                    });
                 });
 
                 grid.appendChild(btn);
