@@ -43,7 +43,7 @@ function getStoreSource(mode) {
   }
   return {
     table: "public.store_info",
-    subcol: "detail_category",        // ✅ 푸드 하위카테고리 (수정됨)
+    subcol: "detail_category", // ✅ 푸드 하위카테고리 (수정됨)
     idcol: "id",
     bno: "business_number",
     bname: "business_name",
@@ -297,15 +297,15 @@ async function pickImageMetaForMode(mode) {
   const candidates =
     m === "combined"
       ? [
-        "public.combined_store_images",
-        "public.store_images",
-        "public.food_store_images",
-      ]
+          "public.combined_store_images",
+          "public.store_images",
+          "public.food_store_images",
+        ]
       : [
-        "public.store_images",
-        "public.food_store_images",
-        "public.combined_store_images",
-      ];
+          "public.store_images",
+          "public.food_store_images",
+          "public.combined_store_images",
+        ];
 
   for (const t of candidates) {
     const cacheKey = `${m}|${t}`;
@@ -525,21 +525,22 @@ function buildSlotColumnMap(cols) {
     slotMode: pickSlotCol(cols, ["slot_mode", "mode"]),
     linkUrl: pickSlotCol(cols, ["link_url", "url"]),
     imageUrl: pickSlotCol(cols, ["image_url", "image_path", "image"]),
-    textTitle: pickSlotCol(cols, ["text_title", "title", "text"]),
-    textDesc: pickSlotCol(cols, ["text_desc", "desc", "description"]),
+    // ✅ 네 스키마에 맞춤: text_content
+    textContent: pickSlotCol(cols, ["text_content", "text_desc", "text", "content", "description", "text_title", "title"]),
     storeId: pickSlotCol(cols, ["store_id"]),
     storeBiz: pickSlotCol(cols, [
-      "business_no",          // ✅ 실제 컬럼(네온 admin_ad_slots)
+      "business_no", // ✅ 실제 컬럼(네온 admin_ad_slots)
       "business_number",
       "store_business_no",
     ]),
-    storeName: pickSlotCol(cols, ["store_name", "business_name"]),
+    storeName: pickSlotCol(cols, ["business_name", "store_name"]),
     storeType: pickSlotCol(cols, ["store_type", "business_type"]),
-    storeImage: pickSlotCol(cols, ["store_image_url", "store_image", "store_img_url"]),
     tableSource: pickSlotCol(cols, ["table_source", "source_table"]),
     noEnd: pickSlotCol(cols, ["no_end", "noend"]),
-    startAt: pickSlotCol(cols, ["start_at", "start_date", "start_datetime"]),
-    endAt: pickSlotCol(cols, ["end_at", "end_date", "end_datetime"]),
+    startAt: pickSlotCol(cols, ["start_at", "start_datetime"]),
+    endAt: pickSlotCol(cols, ["end_at", "end_datetime"]),
+    startDate: pickSlotCol(cols, ["start_date"]),
+    endDate: pickSlotCol(cols, ["end_date"]),
     updatedAt: pickSlotCol(cols, ["updated_at"]),
     createdAt: pickSlotCol(cols, ["created_at"]),
   };
@@ -698,9 +699,17 @@ export async function upsertSlot(req, res) {
     const slot_mode = clean(req.body.slotMode || req.body.slot_mode || "store");
 
     const linkUrl = clean(req.body.linkUrl || req.body.link_url);
-    const textTitle = clean(req.body.textTitle || req.body.title || req.body.text_title);
-    const textDesc = clean(
-      req.body.textDesc || req.body.desc || req.body.description || req.body.text_desc
+
+    // ✅ text_content로 통일 (기존 필드 호환)
+    const textContent = clean(
+      req.body.textContent ||
+        req.body.text_content ||
+        req.body.textDesc ||
+        req.body.desc ||
+        req.body.description ||
+        req.body.textTitle ||
+        req.body.title ||
+        req.body.text_title
     );
 
     const noEnd = toBool(req.body.noEnd);
@@ -714,22 +723,18 @@ export async function upsertSlot(req, res) {
 
     let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
-      req.body.business_no ||          // ✅ admin_ad_slots 실제 컬럼명
-      req.body.business_number ||
-      req.body.store_business_no
+        req.body.business_no || // ✅ admin_ad_slots 실제 컬럼명
+        req.body.business_number ||
+        req.body.store_business_no
     );
     let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
     let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
-    let storeImageUrl = clean(
-      req.body.storeImageUrl || req.body.store_image_url || req.body.image_url
-    );
 
     // store 모드 + storeId만 있어도 DB에서 자동 채움
     if (slot_mode === "store" && storeId !== null) {
-
       const tableSource2 = inferTableSourceFromPosition(position);
       const table =
-        tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
+        tableSource2 === "combined_store_info" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
 
       if (table) {
         const tcols = await getColumns(table);
@@ -746,9 +751,9 @@ export async function upsertSlot(req, res) {
         const sql2 = `
           SELECT
             "${sel2.idCol}"::text AS id,
-            ${sel2.bnCol ? `"${sel2.bnCol}"::text` : "''"} AS business_number,
+            ${sel2.bnCol ? `"${sel2.bnCol}"::text` : `''`} AS business_number,
             "${sel2.nameCol}"::text AS business_name,
-            ${sel2.typeCol ? `"${sel2.typeCol}"::text` : "''"} AS business_type,
+            ${sel2.typeCol ? `COALESCE("${sel2.typeCol}"::text,'')` : `''`} AS business_type,
             ${imageExpr2} AS image_url
           FROM ${table}
           WHERE "${sel2.idCol}" = $1
@@ -761,13 +766,10 @@ export async function upsertSlot(req, res) {
           if (!storeBusinessNumber) storeBusinessNumber = clean(s.business_number);
           if (!storeName) storeName = clean(s.business_name);
           if (!storeType) storeType = clean(s.business_type);
-          if (!storeImageUrl) storeImageUrl = clean(s.image_url);
+          if (!imageUrl) imageUrl = clean(s.image_url); // ✅ 업로드 없으면 자동
         }
       }
     }
-
-    // 업로드 이미지 없고 store 모드면 가게 이미지로 자동
-    if (!imageUrl && slot_mode === "store" && storeImageUrl) imageUrl = storeImageUrl;
 
     const tableSource = inferTableSourceFromPosition(position);
 
@@ -792,14 +794,12 @@ export async function upsertSlot(req, res) {
     add(m.linkUrl, linkUrl);
     if (m.imageUrl) add(m.imageUrl, imageUrl);
 
-    add(m.textTitle, textTitle);
-    add(m.textDesc, textDesc);
+    if (m.textContent) add(m.textContent, textContent);
 
     if (m.storeId && storeId !== null) add(m.storeId, storeId);
-    add(m.storeBiz, storeBusinessNumber);
-    add(m.storeName, storeName);
-    add(m.storeType, storeType);
-    add(m.storeImage, storeImageUrl);
+    if (m.storeBiz) add(m.storeBiz, storeBusinessNumber);
+    if (m.storeName) add(m.storeName, storeName);
+    if (m.storeType) add(m.storeType, storeType);
 
     if (m.tableSource && tableSource) add(m.tableSource, tableSource);
 
@@ -819,7 +819,9 @@ export async function upsertSlot(req, res) {
       INSERT INTO ${SLOTS_TABLE} (${insertCols.join(",")})
       VALUES (${insertVals.join(",")})
       ON CONFLICT (${conflictTarget})
-      DO UPDATE SET ${updateSets.length ? updateSets.join(",") : `"${m.page}"=EXCLUDED."${m.page}"`}
+      DO UPDATE SET ${
+        updateSets.length ? updateSets.join(",") : `"${m.page}"=EXCLUDED."${m.page}"`
+      }
       RETURNING *
     `;
 
@@ -854,7 +856,20 @@ export async function upsertSlot(req, res) {
 
 // ------------------------------
 // ✅ GET /grid (12칸)
+// ✅ 핵심: 자동배치 12개 + admin_ad_slots(저장된 칸) 오버라이드 덮어쓰기
 // ------------------------------
+function buildAutoOrderBy(section, sel) {
+  const s = clean(section).toLowerCase();
+  if (s === "new_registration" && sel.createdCol) {
+    return `"${sel.createdCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
+  }
+  if (s === "best_seller" && sel.viewsCol) {
+    return `"${sel.viewsCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
+  }
+  // all_items 기본은 최신(id desc)
+  return `"${sel.idCol}" DESC`;
+}
+
 export async function getGrid(req, res) {
   try {
     const cols = await getSlotCols();
@@ -872,106 +887,231 @@ export async function getGrid(req, res) {
     const mode = clean(req.query.mode) || "food";
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
 
+    const category = clean(req.query.category);
+    const subcategory = clean(req.query.subcategory);
+
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
     const suffix = mode === "food" ? "__food" : "__combined";
     const like = `${section}__p${pageNo}__b%${suffix}`;
 
+    // --------------------------
+    // 0) 스토어 테이블 선택(자동배치용)
+    // --------------------------
+    const storeTable =
+      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+    const tcols = await getColumns(storeTable);
+    const sel = buildStoreSelect(storeTable, tcols);
+
+    // 대표 이미지(스토어 테이블 imgCol or 이미지 테이블 subquery)
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
+
+    // --------------------------
+    // 1) 오버라이드 슬롯 조회(저장된 칸)
+    //    - category/subcategory 필터가 있으면 store_id 조인으로 "해당 필터에 맞는 store 슬롯만" 보여줌
+    // --------------------------
+    const paramsSlots = [page, like];
+    let joinSlots = "";
+    const whereExtra = [];
+
+    if ((category || subcategory) && m.storeId && (sel.catCol || sel.subCol)) {
+      joinSlots = `LEFT JOIN ${storeTable} s ON s."${sel.idCol}"::text = slots."${m.storeId}"::text`;
+
+      if (category && sel.catCol) {
+        paramsSlots.push(category);
+        whereExtra.push(`COALESCE(s."${sel.catCol}"::text,'') = $${paramsSlots.length}`);
+      }
+      if (subcategory && sel.subCol) {
+        paramsSlots.push(subcategory);
+        whereExtra.push(`COALESCE(s."${sel.subCol}"::text,'') = $${paramsSlots.length}`);
+      }
+    }
+
+    const extraSql = whereExtra.length ? `AND (${whereExtra.join(" AND ")})` : "";
+
     const posCol = m.position;
     const priCol = m.priority;
     const slotTypeCol = m.slotType;
     const slotModeCol = m.slotMode;
-    const storeNameCol = m.storeName;
-    const textTitleCol = m.textTitle;
-    const imageUrlCol = m.imageUrl;
-    const updatedAtCol = m.updatedAt;
     const storeIdCol = m.storeId;
     const storeBizCol = m.storeBiz;
+    const storeNameCol = m.storeName;
+    const storeTypeCol = m.storeType;
+    const imageUrlCol = m.imageUrl;
+    const textContentCol = m.textContent;
+    const updatedAtCol = m.updatedAt;
 
-    // subcategory / category 필터링을 위한 store 테이블 조인
-    let storeJoin = "";
-    let whereCat = "";
-    let whereSub = "";
-    const params = [page, like];
-
-    const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
-
-    // ✅ category/subcategory 둘 중 하나라도 있으면 store 조인
-    if ((category || subcategory) && storeIdCol) {
-      const src = getStoreSource(mode);
-
-      storeJoin = `LEFT JOIN ${src.table} s ON s.${src.idcol}::text = slots."${storeIdCol}"::text`;
-
-      if (category) {
-        params.push(category);
-        whereCat = `AND COALESCE(s.${src.bcat}, '') = $${params.length}`;
-      }
-
-      if (subcategory) {
-        params.push(subcategory);
-        whereSub = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
-      }
-    }
-
-    const sql = `
+    const slotSql = `
       SELECT DISTINCT ON (slots."${posCol}")
         slots."${posCol}"::text AS position,
         ${priCol ? `slots."${priCol}"::int` : `1`} AS priority,
-        ${slotTypeCol ? `slots."${slotTypeCol}"::text` : `''`} AS slot_type,
-        ${slotModeCol ? `slots."${slotModeCol}"::text` : `''`} AS slot_mode,
-        ${storeNameCol ? `COALESCE(NULLIF(slots."${storeNameCol}"::text,''),'')` : `''`} AS store_name,
-        ${textTitleCol ? `COALESCE(NULLIF(slots."${textTitleCol}"::text,''),'')` : `''`} AS text_title,
-        ${imageUrlCol ? `COALESCE(NULLIF(slots."${imageUrlCol}"::text,''),'')` : `''`} AS image_url,
+        ${slotTypeCol ? `COALESCE(slots."${slotTypeCol}"::text,'')` : `''`} AS slot_type,
+        ${slotModeCol ? `COALESCE(slots."${slotModeCol}"::text,'')` : `''`} AS slot_mode,
+        ${storeIdCol ? `slots."${storeIdCol}"` : `NULL`} AS store_id,
+        ${storeBizCol ? `COALESCE(slots."${storeBizCol}"::text,'')` : `''`} AS business_no,
+        ${storeNameCol ? `COALESCE(slots."${storeNameCol}"::text,'')` : `''`} AS business_name,
+        ${storeTypeCol ? `COALESCE(slots."${storeTypeCol}"::text,'')` : `''`} AS store_type,
+        ${imageUrlCol ? `COALESCE(slots."${imageUrlCol}"::text,'')` : `''`} AS image_url,
+        ${textContentCol ? `COALESCE(slots."${textContentCol}"::text,'')` : `''`} AS text_content,
         ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
       FROM ${SLOTS_TABLE} slots
-      ${storeJoin}
+      ${joinSlots}
       WHERE slots."${m.page}"=$1
         AND slots."${posCol}" LIKE $2
-        ${whereCat}
-        ${whereSub}
+        ${extraSql}
       ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
     `;
 
-    const { rows } = await pool.query(sql, params);
+    const { rows: slotRows } = await pool.query(slotSql, paramsSlots);
 
-    const map = new Map();
-    for (const r of rows) {
+    const overrideMap = new Map(); // boxNo -> row
+    for (const r of slotRows) {
       const pos = String(r.position || "");
       const mm = pos.match(/__b(\d+)__/);
       if (!mm) continue;
       const boxNo = Number(mm[1]);
       if (!Number.isFinite(boxNo)) continue;
-      map.set(boxNo, r);
+      overrideMap.set(boxNo, r);
     }
 
+    // --------------------------
+    // 2) 자동배치 12개 계산(스토어 테이블에서 row_number)
+    // --------------------------
+    const values = [];
+    const whereParts = [];
+
+    if (category && sel.catCol) {
+      values.push(category);
+      whereParts.push(`"${sel.catCol}" = $${values.length}`);
+    }
+    if (subcategory && sel.subCol) {
+      values.push(subcategory);
+      whereParts.push(`COALESCE("${sel.subCol}"::text,'') = $${values.length}`);
+    }
+
+    const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+    const orderBy = buildAutoOrderBy(section, sel);
+
+    const startRn = (pageNo - 1) * 12 + 1;
+    const endRn = pageNo * 12;
+
+    values.push(startRn);
+    const pStart = values.length;
+    values.push(endRn);
+    const pEnd = values.length;
+
+    const autoSql = `
+      WITH ranked AS (
+        SELECT
+          "${sel.idCol}"::text AS id,
+          ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_no,
+          "${sel.nameCol}"::text AS business_name,
+          ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS store_type,
+          ${imageExpr} AS image_url,
+          ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
+        FROM ${storeTable}
+        ${whereSql}
+      )
+      SELECT *
+      FROM ranked
+      WHERE rn BETWEEN $${pStart} AND $${pEnd}
+      ORDER BY rn ASC
+    `;
+
+    const { rows: autoRows } = await pool.query(autoSql, values);
+
+    const autoMap = new Map(); // boxNo -> autoRow
+    for (let i = 0; i < autoRows.length; i += 1) {
+      autoMap.set(i + 1, autoRows[i]);
+    }
+
+    // --------------------------
+    // 3) 12칸 합성(override 우선)
+    // --------------------------
     const items = [];
     for (let b = 1; b <= 12; b += 1) {
-      const r = map.get(b) || null;
-      const occupied = !!r;
+      const position = `${section}__p${pageNo}__b${b}${suffix}`;
 
-      const label = r?.store_name
-        ? r.store_name
-        : r?.text_title
-          ? r.text_title
-          : occupied
-            ? (r.slot_type === "text" ? "텍스트" : "이미지")
-            : "";
+      const over = overrideMap.get(b);
+      const auto = autoMap.get(b);
+
+      if (over) {
+        items.push({
+          boxNo: b,
+          position,
+          occupied: true,
+          source: "override",
+          priority: over.priority ?? null,
+          slot_type: over.slot_type ?? "",
+          slot_mode: over.slot_mode ?? "",
+          store_id: over.store_id ?? null,
+          business_no: over.business_no ?? "",
+          business_name: over.business_name ?? "",
+          store_type: over.store_type ?? "",
+          image_url: over.image_url ?? "",
+          text_content: over.text_content ?? "",
+          label: over.business_name || over.text_content || "",
+          updated_at: over.updated_at ?? null,
+        });
+        continue;
+      }
+
+      if (auto) {
+        items.push({
+          boxNo: b,
+          position,
+          occupied: true,
+          source: "auto",
+          priority: null,
+          slot_type: "banner",
+          slot_mode: "store",
+          store_id: auto.id ? safeIntOrNull(auto.id) : null,
+          business_no: auto.business_no ?? "",
+          business_name: auto.business_name ?? "",
+          store_type: auto.store_type ?? "",
+          image_url: auto.image_url ?? "",
+          text_content: "",
+          label: auto.business_name ?? "",
+          updated_at: null,
+        });
+        continue;
+      }
 
       items.push({
         boxNo: b,
-        occupied,
-        label,
-        position: `${section}__p${pageNo}__b${b}${suffix}`,
-        priority: r?.priority ?? null,
-        slot_type: r?.slot_type ?? "",
-        slot_mode: r?.slot_mode ?? "",
-        updated_at: r?.updated_at ?? null,
+        position,
+        occupied: false,
+        source: "empty",
+        priority: null,
+        slot_type: "",
+        slot_mode: "",
+        store_id: null,
+        business_no: "",
+        business_name: "",
+        store_type: "",
+        image_url: "",
+        text_content: "",
+        label: "",
+        updated_at: null,
       });
     }
 
-    return res.json({ success: true, page, section, mode, pageNo, items });
+    return res.json({
+      success: true,
+      page,
+      section,
+      mode,
+      pageNo,
+      category,
+      subcategory,
+      items,
+    });
   } catch (err) {
+    console.error("[getGrid ERROR]", err);
     return res
       .status(500)
       .json({ success: false, error: err?.message || "getGrid 실패" });
