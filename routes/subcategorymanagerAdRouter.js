@@ -11,6 +11,7 @@ import {
   getGrid,
   makeMulterStorage,
   fileFilter,
+  whereStore,
 } from "../controllers/subcategorymanagerAdController.js";
 
 const router = express.Router();
@@ -37,6 +38,8 @@ router.get("/search", searchStore);
 
 // ✅ alias (HTML이 /search 실패 시 /search-store도 호출 가능)
 router.get("/search-store", searchStore);
+
+router.get("/where", whereStore); // ✅ 사업자번호로 등록 위치 조회
 
 // ------------------------------
 // 슬롯 읽기/후보/저장/삭제

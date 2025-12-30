@@ -461,6 +461,112 @@ export async function searchStore(req, res) {
 }
 
 // ------------------------------
+// ✅ GET /where
+//   - business_number(q)로 admin_ad_slots 역검색
+//   - position을 파싱해서 section/page/box/mode 보여줌
+// ------------------------------
+function parsePosition(position) {
+  const p = clean(position);
+  // 예: all_items__p3__b7__combined
+  const m = p.match(/^([a-z_]+)__p(\d+)__b(\d+)(?:__(food|combined))?$/i);
+  if (!m) return { raw: p, section: "", page_number: null, index_in_page: null, mode: "" };
+
+  const section = (m[1] || "").toLowerCase();
+  const page_number = Number(m[2] || 0) || null;
+  const index_in_page = Number(m[3] || 0) || null;
+  const mode = (m[4] || "").toLowerCase();
+
+  const labelMap = {
+    all_items: "All items",
+    best_seller: "Best Seller",
+    new_registration: "New registration",
+  };
+
+  return {
+    raw: p,
+    section,
+    section_label: labelMap[section] || section,
+    page_number,
+    index_in_page,
+    mode,
+  };
+}
+
+export async function whereStore(req, res) {
+  try {
+    const cols = await getSlotCols();
+    const m = buildSlotColumnMap(cols);
+
+    // ✅ 어떤 컬럼이든 store_business_number 후보로 잡히게 이미 m.storeBiz에 넣어놨음
+    if (!m.storeBiz || !m.position || !m.page || !m.priority) {
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 store_business_number(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
+      });
+    }
+
+    const qRaw = clean(req.query.q || req.query.business_number || "");
+    const biz = digitsOnly(qRaw);
+
+    if (!biz) {
+      return res.status(400).json({ success: false, error: "q(사업자번호)가 필요합니다." });
+    }
+
+    // 기본은 subcategory만, 필요하면 page=all 로 전체 검색 가능
+    const page = clean(req.query.page || "subcategory"); // "subcategory" | "all"
+    const limit = Math.min(Math.max(safeInt(req.query.limit, 50), 1), 200);
+
+    const params = [biz];
+    let where = `
+      (
+        regexp_replace(COALESCE("${m.storeBiz}"::text,''), '\\\\D', '', 'g') = $1
+        OR ltrim(regexp_replace(COALESCE("${m.storeBiz}"::text,''), '\\\\D', '', 'g'), '0') = ltrim($1, '0')
+      )
+    `;
+
+    if (page && page !== "all") {
+      params.push(page);
+      where += ` AND "${m.page}" = $${params.length}`;
+    }
+
+    params.push(limit);
+
+    const sql = `
+      SELECT *
+      FROM ${SLOTS_TABLE}
+      WHERE ${where}
+      ORDER BY "${m.page}" ASC, "${m.position}" ASC, "${m.priority}" ASC
+      LIMIT $${params.length}
+    `;
+
+    const { rows } = await pool.query(sql, params);
+
+    const items = (rows || []).map((r) => {
+      const pos = parsePosition(r?.[m.position]);
+      return {
+        page: r?.[m.page],
+        priority: r?.[m.priority],
+        position: r?.[m.position],
+        parsed: pos,
+
+        // 아래는 있으면 같이 보여주기(컬럼명이 다를 수 있으니 원본 row도 같이)
+        row: r,
+      };
+    });
+
+    return res.json({
+      success: true,
+      q: biz,
+      pageFilter: page,
+      count: items.length,
+      items,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || "whereStore 실패" });
+  }
+}
+
+// ------------------------------
 // ✅ 슬롯 테이블 컬럼 매핑(동적)
 // ------------------------------
 let slotsColsCached = null;

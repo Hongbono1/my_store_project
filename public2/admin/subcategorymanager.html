@@ -277,6 +277,14 @@
                         <div class="text-sm font-black mb-2">검색 결과</div>
                         <div id="searchResults" class="space-y-2"></div>
                     </div>
+
+                    <!-- 현재 등록 위치 -->
+                    <div class="md:col-span-12 soft p-3">
+                        <div class="text-sm font-black mb-2">현재 등록 위치(사업자번호 기준)</div>
+                        <div id="whereResults" class="space-y-2 text-sm text-slate-700">
+                            <div class="text-slate-500">가게를 선택하면 자동 조회됩니다.</div>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
@@ -726,9 +734,54 @@
                     setStatus("warn", "가게 선택됨", `position 생성됨 / 시간: ${nowStr()}`);
 
                     await loadSlot();
+                    await loadWhere(); 
                 });
 
                 list.appendChild(btn);
+            }
+        }
+
+        async function loadWhere() {
+            try {
+                const biz = String($("storeBusinessNumber").value || "").trim();
+                const bizDigits = digitsOnly(biz);
+                const box = $("whereResults");
+                if (!box) return;
+
+                if (!bizDigits) {
+                    box.innerHTML = `<div class="text-slate-500">사업자번호가 없어 조회할 수 없습니다.</div>`;
+                    return;
+                }
+
+                const qs = new URLSearchParams({
+                    q: bizDigits,
+                    page: PAGE_NAME, // subcategory만 보려면 이대로, 전체면 "all"
+                    limit: "100",
+                }).toString();
+
+                const data = await apiFetch(`/where?${qs}`);
+                const items = data?.items || [];
+
+                if (!items.length) {
+                    box.innerHTML = `<div class="text-slate-500">현재 등록된 슬롯이 없습니다.</div>`;
+                    return;
+                }
+
+                box.innerHTML = items.map((it) => {
+                    const p = it.parsed || {};
+                    return `
+        <div class="soft p-2">
+          <div class="font-black">${p.section_label || "(unknown section)"}</div>
+          <div class="text-xs text-slate-600 mt-1">
+            ${it.page} / ${p.page_number || "?"}페이지 / ${p.index_in_page || "?"}번째 / priority ${it.priority}
+          </div>
+          <div class="text-[11px] text-slate-500 break-all mt-1">position: <b>${it.position}</b></div>
+        </div>
+      `;
+                }).join("");
+            } catch (e) {
+                const box = $("whereResults");
+                if (box) box.innerHTML = `<div class="text-red-600">조회 실패: ${e.message}</div>`;
             }
         }
 
