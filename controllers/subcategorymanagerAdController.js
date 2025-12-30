@@ -226,11 +226,11 @@ function buildFilterWhere(params, sel, values) {
 
   if (category && sel.catCol) {
     values.push(category);
-    where.push(`"${sel.catCol}" = $${values.length}`);
+    where.push(`TRIM(COALESCE("${sel.catCol}"::text,'')) = $${values.length}`);
   }
   if (subcategory && sel.subCol) {
     values.push(subcategory);
-    where.push(`"${sel.subCol}" = $${values.length}`);
+    where.push(`TRIM(COALESCE("${sel.subCol}"::text,'')) = $${values.length}`);
   }
 
   const qRaw = clean(params.q);
@@ -972,11 +972,11 @@ export async function getGrid(req, res) {
 
     if (category && sel.catCol) {
       values.push(category);
-      whereParts.push(`"${sel.catCol}" = $${values.length}`);
+      whereParts.push(`TRIM(COALESCE("${sel.catCol}"::text,'')) = $${values.length}`);
     }
     if (subcategory && sel.subCol) {
       values.push(subcategory);
-      whereParts.push(`COALESCE("${sel.subCol}"::text,'') = $${values.length}`);
+      whereParts.push(`TRIM(COALESCE("${sel.subCol}"::text,'')) = $${values.length}`);
     }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
