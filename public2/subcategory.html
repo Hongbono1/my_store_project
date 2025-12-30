@@ -212,6 +212,46 @@
             return json;
         }
 
+        // ✅ 매니저 API 호출 헬퍼
+        const GRID_API_BASE = "/subcategorymanager/ad";
+
+        function sectionKeyToManagerSection(key) {
+            if (key === "items") return "all_items";
+            if (key === "best") return "best_seller";
+            if (key === "newly") return "new_registration";
+            return "all_items";
+        }
+
+        async function fetchManagerGrid(sectionKey, pageNo) {
+            const section = sectionKeyToManagerSection(sectionKey);
+            const qs = new URLSearchParams();
+            qs.set("page", "subcategory");
+            qs.set("section", section);
+            qs.set("mode", TYPE);          // "food" | "combined"
+            qs.set("pageNo", String(pageNo || 1));
+            if (CATEGORY) qs.set("category", CATEGORY);
+            if (CURRENT_SUB) qs.set("subcategory", CURRENT_SUB);
+
+            return await fetchJson(`${GRID_API_BASE}/grid?${qs.toString()}`);
+        }
+
+        function gridItemsToStores(items, limit) {
+            const stores = (items || [])
+                .filter((it) => it && it.occupied) // empty 제외
+                .map((it) => ({
+                    id: it.store_id,
+                    business_number: it.business_no || "",
+                    business_name: it.business_name || "",
+                    business_type: it.store_type || "",
+                    image_url: it.image_url || "",
+                    // 필요하면 source/position도 보관 가능(화면 노출 X)
+                    _source: it.source,
+                    _position: it.position,
+                }));
+
+            return typeof limit === "number" ? stores.slice(0, limit) : stores;
+        }
+
         function buildDynamicFiltersFromStores(stores) {
             // business_subcategory 기반으로 unique 생성
             const set = new Set();
@@ -492,61 +532,74 @@
             return { slice: listArr.slice(start, start + PAGE_SIZE), totalPages };
         }
 
-        function renderItemsSection() {
+        async function renderItemsSection() {
             const grid = document.getElementById("lineGrid");
             const pager = document.getElementById("itemsPager");
             const prev = document.getElementById("itemsPrev");
             const next = document.getElementById("itemsNext");
             const info = document.getElementById("itemsPageInfo");
 
-            const v = getVisible(DATA.stores || [], sectionState.items);
-            renderStoresGrid(v.slice, grid);
+            const pageNo = sectionState.items.expanded ? sectionState.items.page : 1;
+            const json = await fetchManagerGrid("items", pageNo);
+            const stores = gridItemsToStores(json.items, sectionState.items.expanded ? undefined : 4);
 
-            if (!sectionState.items.expanded || v.totalPages <= 1) {
+            renderStoresGrid(stores, grid);
+
+            // 페이지네이션 처리 (매니저는 12개씩 고정)
+            const totalPages = Math.ceil((json.items?.length || 0) / 12);
+            if (!sectionState.items.expanded || totalPages <= 1) {
                 pager.classList.add("hidden");
             } else {
                 pager.classList.remove("hidden");
-                info.textContent = `${sectionState.items.page} / ${v.totalPages}`;
+                info.textContent = `${sectionState.items.page} / ${totalPages}`;
                 prev.disabled = sectionState.items.page <= 1;
-                next.disabled = sectionState.items.page >= v.totalPages;
+                next.disabled = sectionState.items.page >= totalPages;
             }
         }
 
-        function renderBestSection() {
+        async function renderBestSection() {
             const pager = document.getElementById("bestPager");
             const prev = document.getElementById("bestPrev");
             const next = document.getElementById("bestNext");
             const info = document.getElementById("bestPageInfo");
 
-            const v = getVisible(DATA.best || [], sectionState.best);
-            renderSmallGrid("bestGrid", v.slice);
+            const pageNo = sectionState.best.expanded ? sectionState.best.page : 1;
+            const json = await fetchManagerGrid("best", pageNo);
+            const items = gridItemsToStores(json.items, sectionState.best.expanded ? undefined : 8);
 
-            if (!sectionState.best.expanded || v.totalPages <= 1) {
+            renderSmallGrid("bestGrid", items);
+
+            const totalPages = Math.ceil((json.items?.length || 0) / 12);
+            if (!sectionState.best.expanded || totalPages <= 1) {
                 pager.classList.add("hidden");
             } else {
                 pager.classList.remove("hidden");
-                info.textContent = `${sectionState.best.page} / ${v.totalPages}`;
+                info.textContent = `${sectionState.best.page} / ${totalPages}`;
                 prev.disabled = sectionState.best.page <= 1;
-                next.disabled = sectionState.best.page >= v.totalPages;
+                next.disabled = sectionState.best.page >= totalPages;
             }
         }
 
-        function renderNewSection() {
+        async function renderNewSection() {
             const pager = document.getElementById("newPager");
             const prev = document.getElementById("newPrev");
             const next = document.getElementById("newNext");
             const info = document.getElementById("newPageInfo");
 
-            const v = getVisible(DATA.new || [], sectionState.newly);
-            renderSmallGrid("newGrid", v.slice);
+            const pageNo = sectionState.newly.expanded ? sectionState.newly.page : 1;
+            const json = await fetchManagerGrid("newly", pageNo);
+            const items = gridItemsToStores(json.items, sectionState.newly.expanded ? undefined : 8);
 
-            if (!sectionState.newly.expanded || v.totalPages <= 1) {
+            renderSmallGrid("newGrid", items);
+
+            const totalPages = Math.ceil((json.items?.length || 0) / 12);
+            if (!sectionState.newly.expanded || totalPages <= 1) {
                 pager.classList.add("hidden");
             } else {
                 pager.classList.remove("hidden");
-                info.textContent = `${sectionState.newly.page} / ${v.totalPages}`;
+                info.textContent = `${sectionState.newly.page} / ${totalPages}`;
                 prev.disabled = sectionState.newly.page <= 1;
-                next.disabled = sectionState.newly.page >= v.totalPages;
+                next.disabled = sectionState.newly.page >= totalPages;
             }
         }
 
@@ -580,11 +633,16 @@
             };
 
             // Best
-            document.getElementById("btnMoreBest").onclick = () => {
+            document.getElementById("btnMoreBest").onclick = async (e) => {
+                e?.preventDefault?.();
+                const keepY = window.scrollY;
+
                 sectionState.best.expanded = !sectionState.best.expanded;
                 sectionState.best.page = 1;
                 syncMoreButtonLabels();
-                renderBestSection();
+                await renderBestSection();
+
+                requestAnimationFrame(() => window.scrollTo({ top: keepY, behavior: "auto" }));
             };
             document.getElementById("bestPrev").onclick = () => {
                 sectionState.best.page = Math.max(1, sectionState.best.page - 1);
@@ -596,11 +654,16 @@
             };
 
             // New
-            document.getElementById("btnMoreNew").onclick = () => {
+            document.getElementById("btnMoreNew").onclick = async (e) => {
+                e?.preventDefault?.();
+                const keepY = window.scrollY;
+
                 sectionState.newly.expanded = !sectionState.newly.expanded;
                 sectionState.newly.page = 1;
                 syncMoreButtonLabels();
-                renderNewSection();
+                await renderNewSection();
+
+                requestAnimationFrame(() => window.scrollTo({ top: keepY, behavior: "auto" }));
             };
             document.getElementById("newPrev").onclick = () => {
                 sectionState.newly.page = Math.max(1, sectionState.newly.page - 1);
