@@ -529,11 +529,9 @@ function buildSlotColumnMap(cols) {
     textDesc: pickSlotCol(cols, ["text_desc", "desc", "description"]),
     storeId: pickSlotCol(cols, ["store_id"]),
     storeBiz: pickSlotCol(cols, [
-      "business_no",
-      "store_business_number",
-      "store_business_no",
+      "business_no",          // ✅ 실제 컬럼(네온 admin_ad_slots)
       "business_number",
-      "business_no",
+      "store_business_no",
     ]),
     storeName: pickSlotCol(cols, ["store_name", "business_name"]),
     storeType: pickSlotCol(cols, ["store_type", "business_type"]),
@@ -716,11 +714,9 @@ export async function upsertSlot(req, res) {
 
     let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
-      req.body.store_business_number ||
-      req.body.business_no ||           // ✅ admin_ad_slots 실제 컬럼명
+      req.body.business_no ||          // ✅ admin_ad_slots 실제 컬럼명
       req.body.business_number ||
-      req.body.store_business_no ||
-      req.body.business_no
+      req.body.store_business_no
     );
     let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
     let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
@@ -730,7 +726,7 @@ export async function upsertSlot(req, res) {
 
     // store 모드 + storeId만 있어도 DB에서 자동 채움
     if (slot_mode === "store" && storeId !== null) {
-      
+
       const tableSource2 = inferTableSourceFromPosition(position);
       const table =
         tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
@@ -894,6 +890,7 @@ export async function getGrid(req, res) {
     const storeBizCol = m.storeBiz;
 
     // subcategory 필터링을 위한 store 테이블 조인 (getStoreSource 사용)
+    // subcategory 필터링을 위한 store 테이블 조인 (store_id OR business_no)
     let storeJoin = "";
     let whereSubcategory = "";
     const params = [page, like];
@@ -902,19 +899,24 @@ export async function getGrid(req, res) {
       const src = getStoreSource(mode);
 
       const joinConds = [];
+
       if (storeIdCol) {
         joinConds.push(`s.${src.idcol}::text = slots."${storeIdCol}"::text`);
       }
+
       if (storeBizCol) {
+        // 숫자만 비교(하이픈/공백/앞자리 0 차이 방어는 최소로)
         joinConds.push(`
-          regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g')
-          = regexp_replace(COALESCE(slots."${storeBizCol}"::text,''), '\\\\D', '', 'g')
-        `);
+      regexp_replace(COALESCE(s.${src.bno}::text,''), '\\\\D', '', 'g')
+      =
+      regexp_replace(COALESCE(slots."${storeBizCol}"::text,''), '\\\\D', '', 'g')
+    `);
       }
 
       storeJoin = `LEFT JOIN ${src.table} s ON (${joinConds.join(" OR ")})`;
+
       params.push(subcategory);
-      whereSubcategory = `AND COALESCE(TRIM(s.${src.subcol}::text), '') = $${params.length}`;
+      whereSubcategory = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
     }
 
     const sql = `
@@ -1018,7 +1020,7 @@ export async function whereStore(req, res) {
       return res.status(500).json({
         success: false,
         error:
-"admin_ad_slots에 business_no(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
+          "admin_ad_slots에 business_no(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
       });
     }
 
