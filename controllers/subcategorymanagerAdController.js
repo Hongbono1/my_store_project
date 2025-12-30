@@ -55,7 +55,9 @@ function getStoreSource(mode) {
 
 function clean(v) {
   if (v === undefined || v === null) return "";
-  return String(v).trim();
+  return String(v)
+    .replace(/\u00a0/g, " ")  // ✅ NBSP 제거
+    .trim();                 // ✅ 앞/뒤 공백 제거
 }
 
 function digitsOnly(v) {
@@ -178,7 +180,6 @@ function buildStoreSelect(tableFullName, cols) {
   const subCol = pickCol(cols, [
     "business_subcategory",
     "detail_category",
-    "subcategory",
     "sub_category",
   ]);
   const createdCol = pickCol(cols, ["created_at", "createdat", "created"]);
