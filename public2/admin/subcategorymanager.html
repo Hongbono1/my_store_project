@@ -391,32 +391,50 @@
                             </div>
                             <div class="hint mt-1">해당 섹션의 페이지 번호</div>
                         </div>
+                    </div>
 
-                        <div>
-                            <div class="label">선택된 박스</div>
-                            <div class="input flex items-center justify-between">
-                                <span id="pickedBoxText" class="font-black">-</span>
-                                <span class="text-xs text-slate-500 hidden" id="pickedBoxPos">position: -</span>
+                    <!-- ✅ 배치현황(12칸) + 선택정보(파란박스) -->
+                    <div class="mt-3">
+                        <div class="label">배치 현황 (12칸)</div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                            <!-- 왼쪽: 12칸 그리드 -->
+                            <div class="lg:col-span-9">
+                                <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+                                <div class="hint mt-2">빈칸은 회색, 사용중은 파란색 테두리로 표시됩니다.</div>
                             </div>
-                            <div class="hint mt-1">아래 그리드에서 클릭하여 선택</div>
 
-                            <div class="mt-2 text-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-500">상호</span>
-                                    <span id="selectedBusinessName" class="font-semibold text-gray-900">-</span>
-                                </div>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-gray-500">사업자</span>
-                                    <span id="selectedBusinessNo" class="font-mono text-gray-900">-</span>
+                            <!-- 오른쪽: 선택 정보(파란색) -->
+                            <div class="lg:col-span-3">
+                                <div class="sticky top-4 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                                    <div class="text-sm font-semibold text-blue-700">
+                                        아래 그리드에서 클릭하여 선택
+                                    </div>
+
+                                    <div class="mt-3 text-sm">
+                                        <div class="text-blue-600/80">상호</div>
+                                        <div id="selectedBusinessName" class="mt-1 text-base font-bold text-blue-900">
+                                            -
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 text-sm">
+                                        <div class="text-blue-600/80">사업자</div>
+                                        <div id="selectedBusinessNo" class="mt-1 font-mono text-base font-bold text-blue-900">
+                                            -
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 text-xs text-blue-700/80">
+                                        선택 박스: <span id="selectedBoxNo">-</span>
+                                    </div>
+
+                                    <div class="hidden">
+                                        <span id="pickedBoxText">-</span>
+                                        <span id="pickedBoxPos">position: -</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <div class="label">배치 현황 (12칸)</div>
-                        <div id="grid" class="grid grid-cols-3 md:grid-cols-4 gap-2"></div>
-                        <div class="hint mt-2">빈칸은 회색, 사용중은 파란색 테두리로 표시됩니다.</div>
                     </div>
                 </div>
 
@@ -1527,17 +1545,34 @@
         $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
 
         let _keepScrollY = 0;
+        let selectedBoxNo = null;
 
         function fillSelectedStoreInfo(item) {
             const nameEl = document.getElementById("selectedBusinessName");
             const bizEl = document.getElementById("selectedBusinessNo");
-            if (!nameEl || !bizEl) return;
+            const boxEl = document.getElementById("selectedBoxNo");
 
             const name = item?.business_name || item?.store_name || "";
             const biz = item?.business_no || item?.business_number || "";
+            const boxNo = item?.boxNo ?? null;
 
-            nameEl.textContent = name || (item?.occupied ? "(이름없음)" : "-");
-            bizEl.textContent = biz || (item?.occupied ? "(번호없음)" : "-");
+            if (nameEl) nameEl.textContent = name || "-";
+            if (bizEl) bizEl.textContent = biz || "-";
+            if (boxEl) boxEl.textContent = boxNo ? String(boxNo) : "-";
+
+            selectedBoxNo = boxNo;
+            highlightSelectedBox();
+        }
+
+        function highlightSelectedBox() {
+            document.querySelectorAll("[data-box]").forEach((el) => {
+                const n = Number(el.getAttribute("data-box"));
+                if (n && selectedBoxNo === n) {
+                    el.classList.add("ring-2", "ring-blue-500");
+                } else {
+                    el.classList.remove("ring-2", "ring-blue-500");
+                }
+            });
         }
 
         async function loadGrid() {
@@ -1568,6 +1603,7 @@
             for (const it of items) {
                 const btn = document.createElement("button");
                 btn.type = "button";
+                btn.setAttribute("data-box", String(it.boxNo));
 
                 btn.className =
                     "text-left soft p-2 rounded-xl border transition " +
@@ -1586,10 +1622,8 @@
         `;
 
                 btn.addEventListener("click", async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    _keepScrollY = window.scrollY;
+                    e?.preventDefault?.();
+                    e?.stopPropagation?.();
 
                     const s = $("section").value || "all_items";
                     const m = $("mode").value || "food";
@@ -1614,10 +1648,6 @@
 
                     scheduleDraftSave();
                     await loadSlot();
-
-                    requestAnimationFrame(() => {
-                        window.scrollTo(0, _keepScrollY);
-                    });
                 });
 
                 grid.appendChild(btn);
