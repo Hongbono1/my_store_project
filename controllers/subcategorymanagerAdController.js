@@ -889,34 +889,30 @@ export async function getGrid(req, res) {
     const storeIdCol = m.storeId;
     const storeBizCol = m.storeBiz;
 
-    // subcategory 필터링을 위한 store 테이블 조인 (getStoreSource 사용)
-    // subcategory 필터링을 위한 store 테이블 조인 (store_id OR business_no)
+    // subcategory / category 필터링을 위한 store 테이블 조인
     let storeJoin = "";
-    let whereSubcategory = "";
+    let whereCat = "";
+    let whereSub = "";
     const params = [page, like];
 
-    if (subcategory && (storeIdCol || storeBizCol)) {
+    const category = clean(req.query.category);
+    const subcategory = clean(req.query.subcategory);
+
+    // ✅ category/subcategory 둘 중 하나라도 있으면 store 조인
+    if ((category || subcategory) && storeIdCol) {
       const src = getStoreSource(mode);
 
-      const joinConds = [];
+      storeJoin = `LEFT JOIN ${src.table} s ON s.${src.idcol}::text = slots."${storeIdCol}"::text`;
 
-      if (storeIdCol) {
-        joinConds.push(`s.${src.idcol}::text = slots."${storeIdCol}"::text`);
+      if (category) {
+        params.push(category);
+        whereCat = `AND COALESCE(s.${src.bcat}, '') = $${params.length}`;
       }
 
-      if (storeBizCol) {
-        // 숫자만 비교(하이픈/공백/앞자리 0 차이 방어는 최소로)
-        joinConds.push(`
-      regexp_replace(COALESCE(s.${src.bno}::text,''), '\\\\D', '', 'g')
-      =
-      regexp_replace(COALESCE(slots."${storeBizCol}"::text,''), '\\\\D', '', 'g')
-    `);
+      if (subcategory) {
+        params.push(subcategory);
+        whereSub = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
       }
-
-      storeJoin = `LEFT JOIN ${src.table} s ON (${joinConds.join(" OR ")})`;
-
-      params.push(subcategory);
-      whereSubcategory = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
     }
 
     const sql = `
