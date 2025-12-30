@@ -43,7 +43,7 @@ function getStoreSource(mode) {
   }
   return {
     table: "public.store_info",
-    subcol: "business_subcategory",   // ✅ 푸드 하위카테고리
+    subcol: "detail_category",        // ✅ 푸드 하위카테고리 (수정됨)
     idcol: "id",
     bno: "business_number",
     bname: "business_name",
