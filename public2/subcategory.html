@@ -479,13 +479,12 @@
 
             btn.textContent = label;
 
-            btn.onclick = () => {
-                // 필터 변경 시: 페이지는 1로 리셋, 섹션은 유지(더보기 켜져 있어도 페이지는 1)
+            btn.onclick = async () => {
                 resetPagingAll();
                 applySubFilter(tagVal || "", true);
                 bindHero();
                 renderFilters();
-                renderItemsSection(); // ✅ All items 갱신
+                await renderItemsSection(); // ✅ All items 갱신
                 renderBestSection();
                 renderNewSection();
             };
@@ -540,20 +539,29 @@
             const info = document.getElementById("itemsPageInfo");
 
             const pageNo = sectionState.items.expanded ? sectionState.items.page : 1;
-            const json = await fetchManagerGrid("items", pageNo);
-            const stores = gridItemsToStores(json.items, sectionState.items.expanded ? undefined : 4);
+
+            // ✅ 서버 섹션명은 all_items 고정
+            const json = await fetchManagerGrid("all_items", pageNo);
+
+            // ✅ 접힘이면 4개만
+            const stores = gridItemsToStores(
+                json.items,
+                sectionState.items.expanded ? undefined : 4
+            );
 
             renderStoresGrid(stores, grid);
 
-            // 페이지네이션 처리 (매니저는 12개씩 고정)
-            const totalPages = Math.ceil((json.items?.length || 0) / 12);
-            if (!sectionState.items.expanded || totalPages <= 1) {
+            // ✅ grid는 항상 12칸 배열을 주기 때문에 totalPages 계산은 의미가 없음(항상 1)
+            // 일단 “더보기” 펼쳤을 때 prev/next 버튼만 보이게 하려면 이렇게 처리
+            if (!sectionState.items.expanded) {
                 pager.classList.add("hidden");
             } else {
                 pager.classList.remove("hidden");
-                info.textContent = `${sectionState.items.page} / ${totalPages}`;
+                info.textContent = `page ${sectionState.items.page}`;
                 prev.disabled = sectionState.items.page <= 1;
-                next.disabled = sectionState.items.page >= totalPages;
+
+                // ✅ 끝 페이지를 서버가 안 내려주므로 next는 일단 항상 허용(원하면 서버에서 total_pages 내려주게 개선 가능)
+                next.disabled = false;
             }
         }
 
