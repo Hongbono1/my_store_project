@@ -226,11 +226,11 @@ function buildFilterWhere(params, sel, values) {
 
   if (category && sel.catCol) {
     values.push(category);
-    where.push(`TRIM(COALESCE("${sel.catCol}"::text,'')) = $${values.length}`);
+    where.push(`btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
   }
   if (subcategory && sel.subCol) {
     values.push(subcategory);
-    where.push(`TRIM(COALESCE("${sel.subCol}"::text,'')) = $${values.length}`);
+    where.push(`btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
   }
 
   const qRaw = clean(params.q);
@@ -976,11 +976,11 @@ export async function getGrid(req, res) {
 
     if (category && sel.catCol) {
       values.push(category);
-      whereParts.push(`TRIM(COALESCE("${sel.catCol}"::text,'')) = $${values.length}`);
+      whereParts.push(`btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
     if (subcategory && sel.subCol) {
       values.push(subcategory);
-      whereParts.push(`TRIM(COALESCE("${sel.subCol}"::text,'')) = $${values.length}`);
+      whereParts.push(`btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
