@@ -386,7 +386,10 @@ export async function listStores(req, res) {
         COALESCE(s.${src.btype}, '')::text AS business_type,
         COALESCE(s.${src.bcat}, '')::text AS business_category,
         COALESCE(s.${src.subcol}, '')::text AS subcategory,
-        ''::text AS image_url
+        COALESCE(
+          (SELECT si.url FROM store_images si WHERE si.store_id = s.${src.idcol} ORDER BY si.sort_order LIMIT 1),
+          ''
+        )::text AS image_url
       FROM ${src.table} s
       ${where}
       ORDER BY s.${src.idcol} DESC
@@ -453,9 +456,6 @@ export async function searchStore(req, res) {
     const where = whereParts.length ? `WHERE (${whereParts.join(" OR ")})` : "";
     const orderBy = `s.${src.bname} ASC NULLS LAST, s.${src.idcol} ASC`;
 
-    // 이미지 컬럼 안전 처리
-    const imgExpr = `''::text`;
-
     const sql = `
       WITH base AS (
         SELECT
@@ -463,7 +463,10 @@ export async function searchStore(req, res) {
           s.${src.bno}::text AS business_number,
           s.${src.bname}::text AS business_name,
           COALESCE(s.${src.btype}, '')::text AS business_type,
-          ${imgExpr} AS image_url,
+          COALESCE(
+            (SELECT si.url FROM store_images si WHERE si.store_id = s.${src.idcol} ORDER BY si.sort_order LIMIT 1),
+            ''
+          )::text AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
         FROM ${src.table} s
         ${where}
