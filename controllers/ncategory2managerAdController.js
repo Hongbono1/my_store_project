@@ -104,7 +104,7 @@ export async function getCategoryTree(req, res) {
     const sql = `
       SELECT
         NULLIF(TRIM(business_category), '') AS category,
-        NULLIF(TRIM(business_subcategory), '') AS subcategory
+        NULLIF(TRIM(detail_category), '') AS subcategory
       FROM ${STORE_TABLE}
       WHERE COALESCE(TRIM(business_category), '') <> ''
       GROUP BY 1,2
@@ -395,7 +395,7 @@ export async function searchStore(req, res) {
           OR COALESCE(s.business_number::text,'') ILIKE $${idx}
           OR COALESCE(s.business_type,'') ILIKE $${idx}
           OR COALESCE(s.business_category,'') ILIKE $${idx}
-          OR COALESCE(s.business_subcategory,'') ILIKE $${idx}
+          OR COALESCE(s.detail_category,'') ILIKE $${idx}
         )
       `);
     }
@@ -410,7 +410,7 @@ export async function searchStore(req, res) {
         COALESCE(s.business_name, '') AS business_name,
         COALESCE(s.business_type, '') AS business_type,
         COALESCE(s.business_category, '') AS business_category,
-        COALESCE(s.business_subcategory, '') AS business_subcategory,
+        COALESCE(s.detail_category, '') AS business_subcategory,
         COALESCE(s.business_category, '') AS category,
         COALESCE(s.main_image_url, '') AS image_url
       FROM ${STORE_TABLE} s

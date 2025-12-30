@@ -130,7 +130,7 @@ export async function createCombinedStore(req, res) {
     const storeSql = `
       INSERT INTO combined_store_info (
         business_number, business_name, business_type,
-        business_category, business_subcategory,
+        business_category, detail_category,
         business_hours, delivery_option, service_details,
         event1, event2, facilities, pets_allowed, parking,
         phone, homepage, instagram, facebook,
