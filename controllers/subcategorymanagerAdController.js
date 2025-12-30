@@ -871,7 +871,6 @@ export async function getGrid(req, res) {
     const section = clean(req.query.section) || "all_items";
     const mode = clean(req.query.mode) || "food";
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
-    const subcategory = clean(req.query.subcategory);
 
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
