@@ -527,11 +527,11 @@
             // ✅ 상단 배너는 고정 position
             if (area === "top") return `subcategory_top${suffix}`;
 
-            // ✅ 나머지는 기존처럼 "가게 위치 기반"
+            // ✅ 나머지는 기존처럼
             const prefix =
                 area === "best_seller" ? "best_seller" :
-                area === "new_registration" ? "new_registration" :
-                "all_items";
+                    area === "new_registration" ? "new_registration" :
+                        "all_items";
 
             return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
         }
@@ -548,6 +548,246 @@
             bannerTarget.mode = $("bannerMode").value || "combined";
             bannerTarget.position = buildBannerPosition(bannerTarget.mode);
             $("bannerPositionView").value = bannerTarget.position;
+        }
+
+        // ===============================
+        // ✅ Draft(임시저장) - 새로고침 복구
+        // ===============================
+        const DRAFT_VER = "v1";
+        const DRAFT_MAIN_KEY = `subcategorymanager:draft:${DRAFT_VER}:main`;
+        const DRAFT_BANNER_KEY = `subcategorymanager:draft:${DRAFT_VER}:banner`;
+
+        let _draftTimer = null;
+
+        function isBlobUrl(src) {
+            return /^blob:/.test(String(src || ""));
+        }
+
+        function safeJsonParse(s) {
+            try { return JSON.parse(s); } catch (_e) { return null; }
+        }
+
+        function scheduleDraftSave() {
+            clearTimeout(_draftTimer);
+            _draftTimer = setTimeout(() => {
+                saveDraftMain();
+                saveDraftBanner();
+            }, 180);
+        }
+
+        function bindDraftAutoSave() {
+            const watchIds = [
+                "mode", "section", "pageNo", "slotArea", "q", "searchType",
+                "linkUrl", "textTitle", "textDesc", "startAt", "endAt", "noEnd",
+                "bannerMode"
+            ];
+
+            watchIds.forEach((id) => {
+                const el = $(id);
+                if (!el) return;
+                el.addEventListener("input", scheduleDraftSave);
+                el.addEventListener("change", scheduleDraftSave);
+            });
+
+            // pick 버튼
+            ["btnPickImage", "btnPickStore", "btnPickText"].forEach((id) => {
+                const el = $(id);
+                if (!el) return;
+                el.addEventListener("click", scheduleDraftSave);
+            });
+
+            // file은 값 저장이 안되니, 미리보기 src만 저장
+            const file = $("bannerFile");
+            if (file) {
+                file.addEventListener("change", () => {
+                    // 미리보기 세팅 후 schedule 저장
+                    scheduleDraftSave();
+                });
+            }
+        }
+
+        function saveDraftMain() {
+            try {
+                const previewSrc = $("bannerPreview")?.src || "";
+                const store = selectedStore ? {
+                    id: selectedStore.id ?? "",
+                    business_number: selectedStore.business_number ?? "",
+                    business_name: selectedStore.business_name ?? "",
+                    business_type: selectedStore.business_type ?? "",
+                    image_url: selectedStore.image_url ?? "",
+                    page_number: selectedStore.page_number ?? "",
+                    index_in_page: selectedStore.index_in_page ?? "",
+                } : null;
+
+                const draft = {
+                    ts: Date.now(),
+                    dirty: true,
+
+                    uiPick,
+                    selectedTarget: { ...selectedTarget },
+
+                    // 상단 선택 UI
+                    mode: $("mode")?.value || "combined",
+                    section: $("section")?.value || "all_items",
+                    pageNo: Number($("pageNo")?.value || 1),
+                    slotArea: $("slotArea")?.value || "all_items",
+
+                    // 검색 관련
+                    q: $("q")?.value || "",
+                    searchType: $("searchType")?.value || "auto",
+
+                    // 입력값
+                    linkUrl: $("linkUrl")?.value || "",
+                    textTitle: $("textTitle")?.value || "",
+                    textDesc: $("textDesc")?.value || "",
+                    startAt: $("startAt")?.value || "",
+                    endAt: $("endAt")?.value || "",
+                    noEnd: !!$("noEnd")?.checked,
+
+                    // hidden store values
+                    storeId: $("storeId")?.value || "",
+                    storeBusinessNumber: $("storeBusinessNumber")?.value || "",
+                    storeNameHidden: $("storeNameHidden")?.value || "",
+                    storeTypeHidden: $("storeTypeHidden")?.value || "",
+                    storeImageUrl: $("storeImageUrl")?.value || "",
+
+                    // 선택된 가게(표시용)
+                    selectedStore: store,
+
+                    // picked UI
+                    pickedBoxText: $("pickedBoxText")?.textContent || "-",
+                    pickedBoxPos: $("pickedBoxPos")?.textContent || "position: -",
+
+                    // preview (blob은 저장 안함)
+                    bannerPreview: isBlobUrl(previewSrc) ? "" : previewSrc,
+                };
+
+                localStorage.setItem(DRAFT_MAIN_KEY, JSON.stringify(draft));
+            } catch (_e) { }
+        }
+
+        function saveDraftBanner() {
+            try {
+                const previewSrc = $("bannerPreview")?.src || "";
+                const draft = {
+                    ts: Date.now(),
+                    dirty: true,
+                    bannerMode: $("bannerMode")?.value || "combined",
+                    bannerPosition: $("bannerPositionView")?.value || "",
+                    bannerPreview: isBlobUrl(previewSrc) ? "" : previewSrc,
+                    // linkUrl이 배너/메인 공용이라 같이 저장해둠
+                    linkUrl: $("linkUrl")?.value || "",
+                };
+                localStorage.setItem(DRAFT_BANNER_KEY, JSON.stringify(draft));
+            } catch (_e) { }
+        }
+
+        function clearDraftMain() {
+            try { localStorage.removeItem(DRAFT_MAIN_KEY); } catch (_e) { }
+        }
+        function clearDraftBanner() {
+            try { localStorage.removeItem(DRAFT_BANNER_KEY); } catch (_e) { }
+        }
+
+        function restoreDraftMain() {
+            const raw = localStorage.getItem(DRAFT_MAIN_KEY);
+            if (!raw) return false;
+
+            const d = safeJsonParse(raw);
+            if (!d) return false;
+
+            // UI 값 복구
+            if ($("mode") && d.mode) $("mode").value = d.mode;
+            if ($("section") && d.section) $("section").value = d.section;
+            if ($("pageNo") && d.pageNo) $("pageNo").value = String(Math.max(Number(d.pageNo || 1), 1));
+            if ($("slotArea") && d.slotArea) $("slotArea").value = d.slotArea;
+            if ($("q")) $("q").value = d.q ?? "";
+            if ($("searchType") && d.searchType) $("searchType").value = d.searchType;
+
+            // 상태/타입
+            if (d.uiPick) setPick(d.uiPick);
+
+            // 입력값 복구
+            if ($("linkUrl")) $("linkUrl").value = d.linkUrl ?? "";
+            if ($("textTitle")) $("textTitle").value = d.textTitle ?? "";
+            if ($("textDesc")) $("textDesc").value = d.textDesc ?? "";
+            if ($("startAt")) $("startAt").value = d.startAt ?? "";
+            if ($("endAt")) $("endAt").value = d.endAt ?? "";
+            if ($("noEnd")) $("noEnd").checked = !!d.noEnd;
+
+            // hidden 복구
+            if ($("storeId")) $("storeId").value = d.storeId ?? "";
+            if ($("storeBusinessNumber")) $("storeBusinessNumber").value = d.storeBusinessNumber ?? "";
+            if ($("storeNameHidden")) $("storeNameHidden").value = d.storeNameHidden ?? "";
+            if ($("storeTypeHidden")) $("storeTypeHidden").value = d.storeTypeHidden ?? "";
+            if ($("storeImageUrl")) $("storeImageUrl").value = d.storeImageUrl ?? "";
+
+            // selectedTarget 복구
+            if (d.selectedTarget && typeof d.selectedTarget === "object") {
+                selectedTarget = {
+                    ...selectedTarget,
+                    ...d.selectedTarget,
+                };
+            }
+
+            // picked UI
+            if ($("pickedBoxText")) $("pickedBoxText").textContent = d.pickedBoxText || "-";
+            if ($("pickedBoxPos")) $("pickedBoxPos").textContent = d.pickedBoxPos || "position: -";
+
+            // 가게 표시 복구
+            if (d.selectedStore) {
+                selectedStore = d.selectedStore;
+                $("storePanelWrap").classList.remove("hidden");
+                setMiniStoreInfo(selectedStore);
+                setStoreBox(selectedStore);
+            } else {
+                selectedStore = null;
+            }
+
+            // 미리보기 복구(업로드 파일은 불가)
+            if (d.bannerPreview) {
+                setBannerPreview(d.bannerPreview);
+            } else {
+                const storeImg = $("storeImageUrl")?.value || "";
+                setBannerPreview(storeImg || "/uploads/no-image.png");
+            }
+
+            syncChips();
+
+            // where 자동 조회
+            if (($("storeBusinessNumber")?.value || "").trim()) {
+                loadWhere();
+            }
+
+            setStatus("ok", "임시저장 복구됨 ✅", `새로고침으로도 입력값이 유지됩니다 / 시간: ${nowStr()}`);
+            if (d.dirty) {
+                $("statusSub").textContent = "※ 업로드 파일은 보안 정책상 복구 불가(미리보기 src만 복구됨)";
+            }
+
+            return true;
+        }
+
+        function restoreDraftBanner() {
+            const raw = localStorage.getItem(DRAFT_BANNER_KEY);
+            if (!raw) return false;
+
+            const d = safeJsonParse(raw);
+            if (!d) return false;
+
+            if ($("bannerMode") && d.bannerMode) $("bannerMode").value = d.bannerMode;
+
+            syncBannerUI();
+
+            // linkUrl 공용이라 같이 복구
+            if ($("linkUrl") && typeof d.linkUrl === "string") {
+                $("linkUrl").value = d.linkUrl;
+            }
+
+            if (d.bannerPreview) {
+                setBannerPreview(d.bannerPreview);
+            }
+
+            return true;
         }
 
         // ✅ 배너 슬롯 불러오기
@@ -571,17 +811,17 @@
                 if (!slot) {
                     setBannerPreview("/uploads/no-image.png");
                     if (!silent) setStatus("warn", "저장된 배너가 없습니다", `배너 모드: ${bannerTarget.mode} / 시간: ${nowStr()}`);
+                    scheduleDraftSave();
                     return;
                 }
 
-                // 배너는 image_url + link_url만 쓰면 충분
                 if (slot.image_url) setBannerPreview(slot.image_url);
                 $("bannerFile").value = "";
 
-                // ⚠️ 네 기존 linkUrl 입력을 그대로 배너에서 쓰고 싶으면 아래 유지
                 if ($("linkUrl")) $("linkUrl").value = slot.link_url || "";
 
                 if (!silent) setStatus("ok", "배너 불러오기 완료", `position: ${bannerTarget.position} / 시간: ${nowStr()}`);
+                scheduleDraftSave();
             } catch (e) {
                 if (!silent) setStatus("bad", "배너 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
@@ -598,10 +838,9 @@
                 fd.append("position", bannerTarget.position);
                 fd.append("priority", "1");
 
-                fd.append("adMode", "banner");      // slot_type=banner
-                fd.append("slotMode", "custom");    // store 아님
+                fd.append("adMode", "banner");
+                fd.append("slotMode", "custom");
 
-                // ⚠️ 배너 링크(현재 linkUrl을 그대로 재사용)
                 if ($("linkUrl")) fd.append("linkUrl", $("linkUrl").value || "");
 
                 const f = $("bannerFile").files?.[0];
@@ -615,6 +854,9 @@
 
                 $("bannerFile").value = "";
 
+                // ✅ 저장 후 draft는 지워도 됨(원하면 유지도 가능)
+                clearDraftBanner();
+
                 setStatus("ok", "배너 저장 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
             } catch (e) {
                 setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간:${nowStr()}`);
@@ -623,7 +865,7 @@
             }
         }
 
-        // ✅ 배너 삭제(배너 이미지를 없애려면 삭제가 가장 확실함)
+        // ✅ 배너 삭제
         async function deleteBannerSlot() {
             try {
                 syncBannerUI();
@@ -646,6 +888,8 @@
 
                 setBannerPreview("/uploads/no-image.png");
                 if ($("linkUrl")) $("linkUrl").value = "";
+
+                clearDraftBanner();
 
                 setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
             } catch (e) {
@@ -674,7 +918,6 @@
             }
             return data;
         }
-
 
         async function apiFetch(path, options) {
             if (API_BASE) return await tryFetchJson(`${API_BASE}${path}`, options);
@@ -705,6 +948,7 @@
             const f = e.target.files?.[0];
             if (!f) return;
             setBannerPreview(URL.createObjectURL(f));
+            scheduleDraftSave();
         });
 
         $("btnClearImage").addEventListener("click", () => {
@@ -712,6 +956,7 @@
             const storeImg = $("storeImageUrl").value;
             setBannerPreview(storeImg || "/uploads/no-image.png");
             setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
+            scheduleDraftSave();
         });
 
         function setPick(next) {
@@ -727,12 +972,11 @@
             if (uiPick === "text") $("bannerFile").value = "";
         }
 
-        $("btnPickImage").addEventListener("click", () => setPick("image"));
-        $("btnPickStore").addEventListener("click", () => setPick("store"));
-        $("btnPickText").addEventListener("click", () => setPick("text"));
+        $("btnPickImage").addEventListener("click", () => { setPick("image"); scheduleDraftSave(); });
+        $("btnPickStore").addEventListener("click", () => { setPick("store"); scheduleDraftSave(); });
+        $("btnPickText").addEventListener("click", () => { setPick("text"); scheduleDraftSave(); });
 
         $("mode").addEventListener("change", async () => {
-            // 선택된 가게가 있으면 position도 같이 바꿔야 키가 안 꼬임
             if (selectedStore) {
                 selectedTarget.section = $("section")?.value || "all_items";
                 selectedTarget.area = $("slotArea")?.value || "all_items";
@@ -742,12 +986,14 @@
                 selectedTarget.position = buildPosition(selectedTarget.area, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
                 syncChips();
                 setStatus("warn", "모드 변경됨", `position 재계산: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                scheduleDraftSave();
                 await loadSlot(true);
                 return;
             }
 
             syncChips();
             setStatus("warn", "모드 변경됨", `현재 모드: ${$("mode").value} / 시간: ${nowStr()}`);
+            scheduleDraftSave();
         });
 
         $("slotArea").addEventListener("change", async () => {
@@ -756,25 +1002,26 @@
             const mode = $("mode").value || "combined";
             selectedTarget.mode = mode;
 
-            // ✅ 상단 배너면 가게 선택 없어도 position 생성
             if (selectedTarget.area === "top") {
                 selectedTarget.pageNo = 1;
                 selectedTarget.boxNo = 1;
                 selectedTarget.position = buildPosition("top", mode, 1, 1);
                 syncChips();
                 setStatus("warn", "상단 배너 편집 모드", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                scheduleDraftSave();
                 await loadSlot(true);
                 return;
             }
 
-            // ✅ 가게 기반 영역이면: 가게를 선택해야 position 생성
             selectedTarget.position = "";
             syncChips();
             setStatus("warn", "가게 선택이 필요합니다", "검색 결과에서 가게를 클릭하면 position이 자동 생성됩니다.");
+            scheduleDraftSave();
         });
 
         $("bannerMode").addEventListener("change", async () => {
             syncBannerUI();
+            scheduleDraftSave();
             await loadBannerSlot();
         });
 
@@ -835,11 +1082,11 @@
                 const slot = data?.slot || null;
 
                 if (!slot) {
-                    // ✅ 슬롯이 없는 건 정상(아직 저장 전). 가게 선택 UI는 유지하고 슬롯 입력만 초기화
                     clearSlotFieldsOnly();
                     if (!silent) {
                         setStatus("warn", "저장된 슬롯이 없습니다", "가게 연결/이미지/텍스트 설정 후 저장하면 생성됩니다.");
                     }
+                    scheduleDraftSave();
                     return;
                 }
 
@@ -866,6 +1113,7 @@
                 if (btnDel) btnDel.disabled = false;
 
                 if (!silent) setStatus("ok", "슬롯 불러오기 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                scheduleDraftSave();
             } catch (e) {
                 if (!silent) setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
@@ -896,8 +1144,6 @@
               <div class="text-xs text-blue-700 font-black mt-1">
                 위치: ${r.page_number}페이지 / ${r.index_in_page}번째
               </div>
-              
-              <!-- ✅ 추가: position 표시 -->
               <div class="text-[11px] text-slate-500 mt-1 break-all">
                 position: <b>${position}</b>
               </div>
@@ -933,8 +1179,12 @@
 
                     setStatus("warn", "가게 선택됨", `position 생성됨 / 시간: ${nowStr()}`);
 
+                    $("storePanelWrap").classList.remove("hidden");
+
+                    scheduleDraftSave();
+
                     await loadSlot();
-                    await loadWhere(); 
+                    await loadWhere();
                 });
 
                 list.appendChild(btn);
@@ -955,7 +1205,7 @@
 
                 const qs = new URLSearchParams({
                     q: bizDigits,
-                    page: PAGE_NAME, // subcategory만 보려면 이대로, 전체면 "all"
+                    page: PAGE_NAME,
                     limit: "100",
                 }).toString();
 
@@ -994,9 +1244,6 @@
                 $("storePanelWrap").classList.remove("hidden");
                 syncChips();
 
-                // ✅ 비었으면 __all__
-                // ✅ 숫자만 있으면 숫자(qDigits)로 검색(하이픈/공백 제거)
-                // ✅ 문자가 섞이면 원문(qRaw)로 검색(상호/업종)
                 const qParam = qRaw ? (qDigits ? qDigits : qRaw) : "__all__";
 
                 setStatus("warn", "검색 중...", `모드: ${mode} / q: ${qParam} / 시간: ${nowStr()}`);
@@ -1018,6 +1265,8 @@
 
                 renderSearchResults(data.results || []);
                 setStatus("ok", "검색 완료", `결과: ${(data.results || []).length}개 / 시간: ${nowStr()}`);
+
+                scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "검색 실패", `${e.message} / 시간: ${nowStr()}`);
             }
@@ -1046,6 +1295,7 @@
             }
 
             setStatus("ok", "가게 연결 준비 완료", `저장 버튼을 누르면 반영됩니다 / 시간: ${nowStr()}`);
+            scheduleDraftSave();
         });
 
         $("btnUseStoreImage").addEventListener("click", () => {
@@ -1055,6 +1305,7 @@
                 $("storeImageUrl").value = selectedStore.image_url;
                 setBannerPreview(selectedStore.image_url);
                 setStatus("ok", "가게 이미지로 배너 미리보기 적용", `시간: ${nowStr()}`);
+                scheduleDraftSave();
             } else {
                 setStatus("bad", "적용 실패", `가게 이미지가 없습니다 / 시간: ${nowStr()}`);
             }
@@ -1082,8 +1333,8 @@
                 fd.append("position", selectedTarget.position);
                 fd.append("priority", String(selectedTarget.priority || DEFAULT_PRIORITY));
 
-                fd.append("adMode", getSlotTypeByPick());   // banner|text
-                fd.append("slotMode", getSlotModeByPick()); // store|custom
+                fd.append("adMode", getSlotTypeByPick());
+                fd.append("slotMode", getSlotModeByPick());
 
                 fd.append("linkUrl", $("linkUrl").value || "");
                 fd.append("textTitle", $("textTitle").value || "");
@@ -1114,6 +1365,9 @@
 
                 await loadGrid();
 
+                // ✅ 저장 성공하면 draft 삭제 (원하면 유지로 바꿔도 됨)
+                clearDraftMain();
+
                 setStatus(
                     "ok",
                     "저장 완료 ✅",
@@ -1140,13 +1394,12 @@
                     page: PAGE_NAME,
                     position: selectedTarget.position,
                     priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
-                    mode: $("mode").value, // ✅ mode도 같이 보냄(서버에서 쓰는 경우 대비)
+                    mode: $("mode").value,
                 }).toString();
 
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
                 if (!data.success) throw new Error(data.error || "삭제 실패");
 
-                // ✅ deleted 값 먼저 검증 (UI 비우기 전에)
                 const delCount = Number(data.deleted);
 
                 console.log("🔍 DELETE 응답:", { deleted: data.deleted, delCount, type: typeof data.deleted });
@@ -1161,10 +1414,12 @@
                     return;
                 }
 
-                // ✅ delCount > 0일 때만 여기 도달 → UI 비우고 성공 표시
                 clearSlotUI();
                 await loadSlot(true);
                 await loadGrid();
+
+                // ✅ 삭제 성공하면 draft 삭제
+                clearDraftMain();
 
                 setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
             } catch (e) {
@@ -1173,7 +1428,6 @@
                 setBusy(false);
             }
         }
-
 
         $("btnSave").addEventListener("click", saveSlot);
         $("btnDelete").addEventListener("click", deleteSlot);
@@ -1191,6 +1445,10 @@
 
         (async function init() {
             hydrateLayout();
+
+            // draft 자동저장 바인딩 (가장 먼저)
+            bindDraftAutoSave();
+
             setPick("image");
 
             $("chipApiBase").textContent = "API: -";
@@ -1204,13 +1462,23 @@
             setBannerPreview("/uploads/no-image.png");
             syncChips();
 
-            // ✅ 배너 초기 로드
+            // ✅ 1) Draft 먼저 복구
+            const restoredMain = restoreDraftMain();
+            const restoredBanner = restoreDraftBanner();
+
+            // ✅ 2) 배너 초기 로드(드래프트가 없을 때만 서버에서 불러오기)
             syncBannerUI();
-            await loadBannerSlot(true);
+            if (!restoredBanner) {
+                await loadBannerSlot(true);
+            }
 
-            setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
-
+            // ✅ 3) 그리드 로드는 항상 실행 (복구된 섹션/모드/페이지 기준)
             await loadGrid();
+
+            // ✅ 4) 상태 기본 문구 (복구 안된 경우만)
+            if (!restoredMain) {
+                setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
+            }
         })();
 
         async function loadGrid() {
@@ -1235,7 +1503,6 @@
                 const btn = document.createElement("button");
                 btn.type = "button";
 
-                // ✅ 색상: 빈칸/사용중
                 btn.className =
                     "text-left soft p-2 rounded-xl border transition " +
                     (it.occupied
@@ -1272,40 +1539,44 @@
 
                     setStatus("warn", "배치 위치 선택됨", `이제 저장하면 이 위치에 반영됩니다 / 시간: ${nowStr()}`);
 
-                    // ✅ 선택된 위치의 기존 슬롯 불러오기
+                    scheduleDraftSave();
+
                     await loadSlot();
                 });
 
                 grid.appendChild(btn);
             }
+
+            scheduleDraftSave();
         }
 
         $("btnLoadGrid").addEventListener("click", loadGrid);
 
         $("section").addEventListener("change", () => {
-            // 섹션 바꾸면 position도 다시 선택해야 함
             selectedTarget.position = "";
             $("pickedBoxText").textContent = "-";
             $("pickedBoxPos").textContent = "position: -";
             syncChips();
             loadGrid();
+            scheduleDraftSave();
         });
 
-        $("pageNo").addEventListener("change", loadGrid);
+        $("pageNo").addEventListener("change", () => { loadGrid(); scheduleDraftSave(); });
 
         $("btnPrevPage").addEventListener("click", () => {
             const v = Math.max(Number($("pageNo").value || "1") - 1, 1);
             $("pageNo").value = String(v);
             loadGrid();
+            scheduleDraftSave();
         });
         $("btnNextPage").addEventListener("click", () => {
             const v = Math.max(Number($("pageNo").value || "1") + 1, 1);
             $("pageNo").value = String(v);
             loadGrid();
+            scheduleDraftSave();
         });
 
         function clearSlotFieldsOnly() {
-            // 슬롯 입력만 초기화 (가게 선택/선택된 position은 유지)
             if ($("bannerFile")) $("bannerFile").value = "";
             if ($("linkUrl")) $("linkUrl").value = "";
             if ($("textTitle")) $("textTitle").value = "";
@@ -1314,19 +1585,15 @@
             if ($("endAt")) $("endAt").value = "";
             if ($("noEnd")) $("noEnd").checked = false;
 
-            // 배너 미리보기는 "가게 이미지"가 있으면 그걸로, 아니면 기본
             const storeImg = $("storeImageUrl")?.value || "";
             setBannerPreview(storeImg || "/uploads/no-image.png");
+            scheduleDraftSave();
         }
 
         function clearSlotUI() {
-            // ✅ 1) 배너 미리보기 초기화
             setBannerPreview("/uploads/no-image.png");
-
-            // ✅ 2) 파일 input 초기화
             if ($("bannerFile")) $("bannerFile").value = "";
 
-            // ✅ 3) 공통 입력 초기화
             if ($("linkUrl")) $("linkUrl").value = "";
             if ($("textTitle")) $("textTitle").value = "";
             if ($("textDesc")) $("textDesc").value = "";
@@ -1334,14 +1601,12 @@
             if ($("endAt")) $("endAt").value = "";
             if ($("noEnd")) $("noEnd").checked = false;
 
-            // ✅ 4) 숨김값(서버로 보내는 값) 초기화  ← 이게 제일 중요
             if ($("storeId")) $("storeId").value = "";
             if ($("storeBusinessNumber")) $("storeBusinessNumber").value = "";
             if ($("storeNameHidden")) $("storeNameHidden").value = "";
             if ($("storeTypeHidden")) $("storeTypeHidden").value = "";
             if ($("storeImageUrl")) $("storeImageUrl").value = "";
 
-            // ✅ 5) 화면에 보이는 “가게 연결” 박스 초기화  ← 지금 이게 빠져있어서 안 사라진 거야
             $("storeName").textContent = "선택된 가게 없음";
             $("storeType").textContent = "-";
             $("storeBiz").textContent = "-";
@@ -1349,18 +1614,10 @@
             $("storeLocChip").textContent = "위치: -";
             $("storeLocText").textContent = "위치: -";
 
-            // ✅ 6) 좌측 미니 정보도 초기화(선택된 가게 표시 제거)
             setMiniStoreInfo(null);
-
-            // ✅ 7) selectedStore도 초기화 (다음 동작 꼬임 방지)
             selectedStore = null;
 
-            // ✅ 8) “가게 이미지로 배너” 같은 경우를 대비해서 banner도 기본으로 고정
-            //     (storeImageUrl이 비었으니 위 setBannerPreview로 끝)
-
-            // ✅ 9) 삭제 버튼 비활성화는 선택사항
-            // const btnDel = $("btnDelete");
-            // if (btnDel) btnDel.disabled = true;
+            scheduleDraftSave();
         }
     </script>
 </body>
