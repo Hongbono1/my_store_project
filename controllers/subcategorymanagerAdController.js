@@ -730,6 +730,7 @@ export async function upsertSlot(req, res) {
 
     // store 모드 + storeId만 있어도 DB에서 자동 채움
     if (slot_mode === "store" && storeId !== null) {
+      
       const tableSource2 = inferTableSourceFromPosition(position);
       const table =
         tableSource2 === "combined_store_info" ? COMBINED_TABLE : await pickFoodTable();
