@@ -838,7 +838,8 @@
             const d = safeJsonParse(raw);
             if (!d) return false;
 
-            if ($("mode") && d.mode) $("mode").value = d.mode;
+            // 모드 복구는 인자로 받은 mode가 '진짜 모드'
+            if ($("mode")) $("mode").value = mode;
             if ($("section") && d.section) $("section").value = d.section;
             if ($("pageNo") && d.pageNo) $("pageNo").value = String(Math.max(Number(d.pageNo || 1), 1));
             if ($("slotArea") && d.slotArea) $("slotArea").value = d.slotArea;
@@ -1223,13 +1224,18 @@
                 btn.addEventListener("click", async () => {
                     selectedStore = r;
 
-                    selectedTarget.section = $("section")?.value || "all_items";
-                    selectedTarget.area = $("slotArea")?.value || "all_items";
+                    const sec = $("section")?.value || "all_items";
+                    if ($("slotArea")) $("slotArea").value = sec; // section과 항상 동기화
+
+                    selectedTarget.section = sec;
+                    selectedTarget.area = sec; // 통일
                     selectedTarget.mode = $("mode").value || "food";
                     selectedTarget.pageNo = Number(r.page_number || 1);
                     selectedTarget.boxNo = Number(r.index_in_page || 1);
                     selectedTarget.priority = DEFAULT_PRIORITY;
-                    selectedTarget.position = buildPosition(selectedTarget.area, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+
+                    // ✅ position은 항상 section 기준
+                    selectedTarget.position = buildPosition(sec, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
 
                     syncChips();
 
@@ -1517,6 +1523,19 @@
             await loadBannerSlot(true);
             await loadGrid();
 
+            // ✅ 모드 바뻔면 현재 선택값으로 position suffix 재생성
+            if (selectedTarget?.pageNo && selectedTarget?.boxNo) {
+                const sec = $("section")?.value || selectedTarget.section || "all_items";
+                selectedTarget.section = sec;
+                selectedTarget.area = sec;
+                selectedTarget.mode = nextMode;
+                selectedTarget.position = buildPosition(sec, nextMode, Number(selectedTarget.pageNo), Number(selectedTarget.boxNo));
+
+                if ($("slotArea")) $("slotArea").value = sec;
+                $("pickedBoxPos").textContent = `position: ${selectedTarget.position}`;
+                syncChips();
+            }
+
             setStatus("ok", `모드 전환 완료 (${prev} → ${nextMode})`, `마지막 입력/선택 상태 유지 / 시간: ${nowStr()}`);
             if (!okMain) {
                 setStatus("warn", `모드 전환 (${prev} → ${nextMode})`, `해당 모드에 저장된 마지막 입력이 없어 기본값으로 시작합니다 / 시간: ${nowStr()}`);
@@ -1638,6 +1657,8 @@
                     selectedTarget.position = buildPosition(s, m, p, b);
                     selectedTarget.priority = DEFAULT_PRIORITY;
 
+                    if ($("slotArea")) $("slotArea").value = s; // ✅ section과 slotArea 동기화
+
                     syncChips();
 
                     $("pickedBoxText").textContent = `${s} / p${p} / box ${b}`;
@@ -1661,6 +1682,25 @@
 
         $("section").addEventListener("change", () => {
             selectedTarget.position = "";
+            $("pickedBoxText").textContent = "-";
+            $("pickedBoxPos").textContent = "position: -";
+            syncChips();
+            loadGrid();
+            scheduleDraftSave();
+        });
+
+        $("slotArea").addEventListener("change", () => {
+            const v = $("slotArea").value;
+
+            // top은 이미 위에서 배너로 따로 처리하니까 여기서는 안내만
+            if (v === "top") {
+                setStatus("warn", "상단 배너는 위의 '배너 저장/삭제'를 사용하세요.", `시간: ${nowStr()}`);
+                return;
+            }
+
+            // ✅ slotArea 바뀌면 section도 같은 값으로 통일
+            $("section").value = v;
+            selectedTarget.position = "";                 // 위치 재선택 유도
             $("pickedBoxText").textContent = "-";
             $("pickedBoxPos").textContent = "position: -";
             syncChips();

@@ -42,7 +42,7 @@ router.get("/search-store", searchStore);
 router.get("/where", whereStore); // ✅ 사업자번호로 등록 위치 조회
 
 // ------------------------------
-// 슬롯 읽기/후보/저장/삭제
+// 슬롯 읽기/후보/배치/저장/삭제
 // ------------------------------
 router.get("/slot", getSlot);
 router.get("/candidates", listCandidates);
@@ -50,9 +50,5 @@ router.get("/grid", getGrid);
 
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
-
-router.get("/grid", getGrid);
-router.get("/where", whereStore);
-router.get("/search-store", searchStore); // alias
 
 export default router;
