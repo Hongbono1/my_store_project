@@ -1445,38 +1445,29 @@
 
         (async function init() {
             hydrateLayout();
-
-            // draft 자동저장 바인딩 (가장 먼저)
-            bindDraftAutoSave();
-
             setPick("image");
 
-            $("chipApiBase").textContent = "API: -";
-            $("chipMode").textContent = `모드: ${$("mode").value}`;
-            $("chipPosition").textContent = "position: -";
+            bindDraftAutosave();
 
-            $("storePanelWrap").classList.add("hidden");
+            const draft = loadDraftRaw();
+            if (draft) {
+                await applyDraft(draft);
+            } else {
+                // (기존 init 흐름 그대로)
+                $("chipApiBase").textContent = "API: -";
+                $("chipMode").textContent = `모드: ${$("mode").value}`;
+                $("chipPosition").textContent = "position: -";
 
-            setMiniStoreInfo(null);
-            setStoreBox(null);
-            setBannerPreview("/uploads/no-image.png");
-            syncChips();
+                $("storePanelWrap").classList.add("hidden");
 
-            // ✅ 1) Draft 먼저 복구
-            const restoredMain = restoreDraftMain();
-            const restoredBanner = restoreDraftBanner();
+                setMiniStoreInfo(null);
+                setStoreBox(null);
+                setBannerPreview("/uploads/no-image.png");
+                syncChips();
 
-            // ✅ 2) 배너 초기 로드(드래프트가 없을 때만 서버에서 불러오기)
-            syncBannerUI();
-            if (!restoredBanner) {
+                syncBannerUI();
                 await loadBannerSlot(true);
-            }
-
-            // ✅ 3) 그리드 로드는 항상 실행 (복구된 섹션/모드/페이지 기준)
-            await loadGrid();
-
-            // ✅ 4) 상태 기본 문구 (복구 안된 경우만)
-            if (!restoredMain) {
+                await loadGrid();
                 setStatus("warn", "대기 중: 가게를 검색하고 선택하세요.", `시간: ${nowStr()}`);
             }
         })();
