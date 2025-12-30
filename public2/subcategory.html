@@ -222,17 +222,29 @@
             return "all_items";
         }
 
-        async function fetchManagerGrid(sectionKey, pageNo) {
-            const section = sectionKeyToManagerSection(sectionKey);
-            const qs = new URLSearchParams();
-            qs.set("page", "subcategory");
-            qs.set("section", section);
-            qs.set("mode", TYPE);          // "food" | "combined"
-            qs.set("pageNo", String(pageNo || 1));
-            if (CATEGORY) qs.set("category", CATEGORY);
-            if (CURRENT_SUB) qs.set("subcategory", CURRENT_SUB);
+        async function fetchManagerGrid(section, pageNo) {
+            const params = new URLSearchParams();
+            params.set("page", "subcategory");              // ✅ 고정
+            params.set("section", section);                 // ✅ all_items / best_seller / new_registration
+            params.set("mode", TYPE);                       // ✅ food | combined
+            params.set("pageNo", String(pageNo || 1));
 
-            return await fetchJson(`${GRID_API_BASE}/grid?${qs.toString()}`);
+            // ✅ 필터 반영 (서브카테고리 화면 기준)
+            // - food: category는 항상, subcategory는 한식처럼 서브필터 있을 때만
+            // - combined: subcategory 버튼 선택 시만(미용/이발 예외는 나중에 추가 보완 가능)
+            if (CATEGORY) params.set("category", CATEGORY);
+
+            if (CURRENT_SUB) {
+                // 미용/이발은 기존 로직이 business_type 기반일 수 있어서 일단 서버 subcategory 필터는 생략(원하면 다음 단계에서 서버까지 맞춰줌)
+                if (!(TYPE === "combined" && CATEGORY === "미용/이발")) {
+                    params.set("subcategory", CURRENT_SUB);
+                }
+            }
+
+            const url = `/subcategorymanager/ad/grid?${params.toString()}`;
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) throw new Error(`grid fetch 실패: ${res.status}`);
+            return await res.json();
         }
 
         function gridItemsToStores(items, limit) {
@@ -551,17 +563,16 @@
 
             renderStoresGrid(stores, grid);
 
-            // ✅ grid는 항상 12칸 배열을 주기 때문에 totalPages 계산은 의미가 없음(항상 1)
-            // 일단 “더보기” 펼쳤을 때 prev/next 버튼만 보이게 하려면 이렇게 처리
-            if (!sectionState.items.expanded) {
+            // ✅ 서버에서 받은 totalPages 사용
+            const totalPages = json.totalPages || 1;
+
+            if (!sectionState.items.expanded || totalPages <= 1) {
                 pager.classList.add("hidden");
             } else {
                 pager.classList.remove("hidden");
-                info.textContent = `page ${sectionState.items.page}`;
+                info.textContent = `${sectionState.items.page} / ${totalPages}`;
                 prev.disabled = sectionState.items.page <= 1;
-
-                // ✅ 끝 페이지를 서버가 안 내려주므로 next는 일단 항상 허용(원하면 서버에서 total_pages 내려주게 개선 가능)
-                next.disabled = false;
+                next.disabled = sectionState.items.page >= totalPages;
             }
         }
 

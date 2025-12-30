@@ -994,6 +994,15 @@ export async function getGrid(req, res) {
     }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+    // ✅ 전체 건수/총페이지 계산 (12칸 기준)
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${whereSql}`;
+    const { rows: cntRows } = await pool.query(countSql, values.slice(0, whereParts.length));
+    const total = cntRows?.[0]?.cnt ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / 12));
+    const hasPrev = pageNo > 1;
+    const hasNext = pageNo < totalPages;
+
     const orderBy = buildAutoOrderBy(section, sel);
 
     const startRn = (pageNo - 1) * 12 + 1;
@@ -1108,6 +1117,10 @@ export async function getGrid(req, res) {
       pageNo,
       category,
       subcategory,
+      total,
+      totalPages,
+      hasPrev,
+      hasNext,
       items,
     });
   } catch (err) {
