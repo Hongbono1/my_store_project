@@ -338,20 +338,38 @@
                         <button class="btn btn-ghost" id="btnLoadGrid" type="button">배치현황 새로고침</button>
                     </div>
 
-                    <!-- 배치현황 상단 필터 (추가) -->
-                    <div class="flex items-center gap-2 mt-3 mb-2">
-                        <label class="text-sm text-gray-600 font-black">하위 카테고리</label>
-                        <select id="placementSubFilter" class="px-3 py-2 rounded-lg border border-gray-200 text-sm">
-                            <option value="">전체</option>
-                            <option value="밥">밥 (비빔밥/덮밥/백반)</option>
-                            <option value="찌개/탕">찌개/탕</option>
-                            <option value="고기/구이">고기/구이 (제육볶음)</option>
-                            <option value="생선">생선</option>
-                            <option value="족발/보쌈">족발/보쌈</option>
-                            <option value="국밥">국밥</option>
-                            <option value="반찬">반찬</option>
-                            <option value="기타">기타</option>
-                        </select>
+                    <!-- ✅ 배치현황 상단 필터: 상위 → 하위 (연동) -->
+                    <div class="mt-3 mb-2 grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                        <div class="md:col-span-5">
+                            <label class="text-sm text-gray-600 font-black">상위 카테고리</label>
+                            <select id="placementCatFilter" class="input">
+                                <option value="">전체</option>
+                                <option value="한식">한식</option>
+                                <option value="중식">중식</option>
+                                <option value="일식">일식</option>
+                                <option value="양식">양식</option>
+                                <option value="분식">분식</option>
+                                <option value="치킨">치킨</option>
+                                <option value="피자">피자</option>
+                                <option value="카페/디저트">카페/디저트</option>
+                                <option value="야식">야식</option>
+                                <option value="패스트푸드">패스트푸드</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-7">
+                            <label class="text-sm text-gray-600 font-black">하위 카테고리</label>
+                            <select id="placementSubFilter" class="input" disabled>
+                                <option value="">(상위 카테고리를 먼저 선택)</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-12">
+                            <div class="hint">
+                                상위 카테고리를 고르면 하위 카테고리 목록이 자동으로 바뀝니다. (전체=필터 없음)
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -519,6 +537,74 @@
             currentMode: "food",
         };
 
+        // ✅ 상위 카테고리 → 하위 카테고리 매핑(필요하면 계속 늘리면 됨)
+        const SUB_BY_CATEGORY = {
+            "한식": ["밥", "찌개/탕", "고기/구이", "생선", "족발/보쌈", "국밥", "반찬", "기타"],
+            "중식": ["짜장", "짬뽕", "탕수육", "마라", "딤섬", "기타"],
+            "일식": ["초밥", "라멘", "돈카츠", "우동/소바", "기타"],
+            "양식": ["파스타", "스테이크", "샐러드", "피자(양식)", "기타"],
+            "분식": ["떡볶이", "김밥", "순대", "튀김", "라면", "기타"],
+            "치킨": ["후라이드", "양념", "간장", "파닭", "기타"],
+            "피자": ["오리지널", "씬", "프리미엄", "기타"],
+            "카페/디저트": ["커피", "음료", "케이크", "빵", "빙수", "기타"],
+            "야식": ["족발/보쌈(야식)", "찜/탕(야식)", "분식(야식)", "기타"],
+            "패스트푸드": ["버거", "치킨(패푸)", "샌드위치", "기타"],
+            "기타": ["기타"],
+        };
+
+        function setSubcategoryOptionsByCategory(cat) {
+            const subSel = $("placementSubFilter");
+            if (!subSel) return;
+
+            subSel.innerHTML = "";
+
+            if (!cat) {
+                subSel.disabled = true;
+                subSel.innerHTML = `<option value="">(상위 카테고리를 먼저 선택)</option>`;
+                return;
+            }
+
+            const subs = SUB_BY_CATEGORY[cat] || [];
+            subSel.disabled = false;
+
+            // ✅ "전체" 옵션(빈 값)은 항상 넣기
+            const optAll = document.createElement("option");
+            optAll.value = "";
+            optAll.textContent = "전체";
+            subSel.appendChild(optAll);
+
+            for (const s of subs) {
+                const opt = document.createElement("option");
+                opt.value = s;
+                opt.textContent = s;
+                subSel.appendChild(opt);
+            }
+        }
+
+        function initCategoryFilterUI() {
+            const catSel = $("placementCatFilter");
+            const subSel = $("placementSubFilter");
+            if (!catSel || !subSel) return;
+
+            // 초기 상태
+            setSubcategoryOptionsByCategory(catSel.value || "");
+
+            catSel.addEventListener("change", () => {
+                // 상위 바뀌면 하위 목록 새로 구성 + 하위 선택 초기화
+                const cat = catSel.value || "";
+                setSubcategoryOptionsByCategory(cat);
+                if (subSel && !subSel.disabled) subSel.value = "";
+
+                loadGrid();
+                scheduleDraftSave();
+            });
+
+            subSel.addEventListener("change", () => {
+                loadGrid();
+                scheduleDraftSave();
+            });
+        }
+
         function $(id) { return document.getElementById(id); }
 
         function nowStr() {
@@ -625,6 +711,7 @@
             const watchIds = [
                 "mode", "section", "pageNo", "slotArea", "q", "searchType",
                 "linkUrl", "textTitle", "textDesc", "startAt", "endAt", "noEnd",
+                "placementCatFilter", "placementSubFilter",   // ✅ 추가
             ];
 
             watchIds.forEach((id) => {
@@ -671,6 +758,9 @@
 
                     q: $("q")?.value || "",
                     searchType: $("searchType")?.value || "auto",
+
+                    placementCatFilter: $("placementCatFilter")?.value || "",
+                    placementSubFilter: $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || ""),
 
                     linkUrl: $("linkUrl")?.value || "",
                     textTitle: $("textTitle")?.value || "",
@@ -724,6 +814,17 @@
             if ($("slotArea") && d.slotArea) $("slotArea").value = d.slotArea;
             if ($("q")) $("q").value = d.q ?? "";
             if ($("searchType") && d.searchType) $("searchType").value = d.searchType;
+
+            if ($("placementCatFilter")) $("placementCatFilter").value = d.placementCatFilter ?? "";
+            setSubcategoryOptionsByCategory($("placementCatFilter")?.value || "");
+
+            if ($("placementSubFilter")) {
+                if ($("placementSubFilter").disabled) {
+                    $("placementSubFilter").value = "";
+                } else {
+                    $("placementSubFilter").value = d.placementSubFilter ?? "";
+                }
+            }
 
             if (d.uiPick) setPick(d.uiPick);
 
@@ -1418,7 +1519,8 @@
             const section = $("section").value || "all_items";
             const mode = $("mode").value || "food";
             const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
-            const subcategory = $("placementSubFilter")?.value || "";
+            const category = $("placementCatFilter")?.value || "";
+            const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
 
             const params = {
                 page: PAGE_NAME,
@@ -1426,9 +1528,9 @@
                 mode,
                 pageNo: String(pageNo),
             };
-            if (subcategory) {
-                params.subcategory = subcategory;
-            }
+
+            if (category) params.category = category;
+            if (subcategory) params.subcategory = subcategory;
 
             const qs = new URLSearchParams(params).toString();
 
@@ -1490,11 +1592,6 @@
 
         $("btnLoadGrid").addEventListener("click", loadGrid);
 
-        // 하위 카테고리 필터 변경 시 재조회
-        $("placementSubFilter")?.addEventListener("change", () => {
-            loadGrid();
-        });
-
         $("section").addEventListener("change", () => {
             selectedTarget.position = "";
             $("pickedBoxText").textContent = "-";
@@ -1531,6 +1628,7 @@
 
             setPick("image");
             bindDraftAutoSave();
+            initCategoryFilterUI();
 
             // 푸드 마지막 입력 복구
             const restored = restoreDraftMainForMode("food");

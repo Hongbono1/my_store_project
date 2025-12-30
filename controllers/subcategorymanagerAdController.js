@@ -933,7 +933,8 @@ export async function getGrid(req, res) {
       ${storeJoin}
       WHERE slots."${m.page}"=$1
         AND slots."${posCol}" LIKE $2
-        ${whereSubcategory}
+        ${whereCat}
+        ${whereSub}
       ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
     `;
 
