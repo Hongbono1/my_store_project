@@ -43,7 +43,7 @@ function getStoreSource(mode) {
   }
   return {
     table: "public.store_info",
-    subcol: "business_subcategory",
+    subcol: "detail_category",
     idcol: "id",
     bno: "business_number",
     bname: "business_name",
@@ -356,49 +356,66 @@ export async function listStores(req, res) {
     const mode = clean(req.query.mode) || "food";
     const category = clean(req.query.category);
     const subcategory = clean(req.query.subcategory);
+
     const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
     const page = Math.max(safeInt(req.query.page, 1), 1);
-
-    const src = getStoreSource(mode);
-
-    const params = [];
-    let where = "WHERE 1=1";
-
-    if (category && src.bcat) {
-      params.push(category);
-      where += ` AND btrim(replace(COALESCE(s.${src.bcat}::text,''), chr(160), ' ')) = btrim(replace($${params.length}, chr(160), ' '))`;
-    }
-    if (subcategory && src.subcol) {
-      params.push(subcategory);
-      where += ` AND btrim(replace(COALESCE(s.${src.subcol}::text,''), chr(160), ' ')) = btrim(replace($${params.length}, chr(160), ' '))`;
-    }
-
     const offset = (page - 1) * pageSize;
 
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${src.table} s ${where}`;
-    const { rows: crows } = await pool.query(countSql, params);
+    // ✅ grid와 동일하게 테이블 선택
+    const storeTable =
+      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+
+    const tcols = await getColumns(storeTable);
+    const sel = buildStoreSelect(storeTable, tcols);
+
+    // ✅ 공백/NBSP 정규화 (컬럼/파라미터 동일 규칙)
+    const normCol = (col) =>
+      `btrim(replace(COALESCE("${col}"::text,''), chr(160), ' '))`;
+    const normParam = (idx) => `btrim(replace($${idx}::text, chr(160), ' '))`;
+
+    const values = [];
+    const whereParts = [];
+
+    if (category && sel.catCol) {
+      values.push(category);
+      whereParts.push(`${normCol(sel.catCol)} = ${normParam(values.length)}`);
+    }
+
+    if (subcategory && sel.subCol) {
+      values.push(subcategory);
+      whereParts.push(`${normCol(sel.subCol)} = ${normParam(values.length)}`);
+    }
+
+    const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+    // ✅ 대표 이미지: 스토어 테이블 imgCol or 이미지테이블 1장
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
+
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${whereSql}`;
+    const { rows: crows } = await pool.query(countSql, values);
     const total = crows[0]?.cnt || 0;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     const selectSql = `
       SELECT
-        s.${src.idcol}::text AS id,
-        s.${src.bno}::text AS business_number,
-        s.${src.bname}::text AS business_name,
-        COALESCE(s.${src.btype}, '')::text AS business_type,
-        COALESCE(s.${src.bcat}, '')::text AS business_category,
-        btrim(replace(COALESCE(s.${src.subcol}::text,''), chr(160), ' ')) AS subcategory,
-        COALESCE(
-          (SELECT si.url FROM store_images si WHERE si.store_id = s.${src.idcol} ORDER BY si.sort_order LIMIT 1),
-          ''
-        )::text AS image_url
-      FROM ${src.table} s
-      ${where}
-      ORDER BY s.${src.idcol} DESC
+        "${sel.idCol}"::text AS id,
+        ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_number,
+        "${sel.nameCol}"::text AS business_name,
+        ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS business_type,
+        ${sel.catCol ? `COALESCE("${sel.catCol}"::text,'')` : `''`} AS business_category,
+        ${sel.subCol ? `${normCol(sel.subCol)} AS subcategory` : `'' AS subcategory`},
+        ${imageExpr} AS image_url
+      FROM ${storeTable}
+      ${whereSql}
+      ORDER BY "${sel.idCol}" DESC
       LIMIT ${pageSize} OFFSET ${offset}
     `;
 
-    const { rows } = await pool.query(selectSql, params);
+    const { rows } = await pool.query(selectSql, values);
 
     return res.json({
       success: true,
@@ -430,47 +447,61 @@ export async function searchStore(req, res) {
     const isAll = qRaw === "__all__" || qRaw === "";
     const qDigits = digitsOnly(qRaw);
 
-    const src = getStoreSource(mode);
+    const storeTable =
+      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+
+    const tcols = await getColumns(storeTable);
+    const sel = buildStoreSelect(storeTable, tcols);
+
+    const imgMeta = await pickImageMetaForMode(mode);
+    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imageExpr = sel.imgCol
+      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      : `COALESCE(${imgSub},'')`;
 
     const params = [];
     const whereParts = [];
 
     if (!isAll) {
-      if (qDigits) {
+      const parts = [];
+
+      // 사업자번호 검색(가능할 때만)
+      if (qDigits && sel.bnCol) {
         params.push(qDigits);
-        whereParts.push(`
-          regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g') = $${params.length}
-        `);
+        parts.push(`regexp_replace(COALESCE("${sel.bnCol}"::text,''), '\\\\D', '', 'g') = $${params.length}`);
 
         params.push(`%${qDigits}%`);
-        whereParts.push(
-          `regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g') LIKE $${params.length}`
-        );
+        parts.push(`regexp_replace(COALESCE("${sel.bnCol}"::text,''), '\\\\D', '', 'g') LIKE $${params.length}`);
       }
 
+      // 상호명
       params.push(`%${qRaw}%`);
-      whereParts.push(`s.${src.bname}::text ILIKE $${params.length}`);
+      parts.push(`"${sel.nameCol}"::text ILIKE $${params.length}`);
 
-      params.push(`%${qRaw}%`);
-      whereParts.push(`s.${src.btype}::text ILIKE $${params.length}`);
+      // 업종(있을 때만)
+      if (sel.typeCol) {
+        params.push(`%${qRaw}%`);
+        parts.push(`COALESCE("${sel.typeCol}"::text,'') ILIKE $${params.length}`);
+      }
+
+      if (parts.length) whereParts.push(`(${parts.join(" OR ")})`);
     }
 
-    const where = whereParts.length ? `WHERE (${whereParts.join(" OR ")})` : "";
-    const orderBy = `s.${src.bname} ASC NULLS LAST, s.${src.idcol} ASC`;
+    const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
+    const orderBy = `"${sel.nameCol}" ASC NULLS LAST, "${sel.idCol}" ASC`;
+
+    // rn 기반 페이지/인덱스 계산 (12개 기준)
     const sql = `
       WITH base AS (
         SELECT
-          s.${src.idcol}::text AS id,
-          s.${src.bno}::text AS business_number,
-          s.${src.bname}::text AS business_name,
-          COALESCE(s.${src.btype}, '')::text AS business_type,
-          COALESCE(
-            (SELECT si.url FROM store_images si WHERE si.store_id = s.${src.idcol} ORDER BY si.sort_order LIMIT 1),
-            ''
-          )::text AS image_url,
+          "${sel.idCol}"::text AS id,
+          ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_number,
+          "${sel.nameCol}"::text AS business_name,
+          ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS business_type,
+          ${imageExpr} AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${src.table} s
+        FROM ${storeTable}
         ${where}
       )
       SELECT
@@ -485,16 +516,10 @@ export async function searchStore(req, res) {
 
     params.push(pageSize);
 
-    console.log("[searchStore] SQL:", sql);
-    console.log("[searchStore] Params:", params);
-
     const { rows } = await pool.query(sql, params);
-    console.log("[searchStore] Results count:", rows.length);
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
     console.error("[searchStore ERROR]", e);
-    console.error("[searchStore] mode:", req.query.mode);
-    console.error("[searchStore] q:", req.query.q);
     return res
       .status(500)
       .json({ success: false, error: e?.message || "searchStore 실패" });
