@@ -26,6 +26,33 @@ function ensureUploadDir() {
   fs.mkdirSync(UPLOAD_ABS_DIR, { recursive: true });
 }
 
+// ✅ mode별 테이블/컬럼 매핑 헬퍼 (필수)
+function getStoreSource(mode) {
+  const m = String(mode || "food").trim().toLowerCase();
+  if (m === "combined") {
+    return {
+      table: "public.combined_store_info",
+      subcol: "detail_category",      // ✅ 통합 하위카테고리
+      idcol: "id",
+      bno: "business_number",
+      bname: "business_name",
+      bcat: "business_category",
+      btype: "business_type",
+      img: "main_image_url",
+    };
+  }
+  return {
+    table: "public.store_info",
+    subcol: "business_subcategory",   // ✅ 푸드 하위카테고리
+    idcol: "id",
+    bno: "business_number",
+    bname: "business_name",
+    bcat: "business_category",
+    btype: "business_type",
+    img: "main_image_url",
+  };
+}
+
 function clean(v) {
   if (v === undefined || v === null) return "";
   return String(v).trim();
@@ -324,63 +351,55 @@ function buildImageSubquery(selIdCol, meta) {
 // ------------------------------
 export async function listStores(req, res) {
   try {
-    const mode = clean(req.query.mode) || "combined";
-    const sort = clean(req.query.sort) || "name";
+    const mode = clean(req.query.mode) || "food";
+    const category = clean(req.query.category);
+    const subcategory = clean(req.query.subcategory);
     const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
     const page = Math.max(safeInt(req.query.page, 1), 1);
 
-    const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-    if (!table) {
-      return res
-        .status(400)
-        .json({ success: false, error: "food 테이블을 찾지 못했습니다." });
+    const src = getStoreSource(mode);
+
+    const params = [];
+    let where = "WHERE 1=1";
+
+    if (category) {
+      params.push(category);
+      where += ` AND s.${src.bcat} = $${params.length}`;
+    }
+    if (subcategory) {
+      params.push(subcategory);
+      where += ` AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
     }
 
-    const cols = await getColumns(table);
-    const sel = buildStoreSelect(table, cols);
-
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
-
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    const values = [];
-    const where = buildFilterWhere(
-      { category: req.query.category, subcategory: req.query.subcategory, q: "" },
-      sel,
-      values
-    );
-
-    const orderBy = buildOrderBy(sort, sel);
     const offset = (page - 1) * pageSize;
 
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${table} ${where}`;
-    const { rows: crows } = await pool.query(countSql, values);
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${src.table} s ${where}`;
+    const { rows: crows } = await pool.query(countSql, params);
     const total = crows[0]?.cnt || 0;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     const selectSql = `
       SELECT
-        "${sel.idCol}"::text AS id,
-        ${sel.bnCol ? `"${sel.bnCol}"::text` : "''"} AS business_number,
-        "${sel.nameCol}"::text AS business_name,
-        ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
-        ${sel.catCol ? `"${sel.catCol}"::text` : "''"} AS business_category,
-        ${sel.subCol ? `"${sel.subCol}"::text` : "''"} AS business_subcategory,
-        ${imageExpr} AS image_url
-      FROM ${table}
+        s.${src.idcol}::text AS id,
+        s.${src.bno}::text AS business_number,
+        s.${src.bname}::text AS business_name,
+        COALESCE(s.${src.btype}, '')::text AS business_type,
+        COALESCE(s.${src.bcat}, '')::text AS business_category,
+        COALESCE(s.${src.subcol}, '')::text AS subcategory,
+        COALESCE(s.${src.img}, '')::text AS image_url
+      FROM ${src.table} s
       ${where}
-      ORDER BY ${orderBy}
+      ORDER BY s.${src.idcol} DESC
       LIMIT ${pageSize} OFFSET ${offset}
     `;
 
-    const { rows } = await pool.query(selectSql, values);
+    const { rows } = await pool.query(selectSql, params);
 
     return res.json({
       success: true,
       mode,
+      category,
+      subcategory,
       page,
       pageSize,
       total,
@@ -399,71 +418,51 @@ export async function listStores(req, res) {
 // ------------------------------
 export async function searchStore(req, res) {
   try {
-    const mode = clean(req.query.mode) || "combined";
+    const mode = clean(req.query.mode) || "food";
     const qRaw = clean(req.query.q) || "__all__";
     const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 200);
 
     const isAll = qRaw === "__all__" || qRaw === "";
     const qDigits = digitsOnly(qRaw);
 
-    const table = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-    if (!table) {
-      return res
-        .status(400)
-        .json({ success: false, error: "food 테이블을 찾지 못했습니다." });
-    }
+    const src = getStoreSource(mode);
 
-    const cols = await getColumns(table);
-    const sel = buildStoreSelect(table, cols);
-
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
-
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    const values = [];
+    const params = [];
     const whereParts = [];
 
     if (!isAll) {
-      if (qDigits && sel.bnCol) {
-        values.push(qDigits);
+      if (qDigits) {
+        params.push(qDigits);
         whereParts.push(`
-          (
-            regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}
-            OR ltrim(regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g'), '0') = ltrim($${values.length}, '0')
-          )
+          regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g') = $${params.length}
         `);
 
-        values.push(`%${qDigits}%`);
+        params.push(`%${qDigits}%`);
         whereParts.push(
-          `regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`
+          `regexp_replace(s.${src.bno}::text, '\\\\D', '', 'g') LIKE $${params.length}`
         );
       }
 
-      values.push(`%${qRaw}%`);
-      whereParts.push(`"${sel.nameCol}"::text ILIKE $${values.length}`);
+      params.push(`%${qRaw}%`);
+      whereParts.push(`s.${src.bname}::text ILIKE $${params.length}`);
 
-      if (sel.typeCol) {
-        values.push(`%${qRaw}%`);
-        whereParts.push(`"${sel.typeCol}"::text ILIKE $${values.length}`);
-      }
+      params.push(`%${qRaw}%`);
+      whereParts.push(`s.${src.btype}::text ILIKE $${params.length}`);
     }
 
     const where = whereParts.length ? `WHERE (${whereParts.join(" OR ")})` : "";
-    const orderBy = `"${sel.nameCol}" ASC NULLS LAST, "${sel.idCol}" ASC`;
+    const orderBy = `s.${src.bname} ASC NULLS LAST, s.${src.idcol} ASC`;
 
     const sql = `
       WITH base AS (
         SELECT
-          "${sel.idCol}"::text AS id,
-          ${sel.bnCol ? `"${sel.bnCol}"::text` : "''"} AS business_number,
-          "${sel.nameCol}"::text AS business_name,
-          ${sel.typeCol ? `"${sel.typeCol}"::text` : "''"} AS business_type,
-          ${imageExpr} AS image_url,
+          s.${src.idcol}::text AS id,
+          s.${src.bno}::text AS business_number,
+          s.${src.bname}::text AS business_name,
+          COALESCE(s.${src.btype}, '')::text AS business_type,
+          COALESCE(s.${src.img}, '')::text AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${table}
+        FROM ${src.table} s
         ${where}
       )
       SELECT
@@ -473,12 +472,12 @@ export async function searchStore(req, res) {
         rn::text AS rn
       FROM base
       ORDER BY rn
-      LIMIT $${values.length + 1};
+      LIMIT $${params.length + 1};
     `;
 
-    values.push(pageSize);
+    params.push(pageSize);
 
-    const { rows } = await pool.query(sql, values);
+    const { rows } = await pool.query(sql, params);
     return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
     console.error(e);
@@ -857,7 +856,7 @@ export async function getGrid(req, res) {
 
     const page = clean(req.query.page);
     const section = clean(req.query.section) || "all_items";
-    const mode = clean(req.query.mode) || "combined";
+    const mode = clean(req.query.mode) || "food";
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
     const subcategory = clean(req.query.subcategory);
 
@@ -876,24 +875,16 @@ export async function getGrid(req, res) {
     const updatedAtCol = m.updatedAt;
     const storeIdCol = m.storeId;
 
-    // subcategory 필터링을 위한 store 테이블 조인
+    // subcategory 필터링을 위한 store 테이블 조인 (getStoreSource 사용)
     let storeJoin = "";
     let whereSubcategory = "";
     const params = [page, like];
 
-    if (subcategory) {
-      const storeTable = mode === "combined" ? COMBINED_TABLE : await pickFoodTable();
-      if (storeTable) {
-        const storeCols = await getColumns(storeTable);
-        const storeIdField = storeCols.has("id") ? "id" : storeCols.has("store_id") ? "store_id" : null;
-        const subField = storeCols.has("business_subcategory") ? "business_subcategory" : storeCols.has("subcategory") ? "subcategory" : null;
-
-        if (storeIdCol && storeIdField && subField) {
-          storeJoin = `LEFT JOIN ${storeTable} s ON s."${storeIdField}"::text = slots."${storeIdCol}"::text`;
-          params.push(subcategory);
-          whereSubcategory = `AND COALESCE(s."${subField}"::text, '') = $${params.length}`;
-        }
-      }
+    if (subcategory && storeIdCol) {
+      const src = getStoreSource(mode);
+      storeJoin = `LEFT JOIN ${src.table} s ON s.${src.idcol}::text = slots."${storeIdCol}"::text`;
+      params.push(subcategory);
+      whereSubcategory = `AND COALESCE(s.${src.subcol}, '') = $${params.length}`;
     }
 
     const sql = `
