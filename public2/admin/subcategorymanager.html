@@ -339,6 +339,21 @@
                         <div class="hint mt-2">빈칸은 회색, 사용중은 파란색 테두리로 표시됩니다.</div>
                     </div>
                 </div>
+
+                <!-- 편집 위치 선택 -->
+                <div class="mt-4">
+                    <div class="label">편집 위치 선택</div>
+                    <select class="input" id="slotArea">
+                        <option value="top">상단 배너(페이지 맨 위)</option>
+                        <option value="all_items" selected>All of the items (가게 선택 기반)</option>
+                        <option value="best_seller">Best Seller (가게 선택 기반)</option>
+                        <option value="new_registration">New registration (가게 선택 기반)</option>
+                    </select>
+                    <div class="hint mt-1">
+                        상단 배너는 가게 선택 없이 저장 가능(모드로 자동 분리). 그 외는 가게 선택으로 위치가 결정됩니다.
+                    </div>
+                </div>
+
                 <!-- 타입 선택 -->
                 <div class="mt-4">
                     <div class="label">작업 유형 선택</div>
@@ -444,7 +459,7 @@
 
         let uiPick = "image";
         let selectedStore = null;
-        let selectedTarget = { mode: "combined", pageNo: 1, boxNo: 1, priority: DEFAULT_PRIORITY, position: "" };
+        let selectedTarget = { mode: "combined", area: "all_items", pageNo: 1, boxNo: 1, priority: DEFAULT_PRIORITY, position: "" };
 
         function $(id) { return document.getElementById(id); }
 
@@ -483,9 +498,19 @@
 
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
-        function buildPosition(section, mode, pageNo, boxNo) {
+        function buildPosition(area, mode, pageNo, boxNo) {
             const suffix = mode === "food" ? "__food" : "__combined";
-            return `${section}__p${pageNo}__b${boxNo}${suffix}`;
+
+            // ✅ 상단 배너는 고정 position
+            if (area === "top") return `subcategory_top${suffix}`;
+
+            // ✅ 나머지는 기존처럼 "가게 위치 기반"
+            const prefix =
+                area === "best_seller" ? "best_seller" :
+                area === "new_registration" ? "new_registration" :
+                "all_items";
+
+            return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
         }
 
         function toIsoLocalInputValue(iso) {
@@ -568,10 +593,11 @@
             // 선택된 가게가 있으면 position도 같이 바꿔야 키가 안 꼬임
             if (selectedStore) {
                 selectedTarget.section = $("section")?.value || "all_items";
+                selectedTarget.area = $("slotArea")?.value || "all_items";
                 selectedTarget.mode = $("mode").value || "combined";
                 selectedTarget.pageNo = Number(selectedStore.page_number || 1);
                 selectedTarget.boxNo = Number(selectedStore.index_in_page || 1);
-                selectedTarget.position = buildPosition(selectedTarget.section, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+                selectedTarget.position = buildPosition(selectedTarget.area, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
                 syncChips();
                 setStatus("warn", "모드 변경됨", `position 재계산: ${selectedTarget.position} / 시간: ${nowStr()}`);
                 await loadSlot(true);
@@ -580,6 +606,29 @@
 
             syncChips();
             setStatus("warn", "모드 변경됨", `현재 모드: ${$("mode").value} / 시간: ${nowStr()}`);
+        });
+
+        $("slotArea").addEventListener("change", async () => {
+            selectedTarget.area = $("slotArea").value;
+
+            const mode = $("mode").value || "combined";
+            selectedTarget.mode = mode;
+
+            // ✅ 상단 배너면 가게 선택 없어도 position 생성
+            if (selectedTarget.area === "top") {
+                selectedTarget.pageNo = 1;
+                selectedTarget.boxNo = 1;
+                selectedTarget.position = buildPosition("top", mode, 1, 1);
+                syncChips();
+                setStatus("warn", "상단 배너 편집 모드", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                await loadSlot(true);
+                return;
+            }
+
+            // ✅ 가게 기반 영역이면: 가게를 선택해야 position 생성
+            selectedTarget.position = "";
+            syncChips();
+            setStatus("warn", "가게 선택이 필요합니다", "검색 결과에서 가게를 클릭하면 position이 자동 생성됩니다.");
         });
 
         function setMiniStoreInfo(store) {
@@ -714,11 +763,12 @@
                     selectedStore = r;
 
                     selectedTarget.section = $("section")?.value || "all_items";
+                    selectedTarget.area = $("slotArea")?.value || "all_items";
                     selectedTarget.mode = $("mode").value || "combined";
                     selectedTarget.pageNo = Number(r.page_number || 1);
                     selectedTarget.boxNo = Number(r.index_in_page || 1);
                     selectedTarget.priority = DEFAULT_PRIORITY;
-                    selectedTarget.position = buildPosition(selectedTarget.section, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
+                    selectedTarget.position = buildPosition(selectedTarget.area, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
 
                     syncChips();
 
