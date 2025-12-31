@@ -14,17 +14,14 @@
     <!-- HERO -->
     <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
         <div class="flex-1 flex justify-center">
-            <img id="heroImage" src="/uploads/no-image.png" alt="배너" class="h-[280px] object-contain">
+            <!-- 배너 전체를 링크로 감싸기 (링크 없으면 그냥 클릭 안 됨) -->
+            <a id="heroLink" href="#" class="block">
+                <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
+            </a>
         </div>
-
         <div class="flex-1 text-left">
             <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
-            <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
-
-            <!-- 히어로 MORE는 All items 더보기 토글과 동일 -->
-            <button id="btnMoreHero" class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg">
-                MORE VIEW
-            </button>
+            ...
         </div>
     </section>
 
@@ -256,18 +253,18 @@
 
             stores.forEach(store => {
                 console.log("[CARD ITEM]", store); // ✅ 디버깅: business_subcategory 확인
-                
+
                 const dispName = clean(store.business_name) || "-";
-                
+
                 // ✅ 카드에 표시할 카테고리 텍스트
                 let catText = (store.business_category || store.store_type || store.business_type || "").trim();
-                
+
                 // ✅ 한식이면 괄호로 하위카테고리(국밥 등) 붙이기
                 if (catText === "한식") {
                     const sub = (store.business_subcategory || store.detail_category || "").trim();
                     if (sub) catText = `한식(${sub})`;
                 }
-                
+
                 const imgNorm = pickImage(store);
 
                 const card = document.createElement("div");
@@ -307,18 +304,18 @@
 
             stores.forEach(store => {
                 console.log("[CARD ITEM]", store); // ✅ 디버깅: business_subcategory 확인
-                
+
                 const name = clean(store.business_name) || "-";
-                
+
                 // ✅ 카드에 표시할 카테고리 텍스트
                 let catText = (store.business_category || store.store_type || store.business_type || "").trim();
-                
+
                 // ✅ 한식이면 괄호로 하위카테고리(국밥 등) 붙이기
                 if (catText === "한식") {
                     const sub = (store.business_subcategory || store.detail_category || "").trim();
                     if (sub) catText = `한식(${sub})`;
                 }
-                
+
                 const img = pickImage(store);
 
                 const card = document.createElement("a");
@@ -673,6 +670,130 @@
         function goNext() {
             window.history.forward();
         }
+
+        (async function () {
+            const PAGE_NAME = "subcategory";
+
+            // ? URL 쿼리에서 type=combined 이면 통합, 아니면 기본 food 로 처리
+            const params = new URLSearchParams(window.location.search);
+            const type = params.get("type");
+            const mode = (type === "combined") ? "combined" : "food";
+
+            // ? manager에서 사용하는 position 규칙과 맞추기
+            function buildBannerPosition(mode) {
+                const suffix = mode === "food" ? "__food" : "__combined";
+                return `subcategory_top${suffix}`;
+            }
+            function buildBannerLegacyPosition(mode) {
+                const suffix = mode === "food" ? "__food" : "__combined";
+                return `subcategory_top_banner${suffix}`;
+            }
+
+            const posCandidates = [
+                buildBannerPosition(mode),        // 새 키: subcategory_top__food / __combined
+                buildBannerLegacyPosition(mode),  // 옛 키: subcategory_top_banner__food / __combined
+            ];
+
+            async function tryFetchJson(url) {
+                const res = await fetch(url);
+                let data = null;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    // JSON 파싱 실패 → 그냥 null
+                }
+                if (!res.ok) {
+                    const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+                    throw new Error(msg);
+                }
+                return data;
+            }
+
+            // ? 실제 살아 있는 API base 자동 탐색
+            const API_BASE_CANDIDATES = [
+                "/subcategorymanager/ad",
+                "/subcategorymanager_food/ad",
+                "/admin/subcategory"
+            ];
+            let API_BASE = API_BASE_CANDIDATES[0];
+
+            async function detectApiBaseForFront() {
+                const testQs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    position: posCandidates[0],
+                    priority: "1",
+                }).toString();
+
+                for (const base of API_BASE_CANDIDATES) {
+                    try {
+                        const res = await fetch(`${base}/slot?${testQs}`, { method: "GET" });
+                        if (res.status !== 404) {
+                            API_BASE = base;
+                            return;
+                        }
+                    } catch (e) {
+                        // 실패 → 다음 후보
+                    }
+                }
+                // 전부 실패하면 기본값 그대로 (그냥 조용히 패스)
+            }
+
+            try {
+                // 1) 어떤 라우터가 살아 있는지 먼저 확인
+                await detectApiBaseForFront();
+
+                // 2) 새 키 → 없다면 옛 키 순서로 slot 조회
+                let foundSlot = null;
+                for (const pos of posCandidates) {
+                    const qs = new URLSearchParams({
+                        page: PAGE_NAME,
+                        position: pos,
+                        priority: "1",
+                    }).toString();
+
+                    try {
+                        const data = await tryFetchJson(`${API_BASE}/slot?${qs}`);
+                        if (data && data.slot) {
+                            foundSlot = data.slot;
+                            break;
+                        }
+                    } catch (e) {
+                        // 이 키에서는 slot 없음 → 다음 키 시도
+                    }
+                }
+
+                if (!foundSlot) {
+                    // 저장된 배너가 없으면 그냥 기본 이미지/제목 유지
+                    return;
+                }
+
+                const imgEl = document.getElementById("heroImage");
+                const linkEl = document.getElementById("heroLink");
+                const titleEl = document.getElementById("heroTitle");
+
+                // image_url 이 있으면 배너 이미지 교체
+                if (imgEl && foundSlot.image_url) {
+                    imgEl.src = foundSlot.image_url;
+                }
+
+                // text_title 이 있으면 오른쪽 제목도 바꿔줌
+                if (titleEl && foundSlot.text_title) {
+                    titleEl.textContent = foundSlot.text_title;
+                }
+
+                // link_url 이 있으면 클릭 시 이동
+                if (linkEl && foundSlot.link_url) {
+                    linkEl.href = foundSlot.link_url;
+                } else if (linkEl) {
+                    // 링크 없으면 클릭 막기 (href 제거)
+                    linkEl.removeAttribute("href");
+                }
+
+            } catch (e) {
+                // 에러 나도 페이지 전체 죽을 필요는 없음 → 콘솔만
+                console.error("[subcategory banner hydrate] 실패:", e.message || e);
+            }
+        })();
     </script>
 </body>
 
