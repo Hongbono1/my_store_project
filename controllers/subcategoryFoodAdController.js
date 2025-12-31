@@ -3,9 +3,7 @@ import pool from "../db.js";
 
 // ✅ 푸드 전용은 무조건 store_info 고정
 const FOOD_TABLE = "public.store_info";
-
-// ✅ 너 DB에서 실제로 쓰는 이미지 테이블
-const FOOD_IMAGE_TABLE = "public.store_images";
+const FOOD_IMAGES_TABLE = "public.store_images"; // ✅ store_id, url, sort_order
 
 function clean(v) {
   return (v ?? "").toString().trim();
@@ -19,6 +17,10 @@ function safeInt(v, fallback) {
   const n = Number(clean(v));
   if (!Number.isFinite(n)) return fallback;
   return Math.trunc(n);
+}
+
+function sqlIdent(name) {
+  return `"${String(name).replace(/"/g, '""')}"`;
 }
 
 const _colsCache = new Map(); // table -> Set(columns)
@@ -46,34 +48,28 @@ function pickCol(cols, ...names) {
   return null;
 }
 
-function sqlIdent(name) {
-  return `"${String(name).replace(/"/g, '""')}"`;
-}
-
-// ✅ DB에 "/uploads/..."처럼 이미 /로 시작하니까 그대로 써도 되지만,
-// 혹시 "uploads/..." 형태도 대비해서 보정
-function normalizeUrlSql(exprText) {
+// ✅ 이미지 1장(대표) 붙이기: store_images에서 sort_order ASC(없으면 id ASC) 1장
+function buildImageJoin(storeIdIdent) {
   return `
-    CASE
-      WHEN TRIM(COALESCE(${exprText}::text,'')) = '' THEN ''
-      WHEN TRIM(COALESCE(${exprText}::text,'')) ~* '^https?://' THEN TRIM(COALESCE(${exprText}::text,''))
-      WHEN LEFT(TRIM(COALESCE(${exprText}::text,'')), 1) = '/' THEN TRIM(COALESCE(${exprText}::text,''))
-      ELSE '/' || TRIM(COALESCE(${exprText}::text,''))
-    END
+    LEFT JOIN LATERAL (
+      SELECT url
+      FROM ${FOOD_IMAGES_TABLE}
+      WHERE store_id = ${storeIdIdent}
+      ORDER BY COALESCE(sort_order, 0) ASC, id ASC
+      LIMIT 1
+    ) img ON TRUE
   `;
 }
 
-/**
- * ✅ 푸드 전용 grid
- * GET /subcategorymanager_food/ad/grid?page=subcategory&section=all_items&pageNo=1&pageSize=12&category=...&subcategory=...
- */
+// ✅ grid: all_items / best_seller / new_registration
+// GET /subcategorymanager_food/ad/grid?page=subcategory&section=all_items&pageNo=1&pageSize=12&category=...&subcategory=...
 export async function grid(req, res) {
   try {
+    const section = clean(req.query.section || "all_items"); // all_items | best_seller | new_registration
     const pageNo = Math.max(1, safeInt(req.query.pageNo, 1));
     const pageSize = Math.min(60, Math.max(1, safeInt(req.query.pageSize, 12)));
     const offset = (pageNo - 1) * pageSize;
 
-    const section = clean(req.query.section || "all_items");
     const category = clean(req.query.category);
 
     // ✅ 푸드 서브는 detail_category 기준
@@ -81,115 +77,148 @@ export async function grid(req, res) {
       req.query.subcategory || req.query.sub || req.query.detail_category || ""
     );
 
-    // ✅ category 필수
-    if (!category) {
-      return res.status(400).json({ success: false, error: "category is required" });
-    }
-
-    // --- store_info 컬럼 매핑 ---
     const table = FOOD_TABLE;
     const cols = await getColumnsSet(table);
 
+    // store_info 컬럼 매핑
     const colId = pickCol(cols, "id");
     const colBizNo = pickCol(cols, "business_number", "business_no");
     const colName = pickCol(cols, "business_name", "store_name", "name");
     const colType = pickCol(cols, "business_type", "type");
     const colCategory = pickCol(cols, "business_category", "category");
     const colDetail = pickCol(cols, "detail_category");
+    const colCreatedAt = pickCol(cols, "created_at", "opened_at", "open_date", "opening_date");
 
-    // 정렬 후보
-    const colCreatedAt = pickCol(cols, "created_at");
-    const colViewCount = pickCol(cols, "view_count", "views");
+    // ✅ 조회수/클릭수 후보 컬럼들(있으면 Best Seller에서 사용)
+    const colViews = pickCol(
+      cols,
+      "view_count",
+      "views",
+      "click_count",
+      "clicks",
+      "hit",
+      "hits",
+      "cnt_view",
+      "cnt_click"
+    );
 
-    if (!colId || !colName || !colCategory) {
+    if (!colId || !colName) {
       return res.status(500).json({
         success: false,
-        error: `FOOD table(${table}) required columns missing (need id/name/business_category).`,
+        error: `FOOD table(${table}) required columns missing (need id/name).`,
       });
     }
 
-    if (!colDetail) {
-      return res.status(500).json({
-        success: false,
-        error: `FOOD table(${table}) has no detail_category column.`,
-      });
-    }
-
-    // --- store_images 컬럼 매핑 ---
-    const imgCols = await getColumnsSet(FOOD_IMAGE_TABLE);
-    const imgStoreId = pickCol(imgCols, "store_id");
-    const imgUrl = pickCol(imgCols, "url");
-    const imgSort = pickCol(imgCols, "sort_order");
-    const imgId = pickCol(imgCols, "id");
-
-    if (!imgStoreId || !imgUrl) {
-      return res.status(500).json({
-        success: false,
-        error: `IMAGE table(${FOOD_IMAGE_TABLE}) missing store_id/url`,
-      });
-    }
-
-    // --- WHERE ---
+    // ✅ where / order 분기
     const where = [];
     const params = [];
 
-    params.push(category);
-    where.push(`TRIM(COALESCE(t.${sqlIdent(colCategory)}::text,'')) = $${params.length}`);
+    // all_items는 category 필수(전체 스캔 방지)
+    if (section === "all_items") {
+      if (!category) {
+        return res.status(400).json({
+          success: false,
+          error: "category is required for all_items",
+        });
+      }
 
-    if (subcategory && subcategory !== "__all__") {
-      params.push(subcategory);
-      where.push(`TRIM(COALESCE(t.${sqlIdent(colDetail)}::text,'')) = $${params.length}`);
+      if (!colCategory) {
+        return res.status(500).json({
+          success: false,
+          error: `FOOD table(${table}) has no business_category column.`,
+        });
+      }
+
+      params.push(category);
+      where.push(
+        `TRIM(COALESCE(${sqlIdent(colCategory)}::text,'')) = $${params.length}`
+      );
+
+      // 한식 등 서브필터(detail_category)
+      if (subcategory && subcategory !== "__all__") {
+        if (!colDetail) {
+          return res.status(500).json({
+            success: false,
+            error: `FOOD table(${table}) has no detail_category column.`,
+          });
+        }
+        params.push(subcategory);
+        where.push(
+          `TRIM(COALESCE(${sqlIdent(colDetail)}::text,'')) = $${params.length}`
+        );
+      }
+    }
+
+    // new_registration: 최근 60일 기준 (category 무시)
+    if (section === "new_registration") {
+      const dateCol = colCreatedAt || "created_at";
+      // created_at 없으면 id desc라도 동작
+      if (cols.has(dateCol)) {
+        where.push(`${sqlIdent(dateCol)} >= (NOW() - INTERVAL '60 days')`);
+      }
     }
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    // --- COUNT ---
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${table} t ${whereSql}`;
+    // ✅ ORDER BY
+    let orderBySql = `${sqlIdent(colId)} DESC`;
+
+    if (section === "best_seller") {
+      // 조회수 컬럼 있으면 그걸로 정렬 + tie-breaker id desc
+      if (colViews) {
+        orderBySql = `COALESCE(${sqlIdent(colViews)}::bigint, 0) DESC, ${sqlIdent(colId)} DESC`;
+      } else {
+        // 컬럼 없으면 일단 최신순(서버는 정상동작)
+        orderBySql = `${sqlIdent(colId)} DESC`;
+      }
+    }
+
+    if (section === "new_registration") {
+      const dateCol = colCreatedAt && cols.has(colCreatedAt) ? colCreatedAt : null;
+      if (dateCol) {
+        orderBySql = `${sqlIdent(dateCol)} DESC, ${sqlIdent(colId)} DESC`;
+      } else {
+        orderBySql = `${sqlIdent(colId)} DESC`;
+      }
+    }
+
+    // ✅ COUNT
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${table} ${whereSql}`;
     const countRes = await pool.query(countSql, params);
     const total = countRes.rows?.[0]?.cnt ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-    // --- ORDER BY (section 반영, 안전 fallback) ---
-    let orderSql = `t.${sqlIdent(colId)} DESC`;
-    if (section === "new_registration") {
-      if (colCreatedAt) orderSql = `t.${sqlIdent(colCreatedAt)} DESC NULLS LAST, t.${sqlIdent(colId)} DESC`;
-    } else if (section === "best_seller") {
-      if (colViewCount) orderSql = `t.${sqlIdent(colViewCount)} DESC NULLS LAST, t.${sqlIdent(colId)} DESC`;
-      else if (colCreatedAt) orderSql = `t.${sqlIdent(colCreatedAt)} DESC NULLS LAST, t.${sqlIdent(colId)} DESC`;
-    }
+    // ✅ ITEMS (이미지 LATERAL JOIN)
+    const storeIdIdent = `s.${sqlIdent(colId)}`;
+    const imageJoinSql = buildImageJoin(storeIdIdent);
 
-    // ✅ 이미지 1장만 붙이기 (sort_order 0 우선)
-    const imgOrderBy = imgSort
-      ? `i.${sqlIdent(imgSort)} ASC NULLS LAST, i.${sqlIdent(imgId || imgStoreId)} ASC`
-      : `i.${sqlIdent(imgId || imgStoreId)} ASC`;
-
-    const joinSql = `
-      LEFT JOIN LATERAL (
-        SELECT ${normalizeUrlSql(`i.${sqlIdent(imgUrl)}`)} AS image_url
-        FROM ${FOOD_IMAGE_TABLE} i
-        WHERE i.${sqlIdent(imgStoreId)} = t.${sqlIdent(colId)}
-        ORDER BY ${imgOrderBy}
-        LIMIT 1
-      ) img ON true
-    `;
-
-    // --- SELECT ---
     const selectParts = [
-      `t.${sqlIdent(colId)} AS id`,
-      colBizNo ? `t.${sqlIdent(colBizNo)}::text AS business_number` : `''::text AS business_number`,
-      `t.${sqlIdent(colName)}::text AS business_name`,
-      colType ? `t.${sqlIdent(colType)}::text AS business_type` : `''::text AS business_type`,
-      `t.${sqlIdent(colCategory)}::text AS business_category`,
-      `COALESCE(NULLIF(TRIM(t.${sqlIdent(colDetail)}::text), ''), '') AS detail_category`,
-      `COALESCE(img.image_url, ''::text) AS image_url`,
+      `s.${sqlIdent(colId)} AS id`,
+      colBizNo
+        ? `s.${sqlIdent(colBizNo)}::text AS business_number`
+        : `''::text AS business_number`,
+      `s.${sqlIdent(colName)}::text AS business_name`,
+      colType ? `s.${sqlIdent(colType)}::text AS business_type` : `''::text AS business_type`,
+      colCategory
+        ? `s.${sqlIdent(colCategory)}::text AS business_category`
+        : `''::text AS business_category`,
+      colDetail
+        ? `COALESCE(NULLIF(TRIM(s.${sqlIdent(colDetail)}::text), ''), '') AS detail_category`
+        : `''::text AS detail_category`,
+      // ✅ 대표 이미지
+      `COALESCE(NULLIF(TRIM(img.url::text), ''), '') AS image_url`,
+      // ✅ 조회수(있으면 내려줌)
+      colViews
+        ? `COALESCE(${sqlIdent(colViews)}::bigint, 0) AS view_count`
+        : `0::bigint AS view_count`,
     ];
 
     const itemsSql = `
       SELECT ${selectParts.join(", ")}
-      FROM ${table} t
-      ${joinSql}
+      FROM ${table} s
+      ${imageJoinSql}
       ${whereSql}
-      ORDER BY ${orderSql}
+      ORDER BY ${orderBySql}
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
 
@@ -208,9 +237,11 @@ export async function grid(req, res) {
       total,
       totalPages,
       hasMore,
-      category,
-      subcategory: subcategory || null,
-      imageSource: FOOD_IMAGE_TABLE,
+
+      // all_items만 의미 있는 값
+      category: section === "all_items" ? category : null,
+      subcategory: section === "all_items" ? (subcategory || null) : null,
+
       items: itemsRes.rows || [],
     });
   } catch (err) {
@@ -248,20 +279,6 @@ export async function searchStore(req, res) {
       });
     }
 
-    // store_images
-    const imgCols = await getColumnsSet(FOOD_IMAGE_TABLE);
-    const imgStoreId = pickCol(imgCols, "store_id");
-    const imgUrl = pickCol(imgCols, "url");
-    const imgSort = pickCol(imgCols, "sort_order");
-    const imgId = pickCol(imgCols, "id");
-
-    if (!imgStoreId || !imgUrl) {
-      return res.status(500).json({
-        success: false,
-        error: `IMAGE table(${FOOD_IMAGE_TABLE}) missing store_id/url`,
-      });
-    }
-
     const params = [];
     const where = [];
 
@@ -270,42 +287,31 @@ export async function searchStore(req, res) {
     } else if (qDigits && colBizNo) {
       params.push(`%${qDigits}%`);
       where.push(
-        `REPLACE(COALESCE(t.${sqlIdent(colBizNo)}::text,''),'-','') ILIKE $${params.length}`
+        `REPLACE(COALESCE(${sqlIdent(colBizNo)}::text,''),'-','') ILIKE $${params.length}`
       );
     } else {
       params.push(`%${qRaw}%`);
-      where.push(`t.${sqlIdent(colName)}::text ILIKE $${params.length}`);
+      where.push(`${sqlIdent(colName)}::text ILIKE $${params.length}`);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const imgOrderBy = imgSort
-      ? `i.${sqlIdent(imgSort)} ASC NULLS LAST, i.${sqlIdent(imgId || imgStoreId)} ASC`
-      : `i.${sqlIdent(imgId || imgStoreId)} ASC`;
-
-    const joinSql = `
-      LEFT JOIN LATERAL (
-        SELECT ${normalizeUrlSql(`i.${sqlIdent(imgUrl)}`)} AS image_url
-        FROM ${FOOD_IMAGE_TABLE} i
-        WHERE i.${sqlIdent(imgStoreId)} = t.${sqlIdent(colId)}
-        ORDER BY ${imgOrderBy}
-        LIMIT 1
-      ) img ON true
-    `;
+    const storeIdIdent = `s.${sqlIdent(colId)}`;
+    const imageJoinSql = buildImageJoin(storeIdIdent);
 
     const sql = `
       SELECT
-        t.${sqlIdent(colId)} AS id,
-        ${colBizNo ? `t.${sqlIdent(colBizNo)}::text` : `''::text`} AS business_number,
-        t.${sqlIdent(colName)}::text AS business_name,
-        ${colType ? `t.${sqlIdent(colType)}::text` : `''::text`} AS business_type,
-        ${colCategory ? `t.${sqlIdent(colCategory)}::text` : `''::text`} AS business_category,
-        ${colDetail ? `COALESCE(NULLIF(TRIM(t.${sqlIdent(colDetail)}::text), ''), '')` : `''::text`} AS detail_category,
-        COALESCE(img.image_url, ''::text) AS image_url
-      FROM ${table} t
-      ${joinSql}
+        s.${sqlIdent(colId)} AS id,
+        ${colBizNo ? `s.${sqlIdent(colBizNo)}::text` : `''::text`} AS business_number,
+        s.${sqlIdent(colName)}::text AS business_name,
+        ${colType ? `s.${sqlIdent(colType)}::text` : `''::text`} AS business_type,
+        ${colCategory ? `s.${sqlIdent(colCategory)}::text` : `''::text`} AS business_category,
+        ${colDetail ? `COALESCE(NULLIF(TRIM(s.${sqlIdent(colDetail)}::text), ''), '')` : `''::text`} AS detail_category,
+        COALESCE(NULLIF(TRIM(img.url::text), ''), '') AS image_url
+      FROM ${table} s
+      ${imageJoinSql}
       ${whereSql}
-      ORDER BY t.${sqlIdent(colId)} DESC
+      ORDER BY s.${sqlIdent(colId)} DESC
       LIMIT 30
     `;
 
@@ -315,7 +321,6 @@ export async function searchStore(req, res) {
       success: true,
       mode: "food",
       q: qRaw,
-      imageSource: FOOD_IMAGE_TABLE,
       results: r.rows || [],
     });
   } catch (err) {
