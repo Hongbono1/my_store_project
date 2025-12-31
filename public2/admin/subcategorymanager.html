@@ -275,10 +275,18 @@
                 </div>
 
                 <div class="mt-3">
-                    <select class="input" id="managerMode">
-                        <option value="combined">통합</option>
-                        <option value="food" selected>푸드</option>
+                    <!-- 배너 모드 버튼 UI -->
+                    <div class="seg" id="bannerModeSeg">
+                        <button type="button" id="btnBannerModeFood" data-active="1">푸드 배너</button>
+                        <button type="button" id="btnBannerModeCombined" data-active="0">통합 배너</button>
+                    </div>
+
+                    <!-- (호환용) JS가 value 읽을 수 있게 select는 숨김 유지 -->
+                    <select class="hidden" id="bannerMode">
+                        <option value="food" selected>푸드 배너</option>
+                        <option value="combined">통합 배너</option>
                     </select>
+
                     <div class="hint mt-1">처음 화면은 푸드 기준. 통합으로 바꿔도 “마지막 입력”은 유지됩니다.</div>
                 </div>
 
@@ -702,10 +710,12 @@
 
         // ✅ 배너 모드 버튼 UI 동기화
         function syncBannerModeButtons(mode) {
-            const isFood = (mode === "food");
-            $("btnBannerModeFood").setAttribute("data-active", isFood ? "1" : "0");
-            $("btnBannerModeCombined").setAttribute("data-active", !isFood ? "1" : "0");
-            $("bannerMode").value = mode;
+            const bf = $("btnBannerModeFood");
+            const bc = $("btnBannerModeCombined");
+            if (bf) bf.setAttribute("data-active", mode === "food" ? "1" : "0");
+            if (bc) bc.setAttribute("data-active", mode === "combined" ? "1" : "0");
+            const sel = $("bannerMode");
+            if (sel) sel.value = mode;
         }
 
         // ===============================
@@ -1529,24 +1539,38 @@
         });
 
         // ✅ 배너 버튼 클릭 → switchMode 호출 (핵심)
-        $("btnBannerModeFood").addEventListener("click", async () => {
-            if (state.currentMode === "food") return;
-            await switchMode("food");
-            scheduleDraftSave();
-        });
-        $("btnBannerModeCombined").addEventListener("click", async () => {
-            if (state.currentMode === "combined") return;
-            await switchMode("combined");
-            scheduleDraftSave();
-        });
+        const _btnFood = $("btnBannerModeFood");
+        if (_btnFood) {
+            _btnFood.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (state.currentMode === "food") return;
+                await switchMode("food");
+                scheduleDraftSave();
+            });
+        }
 
-        // (호환) bannerMode select 값이 바뀌는 경우도 처리
-        $("bannerMode").addEventListener("change", async () => {
-            const next = $("bannerMode").value || "food";
-            if (next === state.currentMode) { syncBannerModeButtons(next); syncBannerUI(); return; }
-            await switchMode(next);
-            scheduleDraftSave();
-        });
+        const _btnCombined = $("btnBannerModeCombined");
+        if (_btnCombined) {
+            _btnCombined.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (state.currentMode === "combined") return;
+                await switchMode("combined");
+                scheduleDraftSave();
+            });
+        }
+
+        // (호환) bannerMode select change도 null-safe
+        const _bannerSel = $("bannerMode");
+        if (_bannerSel) {
+            _bannerSel.addEventListener("change", async () => {
+                const next = _bannerSel.value || "food";
+                if (next === state.currentMode) { syncBannerModeButtons(next); syncBannerUI(); return; }
+                await switchMode(next);
+                scheduleDraftSave();
+            });
+        }
 
         $("btnBannerSave").addEventListener("click", saveBannerSlot);
         $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
