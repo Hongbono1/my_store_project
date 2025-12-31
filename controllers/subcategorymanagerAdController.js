@@ -1229,6 +1229,56 @@ export async function getGrid(req, res) {
       });
     }
 
+    // ✅ 서브카테고리 필터가 있으면, occupied 아이템을 1번 박스부터 당겨서 재배치
+    const hasSub = String(subcategory || "").trim().length > 0;
+
+    if (hasSub) {
+      const occupied = items.filter(it => it.occupied);
+
+      const buildPos = (sec, pNo, bNo, m) => {
+        const sfx = m === "food" ? "__food" : "__combined";
+        return `${sec}__p${pNo}__b${bNo}${sfx}`;
+      };
+
+      const emptyBox = (boxNo) => ({
+        boxNo,
+        position: buildPos(section, pageNo, boxNo, mode),
+        occupied: false,
+        source: "empty",
+        priority: null,
+        slot_type: "",
+        slot_mode: "",
+        store_id: null,
+        business_no: "",
+        business_name: "",
+        store_type: "",
+        image_url: "",
+        link_url: "",
+        text_content: "",
+        label: "",
+        updated_at: null,
+      });
+
+      const compacted = Array.from({ length: 12 }, (_, i) => {
+        const boxNo = i + 1;
+        const it = occupied[i];
+        if (!it) return emptyBox(boxNo);
+
+        // boxNo/position만 앞으로 당겨서 재세팅
+        return {
+          ...it,
+          boxNo,
+          position: buildPos(section, pageNo, boxNo, mode),
+        };
+      });
+
+      items = compacted;
+      total = occupied.length;         // ✅ total도 "보이는 개수"로 통일
+      totalPages = Math.max(1, Math.ceil(total / 12));
+      hasPrev = false;
+      hasNext = totalPages > 1;
+    }
+
     // ✅ 응답 직전 최종 clean 처리
     const categoryClean = clean(category);
     const subcategoryClean = clean(subcategory);
