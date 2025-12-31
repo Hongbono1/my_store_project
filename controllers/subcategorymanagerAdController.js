@@ -977,6 +977,7 @@ export async function getGrid(req, res) {
     const storeTypeCol = m.storeType;
     const imageUrlCol = m.imageUrl;
     const textContentCol = m.textContent;
+    const linkUrlCol = m.linkUrl;  // ✅ link_url 컴럼 추가
     const updatedAtCol = m.updatedAt;
 
     // ✅ store 필터(override용) - 값이 있을 때만 적용
@@ -1028,6 +1029,7 @@ export async function getGrid(req, res) {
         ${storeTypeCol ? `COALESCE(slots."${storeTypeCol}"::text,'')` : `''`} AS store_type,
         ${imageUrlCol ? `COALESCE(slots."${imageUrlCol}"::text,'')` : `''`} AS image_url,
         ${textContentCol ? `COALESCE(slots."${textContentCol}"::text,'')` : `''`} AS text_content,
+        ${linkUrlCol ? `COALESCE(slots."${linkUrlCol}"::text,'')` : `''`} AS link_url,
         ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
       FROM ${SLOTS_TABLE} slots
       WHERE slots."${m.page}"=$1
@@ -1153,6 +1155,7 @@ export async function getGrid(req, res) {
           store_type: String(over.store_type || "").trim(),
           image_url: clean(over.image_url),
           text_content: clean(over.text_content),
+          link_url: clean(over.link_url),  // ✅ DB에서 가져온 link_url
           label: clean(over.business_name || over.text_content),
           updated_at: over.updated_at ?? null,
         });
@@ -1163,6 +1166,14 @@ export async function getGrid(req, res) {
       const auto = pickNextAutoStore();
 
       if (auto) {
+        // ✅ mode 기반 link_url 생성 (store_type이 아닌 mode 사용)
+        const autoStoreId = auto.id ? safeIntOrNull(auto.id) : null;
+        const autoLinkUrl = autoStoreId
+          ? (mode === "combined"
+            ? `/ndetail.html?id=${encodeURIComponent(autoStoreId)}&type=combined`
+            : `/ndetail.html?id=${encodeURIComponent(autoStoreId)}&type=food`)
+          : "";
+
         items.push({
           boxNo: b,
           position,
@@ -1171,12 +1182,13 @@ export async function getGrid(req, res) {
           priority: null,
           slot_type: "banner",
           slot_mode: "store",
-          store_id: auto.id ? safeIntOrNull(auto.id) : null,
+          store_id: autoStoreId,
           business_no: clean(auto.business_no),
           business_name: clean(auto.business_name),
           store_type: String(auto.store_type || "").trim(),
           image_url: clean(auto.image_url),
           text_content: "",
+          link_url: autoLinkUrl,  // ✅ 자동 생성된 link_url
           label: clean(auto.business_name),
           updated_at: null,
         });
