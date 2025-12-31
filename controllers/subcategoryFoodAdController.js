@@ -73,15 +73,36 @@ function keyPart(v) {
 }
 
 /**
+ * ✅ 핵심 규칙(요구사항 반영)
+ * - 한식만 subcategory(detail_category) 사용
+ * - 그 외 카테고리는 subcategory 무조건 무시("")
+ */
+function normalizeCategorySub(category, subcategory) {
+  const cat = clean(category);
+  let sub = clean(subcategory);
+
+  const isHansik = cat === "한식";
+  if (!isHansik) sub = "";
+
+  // category 자체가 없으면 subcategory도 의미 없으니 제거
+  if (!cat) sub = "";
+
+  return { category: cat, subcategory: sub, isHansik };
+}
+
+/**
  * position 규칙(FOOD)
  * subcategory|food|{category}|{subcategory}|{section}|{idx}
  */
 function buildPosition({ mode = "food", category = "", subcategory = "", section = "", idx = 1 }) {
+  // ✅ 한식만 subcategory 유지
+  const norm = normalizeCategorySub(category, subcategory);
+
   return [
     PAGE_NAME,
     keyPart(mode || "food"),
-    keyPart(category),
-    keyPart(subcategory),
+    keyPart(norm.category),
+    keyPart(norm.subcategory),
     keyPart(section),
     String(idx),
   ].join("|");
@@ -104,7 +125,9 @@ export function makeMulterStorage() {
     },
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-      const name = `${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")}${ext}`;
+      const name = `${
+        crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")
+      }${ext}`;
       cb(null, name);
     },
   };
@@ -121,7 +144,10 @@ async function getSlotsColumns() {
     WHERE table_schema = $1 AND table_name = $2
   `;
   const [schema, table] = SLOTS_TABLE.split(".");
-  const { rows } = await pool.query(sql, [schema.replaceAll('"', ""), table.replaceAll('"', "")]);
+  const { rows } = await pool.query(sql, [
+    schema.replaceAll('"', ""),
+    table.replaceAll('"', ""),
+  ]);
   _slotsColsCache = new Set(rows.map((r) => r.column_name));
   return _slotsColsCache;
 }
@@ -146,7 +172,9 @@ async function ensureStoreImagesReady() {
   if (_storeImagesReadyCache !== null) return _storeImagesReadyCache;
 
   // 테이블 존재 확인
-  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [FOOD_IMAGE_TABLE]);
+  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [
+    FOOD_IMAGE_TABLE,
+  ]);
   if (!r0?.[0]?.reg) {
     _storeImagesReadyCache = false;
     return false;
@@ -208,9 +236,7 @@ export async function listStores(req, res) {
 
     const hasStoreImages = await ensureStoreImagesReady();
 
-    const imgSelectSql = hasStoreImages
-      ? `, COALESCE(img.url, '') AS image_url`
-      : `, '' AS image_url`;
+    const imgSelectSql = hasStoreImages ? `, COALESCE(img.url, '') AS image_url` : `, '' AS image_url`;
 
     const imgJoinSql = hasStoreImages
       ? `
@@ -299,8 +325,11 @@ export async function grid(req, res) {
   try {
     const page = clean(req.query.page) || PAGE_NAME;
     const section = clean(req.query.section);
-    const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
+
+    // ✅ 한식만 subcategory 유지
+    const norm = normalizeCategorySub(req.query.category, req.query.subcategory);
+    const category = norm.category;
+    const subcategory = norm.subcategory;
 
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
     const pageSize = clamp(safeInt(req.query.pageSize, 12), 1, 50);
@@ -312,9 +341,7 @@ export async function grid(req, res) {
     if (section === "all_items") {
       const hasStoreImages = await ensureStoreImagesReady();
 
-      const imgSelectSql = hasStoreImages
-        ? `, COALESCE(img.url, '') AS image_url`
-        : `, '' AS image_url`;
+      const imgSelectSql = hasStoreImages ? `, COALESCE(img.url, '') AS image_url` : `, '' AS image_url`;
 
       const imgJoinSql = hasStoreImages
         ? `
@@ -338,6 +365,8 @@ export async function grid(req, res) {
         );
         params.push(category);
       }
+
+      // ✅ 한식만 subcategory(detail_category) 필터 적용
       if (subcategory) {
         where.push(
           `btrim(replace(s.${STORE_MAP.subcategory}::text, chr(160), ' ')) = btrim(replace($${i++}::text, chr(160), ' '))`
@@ -384,6 +413,7 @@ export async function grid(req, res) {
     // ✅ 2) 나머지 섹션은 admin_ad_slots
     const cols = await getSlotsColumns();
 
+    // ✅ 한식만 subcategory 포함된 prefix
     const prefixBase = [PAGE_NAME, "food", keyPart(category), keyPart(subcategory), keyPart(section)].join("|");
     const likePrefix = `${prefixBase}|%`;
 
@@ -460,8 +490,12 @@ export async function getSlot(req, res) {
 
     const page = clean(req.query.page) || PAGE_NAME;
     const section = clean(req.query.section);
-    const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
+
+    // ✅ 한식만 subcategory 유지
+    const norm = normalizeCategorySub(req.query.category, req.query.subcategory);
+    const category = norm.category;
+    const subcategory = norm.subcategory;
+
     const idx = Math.max(safeInt(req.query.idx, 1), 1);
 
     if (!section) return res.status(400).json({ success: false, error: "section is required" });
@@ -519,8 +553,12 @@ export async function upsertSlot(req, res) {
 
     const page = clean(req.body.page) || PAGE_NAME;
     const section = clean(req.body.section);
-    const category = clean(req.body.category);
-    const subcategory = clean(req.body.subcategory);
+
+    // ✅ 한식만 subcategory 유지
+    const norm = normalizeCategorySub(req.body.category, req.body.subcategory);
+    const category = norm.category;
+    const subcategory = norm.subcategory;
+
     const idx = Math.max(safeInt(req.body.idx, 1), 1);
 
     if (!section) return res.status(400).json({ success: false, error: "section is required" });
@@ -640,8 +678,12 @@ export async function deleteSlot(req, res) {
 
     const page = clean(req.query.page) || PAGE_NAME;
     const section = clean(req.query.section);
-    const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
+
+    // ✅ 한식만 subcategory 유지
+    const norm = normalizeCategorySub(req.query.category, req.query.subcategory);
+    const category = norm.category;
+    const subcategory = norm.subcategory;
+
     const idx = Math.max(safeInt(req.query.idx, 1), 1);
 
     if (!section) return res.status(400).json({ success: false, error: "section is required" });
