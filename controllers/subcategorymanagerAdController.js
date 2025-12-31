@@ -1038,6 +1038,14 @@ export async function getGrid(req, res) {
 
     const { rows: slotRows } = await pool.query(slotSql, paramsSlots);
 
+    // ✅ override 슬롯에 이미 들어간 store_id는 auto에서 제외 (중복 방지)
+    const overrideStoreIds = new Set(
+      (slotRows || [])
+        .filter((r) => r && r.slot_mode === "store" && r.store_id !== null && r.store_id !== undefined)
+        .map((r) => Number(r.store_id))
+        .filter((n) => Number.isFinite(n))
+    );
+
     const overrideMap = new Map(); // boxNo -> row
     for (const r of slotRows) {
       const pos = String(r.position || "");
@@ -1103,9 +1111,22 @@ export async function getGrid(req, res) {
 
     const { rows: autoRows } = await pool.query(autoSql, values);
 
-    const autoMap = new Map(); // boxNo -> autoRow
-    for (let i = 0; i < autoRows.length; i += 1) {
-      autoMap.set(i + 1, autoRows[i]);
+    // ✅ override에 이미 들어간 가게는 자동 채우기에서 제외
+    let autoStores = (autoRows || []).filter((s) => !overrideStoreIds.has(Number(s.id)));
+
+    // ✅ auto 채우기 시 중복 2차 방지
+    const usedAutoStoreIds = new Set();
+
+    function pickNextAutoStore() {
+      while (autoStores.length > 0) {
+        const s = autoStores.shift();
+        const sid = Number(s?.id);
+        if (!Number.isFinite(sid)) continue;
+        if (usedAutoStoreIds.has(sid)) continue;
+        usedAutoStoreIds.add(sid);
+        return s;
+      }
+      return null;
     }
 
     // --------------------------
@@ -1116,7 +1137,6 @@ export async function getGrid(req, res) {
       const position = `${section}__p${pageNo}__b${b}${suffix}`;
 
       const over = overrideMap.get(b);
-      const auto = autoMap.get(b);
 
       if (over) {
         items.push({
@@ -1138,6 +1158,9 @@ export async function getGrid(req, res) {
         });
         continue;
       }
+
+      // ✅ pickNextAutoStore로 중복 없이 다음 가게 가져오기
+      const auto = pickNextAutoStore();
 
       if (auto) {
         items.push({
