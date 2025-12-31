@@ -1,12 +1,8 @@
 // controllers/subcategoryFoodAdController.js
 import pool from "../db.js";
 
-// ✅ 푸드 전용: FOOD 테이블 후보(존재하는 것 자동 선택)
-const FOOD_TABLE_CANDIDATES = [
-  "public.store_info",
-  "public.food_stores",
-  "public.food_store_info",
-];
+// ✅ 푸드 전용은 무조건 store_info 고정 (foodregister로 저장되는 테이블)
+const FOOD_TABLE = "public.store_info";
 
 function clean(v) {
   return (v ?? "").toString().trim();
@@ -22,31 +18,7 @@ function safeInt(v, fallback) {
   return Math.trunc(n);
 }
 
-let _foodTableCache = null;
 const _colsCache = new Map(); // table -> Set(columns)
-
-async function detectExistingTable(candidates) {
-  for (const full of candidates) {
-    const [schema, table] = full.split(".");
-    const { rows } = await pool.query(
-      `
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = $1 AND table_name = $2
-      LIMIT 1
-      `,
-      [schema, table]
-    );
-    if (rows?.length) return full;
-  }
-  throw new Error(`FOOD table not found. Tried: ${candidates.join(", ")}`);
-}
-
-async function getFoodTable() {
-  if (_foodTableCache) return _foodTableCache;
-  _foodTableCache = await detectExistingTable(FOOD_TABLE_CANDIDATES);
-  return _foodTableCache;
-}
 
 async function getColumnsSet(fullTable) {
   if (_colsCache.has(fullTable)) return _colsCache.get(fullTable);
@@ -87,16 +59,15 @@ export async function grid(req, res) {
 
     const category = clean(req.query.category);
 
-    // ✅ food subcategory: detail_category 기준
+    // ✅ 푸드 서브는 detail_category 기준
     const subcategory = clean(
       req.query.subcategory ||
         req.query.sub ||
         req.query.detail_category ||
-        req.query.business_subcategory ||
         ""
     );
 
-    // ✅ category는 필수로 두는게 안전(전체 스캔 방지)
+    // ✅ category 필수 (전체 스캔 방지)
     if (!category) {
       return res.status(400).json({
         success: false,
@@ -104,16 +75,24 @@ export async function grid(req, res) {
       });
     }
 
-    const table = await getFoodTable();
+    const table = FOOD_TABLE;
     const cols = await getColumnsSet(table);
 
+    // store_info 기준으로 컬럼 매핑
     const colId = pickCol(cols, "id");
     const colBizNo = pickCol(cols, "business_number", "business_no");
     const colName = pickCol(cols, "business_name", "store_name", "name");
     const colType = pickCol(cols, "business_type", "type");
     const colCategory = pickCol(cols, "business_category", "category");
     const colDetail = pickCol(cols, "detail_category"); // ✅ FOOD는 detail_category
-    const colImg = pickCol(cols, "main_image_url", "image_url");
+    const colImg = pickCol(
+      cols,
+      "main_image_url",
+      "image_url",
+      "image1",
+      "image_1",
+      "thumbnail_url"
+    );
 
     if (!colId || !colName || !colCategory) {
       return res.status(500).json({
@@ -134,16 +113,12 @@ export async function grid(req, res) {
 
     // category
     params.push(category);
-    where.push(
-      `TRIM(COALESCE(${sqlIdent(colCategory)}::text,'')) = $${params.length}`
-    );
+    where.push(`TRIM(COALESCE(${sqlIdent(colCategory)}::text,'')) = $${params.length}`);
 
-    // subcategory (detail_category)
+    // subcategory(detail_category)
     if (subcategory && subcategory !== "__all__") {
       params.push(subcategory);
-      where.push(
-        `TRIM(COALESCE(${sqlIdent(colDetail)}::text,'')) = $${params.length}`
-      );
+      where.push(`TRIM(COALESCE(${sqlIdent(colDetail)}::text,'')) = $${params.length}`);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -212,7 +187,7 @@ export async function searchStore(req, res) {
     const qRaw = clean(req.query.q);
     const qDigits = digitsOnly(qRaw);
 
-    const table = await getFoodTable();
+    const table = FOOD_TABLE;
     const cols = await getColumnsSet(table);
 
     const colId = pickCol(cols, "id");
@@ -221,7 +196,14 @@ export async function searchStore(req, res) {
     const colType = pickCol(cols, "business_type", "type");
     const colCategory = pickCol(cols, "business_category", "category");
     const colDetail = pickCol(cols, "detail_category");
-    const colImg = pickCol(cols, "main_image_url", "image_url");
+    const colImg = pickCol(
+      cols,
+      "main_image_url",
+      "image_url",
+      "image1",
+      "image_1",
+      "thumbnail_url"
+    );
 
     if (!colId || !colName) {
       return res.status(500).json({
@@ -271,6 +253,8 @@ export async function searchStore(req, res) {
     });
   } catch (err) {
     console.error("❌ [subcategoryFood searchStore]", err?.message || err);
-    return res.status(500).json({ success: false, error: err?.message || String(err) });
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message || String(err) });
   }
 }
