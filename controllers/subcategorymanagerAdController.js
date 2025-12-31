@@ -1295,6 +1295,8 @@ export async function getGrid(req, res) {
         business_no: "",
         business_name: "",
         store_type: "",
+        business_category: "",
+        business_subcategory: "",
         image_url: "",
         text_content: "",
         label: "",
