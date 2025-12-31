@@ -2,11 +2,9 @@
  *  MALL HANKOOK SERVER - PERSISTENT UPLOAD VERSION (A 방식)
  *  이미지 경로 /data/uploads 로 영구 저장
  *  public2/uploads와 충돌 제거
- *  기존 라우터 / 기능 절대 변경 없음
+ *  기존 라우터 / 기능 절대 변경 없음 (필요 최소만 정리)
  *  ---------------------------------------------------------- */
 
-// .env 를 가장 먼저 로드 (cwd 기준)
-// pm2 start 시 cwd 를 /root/my_store_project_new 로 맞출 것!
 import "dotenv/config";
 
 import express from "express";
@@ -45,18 +43,19 @@ import localRankRouter from "./routes/localRankRouter.js";
 import hotplaceRouter from "./routes/hotplaceRouter.js";
 import hotRouter from "./routes/hotRouter.js";
 import hotblosubRouter from "./routes/hotblosubRouter.js";
+
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
 import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
+
 import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
 import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
 import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js";
 
-
 import pool from "./db.js";
 
 // ------------------------------------------------------------
-// 0. __dirname 설정
+// 0. __dirname
 // ------------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,17 +63,11 @@ const __dirname = path.dirname(__filename);
 // ------------------------------------------------------------
 // 0-1. ENV 로드 확인 로그
 // ------------------------------------------------------------
-if (!process.env.BIZ_API_KEY) {
-  console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
-} else {
-  console.log("✅ BIZ_API_KEY 환경변수 감지됨");
-}
+if (!process.env.BIZ_API_KEY) console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
+else console.log("✅ BIZ_API_KEY 환경변수 감지됨");
 
-if (!process.env.DATABASE_URL) {
-  console.error("❌ DATABASE_URL 환경변수가 없습니다.");
-} else {
-  console.log("✅ DATABASE_URL 환경변수 감지됨");
-}
+if (!process.env.DATABASE_URL) console.error("❌ DATABASE_URL 환경변수가 없습니다.");
+else console.log("✅ DATABASE_URL 환경변수 감지됨");
 
 // ------------------------------------------------------------
 // 1. 공연/예술 테이블 자동 생성
@@ -123,25 +116,21 @@ async function initPerformingArtsTables() {
     console.error("❌ performing_arts 테이블 생성 오류:", err.message);
   }
 }
-
 initPerformingArtsTables();
 
 // ------------------------------------------------------------
 // 2. 업로드 폴더 구성 (영구 저장용)
 // ------------------------------------------------------------
-// ✅ Windows 로컬 개발: public2/uploads, 프로덕션: /data/uploads
 const isProduction = process.env.NODE_ENV === "production";
-const UPLOAD_ROOT = isProduction
-  ? "/data/uploads"
-  : path.join(__dirname, "public2/uploads");
+const UPLOAD_ROOT = isProduction ? "/data/uploads" : path.join(__dirname, "public2/uploads");
 
 const uploadDirs = [
   UPLOAD_ROOT,
   path.join(UPLOAD_ROOT, "inquiry"),
   path.join(UPLOAD_ROOT, "traditionalmarket"),
   path.join(UPLOAD_ROOT, "performingart"),
-  path.join(UPLOAD_ROOT, "manager_ad"), // ✅ indexmanager 광고 업로드 폴더
-  path.join(UPLOAD_ROOT, "ncategory2_ad"), // ✅ ncategory2 광고 업로드 폴더
+  path.join(UPLOAD_ROOT, "manager_ad"),
+  path.join(UPLOAD_ROOT, "ncategory2_ad"),
 ];
 
 uploadDirs.forEach((dir) => {
@@ -153,13 +142,13 @@ uploadDirs.forEach((dir) => {
   }
 });
 
-// ✅ no-image.png 자동 복사 (프로덕션 배포 시 필수)
+// no-image.png 복사
 const noImageSource = path.join(__dirname, "public2/uploads/no-image.png");
 const noImageDest = path.join(UPLOAD_ROOT, "no-image.png");
 if (fs.existsSync(noImageSource) && !fs.existsSync(noImageDest)) {
   try {
     fs.copyFileSync(noImageSource, noImageDest);
-    console.log("✅ no-image.png copied to /data/uploads/");
+    console.log("✅ no-image.png copied to uploads root");
   } catch (err) {
     console.error("❌ Failed to copy no-image.png:", err);
   }
@@ -170,7 +159,7 @@ if (fs.existsSync(noImageSource) && !fs.existsSync(noImageDest)) {
 // ------------------------------------------------------------
 const app = express();
 
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   req.id = randomUUID();
   next();
 });
@@ -179,9 +168,7 @@ app.use((req, res, next) => {
   const started = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - started;
-    console.log(
-      `[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`
-    );
+    console.log(`[${req.id}] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`);
   });
   next();
 });
@@ -191,15 +178,14 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ------------------------------------------------------------
-// 3-1. 표준화된 국세청 사업자번호 인증 API (mock 테스트 모드 지원)
+// 3-1. 사업자번호 인증
 // ------------------------------------------------------------
 app.post("/verify-biz", async (req, res) => {
   try {
     const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
-    const MODE = (process.env.BIZ_VERIFY_MODE || "real").toLowerCase(); // "mock" | "real"
+    const MODE = (process.env.BIZ_VERIFY_MODE || "real").toLowerCase();
     const isProd = NODE_ENV === "production";
 
-    // ✅ 운영에서 mock 절대 금지 (실수 방지)
     if (isProd && MODE === "mock") {
       return res.status(500).json({
         ok: false,
@@ -207,84 +193,43 @@ app.post("/verify-biz", async (req, res) => {
       });
     }
 
-    // 👉 두 형태 모두 지원: { bizNo } 또는 { b_no: ["1234567890"] }
     const { bizNo, b_no } = req.body || {};
-
     let rawBizNo = bizNo;
+
     if (!rawBizNo) {
-      if (Array.isArray(b_no) && b_no.length > 0) {
-        rawBizNo = b_no[0];
-      } else if (typeof b_no === "string") {
-        rawBizNo = b_no;
-      }
+      if (Array.isArray(b_no) && b_no.length > 0) rawBizNo = b_no[0];
+      else if (typeof b_no === "string") rawBizNo = b_no;
     }
 
     if (!rawBizNo) {
-      return res.status(400).json({
-        ok: false,
-        message: "사업자등록번호가 없습니다.",
-      });
+      return res.status(400).json({ ok: false, message: "사업자등록번호가 없습니다." });
     }
 
     const cleanBizNo = String(rawBizNo).replace(/-/g, "").trim();
 
-    // ============================================================
-    // ✅ MOCK 모드 (개발/스테이징에서만)
-    // - 프론트가 data.data[0] 형태로 쓰는 걸 고려해서
-    //   "ok: true, data: [ ... ]" 구조를 동일하게 맞춤
-    // ============================================================
+    // MOCK
     if (!isProd && MODE === "mock") {
-      // 🔻 여기서 성공/실패 규칙을 네가 원하는대로 바꿀 수 있음
-      // 지금은: 마지막 자리가 0이면 실패, 그 외 성공(개발 편의용)
       const last = cleanBizNo.slice(-1);
       const isOk = last !== "0";
-
-      if (isOk) {
-        return res.json({
-          ok: true,
-          data: [
-            {
-              b_no: cleanBizNo,
-              b_stt_cd: "01",
-              b_stt: "계속사업자",
-              tax_type: "mock",
-              tax_type_cd: "00",
-            },
-          ],
-          mock: true,
-        });
-      } else {
-        return res.json({
-          ok: true,
-          data: [
-            {
-              b_no: cleanBizNo,
-              b_stt_cd: "02",
-              b_stt: "휴업자/폐업자/미등록(mock)",
-              tax_type: "mock",
-              tax_type_cd: "00",
-            },
-          ],
-          mock: true,
-        });
-      }
-    }
-
-    // ============================================================
-    // ✅ REAL 모드 (국세청/odcloud 실제 호출)
-    // ============================================================
-    const serviceKey = process.env.BIZ_API_KEY;
-    if (!serviceKey) {
-      console.error("❌ BIZ_API_KEY 환경변수가 없습니다. (.env 확인 필요)");
-      return res.status(500).json({
-        ok: false,
-        message: "서버 설정 오류(BIZ_API_KEY 미설정)",
+      return res.json({
+        ok: true,
+        data: [
+          isOk
+            ? { b_no: cleanBizNo, b_stt_cd: "01", b_stt: "계속사업자", tax_type: "mock", tax_type_cd: "00" }
+            : { b_no: cleanBizNo, b_stt_cd: "02", b_stt: "휴업자/폐업자/미등록(mock)", tax_type: "mock", tax_type_cd: "00" },
+        ],
+        mock: true,
       });
     }
 
-    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(
-      serviceKey
-    )}`;
+    // REAL
+    const serviceKey = process.env.BIZ_API_KEY;
+    if (!serviceKey) {
+      console.error("❌ BIZ_API_KEY 환경변수가 없습니다.");
+      return res.status(500).json({ ok: false, message: "서버 설정 오류(BIZ_API_KEY 미설정)" });
+    }
+
+    const API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -296,26 +241,115 @@ app.post("/verify-biz", async (req, res) => {
 
     if (!data?.data || data.data.length === 0) {
       console.error("verify-biz 응답 이상:", data);
-      return res.status(500).json({
-        ok: false,
-        message: "국세청 응답 없음",
-        raw: data,
-      });
+      return res.status(500).json({ ok: false, message: "국세청 응답 없음", raw: data });
     }
 
-    // ✅ 프론트에서 d.data[0] 접근할 수 있게 배열 그대로 내려줌
-    return res.json({
-      ok: true,
-      data: data.data,
-    });
+    return res.json({ ok: true, data: data.data });
   } catch (err) {
     console.error("verify-biz ERROR:", err.message);
-    return res.status(500).json({
-      ok: false,
-      message: "서버 오류",
-    });
+    return res.status(500).json({ ok: false, message: "서버 오류" });
   }
 });
+
+// ------------------------------------------------------------
+// ✅ 핵심: /api/subcategory 라우터는 “서브카테고리 페이지에서 가게 목록”용
+// - 매니저(grid/slot)는 /subcategorymanager_* 쪽과 완전 별개
+// ------------------------------------------------------------
+const subcategoryRouter = express.Router();
+
+/**
+ * GET /api/subcategory/combined?category=반려동물
+ * - combined_store_info 기반
+ */
+subcategoryRouter.get("/combined", async (req, res) => {
+  try {
+    const category = String(req.query.category || "").trim();
+    if (!category) return res.json({ success: true, stores: [] });
+
+    const sql = `
+      SELECT
+        id,
+        business_number,
+        business_name,
+        business_type,
+        btrim(replace(business_category::text, chr(160), ' ')) AS business_category,
+        btrim(replace(business_subcategory::text, chr(160), ' ')) AS business_subcategory,
+        business_hours,
+        delivery_option,
+        service_details,
+        event1,
+        event2,
+        facilities,
+        pets_allowed,
+        parking,
+        phone,
+        homepage,
+        instagram,
+        facebook,
+        additional_desc,
+        postal_code,
+        road_address,
+        detail_address,
+        owner_name,
+        birth_date,
+        owner_email,
+        owner_address,
+        owner_phone,
+        business_cert_path,
+        created_at,
+        main_image_url,
+        view_count
+      FROM public.combined_store_info
+      WHERE btrim(replace(business_category::text, chr(160), ' ')) = btrim(replace($1::text, chr(160), ' '))
+      ORDER BY id DESC
+    `;
+
+    const { rows } = await pool.query(sql, [category]);
+    return res.json({ success: true, stores: rows });
+  } catch (err) {
+    console.error("❌ /api/subcategory/combined error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+/**
+ * GET /api/subcategory/food?category=한식&subcategory=국밥
+ * - store_info 기반
+ */
+subcategoryRouter.get("/food", async (req, res) => {
+  try {
+    const category = String(req.query.category || "").trim();
+    const subcategory = String(req.query.subcategory || "").trim();
+
+    if (!category) return res.json({ success: true, stores: [] });
+
+    const sql = `
+      SELECT
+        id,
+        business_number,
+        business_name,
+        business_type,
+        btrim(replace(business_category::text, chr(160), ' ')) AS business_category,
+        btrim(replace(detail_category::text, chr(160), ' ')) AS business_subcategory,
+        created_at
+      FROM public.store_info
+      WHERE btrim(replace(business_category::text, chr(160), ' ')) = btrim(replace($1::text, chr(160), ' '))
+        AND (
+          $2 = '' OR btrim(replace(detail_category::text, chr(160), ' ')) = btrim(replace($2::text, chr(160), ' '))
+        )
+      ORDER BY id DESC
+    `;
+
+    const { rows } = await pool.query(sql, [category, subcategory]);
+    return res.json({ success: true, stores: rows });
+  } catch (err) {
+    console.error("❌ /api/subcategory/food error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// ✅ 여기 “반드시” 있어야 /api/subcategory/* 가 404가 안 남
+app.use("/api/subcategory", subcategoryRouter);
 
 // ------------------------------------------------------------
 // 4. 문의 게시판 라우트
@@ -360,30 +394,23 @@ app.use("/upload", uploadRouter);
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 
+// 기존 매니저
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
+// hot
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
-
-// ✅ 여기서 hotblosubRouter 하나만 사용 (핫 서브 카드)
 app.use("/api/hotsubcategory", hotblosubRouter);
 
-// ✅ 인덱스 광고 관리자 API (기존 유지)
+// 관리자
 app.use("/manager/ad", indexmanagerAdRouter);
-
-// ✅ FOOD CATEGORY 관리자 API (새 경로로 분리)
 app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
-
-// ✅ NCATEGORY2 관리자 API (추가만)
 app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 
-// ✅ Subcategory 관리자 API (mode별 분리: food/combined)
+// ✅ 서브카테고리 매니저 (FOOD/COMBINED 분리) — 이게 네 grid 엔드포인트
 app.use("/subcategorymanager_food/ad", subcategoryFoodAdRouter);
 app.use("/subcategorymanager_combined/ad", subcategoryCombinedAdRouter);
-
-// ✅ subcategoryRouter 마운트 (이게 없으면 /api/subcategory/* 가 404)
-app.use("/api/subcategory", subcategoryRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
@@ -403,30 +430,24 @@ app.use(
 );
 
 // ------------------------------------------------------------
-// 7. 업로드 파일 정적 서빙 (영구 저장 /data/uploads)
-//    ✅ 중복 제거: /uploads는 여기서 1번만 서빙
+// 7. 업로드 파일 정적 서빙
 // ------------------------------------------------------------
 app.use("/uploads", express.static(UPLOAD_ROOT));
-
-// public2/uploads도 서빙 (폴백)
 app.use("/uploads", express.static(path.join(__dirname, "public2/uploads")));
 
 // ------------------------------------------------------------
 // 8. 헬스체크
 // ------------------------------------------------------------
-app.get("/__ping", (req, res) => res.json({ ok: true }));
+app.get("/__ping", (_req, res) => res.json({ ok: true }));
 
 // ------------------------------------------------------------
 // 9. 에러 핸들러
 // ------------------------------------------------------------
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error("[error]", req.id, err);
 
-  if (err.code === "LIMIT_FILE_SIZE")
-    return res.status(413).json({ ok: false, error: "file_too_large" });
-
-  if (/Unexpected field/.test(err.message))
-    return res.status(400).json({ ok: false, error: "upload_field_error" });
+  if (err.code === "LIMIT_FILE_SIZE") return res.status(413).json({ ok: false, error: "file_too_large" });
+  if (/Unexpected field/.test(err.message)) return res.status(400).json({ ok: false, error: "upload_field_error" });
 
   res.status(500).json({ ok: false, error: "internal", message: err.message });
 });
@@ -435,9 +456,7 @@ app.use((err, req, res, next) => {
 // 10. 404 핸들러
 // ------------------------------------------------------------
 app.use((req, res) => {
-  if (/^(\/store|\/combined|\/api)/.test(req.path))
-    return res.status(404).json({ ok: false, error: "not_found" });
-
+  if (/^(\/store|\/combined|\/api)/.test(req.path)) return res.status(404).json({ ok: false, error: "not_found" });
   res.status(404).send("<h1>Not Found</h1>");
 });
 
@@ -448,5 +467,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n🚀 MALL HANKOOK server running on http://127.0.0.1:${PORT}`);
   console.log(`📁 Static root: public2/`);
-  console.log(`📤 Upload folder (persistent): /data/uploads/`);
+  console.log(`📤 Upload folder (persistent): ${UPLOAD_ROOT}`);
 });
