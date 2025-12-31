@@ -391,10 +391,20 @@ export async function grid(req, res) {
         FROM ${SLOTS_TABLE}
         WHERE (${hasCol(cols, "page") ? "page = $1 AND " : ""} position LIKE $2)
         ORDER BY
-          CASE
-            WHEN position IS NULL THEN 999999
-            ELSE COALESCE(NULLIF(regexp_replace(position, '.*\\|', ''), ''), '999999')::int
-          END ASC
+  CASE
+    WHEN position IS NULL THEN 999999
+    ELSE COALESCE(
+      NULLIF(
+        regexp_replace(
+          regexp_replace(position, '.*\\|', ''),
+          '\\D', '', 'g'
+        ),
+        ''
+      ),
+      '999999'
+    )::int
+  END ASC
+
         LIMIT $3 OFFSET $4
       `
             : `
