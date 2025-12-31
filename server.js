@@ -359,11 +359,12 @@ app.use("/upload", uploadRouter);
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 
-// ✅ [A 방식] 통합(combined) 서브카테고리 조회 API 추가
+// ✅ [A 방식] subcategory 라우터 (파일 없이 server.js 내부에서 유지)
+const subcategoryRouter = express.Router();
+
+// ✅ 통합(combined) 서브카테고리 조회 API
 // 예) /api/subcategory/combined?category=반려동물
-// ✅ [A 방식] 통합(combined) 서브카테고리 조회 API
-// 예) /api/subcategory/combined?category=반려동물
-app.get("/api/subcategory/combined", async (req, res) => {
+subcategoryRouter.get("/combined", async (req, res) => {
   try {
     const category = (req.query.category || "").toString().trim();
     if (!category) return res.json({ success: true, stores: [] });
@@ -414,7 +415,9 @@ app.get("/api/subcategory/combined", async (req, res) => {
   }
 });
 
+// ✅ 기존 마운트 유지
 app.use("/api/subcategory", subcategoryRouter);
+
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
