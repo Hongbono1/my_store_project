@@ -935,7 +935,8 @@ export async function getGrid(req, res) {
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
 
     const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory ?? req.query.sub ?? req.query.business_subcategory);
+    // ✅ 여러 파라미터 이름 지원
+    const subcategory = clean(req.query.subcategory || req.query.sub || req.query.detail_category || req.query.business_subcategory || "");
 
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
@@ -993,8 +994,14 @@ export async function getGrid(req, res) {
     }
     if (hasSubFilter) {
       paramsSlots.push(subcategory);
+      // ✅ 여러 서브카테고리 컴럼명을 통합해서 비교
       storeWherePartsForSlots.push(
-        `btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+        `btrim(COALESCE(
+          NULLIF("business_subcategory"::text, ''),
+          NULLIF("detail_category"::text, ''),
+          NULLIF("sub_category"::text, ''),
+          ''
+        )) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
 
@@ -1070,7 +1077,15 @@ export async function getGrid(req, res) {
     }
     if (subcategory && sel.subCol) {
       values.push(subcategory);
-      whereParts.push(`btrim(replace(${col(sel.subCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
+      // ✅ 여러 서브카테고리 컴럼명을 통합해서 비교
+      whereParts.push(
+        `btrim(COALESCE(
+          NULLIF(${col('business_subcategory')}::text, ''),
+          NULLIF(${col('detail_category')}::text, ''),
+          NULLIF(${col('sub_category')}::text, ''),
+          ''
+        )) = btrim(replace($${values.length}, chr(160), ' '))`
+      );
     }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
