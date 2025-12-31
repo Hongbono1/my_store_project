@@ -92,7 +92,7 @@ function parseDateTimeLocalToTs(v) {
 // ✅ detail_category 표현식 (mode별로 다른 컬럼 매핑)
 function detailCategoryExpr(mode, alias = "s") {
   const prefix = alias ? `${alias}.` : "";
-  
+
   // mode=combined => combined_store_info에는 detail_category가 없으니 business_subcategory를 사용
   if (String(mode) === "combined") {
     return `
@@ -958,7 +958,7 @@ export async function getGrid(req, res) {
   try {
     console.log("[getGrid] === START ===");
     console.log("[getGrid] query:", req.query);
-    
+
     const cols = await getSlotCols();
     const m = buildSlotColumnMap(cols);
 
@@ -981,7 +981,7 @@ export async function getGrid(req, res) {
     const category = clean(req.query.category);
     // ✅ 여러 파라미터 이름 지원
     const subcategory = clean(req.query.subcategory || req.query.sub || req.query.detail_category || req.query.business_subcategory || "");
-    
+
     console.log("[getGrid] parsed - page:", page, "section:", section, "mode:", mode, "pageNo:", pageNo);
     console.log("[getGrid] parsed - category:", category, "subcategory:", subcategory);
 
@@ -989,7 +989,7 @@ export async function getGrid(req, res) {
 
     const suffix = mode === "food" ? "__food" : "__combined";
     const like = `${section}__p${pageNo}__b%${suffix}`;
-    
+
     console.log("[getGrid] suffix:", suffix, "like pattern:", like);
 
     // --------------------------
@@ -997,7 +997,7 @@ export async function getGrid(req, res) {
     // --------------------------
     const storeTable =
       mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
-    
+
     console.log("[getGrid] storeTable:", storeTable);
     const tcols = await getColumns(storeTable);
     const sel = buildStoreSelect(storeTable, tcols);
@@ -1043,7 +1043,7 @@ export async function getGrid(req, res) {
         `btrim(replace(st."${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
-    
+
     if (hasSubFilter) {
       paramsSlots.push(subcategory);
       storeWherePartsForSlots.push(
@@ -1121,7 +1121,7 @@ export async function getGrid(req, res) {
       values.push(category);
       whereParts.push(`btrim(replace(${col(sel.catCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
-    
+
     if (subcategory && sel.subCol) {
       values.push(subcategory);
       whereParts.push(
@@ -1134,10 +1134,10 @@ export async function getGrid(req, res) {
     // ✅ 전체 건수/총페이지 계산 (12칸 기준)
     const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${A} ${whereSql}`;
     const { rows: cntRows } = await pool.query(countSql, values.slice(0, whereParts.length));
-    const total = cntRows?.[0]?.cnt ?? 0;
-    const totalPages = Math.max(1, Math.ceil(total / 12));
-    const hasPrev = pageNo > 1;
-    const hasNext = pageNo < totalPages;
+    let total = cntRows?.[0]?.cnt ?? 0;
+    let totalPages = Math.max(1, Math.ceil(total / 12));
+    let hasPrev = pageNo > 1;
+    let hasNext = pageNo < totalPages;
 
     const orderBy = buildAutoOrderBy(section, sel, A);
 
@@ -1190,7 +1190,7 @@ export async function getGrid(req, res) {
     // --------------------------
     // 3) 12칸 합성(override 우선)
     // --------------------------
-    const items = [];
+    let items = [];
     for (let b = 1; b <= 12; b += 1) {
       const position = `${section}__p${pageNo}__b${b}${suffix}`;
 
