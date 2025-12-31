@@ -419,7 +419,8 @@
 
                                     <div class="mt-4 text-sm">
                                         <div class="text-blue-600/80">사업자</div>
-                                        <div id="selectedBusinessNo" class="mt-1 font-mono text-base font-bold text-blue-900">
+                                        <div id="selectedBusinessNo"
+                                            class="mt-1 font-mono text-base font-bold text-blue-900">
                                             -
                                         </div>
                                     </div>
@@ -554,7 +555,8 @@
         const PAGE_NAME = "subcategory";
         const DEFAULT_PRIORITY = 1;
 
-        const API_BASE_CANDIDATES = ["/subcategorymanager/ad", "/admin/subcategory"];
+        // ✅ 푸드 매니저 API를 최우선으로 잡는다 (저장 위치 달라지는 문제 해결)
+        const API_BASE_CANDIDATES = ["/subcategorymanager_food/ad", "/subcategorymanager/ad", "/admin/subcategory"];
         let API_BASE = null;
 
         let uiPick = "image";
@@ -565,6 +567,16 @@
         const state = {
             currentMode: "food",
         };
+
+        // ✅ 헤더 삽입 후 id 충돌 방지: main 내부를 먼저 찾고, 없으면 document에서 찾기
+        const MAIN_ROOT = document.querySelector("main");
+        function $(id) {
+            if (MAIN_ROOT) {
+                const el = MAIN_ROOT.querySelector(`#${id}`);
+                if (el) return el;
+            }
+            return document.getElementById(id);
+        }
 
         // ✅ 상위 카테고리 → 하위 카테고리 매핑(필요하면 계속 늘리면 됨)
         const SUB_BY_CATEGORY = {
@@ -634,23 +646,13 @@
             });
         }
 
-        function $(id) { return document.getElementById(id); }
-
         function nowStr() {
             const d = new Date();
             const pad = (n) => String(n).padStart(2, "0");
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
-        function ensureBottomVisible() {
-            // 마지막 입력(상태바)로 스크롤 보정
-            // ✅ 스크롤 점프 방지를 위해 비활성화
-            // try {
-            //     const el = $("statusBar");
-            //     if (!el) return;
-            //     el.scrollIntoView({ block: "end", behavior: "instant" });
-            // } catch (_e) { }
-        }
+        function ensureBottomVisible() { }
 
         function setStatus(type, text, sub = "") {
             const bar = $("statusBar");
@@ -664,9 +666,9 @@
         }
 
         function setBusy(on, msg) {
-            const save = document.getElementById("btnSave");
-            const del = document.getElementById("btnDelete");
-            const search = document.getElementById("btnSearch");
+            const save = $("btnSave");
+            const del = $("btnDelete");
+            const search = $("btnSearch");
 
             save.disabled = !!on;
             del.disabled = !!on;
@@ -696,10 +698,18 @@
             return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
         }
 
-        // ✅ 배너는 독립 position
+        // ✅ 배너는 "서브카테고리 페이지가 읽는 키"와 동일하게 맞춘다: subcategory_top__food/__combined
+        // ✅ 단, 과거 키(subcategory_top_banner__*)로 저장된 게 있으면 자동 로드/삭제 지원
         function buildBannerPosition(mode) {
             const suffix = mode === "food" ? "__food" : "__combined";
+            return `subcategory_top${suffix}`;
+        }
+        function buildBannerLegacyPosition(mode) {
+            const suffix = mode === "food" ? "__food" : "__combined";
             return `subcategory_top_banner${suffix}`;
+        }
+        function bannerPositionCandidates(mode) {
+            return [buildBannerPosition(mode), buildBannerLegacyPosition(mode)];
         }
 
         let bannerTarget = { mode: "food", position: buildBannerPosition("food"), priority: 1 };
@@ -721,13 +731,8 @@
 
         let _draftTimer = null;
 
-        function isBlobUrl(src) {
-            return /^blob:/.test(String(src || ""));
-        }
-
-        function safeJsonParse(s) {
-            try { return JSON.parse(s); } catch (_e) { return null; }
-        }
+        function isBlobUrl(src) { return /^blob:/.test(String(src || "")); }
+        function safeJsonParse(s) { try { return JSON.parse(s); } catch (_e) { return null; } }
 
         function scheduleDraftSave() {
             clearTimeout(_draftTimer);
@@ -741,7 +746,7 @@
             const watchIds = [
                 "mode", "section", "pageNo", "slotArea", "q", "searchType",
                 "linkUrl", "textTitle", "textDesc", "startAt", "endAt", "noEnd",
-                "placementCatFilter", "placementSubFilter",   // ✅ 추가
+                "placementCatFilter", "placementSubFilter",
             ];
 
             watchIds.forEach((id) => {
@@ -758,9 +763,7 @@
             });
 
             const file = $("bannerFile");
-            if (file) {
-                file.addEventListener("change", () => scheduleDraftSave());
-            }
+            if (file) file.addEventListener("change", () => scheduleDraftSave());
         }
 
         function saveDraftMain(mode) {
@@ -838,7 +841,6 @@
             const d = safeJsonParse(raw);
             if (!d) return false;
 
-            // 모드 복구는 인자로 받은 mode가 '진짜 모드'
             if ($("mode")) $("mode").value = mode;
             if ($("section") && d.section) $("section").value = d.section;
             if ($("pageNo") && d.pageNo) $("pageNo").value = String(Math.max(Number(d.pageNo || 1), 1));
@@ -850,11 +852,8 @@
             setSubcategoryOptionsByCategory($("placementCatFilter")?.value || "");
 
             if ($("placementSubFilter")) {
-                if ($("placementSubFilter").disabled) {
-                    $("placementSubFilter").value = "";
-                } else {
-                    $("placementSubFilter").value = d.placementSubFilter ?? "";
-                }
+                if ($("placementSubFilter").disabled) $("placementSubFilter").value = "";
+                else $("placementSubFilter").value = d.placementSubFilter ?? "";
             }
 
             if (d.uiPick) setPick(d.uiPick);
@@ -889,9 +888,8 @@
                 setStoreBox(null);
             }
 
-            if (d.bannerPreview) {
-                setBannerPreview(d.bannerPreview);
-            } else {
+            if (d.bannerPreview) setBannerPreview(d.bannerPreview);
+            else {
                 const storeImg = $("storeImageUrl")?.value || "";
                 setBannerPreview(storeImg || "/uploads/no-image.png");
             }
@@ -907,10 +905,7 @@
             const d = safeJsonParse(raw);
             if (!d) return false;
 
-            // bannerMode는 모드와 동일하게 유지
-            if ($("linkUrl") && typeof d.linkUrl === "string") {
-                $("linkUrl").value = d.linkUrl;
-            }
+            if ($("linkUrl") && typeof d.linkUrl === "string") $("linkUrl").value = d.linkUrl;
             if (d.bannerPreview) setBannerPreview(d.bannerPreview);
             return true;
         }
@@ -918,21 +913,6 @@
         function setBannerPreview(src) {
             $("bannerPreview").src = src || "/uploads/no-image.png";
         }
-
-        $("bannerFile").addEventListener("change", (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            setBannerPreview(URL.createObjectURL(f));
-            scheduleDraftSave();
-        });
-
-        $("btnClearImage").addEventListener("click", () => {
-            $("bannerFile").value = "";
-            const storeImg = $("storeImageUrl").value;
-            setBannerPreview(storeImg || "/uploads/no-image.png");
-            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
-            scheduleDraftSave();
-        });
 
         function setPick(next) {
             uiPick = next;
@@ -945,7 +925,6 @@
             $("textInputs").classList.toggle("hidden", uiPick !== "text");
 
             if (uiPick === "text") $("bannerFile").value = "";
-
             ensureBottomVisible();
         }
 
@@ -986,44 +965,62 @@
             $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
         }
 
-        // ✅ 배너 슬롯 불러오기
+        // ✅ 배너 슬롯 불러오기 (신키/구키 모두 탐색)
         async function loadBannerSlot(silent = false) {
             try {
                 syncBannerUI();
 
-                if (!silent) {
-                    setStatus("warn", "배너 불러오는 중...", `position: ${bannerTarget.position} / 시간: ${nowStr()}`);
+                if (!silent) setStatus("warn", "배너 불러오는 중...", `시간: ${nowStr()}`);
+
+                const posList = bannerPositionCandidates(bannerTarget.mode);
+
+                let foundSlot = null;
+                let foundPos = null;
+
+                for (const pos of posList) {
+                    const qs = new URLSearchParams({
+                        page: PAGE_NAME,
+                        position: pos,
+                        priority: String(bannerTarget.priority),
+                    }).toString();
+
+                    const data = await apiFetch(`/slot?${qs}`);
+                    const slot = data?.slot || null;
+                    if (slot) {
+                        foundSlot = slot;
+                        foundPos = pos;
+                        break;
+                    }
                 }
 
-                const qs = new URLSearchParams({
-                    page: PAGE_NAME,
-                    position: bannerTarget.position,
-                    priority: String(bannerTarget.priority),
-                }).toString();
-
-                const data = await apiFetch(`/slot?${qs}`);
-                const slot = data?.slot || null;
-
-                if (!slot) {
+                if (!foundSlot) {
                     setBannerPreview("/uploads/no-image.png");
-                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `배너 모드: ${bannerTarget.mode} / 시간: ${nowStr()}`);
+                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `모드: ${bannerTarget.mode} / 시간: ${nowStr()}`);
                     scheduleDraftSave();
                     return;
                 }
 
-                if (slot.image_url) setBannerPreview(slot.image_url);
+                if (foundSlot.image_url) setBannerPreview(foundSlot.image_url);
                 $("bannerFile").value = "";
+                if ($("linkUrl")) $("linkUrl").value = foundSlot.link_url || "";
 
-                if ($("linkUrl")) $("linkUrl").value = slot.link_url || "";
+                // 화면에 표시되는 position은 "신키"로 유지 (서브카테고리 페이지와 동일)
+                $("bannerPositionView").value = buildBannerPosition(bannerTarget.mode);
 
-                if (!silent) setStatus("ok", "배너 불러오기 완료", `position: ${bannerTarget.position} / 시간: ${nowStr()}`);
+                if (!silent) {
+                    const note = foundPos === buildBannerLegacyPosition(bannerTarget.mode)
+                        ? "※ 예전 키에서 불러옴(저장하면 자동으로 새 키로 정리됩니다)"
+                        : "";
+                    setStatus("ok", "배너 불러오기 완료", `position: ${foundPos} ${note} / 시간: ${nowStr()}`);
+                }
+
                 scheduleDraftSave();
             } catch (e) {
                 if (!silent) setStatus("bad", "배너 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
-        // ✅ 배너 저장
+        // ✅ 배너 저장 (항상 신키로 저장)
         async function saveBannerSlot() {
             try {
                 syncBannerUI();
@@ -1031,7 +1028,7 @@
 
                 const fd = new FormData();
                 fd.append("page", PAGE_NAME);
-                fd.append("position", bannerTarget.position);
+                fd.append("position", buildBannerPosition(bannerTarget.mode));
                 fd.append("priority", "1");
 
                 fd.append("adMode", "banner");
@@ -1050,7 +1047,7 @@
 
                 $("bannerFile").value = "";
 
-                setStatus("ok", "배너 저장 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
+                setStatus("ok", "배너 저장 완료 ✅", `mode:${bannerTarget.mode} / position:${buildBannerPosition(bannerTarget.mode)} / 시간:${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간:${nowStr()}`);
@@ -1059,31 +1056,45 @@
             }
         }
 
-        // ✅ 배너 삭제
+        // ✅ 배너 삭제 (신키 먼저 → 0개면 구키도 삭제 시도)
         async function deleteBannerSlot() {
             try {
                 syncBannerUI();
                 setBusy(true, "배너 삭제 중...");
 
-                const qs = new URLSearchParams({
-                    page: PAGE_NAME,
-                    position: bannerTarget.position,
-                    priority: "1",
-                }).toString();
+                const tryDelete = async (pos) => {
+                    const qs = new URLSearchParams({
+                        page: PAGE_NAME,
+                        position: pos,
+                        priority: "1",
+                    }).toString();
+                    const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                    return data;
+                };
 
-                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                const posNew = buildBannerPosition(bannerTarget.mode);
+                const posOld = buildBannerLegacyPosition(bannerTarget.mode);
+
+                let data = await tryDelete(posNew);
                 if (!data.success) throw new Error(data.error || "배너 삭제 실패");
 
-                const delCount = Number(data.deleted || 0);
+                let delCount = Number(data.deleted || 0);
+
                 if (delCount === 0) {
-                    setStatus("bad", "배너 삭제 실패 ❌", `삭제된 행 0개(키 불일치) / position:${bannerTarget.position}`);
+                    // 구키도 시도
+                    data = await tryDelete(posOld);
+                    if (data.success) delCount = Number(data.deleted || 0);
+                }
+
+                if (delCount === 0) {
+                    setStatus("bad", "배너 삭제 실패 ❌", `삭제된 행 0개(키 불일치) / new:${posNew} / old:${posOld}`);
                     return;
                 }
 
                 setBannerPreview("/uploads/no-image.png");
                 if ($("linkUrl")) $("linkUrl").value = "";
 
-                setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / position:${bannerTarget.position} / 시간:${nowStr()}`);
+                setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / 시간:${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간:${nowStr()}`);
@@ -1225,16 +1236,15 @@
                     selectedStore = r;
 
                     const sec = $("section")?.value || "all_items";
-                    if ($("slotArea")) $("slotArea").value = sec; // section과 항상 동기화
+                    if ($("slotArea")) $("slotArea").value = sec;
 
                     selectedTarget.section = sec;
-                    selectedTarget.area = sec; // 통일
+                    selectedTarget.area = sec;
                     selectedTarget.mode = $("mode").value || "food";
                     selectedTarget.pageNo = Number(r.page_number || 1);
                     selectedTarget.boxNo = Number(r.index_in_page || 1);
                     selectedTarget.priority = DEFAULT_PRIORITY;
 
-                    // ✅ position은 항상 section 기준
                     selectedTarget.position = buildPosition(sec, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
 
                     syncChips();
@@ -1428,12 +1438,7 @@
 
                 await loadGrid();
 
-                setStatus(
-                    "ok",
-                    "저장 완료 ✅",
-                    `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`
-                );
-
+                setStatus("ok", "저장 완료 ✅", `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
@@ -1504,26 +1509,21 @@
         async function switchMode(nextMode) {
             const prev = state.currentMode || "food";
 
-            // 현재 모드 저장
             saveDraftMain(prev);
             saveDraftBanner(prev);
 
-            // 배너 모드도 같이 변경(연동)
             $("mode").value = nextMode;
             $("bannerMode").value = nextMode;
             syncBannerUI();
 
             state.currentMode = nextMode;
 
-            // 전환 모드 복구
             const okMain = restoreDraftMainForMode(nextMode);
             restoreDraftBannerForMode(nextMode);
 
-            // 배너/그리드 새로고침
             await loadBannerSlot(true);
             await loadGrid();
 
-            // ✅ 모드 바뻔면 현재 선택값으로 position suffix 재생성
             if (selectedTarget?.pageNo && selectedTarget?.boxNo) {
                 const sec = $("section")?.value || selectedTarget.section || "all_items";
                 selectedTarget.section = sec;
@@ -1536,26 +1536,19 @@
                 syncChips();
             }
 
-            setStatus("ok", `모드 전환 완료 (${prev} → ${nextMode})`, `마지막 입력/선택 상태 유지 / 시간: ${nowStr()}`);
-            if (!okMain) {
-                setStatus("warn", `모드 전환 (${prev} → ${nextMode})`, `해당 모드에 저장된 마지막 입력이 없어 기본값으로 시작합니다 / 시간: ${nowStr()}`);
-            }
+            setStatus("ok", `모드 전환 완료 (${prev} → ${nextMode})`, `시간: ${nowStr()}`);
+            if (!okMain) setStatus("warn", `모드 전환 (${prev} → ${nextMode})`, `해당 모드에 저장된 마지막 입력이 없어 기본값으로 시작합니다 / 시간: ${nowStr()}`);
 
             ensureBottomVisible();
         }
 
-        // ✅ 모드 변경 이벤트
         $("mode").addEventListener("change", async () => {
             const next = $("mode").value || "food";
             if (next === state.currentMode) return;
-
-            // 배너는 항상 하단 모드 기준으로
             await switchMode(next);
             scheduleDraftSave();
         });
 
-        // 배너Mode는 수동 변경 막고, 모드에서만 바뀌게(요구사항: 배너/아래는 푸드 기준)
-        // 사용자는 "mode"만 바꾸면 됨
         $("bannerMode").addEventListener("change", () => {
             $("bannerMode").value = $("mode").value || "food";
             syncBannerUI();
@@ -1564,13 +1557,27 @@
         $("btnBannerSave").addEventListener("click", saveBannerSlot);
         $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
 
-        let _keepScrollY = 0;
+        $("bannerFile").addEventListener("change", (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setBannerPreview(URL.createObjectURL(f));
+            scheduleDraftSave();
+        });
+
+        $("btnClearImage").addEventListener("click", () => {
+            $("bannerFile").value = "";
+            const storeImg = $("storeImageUrl").value;
+            setBannerPreview(storeImg || "/uploads/no-image.png");
+            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
+            scheduleDraftSave();
+        });
+
         let selectedBoxNo = null;
 
         function fillSelectedStoreInfo(item) {
-            const nameEl = document.getElementById("selectedBusinessName");
-            const bizEl = document.getElementById("selectedBusinessNo");
-            const boxEl = document.getElementById("selectedBoxNo");
+            const nameEl = $("selectedBusinessName");
+            const bizEl = $("selectedBusinessNo");
+            const boxEl = $("selectedBoxNo");
 
             const name = item?.business_name || item?.store_name || "";
             const biz = item?.business_no || item?.business_number || "";
@@ -1587,11 +1594,8 @@
         function highlightSelectedBox() {
             document.querySelectorAll("[data-box]").forEach((el) => {
                 const n = Number(el.getAttribute("data-box"));
-                if (n && selectedBoxNo === n) {
-                    el.classList.add("ring-2", "ring-blue-500");
-                } else {
-                    el.classList.remove("ring-2", "ring-blue-500");
-                }
+                if (n && selectedBoxNo === n) el.classList.add("ring-2", "ring-blue-500");
+                else el.classList.remove("ring-2", "ring-blue-500");
             });
         }
 
@@ -1642,7 +1646,7 @@
         `;
 
                 btn.addEventListener("click", async (e) => {
-                    e.preventDefault();     // ✅ href="#" 점프 방지
+                    e.preventDefault();
                     e.stopPropagation();
 
                     const s = $("section").value || "all_items";
@@ -1657,7 +1661,7 @@
                     selectedTarget.position = buildPosition(s, m, p, b);
                     selectedTarget.priority = DEFAULT_PRIORITY;
 
-                    if ($("slotArea")) $("slotArea").value = s; // ✅ section과 slotArea 동기화
+                    if ($("slotArea")) $("slotArea").value = s;
 
                     syncChips();
 
@@ -1692,15 +1696,13 @@
         $("slotArea").addEventListener("change", () => {
             const v = $("slotArea").value;
 
-            // top은 이미 위에서 배너로 따로 처리하니까 여기서는 안내만
             if (v === "top") {
                 setStatus("warn", "상단 배너는 위의 '배너 저장/삭제'를 사용하세요.", `시간: ${nowStr()}`);
                 return;
             }
 
-            // ✅ slotArea 바뀌면 section도 같은 값으로 통일
             $("section").value = v;
-            selectedTarget.position = "";                 // 위치 재선택 유도
+            selectedTarget.position = "";
             $("pickedBoxText").textContent = "-";
             $("pickedBoxPos").textContent = "position: -";
             syncChips();
@@ -1727,17 +1729,15 @@
         (async function init() {
             hydrateLayout();
 
-            // 기본은 푸드
             $("mode").value = "food";
             $("bannerMode").value = "food";
-            $("bannerMode").disabled = true; // 배너/아래 모드 연동 고정
+            $("bannerMode").disabled = true;
             state.currentMode = "food";
 
             setPick("image");
             bindDraftAutoSave();
             initCategoryFilterUI();
 
-            // 푸드 마지막 입력 복구
             const restored = restoreDraftMainForMode("food");
             restoreDraftBannerForMode("food");
 
@@ -1745,11 +1745,8 @@
             await loadBannerSlot(true);
             await loadGrid();
 
-            if (restored) {
-                setStatus("ok", "푸드 마지막 입력 복구됨 ✅", `새로고침/재진입에도 유지 / 시간: ${nowStr()}`);
-            } else {
-                setStatus("warn", "푸드 기본 화면", `가게 검색 후 선택하세요 / 시간: ${nowStr()}`);
-            }
+            if (restored) setStatus("ok", "푸드 마지막 입력 복구됨 ✅", `새로고침/재진입에도 유지 / 시간: ${nowStr()}`);
+            else setStatus("warn", "푸드 기본 화면", `가게 검색 후 선택하세요 / 시간: ${nowStr()}`);
         })();
     </script>
 </body>
