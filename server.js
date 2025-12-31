@@ -20,7 +20,6 @@ import fetch from "node-fetch";
 // Routers
 import foodregisterRouter from "./routes/foodregister.js";
 import ncombinedregister from "./routes/ncombinedregister.js";
-import subcategoryRouter from "./routes/subcategory.js";
 import hotblogRouter from "./routes/hotblogregister.js";
 import ownerRouter from "./routes/owner.js";
 import suggestRouter from "./routes/suggestRouter.js";
