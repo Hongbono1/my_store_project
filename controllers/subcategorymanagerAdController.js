@@ -89,6 +89,28 @@ function parseDateTimeLocalToTs(v) {
   return d.toISOString();
 }
 
+// ✅ detail_category 표현식 (mode별로 다른 컬럼 매핑)
+function detailCategoryExpr(mode, alias = "s") {
+  // mode=combined => combined_store_info에는 detail_category가 없으니 business_subcategory를 사용
+  if (String(mode) === "combined") {
+    return `
+      COALESCE(
+        NULLIF(TRIM(${alias}."business_subcategory"::text), ''),
+        NULLIF(TRIM(${alias}."business_type"::text), ''),
+        ''
+      )
+    `;
+  }
+
+  // food(store_info 등) => detail_category 존재
+  return `
+    COALESCE(
+      NULLIF(TRIM(${alias}."detail_category"::text), ''),
+      ''
+    )
+  `;
+}
+
 export function makeMulterStorage() {
   return {
     destination(_req, _file, cb) {
@@ -994,14 +1016,9 @@ export async function getGrid(req, res) {
     }
     if (hasSubFilter) {
       paramsSlots.push(subcategory);
-      // ✅ 여러 서브카테고리 컴럼명을 통합해서 비교
+      // ✅ mode별로 안전하게 detail_category 표현식 사용
       storeWherePartsForSlots.push(
-        `btrim(COALESCE(
-          NULLIF("business_subcategory"::text, ''),
-          NULLIF("detail_category"::text, ''),
-          NULLIF("sub_category"::text, ''),
-          ''
-        )) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+        `btrim(${detailCategoryExpr(mode, "")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
 
@@ -1077,14 +1094,9 @@ export async function getGrid(req, res) {
     }
     if (subcategory && sel.subCol) {
       values.push(subcategory);
-      // ✅ 여러 서브카테고리 컴럼명을 통합해서 비교
+      // ✅ mode별로 안전하게 detail_category 표현식 사용
       whereParts.push(
-        `btrim(COALESCE(
-          NULLIF(${col('business_subcategory')}::text, ''),
-          NULLIF(${col('detail_category')}::text, ''),
-          NULLIF(${col('sub_category')}::text, ''),
-          ''
-        )) = btrim(replace($${values.length}, chr(160), ' '))`
+        `btrim(${detailCategoryExpr(mode, A)}) = btrim(replace($${values.length}, chr(160), ' '))`
       );
     }
 
