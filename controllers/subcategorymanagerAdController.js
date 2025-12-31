@@ -1016,13 +1016,14 @@ export async function getGrid(req, res) {
         `btrim(replace(st."${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
-    if (hasSubFilter) {
-      paramsSlots.push(subcategory);
-      // ✅ mode별로 안전하게 detail_category 표현식 사용 (서브쿼리용 alias: st)
-      storeWherePartsForSlots.push(
-        `btrim(${detailCategoryExpr(mode, "st")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
-      );
-    }
+    
+    // ✅ subcategory 필터는 combined 테이블 구조 확인 후 적용 (임시 비활성화)
+    // if (hasSubFilter) {
+    //   paramsSlots.push(subcategory);
+    //   storeWherePartsForSlots.push(
+    //     `btrim(${detailCategoryExpr(mode, "st")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+    //   );
+    // }
 
     const storeWhereSqlForSlots = storeWherePartsForSlots.length
       ? `WHERE ${storeWherePartsForSlots.join(" AND ")}`
@@ -1094,13 +1095,14 @@ export async function getGrid(req, res) {
       values.push(category);
       whereParts.push(`btrim(replace(${col(sel.catCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
-    if (subcategory && sel.subCol) {
-      values.push(subcategory);
-      // ✅ mode별로 안전하게 detail_category 표현식 사용
-      whereParts.push(
-        `btrim(${detailCategoryExpr(mode, A)}) = btrim(replace($${values.length}, chr(160), ' '))`
-      );
-    }
+    
+    // ✅ subcategory 필터는 combined 테이블 구조 확인 후 적용 (임시 비활성화)
+    // if (subcategory && sel.subCol) {
+    //   values.push(subcategory);
+    //   whereParts.push(
+    //     `btrim(${detailCategoryExpr(mode, A)}) = btrim(replace($${values.length}, chr(160), ' '))`
+    //   );
+    // }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
