@@ -1013,14 +1013,14 @@ export async function getGrid(req, res) {
     if (hasCatFilter) {
       paramsSlots.push(category);
       storeWherePartsForSlots.push(
-        `btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+        `btrim(replace(st."${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
     if (hasSubFilter) {
       paramsSlots.push(subcategory);
-      // ✅ mode별로 안전하게 detail_category 표현식 사용
+      // ✅ mode별로 안전하게 detail_category 표현식 사용 (서브쿼리용 alias: st)
       storeWherePartsForSlots.push(
-        `btrim(${detailCategoryExpr(mode, "")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+        `btrim(${detailCategoryExpr(mode, "st")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
       );
     }
 
@@ -1035,8 +1035,8 @@ export async function getGrid(req, res) {
       AND (
         slots."${storeIdCol}" IS NULL
         OR slots."${storeIdCol}"::text IN (
-          SELECT "${sel.idCol}"::text
-          FROM ${storeTable}
+          SELECT st."${sel.idCol}"::text
+          FROM ${storeTable} st
           ${storeWhereSqlForSlots}
         )
       )
