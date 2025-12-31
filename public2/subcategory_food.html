@@ -13,20 +13,19 @@
 
     <!-- HERO -->
     <section class="relative h-[70vh] max-h-[400px] flex items-center justify-between px-8 bg-gray-50">
-  <div class="flex-1 flex justify-center">
-    <a id="heroLink" href="#">
-      <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너"
-           class="h-[280px] object-contain">
-    </a>
-  </div>
-  <div class="flex-1 text-left">
-    <!-- ✅ setHero 에서 heroTitle, heroSubtitle 를 찾을 수 있게 id 부여 -->
-    <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
-    <p id="heroSubtitle" class="text-slate-600 text-sm md:text-base mt-2">
-      설명 텍스트...
-    </p>
-  </div>
-</section>
+        <div class="flex-1 flex justify-center">
+            <a id="heroLink" href="#">
+                <img id="heroImage" src="/uploads/sample-banner-product.png" alt="배너" class="h-[280px] object-contain">
+            </a>
+        </div>
+        <div class="flex-1 text-left">
+            <!-- ✅ setHero 에서 heroTitle, heroSubtitle 를 찾을 수 있게 id 부여 -->
+            <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
+            <p id="heroSubtitle" class="text-slate-600 text-sm md:text-base mt-2">
+                설명 텍스트...
+            </p>
+        </div>
+    </section>
 
     <!-- All of the items -->
     <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
@@ -378,11 +377,25 @@
             }
         }
 
+        // ✅ 여기서 btnMoreHero 가 없을 수도 있으니까 안전하게 처리
         function syncMoreButtonLabels() {
-            qs("#btnMoreItems").textContent = state.sectionState.items.expanded ? "접기" : "더보기";
-            qs("#btnMoreBest").textContent = state.sectionState.best.expanded ? "접기" : "더보기";
-            qs("#btnMoreNew").textContent = state.sectionState.newly.expanded ? "접기" : "더보기";
-            qs("#btnMoreHero").textContent = state.sectionState.items.expanded ? "CLOSE VIEW" : "MORE VIEW";
+            const btnItems = qs("#btnMoreItems");
+            const btnBest = qs("#btnMoreBest");
+            const btnNew = qs("#btnMoreNew");
+            const btnHero = qs("#btnMoreHero"); // 현재 HTML에는 없지만, 있어도 동작하게
+
+            if (btnItems) {
+                btnItems.textContent = state.sectionState.items.expanded ? "접기" : "더보기";
+            }
+            if (btnBest) {
+                btnBest.textContent = state.sectionState.best.expanded ? "접기" : "더보기";
+            }
+            if (btnNew) {
+                btnNew.textContent = state.sectionState.newly.expanded ? "접기" : "더보기";
+            }
+            if (btnHero) {
+                btnHero.textContent = state.sectionState.items.expanded ? "CLOSE VIEW" : "MORE VIEW";
+            }
         }
 
         function resetAllPages() {
@@ -592,64 +605,102 @@
             }
         }
 
+        // ✅ 여기서도 btnMoreHero 없을 수 있으니 null 체크
         function bindEvents() {
-            qs("#btnMoreItems").onclick = async () => {
-                const st = state.sectionState.items;
-                st.expanded = !st.expanded;
-                st.page = 1;
-                syncMoreButtonLabels();
-                await renderItemsSection();
-            };
-            qs("#btnMoreHero").onclick = () => qs("#btnMoreItems").click();
+            const btnMoreItems = qs("#btnMoreItems");
+            const btnMoreBest = qs("#btnMoreBest");
+            const btnMoreNew = qs("#btnMoreNew");
+            const btnMoreHero = qs("#btnMoreHero"); // 현재는 없음
+            const itemsPrev = qs("#itemsPrev");
+            const itemsNext = qs("#itemsNext");
+            const bestPrev = qs("#bestPrev");
+            const bestNext = qs("#bestNext");
+            const newPrev = qs("#newPrev");
+            const newNext = qs("#newNext");
 
-            qs("#itemsPrev").onclick = async () => {
-                const st = state.sectionState.items;
-                st.page = Math.max(1, st.page - 1);
-                await renderItemsSection();
-            };
-            qs("#itemsNext").onclick = async () => {
-                const st = state.sectionState.items;
-                st.page = Math.min(st.totalPages || 1, st.page + 1);
-                await renderItemsSection();
-            };
+            if (btnMoreItems) {
+                btnMoreItems.onclick = async () => {
+                    const st = state.sectionState.items;
+                    st.expanded = !st.expanded;
+                    st.page = 1;
+                    syncMoreButtonLabels();
+                    await renderItemsSection();
+                };
+            }
 
-            qs("#btnMoreBest").onclick = async (e) => {
-                e?.preventDefault?.();
-                const st = state.sectionState.best;
-                st.expanded = !st.expanded;
-                st.page = 1;
-                syncMoreButtonLabels();
-                await renderBestSection();
-            };
-            qs("#bestPrev").onclick = async () => {
-                const st = state.sectionState.best;
-                st.page = Math.max(1, st.page - 1);
-                await renderBestSection();
-            };
-            qs("#bestNext").onclick = async () => {
-                const st = state.sectionState.best;
-                st.page = Math.min(st.totalPages || 1, st.page + 1);
-                await renderBestSection();
-            };
+            if (btnMoreHero && btnMoreItems) {
+                btnMoreHero.onclick = () => btnMoreItems.click();
+            }
 
-            qs("#btnMoreNew").onclick = async (e) => {
-                e?.preventDefault?.();
-                const st = state.sectionState.newly;
-                st.expanded = !st.expanded;
-                st.page = 1;
-                syncMoreButtonLabels();
-                await renderNewSection();
-            };
-            qs("#newPrev").onclick = async () => {
-                const st = state.sectionState.newly;
-                st.page = Math.max(1, st.page - 1);
-                await renderNewSection();
-            };
-            qs("#newNext").onclick = async () => {
-                const st = state.sectionState.newly;
-                st.page = Math.min(st.totalPages || 1, st.page + 1);
-                await renderNewSection();
-            };
+            if (itemsPrev) {
+                itemsPrev.onclick = async () => {
+                    const st = state.sectionState.items;
+                    st.page = Math.max(1, st.page - 1);
+                    await renderItemsSection();
+                };
+            }
+
+            if (itemsNext) {
+                itemsNext.onclick = async () => {
+                    const st = state.sectionState.items;
+                    st.page = Math.min(st.totalPages || 1, st.page + 1);
+                    await renderItemsSection();
+                };
+            }
+
+            if (btnMoreBest) {
+                btnMoreBest.onclick = async (e) => {
+                    e?.preventDefault?.();
+                    const st = state.sectionState.best;
+                    st.expanded = !st.expanded;
+                    st.page = 1;
+                    syncMoreButtonLabels();
+                    await renderBestSection();
+                };
+            }
+
+            if (bestPrev) {
+                bestPrev.onclick = async () => {
+                    const st = state.sectionState.best;
+                    st.page = Math.max(1, st.page - 1);
+                    await renderBestSection();
+                };
+            }
+
+            if (bestNext) {
+                bestNext.onclick = async () => {
+                    const st = state.sectionState.best;
+                    st.page = Math.min(st.totalPages || 1, st.page + 1);
+                    await renderBestSection();
+                };
+            }
+
+            if (btnMoreNew) {
+                btnMoreNew.onclick = async (e) => {
+                    e?.preventDefault?.();
+                    const st = state.sectionState.newly;
+                    st.expanded = !st.expanded;
+                    st.page = 1;
+                    syncMoreButtonLabels();
+                    await renderNewSection();
+                };
+            }
+
+            if (newPrev) {
+                newPrev.onclick = async () => {
+                    const st = state.sectionState.newly;
+                    st.page = Math.max(1, st.page - 1);
+                    await renderNewSection();
+                };
+            }
+
+            if (newNext) {
+                newNext.onclick = async () => {
+                    const st = state.sectionState.newly;
+                    st.page = Math.min(st.totalPages || 1, st.page + 1);
+                    await renderNewSection();
+                };
+            }
         }
 
         async function includeHeaderFooter() {
