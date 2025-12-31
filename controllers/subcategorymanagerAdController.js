@@ -331,17 +331,21 @@ async function pickImageMetaForMode(mode) {
   return null;
 }
 
-function buildImageSubquery(selIdCol, meta) {
+function buildImageSubquery(outerAlias, outerIdCol, meta) {
   if (!meta) return "NULL";
+
   const order = meta.orderCol
     ? `"${meta.orderCol}" ASC NULLS LAST`
     : `"${meta.urlCol}" ASC NULLS LAST`;
+
+  // ✅ 핵심: 바깥(store) alias를 명시해서 fk = s.id 로 비교
+  const outerIdExpr = `${outerAlias}."${outerIdCol}"`;
 
   return `
     (
       SELECT NULLIF("${meta.urlCol}"::text,'')
       FROM ${meta.table}
-      WHERE "${meta.fkCol}"::text = "${selIdCol}"::text
+      WHERE "${meta.fkCol}"::text = ${outerIdExpr}::text
       ORDER BY ${order}
       LIMIT 1
     )
@@ -368,9 +372,13 @@ export async function listStores(req, res) {
     const tcols = await getColumns(storeTable);
     const sel = buildStoreSelect(storeTable, tcols);
 
+    // ✅ alias 설정
+    const A = "s";
+    const col = (c) => `${A}."${c}"`;
+
     // ✅ 공백/NBSP 정규화 (컬럼/파라미터 동일 규칙)
-    const normCol = (col) =>
-      `btrim(replace(COALESCE("${col}"::text,''), chr(160), ' '))`;
+    const normCol = (c) =>
+      `btrim(replace(COALESCE(${col(c)}::text,''), chr(160), ' '))`;
     const normParam = (idx) => `btrim(replace($${idx}::text, chr(160), ' '))`;
 
     const values = [];
@@ -390,28 +398,28 @@ export async function listStores(req, res) {
 
     // ✅ 대표 이미지: 스토어 테이블 imgCol or 이미지테이블 1장
     const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
     const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
       : `COALESCE(${imgSub},'')`;
 
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${whereSql}`;
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${A} ${whereSql}`;
     const { rows: crows } = await pool.query(countSql, values);
     const total = crows[0]?.cnt || 0;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     const selectSql = `
       SELECT
-        "${sel.idCol}"::text AS id,
-        ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_number,
-        "${sel.nameCol}"::text AS business_name,
-        ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS business_type,
-        ${sel.catCol ? `COALESCE("${sel.catCol}"::text,'')` : `''`} AS business_category,
+        ${col(sel.idCol)}::text AS id,
+        ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_number,
+        ${col(sel.nameCol)}::text AS business_name,
+        ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS business_type,
+        ${sel.catCol ? `COALESCE(${col(sel.catCol)}::text,'')` : `''`} AS business_category,
         ${sel.subCol ? `${normCol(sel.subCol)} AS subcategory` : `'' AS subcategory`},
         ${imageExpr} AS image_url
-      FROM ${storeTable}
+      FROM ${storeTable} ${A}
       ${whereSql}
-      ORDER BY "${sel.idCol}" DESC
+      ORDER BY ${col(sel.idCol)} DESC
       LIMIT ${pageSize} OFFSET ${offset}
     `;
 
@@ -453,10 +461,14 @@ export async function searchStore(req, res) {
     const tcols = await getColumns(storeTable);
     const sel = buildStoreSelect(storeTable, tcols);
 
+    // ✅ alias 설정
+    const A = "s";
+    const col = (c) => `${A}."${c}"`;
+
     const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
     const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
       : `COALESCE(${imgSub},'')`;
 
     const params = [];
@@ -468,20 +480,20 @@ export async function searchStore(req, res) {
       // 사업자번호 검색(가능할 때만)
       if (qDigits && sel.bnCol) {
         params.push(qDigits);
-        parts.push(`regexp_replace(COALESCE("${sel.bnCol}"::text,''), '\\\\D', '', 'g') = $${params.length}`);
+        parts.push(`regexp_replace(COALESCE(${col(sel.bnCol)}::text,''), '\\\\D', '', 'g') = $${params.length}`);
 
         params.push(`%${qDigits}%`);
-        parts.push(`regexp_replace(COALESCE("${sel.bnCol}"::text,''), '\\\\D', '', 'g') LIKE $${params.length}`);
+        parts.push(`regexp_replace(COALESCE(${col(sel.bnCol)}::text,''), '\\\\D', '', 'g') LIKE $${params.length}`);
       }
 
       // 상호명
       params.push(`%${qRaw}%`);
-      parts.push(`"${sel.nameCol}"::text ILIKE $${params.length}`);
+      parts.push(`${col(sel.nameCol)}::text ILIKE $${params.length}`);
 
       // 업종(있을 때만)
       if (sel.typeCol) {
         params.push(`%${qRaw}%`);
-        parts.push(`COALESCE("${sel.typeCol}"::text,'') ILIKE $${params.length}`);
+        parts.push(`COALESCE(${col(sel.typeCol)}::text,'') ILIKE $${params.length}`);
       }
 
       if (parts.length) whereParts.push(`(${parts.join(" OR ")})`);
@@ -489,19 +501,19 @@ export async function searchStore(req, res) {
 
     const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
-    const orderBy = `"${sel.nameCol}" ASC NULLS LAST, "${sel.idCol}" ASC`;
+    const orderBy = `${col(sel.nameCol)} ASC NULLS LAST, ${col(sel.idCol)} ASC`;
 
     // rn 기반 페이지/인덱스 계산 (12개 기준)
     const sql = `
       WITH base AS (
         SELECT
-          "${sel.idCol}"::text AS id,
-          ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_number,
-          "${sel.nameCol}"::text AS business_name,
-          ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS business_type,
+          ${col(sel.idCol)}::text AS id,
+          ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_number,
+          ${col(sel.nameCol)}::text AS business_name,
+          ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS business_type,
           ${imageExpr} AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${storeTable}
+        FROM ${storeTable} ${A}
         ${where}
       )
       SELECT
@@ -883,21 +895,22 @@ export async function upsertSlot(req, res) {
 // ✅ GET /grid (12칸)
 // ✅ 핵심: 자동배치 12개 + admin_ad_slots(저장된 칸) 오버라이드 덮어쓰기
 // ------------------------------
-function buildAutoOrderBy(section, sel) {
+function buildAutoOrderBy(section, sel, alias = "s") {
   const s = clean(section).toLowerCase();
+  const col = (c) => `${alias}."${c}"`;
 
   // ✅ newly 별칭 지원
   if ((s === "new_registration" || s === "newly" || s === "new") && sel.createdCol) {
-    return `"${sel.createdCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
+    return `${col(sel.createdCol)} DESC NULLS LAST, ${col(sel.idCol)} DESC`;
   }
 
   // ✅ best 별칭 지원
   if ((s === "best_seller" || s === "best") && sel.viewsCol) {
-    return `"${sel.viewsCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
+    return `${col(sel.viewsCol)} DESC NULLS LAST, ${col(sel.idCol)} DESC`;
   }
 
   // all_items 기본
-  return `"${sel.idCol}" DESC`;
+  return `${col(sel.idCol)} DESC`;
 }
 
 export async function getGrid(req, res) {
@@ -937,11 +950,15 @@ export async function getGrid(req, res) {
     const tcols = await getColumns(storeTable);
     const sel = buildStoreSelect(storeTable, tcols);
 
+    // ✅ alias 설정
+    const A = "s";
+    const col = (c) => `${A}."${c}"`;
+
     // 대표 이미지(스토어 테이블 imgCol or 이미지 테이블 subquery)
     const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(sel.idCol, imgMeta);
+    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
     const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF("${sel.imgCol}"::text,''), COALESCE(${imgSub},''))`
+      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
       : `COALESCE(${imgSub},'')`;
 
     // --------------------------
@@ -1001,24 +1018,24 @@ export async function getGrid(req, res) {
 
     if (category && sel.catCol) {
       values.push(category);
-      whereParts.push(`btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
+      whereParts.push(`btrim(replace(${col(sel.catCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
     if (subcategory && sel.subCol) {
       values.push(subcategory);
-      whereParts.push(`btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
+      whereParts.push(`btrim(replace(${col(sel.subCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
     // ✅ 전체 건수/총페이지 계산 (12칸 기준)
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${whereSql}`;
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${A} ${whereSql}`;
     const { rows: cntRows } = await pool.query(countSql, values.slice(0, whereParts.length));
     const total = cntRows?.[0]?.cnt ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / 12));
     const hasPrev = pageNo > 1;
     const hasNext = pageNo < totalPages;
 
-    const orderBy = buildAutoOrderBy(section, sel);
+    const orderBy = buildAutoOrderBy(section, sel, A);
 
     const startRn = (pageNo - 1) * 12 + 1;
     const endRn = pageNo * 12;
@@ -1031,13 +1048,13 @@ export async function getGrid(req, res) {
     const autoSql = `
       WITH ranked AS (
         SELECT
-          "${sel.idCol}"::text AS id,
-          ${sel.bnCol ? `"${sel.bnCol}"::text` : `''`} AS business_no,
-          "${sel.nameCol}"::text AS business_name,
-          ${sel.typeCol ? `COALESCE("${sel.typeCol}"::text,'')` : `''`} AS store_type,
+          ${col(sel.idCol)}::text AS id,
+          ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_no,
+          ${col(sel.nameCol)}::text AS business_name,
+          ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS store_type,
           ${imageExpr} AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${storeTable}
+        FROM ${storeTable} ${A}
         ${whereSql}
       )
       SELECT *

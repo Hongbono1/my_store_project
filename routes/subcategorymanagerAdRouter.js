@@ -52,3 +52,4 @@ router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
 
 export default router;
+
