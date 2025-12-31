@@ -49,7 +49,8 @@ import hotblosubRouter from "./routes/hotblosubRouter.js";
 import indexmanagerAdRouter from "./routes/indexmanagerAdRouter.js";
 import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js";
 import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
-import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js";
+import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
+import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
 
 
 import pool from "./db.js";
@@ -431,11 +432,9 @@ app.use("/foodcategorymanager/ad", foodcategorymanagerAdRouter);
 // ✅ NCATEGORY2 관리자 API (추가만)
 app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 
-// ✅ Subcategory 관리자 API (position + priority 기반)
-app.use("/admin/subcategory", subcategorymanagerAdRouter);
-
-
-app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
+// ✅ Subcategory 관리자 API (mode별 분리: food/combined)
+app.use("/subcategorymanager_food/ad", subcategoryFoodAdRouter);
+app.use("/subcategorymanager_combined/ad", subcategoryCombinedAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)

@@ -1,0 +1,248 @@
+// controllers/subcategoryFoodAdController.js
+import pool from "../db.js";
+
+// ✅ 푸드 전용: food 테이블 후보(존재하는 것 자동 선택)
+const FOOD_TABLE_CANDIDATES = [
+  "public.store_info",
+  "public.food_stores",
+  "public.food_store_info",
+];
+
+function clean(v) {
+  return (v ?? "").toString().trim();
+}
+
+function digitsOnly(v) {
+  return clean(v).replace(/[^\d]/g, "");
+}
+
+function safeInt(v, fallback) {
+  const n = Number(clean(v));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+let _foodTableCache = null;
+const _colsCache = new Map(); // table -> Set(columns)
+
+async function detectExistingTable(candidates) {
+  for (const full of candidates) {
+    const [schema, table] = full.split(".");
+    const { rows } = await pool.query(
+      `
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = $1 AND table_name = $2
+      LIMIT 1
+      `,
+      [schema, table]
+    );
+    if (rows?.length) return full;
+  }
+  throw new Error(`FOOD table not found. Tried: ${candidates.join(", ")}`);
+}
+
+async function getFoodTable() {
+  if (_foodTableCache) return _foodTableCache;
+  _foodTableCache = await detectExistingTable(FOOD_TABLE_CANDIDATES);
+  return _foodTableCache;
+}
+
+async function getColumnsSet(fullTable) {
+  if (_colsCache.has(fullTable)) return _colsCache.get(fullTable);
+
+  const [schema, table] = fullTable.split(".");
+  const { rows } = await pool.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1 AND table_name = $2
+    `,
+    [schema, table]
+  );
+
+  const set = new Set((rows || []).map((r) => r.column_name));
+  _colsCache.set(fullTable, set);
+  return set;
+}
+
+function pickCol(cols, ...names) {
+  for (const n of names) if (cols.has(n)) return n;
+  return null;
+}
+
+function sqlIdent(name) {
+  return `"${String(name).replace(/"/g, '""')}"`;
+}
+
+/**
+ * ✅ 푸드 전용 grid
+ * GET /subcategorymanager_food/ad/grid?page=subcategory&section=all_items&pageNo=1&category=...&subcategory=...
+ */
+export async function grid(req, res) {
+  try {
+    const pageNo = Math.max(1, safeInt(req.query.pageNo, 1));
+    const pageSize = Math.max(1, safeInt(req.query.pageSize, 12));
+    const offset = (pageNo - 1) * pageSize;
+
+    const category = clean(req.query.category);
+    const subcategory = clean(
+      req.query.subcategory ||
+        req.query.sub ||
+        req.query.detail_category ||
+        req.query.business_subcategory
+    );
+
+    const table = await getFoodTable();
+    const cols = await getColumnsSet(table);
+
+    const colId = pickCol(cols, "id");
+    const colBizNo = pickCol(cols, "business_number", "business_no");
+    const colName = pickCol(cols, "business_name", "store_name", "name");
+    const colType = pickCol(cols, "business_type", "type");
+    const colCategory = pickCol(cols, "business_category", "category");
+    const colDetail = pickCol(cols, "detail_category"); // ✅ food는 detail_category
+    const colImg = pickCol(cols, "main_image_url", "image_url");
+
+    if (!colId || !colName || !colCategory) {
+      return res.status(500).json({
+        success: false,
+        error: `FOOD table(${table}) required columns missing (need id/name/business_category).`,
+      });
+    }
+
+    if (!colDetail) {
+      return res.status(500).json({
+        success: false,
+        error: `FOOD table(${table}) has no detail_category column.`,
+      });
+    }
+
+    const where = [];
+    const params = [];
+
+    if (category) {
+      params.push(category);
+      where.push(`TRIM(COALESCE(${sqlIdent(colCategory)}::text,'')) = $${params.length}`);
+    }
+
+    // ✅ subcategory 필터 (food는 detail_category 기준)
+    if (subcategory && subcategory !== "__all__") {
+      params.push(subcategory);
+      where.push(`TRIM(COALESCE(${sqlIdent(colDetail)}::text,'')) = $${params.length}`);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    // count
+    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${table} ${whereSql}`;
+    const countRes = await pool.query(countSql, params);
+    const total = countRes.rows?.[0]?.cnt ?? 0;
+
+    // items
+    const selectParts = [
+      `${sqlIdent(colId)} AS id`,
+      colBizNo ? `${sqlIdent(colBizNo)}::text AS business_number` : `''::text AS business_number`,
+      `${sqlIdent(colName)}::text AS business_name`,
+      colType ? `${sqlIdent(colType)}::text AS business_type` : `''::text AS business_type`,
+      `${sqlIdent(colCategory)}::text AS business_category`,
+      `COALESCE(NULLIF(TRIM(${sqlIdent(colDetail)}::text), ''), '') AS detail_category`,
+      colImg ? `COALESCE(NULLIF(TRIM(${sqlIdent(colImg)}::text), ''), '') AS image_url` : `''::text AS image_url`,
+    ];
+
+    const itemsSql = `
+      SELECT ${selectParts.join(", ")}
+      FROM ${table}
+      ${whereSql}
+      ORDER BY ${sqlIdent(colId)} DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+    const itemsParams = [...params, pageSize, offset];
+    const itemsRes = await pool.query(itemsSql, itemsParams);
+
+    const hasMore = offset + (itemsRes.rows?.length || 0) < total;
+
+    return res.json({
+      success: true,
+      mode: "food",
+      pageNo,
+      pageSize,
+      total,
+      hasMore,
+      items: itemsRes.rows || [],
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || String(err),
+    });
+  }
+}
+
+/**
+ * ✅ 푸드 전용 검색 (필요 시)
+ * GET /subcategorymanager_food/ad/search-store?q=...
+ */
+export async function searchStore(req, res) {
+  try {
+    const qRaw = clean(req.query.q);
+    const qDigits = digitsOnly(qRaw);
+
+    const table = await getFoodTable();
+    const cols = await getColumnsSet(table);
+
+    const colId = pickCol(cols, "id");
+    const colBizNo = pickCol(cols, "business_number", "business_no");
+    const colName = pickCol(cols, "business_name", "store_name", "name");
+    const colType = pickCol(cols, "business_type", "type");
+    const colCategory = pickCol(cols, "business_category", "category");
+    const colDetail = pickCol(cols, "detail_category");
+    const colImg = pickCol(cols, "main_image_url", "image_url");
+
+    if (!colId || !colName) {
+      return res.status(500).json({
+        success: false,
+        error: `FOOD table(${table}) missing id/name`,
+      });
+    }
+
+    const params = [];
+    const where = [];
+
+    if (qRaw === "__all__" || qRaw === "") {
+      // 전체
+    } else if (qDigits && colBizNo) {
+      params.push(`%${qDigits}%`);
+      where.push(`REPLACE(COALESCE(${sqlIdent(colBizNo)}::text,''),'-','') ILIKE $${params.length}`);
+    } else {
+      params.push(`%${qRaw}%`);
+      where.push(`${sqlIdent(colName)}::text ILIKE $${params.length}`);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const sql = `
+      SELECT
+        ${sqlIdent(colId)} AS id,
+        ${colBizNo ? `${sqlIdent(colBizNo)}::text` : `''::text`} AS business_number,
+        ${sqlIdent(colName)}::text AS business_name,
+        ${colType ? `${sqlIdent(colType)}::text` : `''::text`} AS business_type,
+        ${colCategory ? `${sqlIdent(colCategory)}::text` : `''::text`} AS business_category,
+        ${colDetail ? `COALESCE(NULLIF(TRIM(${sqlIdent(colDetail)}::text), ''), '')` : `''::text`} AS detail_category,
+        ${colImg ? `COALESCE(NULLIF(TRIM(${sqlIdent(colImg)}::text), ''), '')` : `''::text`} AS image_url
+      FROM ${table}
+      ${whereSql}
+      ORDER BY ${sqlIdent(colId)} DESC
+      LIMIT 30
+    `;
+    const r = await pool.query(sql, params);
+
+    return res.json({
+      success: true,
+      mode: "food",
+      q: qRaw,
+      results: r.rows || [],
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+}

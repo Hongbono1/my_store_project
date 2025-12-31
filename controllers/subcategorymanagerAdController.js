@@ -939,6 +939,9 @@ function buildAutoOrderBy(section, sel, alias = "s") {
 
 export async function getGrid(req, res) {
   try {
+    console.log("[getGrid] === START ===");
+    console.log("[getGrid] query:", req.query);
+    
     const cols = await getSlotCols();
     const m = buildSlotColumnMap(cols);
 
@@ -961,17 +964,24 @@ export async function getGrid(req, res) {
     const category = clean(req.query.category);
     // ✅ 여러 파라미터 이름 지원
     const subcategory = clean(req.query.subcategory || req.query.sub || req.query.detail_category || req.query.business_subcategory || "");
+    
+    console.log("[getGrid] parsed - page:", page, "section:", section, "mode:", mode, "pageNo:", pageNo);
+    console.log("[getGrid] parsed - category:", category, "subcategory:", subcategory);
 
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
     const suffix = mode === "food" ? "__food" : "__combined";
     const like = `${section}__p${pageNo}__b%${suffix}`;
+    
+    console.log("[getGrid] suffix:", suffix, "like pattern:", like);
 
     // --------------------------
     // 0) 스토어 테이블 선택(자동배치용)
     // --------------------------
     const storeTable =
       mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+    
+    console.log("[getGrid] storeTable:", storeTable);
     const tcols = await getColumns(storeTable);
     const sel = buildStoreSelect(storeTable, tcols);
 
@@ -1100,7 +1110,7 @@ export async function getGrid(req, res) {
     // if (subcategory && sel.subCol) {
     //   values.push(subcategory);
     //   whereParts.push(
-    //     `btrim(${detailCategoryExpr(mode, A)}) = btrim(replace($${values.length}, chr(160), ' '))`
+    //     `btrim(${detailCategoryExpr(mode, "A")}) = btrim(replace($${values.length}, chr(160), ' '))`
     //   );
     // }
 
@@ -1315,10 +1325,14 @@ export async function getGrid(req, res) {
       items,
     });
   } catch (err) {
-    console.error("[getGrid ERROR]", err);
+    console.error("[getGrid ERROR] ====================");
+    console.error("[getGrid ERROR] Message:", err?.message);
+    console.error("[getGrid ERROR] Stack:", err?.stack);
+    console.error("[getGrid ERROR] Full error:", err);
+    console.error("[getGrid ERROR] ====================");
     return res
       .status(500)
-      .json({ success: false, error: err?.message || "getGrid 실패" });
+      .json({ success: false, error: err?.message || "getGrid 실패", details: err?.stack });
   }
 }
 
