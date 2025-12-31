@@ -149,17 +149,25 @@ let _foodColsCache = null;
 async function pickFoodTable() {
     if (_foodTableCache) return _foodTableCache;
 
-    // to_regclass로 존재 여부 확인
     for (const t of FOOD_TABLE_CANDIDATES) {
-        const q = "SELECT to_regclass($1) AS reg";
-        const { rows } = await pool.query(q, [t]);
-        if (rows?.[0]?.reg) {
-            _foodTableCache = t;
-            return _foodTableCache;
+        // 1) 테이블 존재 확인
+        const { rows: r1 } = await pool.query("SELECT to_regclass($1) AS reg", [t]);
+        if (!r1?.[0]?.reg) continue;
+
+        // 2) 데이터 1건이라도 있으면 채택
+        try {
+            const { rows: r2 } = await pool.query(`SELECT 1 AS ok FROM ${t} LIMIT 1`);
+            if (r2 && r2.length > 0) {
+                _foodTableCache = t;
+                return _foodTableCache;
+            }
+        } catch {
+            // 접근/컬럼 문제 등은 그냥 다음 후보로 넘김
         }
     }
-    // 없으면 fallback
-    _foodTableCache = FOOD_TABLE_CANDIDATES[0];
+
+    // 전부 비어있으면, 일단 store_info로 강제(네 상황에서 제일 안전)
+    _foodTableCache = "public.store_info";
     return _foodTableCache;
 }
 
