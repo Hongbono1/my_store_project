@@ -362,66 +362,6 @@ app.use("/combined", ncombinedregister);
 
 app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
 
-
-// ✅ [A 방식] subcategory 라우터 (파일 없이 server.js 내부에서 유지)
-const subcategoryRouter = express.Router();
-
-// ✅ 통합(combined) 서브카테고리 조회 API
-// 예) /api/subcategory/combined?category=반려동물
-subcategoryRouter.get("/combined", async (req, res) => {
-  try {
-    const category = (req.query.category || "").toString().trim();
-    if (!category) return res.json({ success: true, stores: [] });
-
-    const sql = `
-      SELECT
-        id,
-        business_number,
-        business_name,
-        business_type,
-        btrim(replace(business_category::text, chr(160), ' ')) AS business_category,
-        btrim(replace(business_subcategory::text, chr(160), ' ')) AS business_subcategory,
-        business_hours,
-        delivery_option,
-        service_details,
-        event1,
-        event2,
-        facilities,
-        pets_allowed,
-        parking,
-        phone,
-        homepage,
-        instagram,
-        facebook,
-        additional_desc,
-        postal_code,
-        road_address,
-        detail_address,
-        owner_name,
-        birth_date,
-        owner_email,
-        owner_address,
-        owner_phone,
-        business_cert_path,
-        created_at,
-        main_image_url,
-        view_count
-      FROM public.combined_store_info
-      WHERE btrim(replace(business_category::text, chr(160), ' ')) = btrim(replace($1::text, chr(160), ' '))
-      ORDER BY id DESC
-    `;
-
-    const { rows } = await pool.query(sql, [category]);
-    return res.json({ success: true, stores: rows });
-  } catch (err) {
-    console.error("❌ /api/subcategory/combined error:", err?.message || err);
-    return res.status(500).json({ success: false, error: "server_error" });
-  }
-});
-
-// ✅ 기존 마운트 유지
-app.use("/api/subcategory", subcategoryRouter);
-
 app.use("/api/hotblog", hotblogRouter);
 app.use("/api/hotplace", hotplaceRouter);
 app.use("/api/hot", hotRouter);
