@@ -280,17 +280,21 @@ async function buildImagesLateralJoin(alias = "s") {
     LEFT JOIN LATERAL (
       SELECT
         COALESCE(
-          ARRAY_AGG(i.${src.imageCol} ORDER BY 1) FILTER (WHERE NULLIF(i.${src.imageCol}, '') IS NOT NULL),
+          ARRAY_AGG(x.${src.imageCol} ORDER BY x.rn)
+            FILTER (WHERE NULLIF(x.${src.imageCol}, '') IS NOT NULL),
           ARRAY[]::text[]
         ) AS images
       FROM (
-        SELECT i.${src.imageCol}
+        SELECT
+          i.${src.imageCol},
+          ROW_NUMBER() OVER (
+            ${src.orderBy ? src.orderBy : "ORDER BY i." + src.imageCol + " ASC"}
+          ) AS rn
         FROM ${src.table} i
         WHERE ${joinKeyExpr}
           AND NULLIF(i.${src.imageCol}, '') IS NOT NULL
-        ${src.orderBy}
         LIMIT 3
-      ) i
+      ) x
     ) img ON true
   `;
 
