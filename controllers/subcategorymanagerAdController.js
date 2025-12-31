@@ -804,11 +804,28 @@ export async function upsertSlot(req, res) {
 
         const mode2 = tableSource2 === "combined_store_info" ? "combined" : "food";
         const imgMeta2 = await pickImageMetaForMode(mode2);
-        const imgSub2 = buildImageSubquery(sel2.idCol, imgMeta2);
+
+        // ✅ storeId($1) 기반으로 이미지 1장 뽑기 (alias 필요 없음)
+        let imgPickSql = "NULL";
+        if (imgMeta2) {
+          const order = imgMeta2.orderCol
+            ? `"${imgMeta2.orderCol}" ASC NULLS LAST`
+            : `"${imgMeta2.urlCol}" ASC NULLS LAST`;
+
+          imgPickSql = `
+            (
+              SELECT NULLIF("${imgMeta2.urlCol}"::text,'')
+              FROM ${imgMeta2.table}
+              WHERE "${imgMeta2.fkCol}"::text = $1::text
+              ORDER BY ${order}
+              LIMIT 1
+            )
+          `;
+        }
 
         const imageExpr2 = sel2.imgCol
-          ? `COALESCE(NULLIF("${sel2.imgCol}"::text,''), COALESCE(${imgSub2},''))`
-          : `COALESCE(${imgSub2},'')`;
+          ? `COALESCE(NULLIF("${sel2.imgCol}"::text,''), COALESCE(${imgPickSql},''))`
+          : `COALESCE(${imgPickSql},'')`;
 
         const sql2 = `
           SELECT
@@ -1027,13 +1044,12 @@ export async function getGrid(req, res) {
       );
     }
     
-    // ✅ subcategory 필터는 combined 테이블 구조 확인 후 적용 (임시 비활성화)
-    // if (hasSubFilter) {
-    //   paramsSlots.push(subcategory);
-    //   storeWherePartsForSlots.push(
-    //     `btrim(${detailCategoryExpr(mode, "st")}) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
-    //   );
-    // }
+    if (hasSubFilter) {
+      paramsSlots.push(subcategory);
+      storeWherePartsForSlots.push(
+        `btrim(replace(st."${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+      );
+    }
 
     const storeWhereSqlForSlots = storeWherePartsForSlots.length
       ? `WHERE ${storeWherePartsForSlots.join(" AND ")}`
@@ -1106,13 +1122,12 @@ export async function getGrid(req, res) {
       whereParts.push(`btrim(replace(${col(sel.catCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
     }
     
-    // ✅ subcategory 필터는 combined 테이블 구조 확인 후 적용 (임시 비활성화)
-    // if (subcategory && sel.subCol) {
-    //   values.push(subcategory);
-    //   whereParts.push(
-    //     `btrim(${detailCategoryExpr(mode, "A")}) = btrim(replace($${values.length}, chr(160), ' '))`
-    //   );
-    // }
+    if (subcategory && sel.subCol) {
+      values.push(subcategory);
+      whereParts.push(
+        `btrim(replace(${col(sel.subCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}::text, chr(160), ' '))`
+      );
+    }
 
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
