@@ -344,6 +344,62 @@ export async function grid(req, res) {
             return res.status(400).json({ success: false, error: "section is required" });
         }
 
+        // ✅ all_items는 "슬롯"이 아니라 "실제 가게 전체"로 쓰고 싶다면: 여기서 store_info 조회 후 반환
+        if (section === "all_items") {
+            const { map, table } = await getFoodMapping();
+
+            const pageNo2 = Math.max(safeInt(req.query.pageNo, 1), 1);
+            const pageSize2 = clamp(safeInt(req.query.pageSize, 12), 1, 50);
+            const offset2 = (pageNo2 - 1) * pageSize2;
+
+            // category는 필수, subcategory는 있으면 필터
+            if (!category) {
+                return res.json({
+                    success: true,
+                    mode: "food",
+                    page,
+                    section,
+                    category,
+                    subcategory,
+                    pageNo: pageNo2,
+                    pageSize: pageSize2,
+                    items: [],
+                });
+            }
+
+            const sqlStores = `
+      SELECT
+        ${map.id} AS id,
+        ${map.businessNo} AS business_number,
+        ${map.businessName} AS business_name,
+        ${map.businessType} AS business_type,
+        ${map.category} AS business_category,
+        ${map.subcategory} AS business_subcategory
+        ${map.imageUrl ? `, COALESCE(${map.imageUrl}, '') AS image_url` : `, '' AS image_url`}
+      FROM ${table}
+      WHERE btrim(replace(${map.category}::text, chr(160), ' ')) = btrim(replace($1::text, chr(160), ' '))
+        AND (
+          $2 = '' OR btrim(replace(${map.subcategory}::text, chr(160), ' ')) = btrim(replace($2::text, chr(160), ' '))
+        )
+      ORDER BY ${map.id} DESC
+      LIMIT $3 OFFSET $4
+    `;
+
+            const { rows } = await pool.query(sqlStores, [category, subcategory || "", pageSize2, offset2]);
+
+            return res.json({
+                success: true,
+                mode: "food",
+                page,
+                section,
+                category,
+                subcategory,
+                pageNo: pageNo2,
+                pageSize: pageSize2,
+                items: rows,
+            });
+        }
+
         // position prefix로 조회
         const prefix = buildPosition({
             mode: "food",
