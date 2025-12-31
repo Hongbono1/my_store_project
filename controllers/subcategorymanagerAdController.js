@@ -91,12 +91,14 @@ function parseDateTimeLocalToTs(v) {
 
 // ✅ detail_category 표현식 (mode별로 다른 컬럼 매핑)
 function detailCategoryExpr(mode, alias = "s") {
+  const prefix = alias ? `${alias}.` : "";
+  
   // mode=combined => combined_store_info에는 detail_category가 없으니 business_subcategory를 사용
   if (String(mode) === "combined") {
     return `
       COALESCE(
-        NULLIF(TRIM(${alias}."business_subcategory"::text), ''),
-        NULLIF(TRIM(${alias}."business_type"::text), ''),
+        NULLIF(TRIM(${prefix}"business_subcategory"::text), ''),
+        NULLIF(TRIM(${prefix}"business_type"::text), ''),
         ''
       )
     `;
@@ -105,7 +107,7 @@ function detailCategoryExpr(mode, alias = "s") {
   // food(store_info 등) => detail_category 존재
   return `
     COALESCE(
-      NULLIF(TRIM(${alias}."detail_category"::text), ''),
+      NULLIF(TRIM(${prefix}"detail_category"::text), ''),
       ''
     )
   `;
