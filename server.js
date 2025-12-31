@@ -50,6 +50,7 @@ import foodcategorymanagerAdRouter from "./routes/foodcategorymanagerAdRouter.js
 import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
 import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
 import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
+import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js";
 
 
 import pool from "./db.js";
@@ -358,6 +359,9 @@ app.use("/upload", uploadRouter);
 
 app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
+
+app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
+
 
 // ✅ [A 방식] subcategory 라우터 (파일 없이 server.js 내부에서 유지)
 const subcategoryRouter = express.Router();
