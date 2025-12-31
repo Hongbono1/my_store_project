@@ -963,7 +963,7 @@ export async function getGrid(req, res) {
 
     // --------------------------
     // 1) 오버라이드 슬롯 조회(저장된 칸)
-    //    ✅ position LIKE만으로 조회 (category/subcategory 필터는 auto 배치에만 적용)
+    //    ✅ 이제 category/subcategory 필터가 있으면 override도 같이 필터링
     // --------------------------
     const paramsSlots = [page, like];
 
@@ -978,6 +978,43 @@ export async function getGrid(req, res) {
     const imageUrlCol = m.imageUrl;
     const textContentCol = m.textContent;
     const updatedAtCol = m.updatedAt;
+
+    // ✅ store 필터(override용) - 값이 있을 때만 적용
+    const storeWherePartsForSlots = [];
+    const hasCatFilter = !!(category && sel.catCol);
+    const hasSubFilter = !!(subcategory && sel.subCol);
+
+    if (hasCatFilter) {
+      paramsSlots.push(category);
+      storeWherePartsForSlots.push(
+        `btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+      );
+    }
+    if (hasSubFilter) {
+      paramsSlots.push(subcategory);
+      storeWherePartsForSlots.push(
+        `btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
+      );
+    }
+
+    const storeWhereSqlForSlots = storeWherePartsForSlots.length
+      ? `WHERE ${storeWherePartsForSlots.join(" AND ")}`
+      : "";
+
+    // ✅ category/subcategory 필터가 있을 때만 override를 store 범위로 제한
+    const overrideFilterSql =
+      (storeWherePartsForSlots.length && storeIdCol)
+        ? `
+      AND (
+        slots."${storeIdCol}" IS NULL
+        OR slots."${storeIdCol}"::text IN (
+          SELECT "${sel.idCol}"::text
+          FROM ${storeTable}
+          ${storeWhereSqlForSlots}
+        )
+      )
+    `
+        : "";
 
     const slotSql = `
       SELECT DISTINCT ON (slots."${posCol}")
@@ -995,6 +1032,7 @@ export async function getGrid(req, res) {
       FROM ${SLOTS_TABLE} slots
       WHERE slots."${m.page}"=$1
         AND slots."${posCol}" LIKE $2
+      ${overrideFilterSql}
       ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
     `;
 
