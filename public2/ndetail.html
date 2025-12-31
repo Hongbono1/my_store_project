@@ -653,24 +653,16 @@
                 // URL에서 type 읽기 (구버전 호환: type=store/open -> store_info로 취급)
                 const qs = new URLSearchParams(location.search);
                 const id = qs.get("id");
-                let type = (qs.get("type") || "").trim();
+                const typeRaw = (qs.get("type") || "food").trim().toLowerCase();
 
-                // ✅ 하위 호환성: 구버전 타입을 새 타입으로 매핑
-                if (type === "store" || type === "open") type = "store_info";
+                // ✅ 표준화: food / combined 만 받기
+                const type = (typeRaw === "combined") ? "combined" : "food";
 
                 if (!id) throw new Error("No id provided");
 
-                // ✅ 타입별로 API를 다르게
-                let api = "";
-                if (type === "combined") {
-                    api = `/combined/${id}/full`;
-                } else if (type === "store_info") {
-                    // ✅ 여기! store_info는 store_info용 API로
-                    api = `/store/${id}/full`;  // foodregister (store_info 테이블)
-                } else {
-                    // type이 없으면(또는 이상하면) 기본을 정하되, 충돌 방지 위해 combined로 두는게 안전
-                    api = `/combined/${id}/full`;
-                }
+                // ✅ 올바른 매핑: food -> /store, combined -> /combined
+                const apiBase = (type === "combined") ? "/combined" : "/store";
+                const api = `${apiBase}/${encodeURIComponent(id)}/full`;
 
                 console.log("[DETAIL] Using type:", type, "API:", api);
 
