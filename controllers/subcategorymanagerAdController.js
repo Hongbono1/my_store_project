@@ -359,7 +359,7 @@ export async function listStores(req, res) {
   try {
     const mode = clean(req.query.mode) || "food";
     const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
+    const subcategory = clean(req.query.subcategory ?? req.query.sub ?? req.query.business_subcategory);
 
     const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
     const page = Math.max(safeInt(req.query.page, 1), 1);
@@ -935,7 +935,7 @@ export async function getGrid(req, res) {
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
 
     const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory);
+    const subcategory = clean(req.query.subcategory ?? req.query.sub ?? req.query.business_subcategory);
 
     if (!page) return res.status(400).json({ success: false, error: "page 필요" });
 
