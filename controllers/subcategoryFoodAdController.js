@@ -9,11 +9,10 @@ import pool from "../db.js";
  *  Subcategory Manager (FOOD) - Controller (Full)
  *  - Upload dir: /data/uploads/manager_ad
  *  - Slot table: public.admin_ad_slots
- *  - Food stores: public.store_info (네 DB 기준)
- *  - Images:
- *      1) public.food_store_images (있고 데이터 있으면 우선)
- *      2) fallback: public.store_menu.image_url (네 ndetail 이미지가 여기 있음)
- *  - section=all_items => "실제 가게 목록" + images[] + image_url(images[0])
+ *  - Food stores: public.store_info
+ *  - Food images: public.store_images (url)  ✅ 확정
+ *    - join: store_images.store_id = store_info.id
+ *    - order: sort_order ASC, id ASC  (첫 번째가 메인)
  * ----------------------------------------------------------
  */
 
@@ -25,14 +24,11 @@ export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 // 슬롯 테이블(기존 재사용)
 const SLOTS_TABLE = "public.admin_ad_slots";
 
-// FOOD 가게 테이블
+// ✅ FOOD 가게 테이블
 const FOOD_TABLE = "public.store_info";
 
-// FOOD 이미지 테이블(있으면 우선)
-const FOOD_IMAGE_TABLE = "public.food_store_images";
-
-// ✅ ndetail에서 실제로 보이는 업로드 경로가 들어있는 곳(네 DB 확인 결과)
-const STORE_MENU_TABLE = "public.store_menu";
+// ✅ FOOD 이미지 테이블(확정): store_images.url
+const FOOD_IMAGE_TABLE = "public.store_images";
 
 // 페이지 고정(서브카테고리)
 const PAGE_NAME = "subcategory";
@@ -91,14 +87,6 @@ function buildPosition({ mode = "food", category = "", subcategory = "", section
   ].join("|");
 }
 
-function normalizeImageUrl(u) {
-  const s = clean(u);
-  if (!s) return "";
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith("/")) return s;
-  return `/${s}`;
-}
-
 /** ----------------- multer helpers ----------------- */
 export function fileFilter(_req, file, cb) {
   const ok = !!file?.mimetype?.startsWith("image/");
@@ -116,9 +104,7 @@ export function makeMulterStorage() {
     },
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-      const name = `${
-        crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")
-      }${ext}`;
+      const name = `${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")}${ext}`;
       cb(null, name);
     },
   };
@@ -151,66 +137,23 @@ const STORE_MAP = {
   businessName: "business_name",
   businessType: "business_type",
   category: "business_category",
-  subcategory: "detail_category", // store_info는 detail_category가 서브카테고리
+  subcategory: "detail_category", // ✅ store_info는 detail_category가 서브카테고리
 };
 
-/** ----------------- 이미지 소스 결정: food_store_images -> fallback store_menu ----------------- */
-let _imageSourceCache = null;
+/** ----------------- image join (store_images.url) ----------------- */
+let _storeImagesReadyCache = null;
+async function ensureStoreImagesReady() {
+  if (_storeImagesReadyCache !== null) return _storeImagesReadyCache;
 
-/**
- * 이미지 소스 구조:
- * {
- *   source: "food_store_images" | "store_menu" | null,
- *   table: "public.xxx",
- *   keyCol: "...",          // join key
- *   keyMode: "store_id"|"business_number",
- *   orderBy: "ORDER BY ...",
- *   imageCol: "image_url",
- * }
- */
-async function detectImageSource() {
-  if (_imageSourceCache) return _imageSourceCache;
-
-  // 1) food_store_images 존재 + 데이터 있으면 우선
-  const f = await detectTableImageSource(FOOD_IMAGE_TABLE, /*prefer*/ true);
-  if (f?.hasAnyRow) {
-    _imageSourceCache = {
-      source: "food_store_images",
-      table: FOOD_IMAGE_TABLE,
-      keyCol: f.keyCol,
-      keyMode: f.keyMode,
-      orderBy: f.orderBy,
-      imageCol: "image_url",
-    };
-    return _imageSourceCache;
+  // 테이블 존재 확인
+  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [FOOD_IMAGE_TABLE]);
+  if (!r0?.[0]?.reg) {
+    _storeImagesReadyCache = false;
+    return false;
   }
 
-  // 2) fallback: store_menu (네가 실제로 이미지가 존재하는 곳)
-  const m = await detectTableImageSource(STORE_MENU_TABLE, /*prefer*/ false);
-  if (m?.exists) {
-    _imageSourceCache = {
-      source: "store_menu",
-      table: STORE_MENU_TABLE,
-      keyCol: m.keyCol,
-      keyMode: m.keyMode,
-      orderBy: m.orderBy,
-      imageCol: "image_url",
-    };
-    return _imageSourceCache;
-  }
-
-  _imageSourceCache = null;
-  return null;
-}
-
-async function detectTableImageSource(tableName, checkHasAnyRow) {
-  // 존재 확인
-  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [tableName]);
-  const exists = !!r0?.[0]?.reg;
-  if (!exists) return { exists: false };
-
-  // 컬럼 확인
-  const [schema, table] = tableName.split(".");
+  // 컬럼 확인(url, store_id 필수)
+  const [schema, table] = FOOD_IMAGE_TABLE.split(".");
   const { rows } = await pool.query(
     `
     SELECT column_name
@@ -219,92 +162,19 @@ async function detectTableImageSource(tableName, checkHasAnyRow) {
   `,
     [schema, table]
   );
+
   const cols = new Set(rows.map((x) => x.column_name));
-
-  // join 키 후보 (네 테이블들은 store_id가 있을 가능성이 높음)
-  // - store_menu 쪽: store_id / storeinfo_id / business_number / business_no 후보
-  // - food_store_images: store_id가 있는 걸 네가 이미 확인했음
-  const keyCol =
-    (cols.has("store_id") && "store_id") ||
-    (cols.has("storeinfo_id") && "storeinfo_id") ||
-    (cols.has("business_number") && "business_number") ||
-    (cols.has("business_no") && "business_no") ||
-    "";
-
-  if (!keyCol) return { exists: true, keyCol: "", keyMode: "", orderBy: "", hasAnyRow: false };
-
-  const keyMode = keyCol === "store_id" || keyCol === "storeinfo_id" ? "store_id" : "business_number";
-
-  // 대표 이미지 정렬 후보
-  const orderParts = [];
-  if (cols.has("is_main")) orderParts.push("i.is_main DESC");
-  if (cols.has("priority")) orderParts.push("i.priority ASC");
-  if (cols.has("sort_order")) orderParts.push("i.sort_order ASC");
-  if (cols.has("id")) orderParts.push("i.id ASC");
-  if (cols.has("created_at")) orderParts.push("i.created_at ASC");
-  const orderBy = orderParts.length ? `ORDER BY ${orderParts.join(", ")}` : "";
-
-  // 데이터 존재 여부(옵션)
-  let hasAnyRow = false;
-  if (checkHasAnyRow) {
-    try {
-      const { rows: r1 } = await pool.query(`SELECT 1 AS ok FROM ${tableName} LIMIT 1`);
-      hasAnyRow = !!(r1 && r1.length);
-    } catch {
-      hasAnyRow = false;
-    }
-  }
-
-  return { exists: true, keyCol, keyMode, orderBy, hasAnyRow };
+  const ok = cols.has("store_id") && cols.has("url");
+  _storeImagesReadyCache = ok;
+  return ok;
 }
 
-/**
- * store_info 한 행에 대해 images[] (최대 3장) + image_url(images[0])를 만드는 LATERAL JOIN
- */
-async function buildImagesLateralJoin(alias = "s") {
-  const src = await detectImageSource();
-  if (!src) {
-    return {
-      selectSql: `, ARRAY[]::text[] AS images, '' AS image_url`,
-      joinSql: ``,
-    };
-  }
-
-  const joinKeyExpr =
-    src.keyMode === "store_id"
-      ? `i.${src.keyCol} = ${alias}.${STORE_MAP.id}`
-      : `i.${src.keyCol} = ${alias}.${STORE_MAP.businessNo}`;
-
-  // ⚠️ 이미지가 NULL/빈문자면 제외
-  const joinSql = `
-    LEFT JOIN LATERAL (
-      SELECT
-        COALESCE(
-          ARRAY_AGG(x.${src.imageCol} ORDER BY x.rn)
-            FILTER (WHERE NULLIF(x.${src.imageCol}, '') IS NOT NULL),
-          ARRAY[]::text[]
-        ) AS images
-      FROM (
-        SELECT
-          i.${src.imageCol},
-          ROW_NUMBER() OVER (
-            ${src.orderBy ? src.orderBy : "ORDER BY i." + src.imageCol + " ASC"}
-          ) AS rn
-        FROM ${src.table} i
-        WHERE ${joinKeyExpr}
-          AND NULLIF(i.${src.imageCol}, '') IS NOT NULL
-        LIMIT 3
-      ) x
-    ) img ON true
-  `;
-
-  // images[1]이 첫번째 (Postgres 배열 1-based)
-  const selectSql = `
-    , COALESCE(img.images, ARRAY[]::text[]) AS images
-    , COALESCE(img.images[1], '') AS image_url
-  `;
-
-  return { selectSql, joinSql };
+function normalizeImageUrl(u) {
+  const s = clean(u);
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s}`;
 }
 
 /** ----------------- SLOT helpers ----------------- */
@@ -336,7 +206,23 @@ export async function listStores(req, res) {
 
     const qDigits = digitsOnly(q);
 
-    const { selectSql: imgSelectSql, joinSql: imgJoinSql } = await buildImagesLateralJoin("s");
+    const hasStoreImages = await ensureStoreImagesReady();
+
+    const imgSelectSql = hasStoreImages
+      ? `, COALESCE(img.url, '') AS image_url`
+      : `, '' AS image_url`;
+
+    const imgJoinSql = hasStoreImages
+      ? `
+      LEFT JOIN LATERAL (
+        SELECT i.url
+        FROM ${FOOD_IMAGE_TABLE} i
+        WHERE i.store_id = s.${STORE_MAP.id}
+        ORDER BY i.sort_order ASC NULLS LAST, i.id ASC
+        LIMIT 1
+      ) img ON true
+    `
+      : "";
 
     const where = [];
     const params = [];
@@ -380,12 +266,7 @@ export async function listStores(req, res) {
     `;
 
     const { rows } = await pool.query(sql, params);
-
-    // normalize
-    for (const r of rows) {
-      r.image_url = normalizeImageUrl(r.image_url);
-      if (Array.isArray(r.images)) r.images = r.images.map(normalizeImageUrl).filter(Boolean);
-    }
+    for (const r of rows) r.image_url = normalizeImageUrl(r.image_url);
 
     return res.json({
       success: true,
@@ -411,8 +292,8 @@ export async function listCandidates(req, res) {
 /** ----------------- API: grid ----------------- */
 /**
  * GET /subcategorymanager_food/ad/grid
- * - section=all_items => 실제 가게 목록 + images[]
- * - 그 외 section => admin_ad_slots position prefix 방식
+ * - section=all_items => "실제 가게 목록" (store_info + store_images.url 메인 1장)
+ * - 그 외 section => admin_ad_slots
  */
 export async function grid(req, res) {
   try {
@@ -427,9 +308,25 @@ export async function grid(req, res) {
 
     if (!section) return res.status(400).json({ success: false, error: "section is required" });
 
-    // ✅ 1) all_items는 실제 가게 목록 + images[]
+    // ✅ 1) all_items는 실제 가게 목록(= ndetail 메인 이미지 규칙과 동일)
     if (section === "all_items") {
-      const { selectSql: imgSelectSql, joinSql: imgJoinSql } = await buildImagesLateralJoin("s");
+      const hasStoreImages = await ensureStoreImagesReady();
+
+      const imgSelectSql = hasStoreImages
+        ? `, COALESCE(img.url, '') AS image_url`
+        : `, '' AS image_url`;
+
+      const imgJoinSql = hasStoreImages
+        ? `
+        LEFT JOIN LATERAL (
+          SELECT i.url
+          FROM ${FOOD_IMAGE_TABLE} i
+          WHERE i.store_id = s.${STORE_MAP.id}
+          ORDER BY i.sort_order ASC NULLS LAST, i.id ASC
+          LIMIT 1
+        ) img ON true
+      `
+        : "";
 
       const where = [];
       const params = [];
@@ -441,7 +338,6 @@ export async function grid(req, res) {
         );
         params.push(category);
       }
-
       if (subcategory) {
         where.push(
           `btrim(replace(s.${STORE_MAP.subcategory}::text, chr(160), ' ')) = btrim(replace($${i++}::text, chr(160), ' '))`
@@ -470,11 +366,7 @@ export async function grid(req, res) {
       `;
 
       const { rows } = await pool.query(sql, params);
-
-      for (const r of rows) {
-        r.image_url = normalizeImageUrl(r.image_url);
-        if (Array.isArray(r.images)) r.images = r.images.map(normalizeImageUrl).filter(Boolean);
-      }
+      for (const r of rows) r.image_url = normalizeImageUrl(r.image_url);
 
       return res.json({
         success: true,
@@ -489,7 +381,7 @@ export async function grid(req, res) {
       });
     }
 
-    // ✅ 2) 나머지 섹션은 admin_ad_slots (기존 방식)
+    // ✅ 2) 나머지 섹션은 admin_ad_slots
     const cols = await getSlotsColumns();
 
     const prefixBase = [PAGE_NAME, "food", keyPart(category), keyPart(subcategory), keyPart(section)].join("|");
@@ -661,6 +553,7 @@ export async function upsertSlot(req, res) {
     const noEnd = toBool(req.body.no_end);
     const priority = safeInt(req.body.priority, 0);
 
+    // 기존 이미지 제거 대비
     let oldImageUrl = "";
     if (uploadedImageUrl && hasCol(cols, "image_url")) {
       const q = `
