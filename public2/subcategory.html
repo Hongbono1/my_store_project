@@ -18,7 +18,6 @@
         <div class="flex-1 text-left">
             <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
             <p id="heroSubtitle" class="text-gray-600 mb-6">카테고리 설명</p>
-            <!-- 히어로 MORE는 "All of the items 더보기" 토글로 사용 -->
             <button id="btnMoreHero" class="px-5 py-2.5 bg-black text-white font-semibold rounded-lg">MORE VIEW</button>
         </div>
     </section>
@@ -33,7 +32,6 @@
         <div id="filterContainer" class="flex justify-center flex-wrap gap-3 mb-8"></div>
         <div id="lineGrid" class="grid grid-cols-1 gap-4"></div>
 
-        <!-- pagination -->
         <div id="itemsPager" class="mt-8 flex justify-center items-center gap-3 hidden">
             <button id="itemsPrev" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">이전</button>
             <div id="itemsPageInfo" class="text-sm font-semibold text-gray-700"></div>
@@ -96,28 +94,21 @@
     </div>
 
     <script>
-        // header/footer
         fetch("/components/header.html").then(r => r.text()).then(d => (document.getElementById("header-placeholder").innerHTML = d));
         fetch("/components/footer.html").then(r => r.text()).then(d => (document.getElementById("footer-placeholder").innerHTML = d));
 
-        // URL params
         const params = new URLSearchParams(window.location.search);
         const TYPE = (params.get("type") || "food").toLowerCase();
 
-        // ✅ category/subcategory (둘 다 지원)
         const RAW_CATEGORY = (params.get("category") || "").trim();
         const RAW_SUB = (params.get("sub") || params.get("subcategory") || "").trim();
 
         let CATEGORY = RAW_CATEGORY;
         let SUB = RAW_SUB;
 
-        // 한식 소제목(고정)
         const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
-
-        // ✅ 미용/이발 버튼(필터)
         const BEAUTY_TYPE_FILTERS = ["미용", "이발", "기타"];
 
-        // 전체 데이터를 1번만 받아두고, 화면은 여기서 필터링
         let ALL_STORES = [];
         let CURRENT_SUB = SUB;
 
@@ -130,7 +121,6 @@
         };
         let DATA = { ...DEFAULT_DATA };
 
-        // ✅ 더보기/페이지네이션 상태 (요구사항: 기본 8개, 더보기 시 12개 + 페이지네이션)
         const COLLAPSED_COUNT = 8;
         const PAGE_SIZE = 12;
 
@@ -153,7 +143,6 @@
         }
 
         function pickImage(store) {
-            // combined_store_info 기준: main_image_url
             const cand = store.main_image_url || store.image_url || store.image || store.url || "";
             return normalizeSrc(cand);
         }
@@ -168,7 +157,6 @@
         }
 
         function getBeautyType(store) {
-            // DB에 business_type이 "미용"/"이발"로 저장됨(너가 레지스터에서 자동설정해둠)
             const t = (store.business_type ?? store.businessType ?? "").toString().trim();
             if (t === "미용") return "미용";
             if (t === "이발") return "이발";
@@ -206,36 +194,23 @@
             const res = await fetch(url);
             const json = await res.json();
             if (!res.ok) {
-                // 500일 때도 json이 내려오면 같이 로그에 남기자
                 console.error("❌ fetchJson not ok:", res.status, url, json);
             }
             return json;
         }
 
-        // ✅ 매니저 API 호출 헬퍼
         const GRID_API_BASE = "/subcategorymanager/ad";
-
-        function sectionKeyToManagerSection(key) {
-            if (key === "items") return "all_items";
-            if (key === "best") return "best_seller";
-            if (key === "newly") return "new_registration";
-            return "all_items";
-        }
 
         async function fetchManagerGrid(section, pageNo) {
             const params = new URLSearchParams();
-            params.set("page", "subcategory");              // ✅ 고정
-            params.set("section", section);                 // ✅ all_items / best_seller / new_registration
-            params.set("mode", TYPE);                       // ✅ food | combined
+            params.set("page", "subcategory");
+            params.set("section", section);
+            params.set("mode", TYPE);
             params.set("pageNo", String(pageNo || 1));
 
-            // ✅ 필터 반영 (서브카테고리 화면 기준)
-            // - food: category는 항상, subcategory는 한식처럼 서브필터 있을 때만
-            // - combined: subcategory 버튼 선택 시만(미용/이발 예외는 나중에 추가 보완 가능)
             if (CATEGORY) params.set("category", CATEGORY);
 
             if (CURRENT_SUB) {
-                // 미용/이발은 기존 로직이 business_type 기반일 수 있어서 일단 서버 subcategory 필터는 생략(원하면 다음 단계에서 서버까지 맞춰줌)
                 if (!(TYPE === "combined" && CATEGORY === "미용/이발")) {
                     params.set("subcategory", CURRENT_SUB);
                 }
@@ -249,14 +224,13 @@
 
         function gridItemsToStores(items, limit) {
             const stores = (items || [])
-                .filter((it) => it && it.occupied) // empty 제외
+                .filter((it) => it && it.occupied)
                 .map((it) => ({
                     id: it.store_id,
                     business_number: it.business_no || "",
                     business_name: it.business_name || "",
                     business_type: it.store_type || "",
                     image_url: it.image_url || "",
-                    // 필요하면 source/position도 보관 가능(화면 노출 X)
                     _source: it.source,
                     _position: it.position,
                 }));
@@ -265,20 +239,17 @@
         }
 
         function buildDynamicFiltersFromStores(stores) {
-            // business_subcategory 기반으로 unique 생성
             const set = new Set();
             (stores || []).forEach(s => {
                 const sub = getCombinedSubcategory(s);
                 if (sub) set.add(sub);
             });
             const list = Array.from(set);
-            // 보기 좋게 정렬(한글/영문 섞여도 OK)
             list.sort((a, b) => a.localeCompare(b, "ko"));
             return list;
         }
 
         function buildBestFromStores(stores) {
-            // Best = view_count/viewCount 기준 내림차순
             const arr = (stores || []).slice();
             arr.sort((a, b) => {
                 const av = Number(a.view_count ?? a.viewCount ?? 0);
@@ -289,7 +260,6 @@
         }
 
         function buildNewFromStores(stores) {
-            // New = 최근 60일(약 2달) + created_at 기준 최신순
             const now = Date.now();
             const limitMs = 60 * 24 * 60 * 60 * 1000;
 
@@ -318,7 +288,6 @@
             const sub = (subVal || "").trim();
             CURRENT_SUB = sub;
 
-            // ✅ 한식에서만 detail_category로 분리
             if (TYPE === "food" && CATEGORY === "한식") {
                 if (!sub) {
                     DATA.stores = ALL_STORES.slice();
@@ -337,14 +306,13 @@
 
                 if (updateHistory) {
                     const q = new URLSearchParams(location.search);
-                    q.set("subcategory", sub); // ✅ 표준은 subcategory로 유지
+                    q.set("subcategory", sub);
                     q.delete("sub");
                     history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
                 }
                 return;
             }
 
-            // ✅ combined: 미용/이발만 business_type으로 분리
             if (TYPE === "combined" && CATEGORY === "미용/이발") {
                 if (!sub) {
                     DATA.stores = ALL_STORES.slice();
@@ -371,7 +339,6 @@
                 return;
             }
 
-            // ✅ combined: 그 외는 business_subcategory로 분리
             if (TYPE === "combined" && DATA.filters && DATA.filters.length) {
                 if (!sub) {
                     DATA.stores = ALL_STORES.slice();
@@ -397,7 +364,6 @@
                 return;
             }
 
-            // 그 외는 필터 없음
             DATA.stores = ALL_STORES.slice();
             setHero(CATEGORY, "카테고리별 가게를 확인하세요.");
         }
@@ -424,7 +390,8 @@
                 card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col h-auto bg-white";
 
                 const dispName = store.business_name ?? store.name ?? store.businessName ?? store.title ?? "-";
-                const dispCategory = store.business_category ?? store.category ?? store.businessCategory ?? "";
+                const dispType = (store.business_type ?? store.businessType ?? "").toString().trim();
+                const dispCategory = (store.business_category ?? store.category ?? store.businessCategory ?? "").toString().trim();
                 const imgNorm = pickImage(store);
 
                 card.innerHTML = `
@@ -432,14 +399,18 @@
             <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
               <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
-              <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
+
+              <!-- ✅ 업종 표시 -->
+              <div class="text-sm text-gray-700 truncate">${escapeHtml(dispType ? `업종: ${dispType}` : "업종: -")}</div>
+
+              <!-- ✅ 카테고리도 있으면 표시(없으면 '-' ) -->
+              <div class="text-xs text-gray-600 truncate">${escapeHtml(dispCategory ? `카테고리: ${dispCategory}` : "카테고리: -")}</div>
             </div>
           </div>`;
 
                 card.addEventListener("click", () => {
-                    const bt = store.business_type ?? store.businessType ?? "";
-                    const type = (bt === "음식점" || bt === "음식") ? "food" : "combined";
-                    window.location.href = `/ndetail.html?id=${store.id}&type=${type}`;
+                    // ✅ 핵심: 클릭 이동 type은 store.business_type으로 판단하지 말고, 현재 페이지 TYPE을 그대로 사용
+                    window.location.href = `/ndetail.html?id=${store.id}&type=${TYPE}`;
                 });
 
                 wrapper.appendChild(card);
@@ -497,7 +468,7 @@
                 applySubFilter(tagVal || "", true);
                 bindHero();
                 renderFilters();
-                await renderItemsSection(); // ✅ All items 갱신
+                await renderItemsSection();
                 renderBestSection();
                 renderNewSection();
             };
@@ -508,40 +479,23 @@
             const wrap = document.getElementById("filterContainer");
             wrap.innerHTML = "";
 
-            // ✅ 한식: 고정 소제목
             if (TYPE === "food" && CATEGORY === "한식") {
                 wrap.appendChild(makeFilterBtn("All", ""));
                 HANSIK_SUBS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
                 return;
             }
 
-            // ✅ combined + 미용/이발: 미용/이발/기타 버튼
             if (TYPE === "combined" && CATEGORY === "미용/이발") {
                 wrap.appendChild(makeFilterBtn("All", ""));
                 BEAUTY_TYPE_FILTERS.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
                 return;
             }
 
-            // ✅ combined: 동적 서브카테고리 버튼
             if (TYPE === "combined" && DATA.filters && DATA.filters.length) {
                 wrap.appendChild(makeFilterBtn("All", ""));
                 DATA.filters.forEach(tag => wrap.appendChild(makeFilterBtn(tag, tag)));
                 return;
             }
-
-            // 그 외: 버튼 없음
-        }
-
-        function getVisible(list, stateObj) {
-            const listArr = (list || []);
-            if (!stateObj.expanded) {
-                return { slice: listArr.slice(0, COLLAPSED_COUNT), totalPages: 1 };
-            }
-            const totalPages = Math.max(1, Math.ceil(listArr.length / PAGE_SIZE));
-            const page = Math.min(Math.max(1, stateObj.page), totalPages);
-            stateObj.page = page;
-            const start = (page - 1) * PAGE_SIZE;
-            return { slice: listArr.slice(start, start + PAGE_SIZE), totalPages };
         }
 
         async function renderItemsSection() {
@@ -553,10 +507,8 @@
 
             const pageNo = sectionState.items.expanded ? sectionState.items.page : 1;
 
-            // ✅ 서버 섹션명은 all_items 고정
             const json = await fetchManagerGrid("all_items", pageNo);
 
-            // ✅ 접힘이면 4개만
             const stores = gridItemsToStores(
                 json.items,
                 sectionState.items.expanded ? undefined : 4
@@ -564,7 +516,6 @@
 
             renderStoresGrid(stores, grid);
 
-            // ✅ 서버에서 받은 totalPages 사용
             const totalPages = json.totalPages || 1;
 
             if (!sectionState.items.expanded || totalPages <= 1) {
@@ -627,16 +578,13 @@
             document.getElementById("btnMoreItems").textContent = sectionState.items.expanded ? "접기" : "더보기";
             document.getElementById("btnMoreBest").textContent = sectionState.best.expanded ? "접기" : "더보기";
             document.getElementById("btnMoreNew").textContent = sectionState.newly.expanded ? "접기" : "더보기";
-
-            // 히어로 MORE는 items 토글과 동일하게 동작
             document.getElementById("btnMoreHero").textContent = sectionState.items.expanded ? "CLOSE VIEW" : "MORE VIEW";
         }
 
         function bindMoreAndPagerEvents() {
-            // Items
             document.getElementById("btnMoreItems").onclick = () => {
                 sectionState.items.expanded = !sectionState.items.expanded;
-                sectionState.items.page = 1; // ✅ 더보기 다시 누르면 원위치
+                sectionState.items.page = 1;
                 syncMoreButtonLabels();
                 renderItemsSection();
             };
@@ -652,7 +600,6 @@
                 renderItemsSection();
             };
 
-            // Best
             document.getElementById("btnMoreBest").onclick = async (e) => {
                 e?.preventDefault?.();
                 const keepY = window.scrollY;
@@ -673,7 +620,6 @@
                 renderBestSection();
             };
 
-            // New
             document.getElementById("btnMoreNew").onclick = async (e) => {
                 e?.preventDefault?.();
                 const keepY = window.scrollY;
@@ -700,12 +646,10 @@
                 DATA = { ...DEFAULT_DATA };
                 ALL_STORES = [];
 
-                // 상태 리셋(새로고침/재진입 동일)
                 sectionState.items.expanded = false; sectionState.items.page = 1;
                 sectionState.best.expanded = false; sectionState.best.page = 1;
                 sectionState.newly.expanded = false; sectionState.newly.page = 1;
 
-                // ✅ TYPE=food
                 if (TYPE === "food") {
                     const q = new URLSearchParams();
                     q.set("category", CATEGORY);
@@ -722,7 +666,6 @@
                         DATA.stores = ALL_STORES.slice();
                     }
 
-                    // best/new는 기존 API가 있으면 사용(없으면 빈 배열 유지)
                     try {
                         const best = await fetchJson(`/api/subcategory/food/best`);
                         DATA.best = best.stores || [];
@@ -732,31 +675,22 @@
                         DATA.new = nw.stores || [];
                     } catch (_) { }
 
-                }
-                // ✅ TYPE=combined
-                else if (TYPE === "combined") {
+                } else if (TYPE === "combined") {
                     const json = await fetchJson(`/api/subcategory/combined?category=${encodeURIComponent(CATEGORY)}`);
                     ALL_STORES = json.stores || [];
 
-                    // ✅ 통합: 기본은 business_subcategory 기반 필터 버튼 자동 생성
                     if (CATEGORY === "미용/이발") {
-                        // 미용/이발만 예외(미용/이발/기타)
                         DATA.filters = BEAUTY_TYPE_FILTERS.slice();
                         applySubFilter(CURRENT_SUB, false);
                     } else {
                         DATA.filters = buildDynamicFiltersFromStores(ALL_STORES);
-                        // URL로 subcategory가 왔으면 적용, 아니면 전체
                         applySubFilter(CURRENT_SUB, false);
                         if (!CURRENT_SUB) setHero(CATEGORY, "카테고리별 가게를 확인하세요.");
                     }
 
-                    // ✅ combined Best/New는 지금 당장 서버 API 없어도 클라이언트에서 만들 수 있음
-                    // - Best: view_count desc
-                    // - New: 최근 60일
                     DATA.best = buildBestFromStores(ALL_STORES);
                     DATA.new = buildNewFromStores(ALL_STORES);
-                }
-                else {
+                } else {
                     ALL_STORES = [];
                     DATA = { ...DEFAULT_DATA };
                 }
@@ -776,7 +710,6 @@
             syncMoreButtonLabels();
             bindMoreAndPagerEvents();
 
-            // 각 섹션 렌더
             await renderItemsSection();
             await renderBestSection();
             await renderNewSection();
