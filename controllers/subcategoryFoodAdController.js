@@ -150,12 +150,12 @@ export async function grid(req, res) {
             }
         }
 
-        // best_seller는 “조회수 기반이 중요” → 컬럼 없으면 500으로 강하게 알려주는 게 안전
-        if (section === "best_seller" && !colViews) {
-            return res.status(500).json({
-                success: false,
-                error: `FOOD table(${table}) has no view/click count column (needed for best_seller).`,
-            });
+        if (section === "best_seller") {
+            if (colViews) {
+                orderBySql = `COALESCE(s.${sqlIdent(colViews)}::bigint, 0) DESC, s.${sqlIdent(colId)} DESC`;
+            } else {
+                orderBySql = `s.${sqlIdent(colId)} DESC`; // ✅ 컬럼 없으면 최신순으로라도
+            }
         }
 
         // new_registration은 “등록일 기준” → 날짜 컬럼 없으면 id 최신순이라도 동작은 하게
