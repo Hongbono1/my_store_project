@@ -10,7 +10,8 @@ import pool from "../db.js";
  *  - Upload dir: /data/uploads/manager_ad
  *  - Slot table: public.admin_ad_slots
  *  - Food stores: public.store_info (네 DB 기준)
- *  - Food images: public.food_store_images (image_url)
+ *  - Food images: public.food_store_images (image_url)  (없으면 fallback)
+ *  - Fallback: public.store_menu (image_url)  // ✅ 네 DB에 실제 이미지 존재(메뉴 이미지)
  *  - section=all_items 일 때는 "가게 실제 목록"을 내려줌 (JOIN으로 image_url 포함)
  * ----------------------------------------------------------
  */
@@ -23,11 +24,14 @@ export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 // 슬롯 테이블(기존 재사용)
 const SLOTS_TABLE = "public.admin_ad_slots";
 
-// ✅ FOOD 가게 테이블: 네 DB 확인 결과 store_info에 3개 있음
+// ✅ FOOD 가게 테이블
 const FOOD_TABLE = "public.store_info";
 
-// ✅ FOOD 이미지 테이블: 네 목록에서 확인됨
+// ✅ FOOD 이미지 테이블
 const FOOD_IMAGE_TABLE = "public.food_store_images";
+
+// ✅ fallback: 메뉴 이미지(네가 실제로 image_url이 존재한다고 보여준 테이블)
+const FALLBACK_MENU_IMAGE_TABLE = "public.store_menu";
 
 // 페이지 고정(서브카테고리)
 const PAGE_NAME = "subcategory";
@@ -75,7 +79,13 @@ function keyPart(v) {
  * position 규칙(FOOD)
  * subcategory|food|{category}|{subcategory}|{section}|{idx}
  */
-function buildPosition({ mode = "food", category = "", subcategory = "", section = "", idx = 1 }) {
+function buildPosition({
+  mode = "food",
+  category = "",
+  subcategory = "",
+  section = "",
+  idx = 1,
+}) {
   return [
     PAGE_NAME,
     keyPart(mode || "food"),
@@ -103,7 +113,9 @@ export function makeMulterStorage() {
     },
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-      const name = `${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")}${ext}`;
+      const name = `${
+        crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")
+      }${ext}`;
       cb(null, name);
     },
   };
@@ -120,7 +132,10 @@ async function getSlotsColumns() {
     WHERE table_schema = $1 AND table_name = $2
   `;
   const [schema, table] = SLOTS_TABLE.split(".");
-  const { rows } = await pool.query(sql, [schema.replaceAll('"', ""), table.replaceAll('"', "")]);
+  const { rows } = await pool.query(sql, [
+    schema.replaceAll('"', ""),
+    table.replaceAll('"', ""),
+  ]);
   _slotsColsCache = new Set(rows.map((r) => r.column_name));
   return _slotsColsCache;
 }
@@ -136,17 +151,19 @@ const STORE_MAP = {
   businessName: "business_name",
   businessType: "business_type",
   category: "business_category",
-  subcategory: "detail_category", // ✅ store_info는 detail_category가 서브카테고리임
+  subcategory: "detail_category", // ✅ store_info는 detail_category가 서브카테고리
 };
 
 /** ----------------- image join (food_store_images) ----------------- */
-// food_store_images가 어떤 키로 연결되는지 모를 수 있어서(환경 차이) 컬럼을 보고 자동 선택
+// food_store_images가 어떤 키로 연결되는지 모를 수 있어서 컬럼 보고 자동 선택
 let _foodImgJoinCache = null;
 async function getFoodImageJoin() {
   if (_foodImgJoinCache) return _foodImgJoinCache;
 
   // 테이블 존재 확인
-  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [FOOD_IMAGE_TABLE]);
+  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [
+    FOOD_IMAGE_TABLE,
+  ]);
   if (!r0?.[0]?.reg) {
     _foodImgJoinCache = null;
     return null;
@@ -164,7 +181,6 @@ async function getFoodImageJoin() {
   );
   const cols = new Set(rows.map((x) => x.column_name));
 
-  // join 키 후보
   const keyCol =
     (cols.has("business_number") && "business_number") ||
     (cols.has("business_no") && "business_no") ||
@@ -177,7 +193,6 @@ async function getFoodImageJoin() {
     return null;
   }
 
-  // 정렬 후보(대표 이미지 우선 등)
   const orderParts = [];
   if (cols.has("is_main")) orderParts.push("i.is_main DESC");
   if (cols.has("priority")) orderParts.push("i.priority ASC");
@@ -188,6 +203,55 @@ async function getFoodImageJoin() {
 
   _foodImgJoinCache = { keyCol, orderBy };
   return _foodImgJoinCache;
+}
+
+/** ----------------- fallback image join (store_menu) ----------------- */
+let _menuImgJoinCache = null;
+async function getFallbackMenuImageJoin() {
+  if (_menuImgJoinCache) return _menuImgJoinCache;
+
+  const { rows: r0 } = await pool.query("SELECT to_regclass($1) AS reg", [
+    FALLBACK_MENU_IMAGE_TABLE,
+  ]);
+  if (!r0?.[0]?.reg) {
+    _menuImgJoinCache = null;
+    return null;
+  }
+
+  const [schema, table] = FALLBACK_MENU_IMAGE_TABLE.split(".");
+  const { rows } = await pool.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1 AND table_name = $2
+  `,
+    [schema, table]
+  );
+  const cols = new Set(rows.map((x) => x.column_name));
+
+  // store_menu는 보통 store_id가 있음(없으면 business_number 계열로도 대응)
+  const keyCol =
+    (cols.has("store_id") && "store_id") ||
+    (cols.has("storeinfo_id") && "storeinfo_id") ||
+    (cols.has("business_number") && "business_number") ||
+    (cols.has("business_no") && "business_no") ||
+    "";
+
+  if (!keyCol || !cols.has("image_url")) {
+    _menuImgJoinCache = null;
+    return null;
+  }
+
+  const orderParts = [];
+  if (cols.has("is_main")) orderParts.push("m.is_main DESC");
+  if (cols.has("priority")) orderParts.push("m.priority ASC");
+  if (cols.has("sort_order")) orderParts.push("m.sort_order ASC");
+  if (cols.has("id")) orderParts.push("m.id ASC");
+  if (cols.has("created_at")) orderParts.push("m.created_at ASC");
+  const orderBy = orderParts.length ? `ORDER BY ${orderParts.join(", ")}` : "";
+
+  _menuImgJoinCache = { keyCol, orderBy };
+  return _menuImgJoinCache;
 }
 
 function normalizeImageUrl(u) {
@@ -227,26 +291,46 @@ export async function listStores(req, res) {
 
     const qDigits = digitsOnly(q);
 
-    // 이미지 join 준비
+    // 이미지 join 준비 (food_store_images + fallback store_menu)
     const imgJoin = await getFoodImageJoin();
+    const menuJoin = await getFallbackMenuImageJoin();
+
     const joinKeyExpr =
       imgJoin?.keyCol === "store_id" || imgJoin?.keyCol === "storeinfo_id"
         ? `i.${imgJoin.keyCol} = s.${STORE_MAP.id}`
-        : `i.${imgJoin?.keyCol} = s.${STORE_MAP.businessNo}`;
+        : imgJoin?.keyCol
+        ? `i.${imgJoin.keyCol} = s.${STORE_MAP.businessNo}`
+        : "1=0";
 
-    const imgSelectSql = imgJoin
-      ? `, COALESCE(img.image_url, '') AS image_url`
-      : `, '' AS image_url`;
+    const menuJoinKeyExpr =
+      menuJoin?.keyCol === "store_id" || menuJoin?.keyCol === "storeinfo_id"
+        ? `m.${menuJoin.keyCol} = s.${STORE_MAP.id}`
+        : menuJoin?.keyCol
+        ? `m.${menuJoin.keyCol} = s.${STORE_MAP.businessNo}`
+        : "1=0";
 
     const imgJoinSql = imgJoin
       ? `
       LEFT JOIN LATERAL (
-        SELECT ${"i.image_url"} AS image_url
+        SELECT i.image_url AS image_url
         FROM ${FOOD_IMAGE_TABLE} i
         WHERE ${joinKeyExpr}
         ${imgJoin.orderBy}
         LIMIT 1
       ) img ON true
+    `
+      : "";
+
+    const menuJoinSql = menuJoin
+      ? `
+      LEFT JOIN LATERAL (
+        SELECT m.image_url AS image_url
+        FROM ${FALLBACK_MENU_IMAGE_TABLE} m
+        WHERE ${menuJoinKeyExpr}
+          AND NULLIF(btrim(m.image_url::text), '') IS NOT NULL
+        ${menuJoin.orderBy}
+        LIMIT 1
+      ) menuimg ON true
     `
       : "";
 
@@ -271,7 +355,6 @@ export async function listStores(req, res) {
       where.push(`(${ors.join(" OR ")})`);
     }
 
-    // limit/offset
     params.push(pageSize, offset);
     const limitIdx = i++;
     const offsetIdx = i++;
@@ -283,18 +366,17 @@ export async function listStores(req, res) {
         s.${STORE_MAP.businessName} AS business_name,
         s.${STORE_MAP.businessType} AS business_type,
         s.${STORE_MAP.category} AS business_category,
-        s.${STORE_MAP.subcategory} AS business_subcategory
-        ${imgSelectSql}
+        s.${STORE_MAP.subcategory} AS business_subcategory,
+        COALESCE(NULLIF(img.image_url, ''), NULLIF(menuimg.image_url, ''), '') AS image_url
       FROM ${FOOD_TABLE} s
       ${imgJoinSql}
+      ${menuJoinSql}
       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY s.${STORE_MAP.id} DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
     const { rows } = await pool.query(sql, params);
-
-    // normalize
     for (const r of rows) r.image_url = normalizeImageUrl(r.image_url);
 
     return res.json({
@@ -321,7 +403,7 @@ export async function listCandidates(req, res) {
 /** ----------------- API: grid ----------------- */
 /**
  * GET /subcategorymanager_food/ad/grid
- * - section=all_items => "실제 가게 목록" (store_info + food_store_images)
+ * - section=all_items => "실제 가게 목록" (store_info + food_store_images + fallback store_menu)
  * - 그 외 section => admin_ad_slots에서 position prefix로 조회
  */
 export async function grid(req, res) {
@@ -340,14 +422,21 @@ export async function grid(req, res) {
     // ✅ 1) all_items는 실제 가게 목록
     if (section === "all_items") {
       const imgJoin = await getFoodImageJoin();
+      const menuJoin = await getFallbackMenuImageJoin();
+
       const joinKeyExpr =
         imgJoin?.keyCol === "store_id" || imgJoin?.keyCol === "storeinfo_id"
           ? `i.${imgJoin.keyCol} = s.${STORE_MAP.id}`
-          : `i.${imgJoin?.keyCol} = s.${STORE_MAP.businessNo}`;
+          : imgJoin?.keyCol
+          ? `i.${imgJoin.keyCol} = s.${STORE_MAP.businessNo}`
+          : "1=0";
 
-      const imgSelectSql = imgJoin
-        ? `, COALESCE(img.image_url, '') AS image_url`
-        : `, '' AS image_url`;
+      const menuJoinKeyExpr =
+        menuJoin?.keyCol === "store_id" || menuJoin?.keyCol === "storeinfo_id"
+          ? `m.${menuJoin.keyCol} = s.${STORE_MAP.id}`
+          : menuJoin?.keyCol
+          ? `m.${menuJoin.keyCol} = s.${STORE_MAP.businessNo}`
+          : "1=0";
 
       const imgJoinSql = imgJoin
         ? `
@@ -361,11 +450,23 @@ export async function grid(req, res) {
       `
         : "";
 
+      const menuJoinSql = menuJoin
+        ? `
+        LEFT JOIN LATERAL (
+          SELECT m.image_url AS image_url
+          FROM ${FALLBACK_MENU_IMAGE_TABLE} m
+          WHERE ${menuJoinKeyExpr}
+            AND NULLIF(btrim(m.image_url::text), '') IS NOT NULL
+          ${menuJoin.orderBy}
+          LIMIT 1
+        ) menuimg ON true
+      `
+        : "";
+
       const where = [];
       const params = [];
       let i = 1;
 
-      // category/subcategory가 넘어오면 필터
       if (category) {
         where.push(
           `btrim(replace(s.${STORE_MAP.category}::text, chr(160), ' ')) = btrim(replace($${i++}::text, chr(160), ' '))`
@@ -390,10 +491,11 @@ export async function grid(req, res) {
           s.${STORE_MAP.businessName} AS business_name,
           s.${STORE_MAP.businessType} AS business_type,
           s.${STORE_MAP.category} AS business_category,
-          s.${STORE_MAP.subcategory} AS business_subcategory
-          ${imgSelectSql}
+          s.${STORE_MAP.subcategory} AS business_subcategory,
+          COALESCE(NULLIF(img.image_url, ''), NULLIF(menuimg.image_url, ''), '') AS image_url
         FROM ${FOOD_TABLE} s
         ${imgJoinSql}
+        ${menuJoinSql}
         ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
         ORDER BY s.${STORE_MAP.id} DESC
         LIMIT $${limitIdx} OFFSET $${offsetIdx}
@@ -418,7 +520,6 @@ export async function grid(req, res) {
     // ✅ 2) 나머지 섹션은 admin_ad_slots (기존 방식)
     const cols = await getSlotsColumns();
 
-    // position prefix
     const prefixBase = [
       PAGE_NAME,
       "food",
@@ -477,8 +578,6 @@ export async function grid(req, res) {
       : ["", likePrefix, pageSize, offset];
 
     const { rows } = await pool.query(sql, params);
-
-    // normalize slot image url도 안전하게
     for (const r of rows) if ("image_url" in r) r.image_url = normalizeImageUrl(r.image_url);
 
     return res.json({
@@ -640,7 +739,7 @@ export async function upsertSlot(req, res) {
     if (hasCol(cols, "priority")) data.priority = priority;
     if (hasCol(cols, "updated_at")) data.updated_at = new Date().toISOString();
 
-    // UPDATE 후 없으면 INSERT (unique 제약 몰라도 안전)
+    // UPDATE 후 없으면 INSERT
     const setKeys = Object.keys(data).filter((k) => k !== "position" && k !== "page");
     const setSql = setKeys.map((k, n) => `${k} = $${n + 3}`).join(", ");
     const setParams = setKeys.map((k) => data[k]);
