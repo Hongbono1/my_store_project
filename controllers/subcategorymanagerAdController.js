@@ -1070,6 +1070,20 @@ export async function getGrid(req, res) {
     `
         : "";
 
+    // ✅ override도 카테고리/세부카테고리 표시용 JOIN
+    const joinStoreSql =
+      storeIdCol
+        ? `LEFT JOIN ${storeTable} st2 ON st2."${sel.idCol}"::text = slots."${storeIdCol}"::text`
+        : "";
+
+    const st2CategoryExpr = sel.catCol
+      ? `COALESCE(st2."${sel.catCol}"::text,'')`
+      : `''`;
+
+    const st2SubcategoryExpr = sel.subCol
+      ? `btrim(replace(COALESCE(st2."${sel.subCol}"::text,''), chr(160), ' '))`
+      : `''`;
+
     const slotSql = `
       SELECT DISTINCT ON (slots."${posCol}")
         slots."${posCol}"::text AS position,
@@ -1080,11 +1094,14 @@ export async function getGrid(req, res) {
         ${storeBizCol ? `COALESCE(slots."${storeBizCol}"::text,'')` : `''`} AS business_no,
         ${storeNameCol ? `COALESCE(slots."${storeNameCol}"::text,'')` : `''`} AS business_name,
         ${storeTypeCol ? `COALESCE(slots."${storeTypeCol}"::text,'')` : `''`} AS store_type,
+        ${st2CategoryExpr} AS business_category,
+        ${st2SubcategoryExpr} AS business_subcategory,
         ${imageUrlCol ? `COALESCE(slots."${imageUrlCol}"::text,'')` : `''`} AS image_url,
         ${textContentCol ? `COALESCE(slots."${textContentCol}"::text,'')` : `''`} AS text_content,
         ${linkUrlCol ? `COALESCE(slots."${linkUrlCol}"::text,'')` : `''`} AS link_url,
         ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
       FROM ${SLOTS_TABLE} slots
+      ${joinStoreSql}
       WHERE slots."${m.page}"=$1
         AND slots."${posCol}" LIKE $2
       ${overrideFilterSql}
@@ -1149,6 +1166,15 @@ export async function getGrid(req, res) {
     values.push(endRn);
     const pEnd = values.length;
 
+    // ✅ 대분류/세부카테고리 expr (응답에 실어보내기용)
+    const categoryExpr = sel.catCol
+      ? `COALESCE(${col(sel.catCol)}::text,'')`
+      : `''`;
+
+    const subcategoryExpr = sel.subCol
+      ? `btrim(replace(COALESCE(${col(sel.subCol)}::text,''), chr(160), ' '))`
+      : `''`;
+
     const autoSql = `
       WITH ranked AS (
         SELECT
@@ -1156,6 +1182,8 @@ export async function getGrid(req, res) {
           ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_no,
           ${col(sel.nameCol)}::text AS business_name,
           ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS store_type,
+          ${categoryExpr} AS business_category,
+          ${subcategoryExpr} AS business_subcategory,
           ${imageExpr} AS image_url,
           ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
         FROM ${storeTable} ${A}
@@ -1209,6 +1237,8 @@ export async function getGrid(req, res) {
           business_no: clean(over.business_no),
           business_name: clean(over.business_name),
           store_type: String(over.store_type || "").trim(),
+          business_category: clean(over.business_category),
+          business_subcategory: clean(over.business_subcategory),
           image_url: clean(over.image_url),
           text_content: clean(over.text_content),
           link_url: clean(over.link_url),  // ✅ DB에서 가져온 link_url
@@ -1242,6 +1272,8 @@ export async function getGrid(req, res) {
           business_no: clean(auto.business_no),
           business_name: clean(auto.business_name),
           store_type: String(auto.store_type || "").trim(),
+          business_category: clean(auto.business_category),
+          business_subcategory: clean(auto.business_subcategory),
           image_url: clean(auto.image_url),
           text_content: "",
           link_url: autoLinkUrl,  // ✅ 자동 생성된 link_url
