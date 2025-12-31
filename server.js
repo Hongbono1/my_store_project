@@ -382,6 +382,9 @@ app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 app.use("/subcategorymanager_food/ad", subcategoryFoodAdRouter);
 app.use("/subcategorymanager_combined/ad", subcategoryCombinedAdRouter);
 
+// ✅ subcategoryRouter 마운트 (이게 없으면 /api/subcategory/* 가 404)
+app.use("/api/subcategory", subcategoryRouter);
+
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
 // ------------------------------------------------------------
