@@ -112,19 +112,20 @@
         // ==========================================
         const GRID_ENDPOINT = "/subcategorymanager_food/ad/grid";
 
-        // 레이아웃 요구: All items는 접힘 4개, 펼침 12개+페이지네이션
+        // All items: 접힘 4개 / 펼침 12개 + 페이지네이션
         const ITEMS_COLLAPSED_COUNT = 4;
-        const PAGE_SIZE = 12;
+        const ITEMS_PAGE_SIZE = 12;
 
-        // Best/New는 접힘 8개
-        const SMALL_COLLAPSED_COUNT = 8;
+        // Best/New: 항상 9개씩 (펼침도 9개/페이지 + 페이지네이션)
+        const SMALL_PAGE_SIZE = 9;
+        const SMALL_COLLAPSED_COUNT = 9;
 
         // 한식 서브(고정)
         const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
 
         const state = {
             category: "",
-            subcategory: "",        // "" = 전체(서브필터 없음) / 한식일 땐 HANSIK_SUBS 중 하나
+            subcategory: "",        // "" = 전체 / 한식일 땐 HANSIK_SUBS 중 하나
             cacheAllFirstPage: [],  // fallback용
             sectionState: {
                 items: { expanded: false, page: 1, totalPages: 1 },
@@ -150,7 +151,6 @@
         }
 
         function pickImage(store) {
-            // 서버 응답에 image_url / main_image_url 등이 섞일 수 있음
             const cand = store.image_url || store.main_image_url || store.image || store.url || "";
             return normalizeSrc(cand);
         }
@@ -159,18 +159,24 @@
             return clean(store.business_category || store.category || store.businessCategory || "");
         }
 
+        // ✅ 핵심: Best/New는 카테고리 구분 없이 → category 파라미터를 보내지 않는다.
         function buildUrl(section, pageNo, pageSize) {
             const params = new URLSearchParams();
             params.set("page", "subcategory");
             params.set("section", section); // all_items | best_seller | new_registration
             params.set("pageNo", String(pageNo || 1));
-            params.set("pageSize", String(pageSize || PAGE_SIZE));
-            params.set("category", state.category);
+            params.set("pageSize", String(pageSize || ITEMS_PAGE_SIZE));
 
-            // ✅ 한식일 때만 subcategory 쿼리 반영
-            if (state.category === "한식" && clean(state.subcategory)) {
-                params.set("subcategory", state.subcategory);
+            // ✅ all_items만 category 필수
+            if (section === "all_items") {
+                params.set("category", state.category);
+
+                // ✅ 한식일 때만 subcategory 반영
+                if (state.category === "한식" && clean(state.subcategory)) {
+                    params.set("subcategory", state.subcategory);
+                }
             }
+
             return `${GRID_ENDPOINT}?${params.toString()}`;
         }
 
@@ -180,7 +186,6 @@
         }
 
         function mapItemsToStores(items) {
-            // manager grid 형식(occupied 포함)도, 일반 store list 형식도 모두 대응
             return (items || [])
                 .filter(it => it && (it.occupied === undefined ? true : !!it.occupied))
                 .map(it => ({
@@ -197,6 +202,7 @@
         async function fetchGrid(section, pageNo, pageSize) {
             const url = buildUrl(section, pageNo, pageSize);
             const res = await fetch(url, { cache: "no-store", headers: { "Accept": "application/json" } });
+
             let json = null;
             try { json = await res.json(); } catch (_) { }
 
@@ -238,8 +244,10 @@
           <div class="relative h-[260px]">
             <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
             <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
-              <div class="font-bold text-lg text-gray-800 leading-tight truncate">${escapeHtml(dispName)}</div>
-              <div class="text-sm text-gray-600">${escapeHtml(dispCategory)}</div>
+              <!-- ✅ 상호 크게 -->
+              <div class="font-extrabold text-xl text-gray-900 leading-tight truncate">${escapeHtml(dispName)}</div>
+              <!-- ✅ 업종/카테고리 크게 -->
+              <div class="text-base font-semibold text-gray-700">${escapeHtml(dispCategory)}</div>
             </div>
           </div>
         `;
@@ -267,6 +275,7 @@
 
             stores.forEach(store => {
                 const name = clean(store.business_name) || "-";
+                const cat = clean(store.business_category || "") || clean(pickCategory(store)) || "";
                 const img = pickImage(store);
 
                 const card = document.createElement("a");
@@ -276,7 +285,10 @@
           <div class="h-40">
             <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover">
           </div>
-          <div class="p-3 text-sm font-semibold truncate">${escapeHtml(name)}</div>
+          <div class="p-3">
+            <div class="text-base font-extrabold truncate">${escapeHtml(name)}</div>
+            <div class="text-sm font-semibold text-gray-600 truncate">${escapeHtml(cat)}</div>
+          </div>
         `;
 
                 card.addEventListener("click", (e) => {
@@ -329,7 +341,6 @@
                 state.subcategory = clean(value);
                 resetAllPages();
 
-                // URL 반영(한식일 때만)
                 if (state.category === "한식") updateUrlSubcategory(state.subcategory);
                 else updateUrlSubcategory("");
 
@@ -344,7 +355,6 @@
             const container = qs("#filterContainer");
             container.innerHTML = "";
 
-            // ✅ 한식만 서브필터 노출
             if (state.category !== "한식") {
                 wrap.classList.add("hidden");
                 state.subcategory = "";
@@ -352,7 +362,7 @@
             }
 
             wrap.classList.remove("hidden");
-            container.appendChild(makeFilterBtn("All", "")); // 전체
+            container.appendChild(makeFilterBtn("All", ""));
             HANSIK_SUBS.forEach(s => container.appendChild(makeFilterBtn(s, s)));
         }
 
@@ -366,22 +376,18 @@
             const st = state.sectionState.items;
             const pageNo = st.expanded ? st.page : 1;
 
-            const json = await fetchGrid("all_items", pageNo, PAGE_SIZE);
+            const json = await fetchGrid("all_items", pageNo, ITEMS_PAGE_SIZE);
             const stores = mapItemsToStores(normalizeItems(json));
 
-            // fallback 캐시(첫 페이지) 저장 (Best/New가 서버에서 실패할 때 사용)
             if (pageNo === 1) state.cacheAllFirstPage = stores.slice();
 
-            // 접힘(=4개), 펼침(=해당 페이지 전체)
             const visible = st.expanded ? stores : stores.slice(0, ITEMS_COLLAPSED_COUNT);
 
-            // 히어로 이미지: 첫 데이터가 있으면 반영(없으면 no-image 유지)
             const firstImg = visible?.[0]?.image_url || stores?.[0]?.image_url || "";
             if (firstImg) qs("#heroImage").src = normalizeSrc(firstImg);
 
             renderStoresGrid(visible, grid);
 
-            // 페이지네이션
             const totalPages = Number(json.totalPages || 1);
             st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
 
@@ -395,6 +401,7 @@
             }
         }
 
+        // ✅ Best: 카테고리 무시 + 9개/페이지
         async function renderBestSection() {
             const st = state.sectionState.best;
             const pager = qs("#bestPager");
@@ -405,7 +412,7 @@
             const pageNo = st.expanded ? st.page : 1;
 
             try {
-                const json = await fetchGrid("best_seller", pageNo, PAGE_SIZE);
+                const json = await fetchGrid("best_seller", pageNo, SMALL_PAGE_SIZE);
                 const stores = mapItemsToStores(normalizeItems(json));
                 const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
 
@@ -422,13 +429,15 @@
                     next.disabled = st.page >= st.totalPages;
                 }
             } catch (e) {
-                // ✅ fallback: all_items(첫 페이지)에서 분배
                 const base = state.cacheAllFirstPage || [];
-                const fallback = base.slice(ITEMS_COLLAPSED_COUNT, ITEMS_COLLAPSED_COUNT + 24); // 임의 구간
-                const visible = st.expanded ? fallback.slice((st.page - 1) * PAGE_SIZE, st.page * PAGE_SIZE) : fallback.slice(0, SMALL_COLLAPSED_COUNT);
+                const fallback = base.slice(ITEMS_COLLAPSED_COUNT, ITEMS_COLLAPSED_COUNT + 60);
+                const visible = st.expanded
+                    ? fallback.slice((st.page - 1) * SMALL_PAGE_SIZE, st.page * SMALL_PAGE_SIZE)
+                    : fallback.slice(0, SMALL_COLLAPSED_COUNT);
+
                 renderSmallGrid("bestGrid", visible);
 
-                st.totalPages = Math.max(1, Math.ceil(fallback.length / PAGE_SIZE));
+                st.totalPages = Math.max(1, Math.ceil(fallback.length / SMALL_PAGE_SIZE));
                 if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
                 else {
                     pager.classList.remove("hidden");
@@ -439,6 +448,7 @@
             }
         }
 
+        // ✅ New: 카테고리 무시 + 9개/페이지
         async function renderNewSection() {
             const st = state.sectionState.newly;
             const pager = qs("#newPager");
@@ -449,7 +459,7 @@
             const pageNo = st.expanded ? st.page : 1;
 
             try {
-                const json = await fetchGrid("new_registration", pageNo, PAGE_SIZE);
+                const json = await fetchGrid("new_registration", pageNo, SMALL_PAGE_SIZE);
                 const stores = mapItemsToStores(normalizeItems(json));
                 const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
 
@@ -466,13 +476,15 @@
                     next.disabled = st.page >= st.totalPages;
                 }
             } catch (e) {
-                // ✅ fallback: all_items(첫 페이지)에서 분배
                 const base = state.cacheAllFirstPage || [];
-                const fallback = base.slice(ITEMS_COLLAPSED_COUNT + 24); // 임의 구간
-                const visible = st.expanded ? fallback.slice((st.page - 1) * PAGE_SIZE, st.page * PAGE_SIZE) : fallback.slice(0, SMALL_COLLAPSED_COUNT);
+                const fallback = base.slice(ITEMS_COLLAPSED_COUNT + 60);
+                const visible = st.expanded
+                    ? fallback.slice((st.page - 1) * SMALL_PAGE_SIZE, st.page * SMALL_PAGE_SIZE)
+                    : fallback.slice(0, SMALL_COLLAPSED_COUNT);
+
                 renderSmallGrid("newGrid", visible);
 
-                st.totalPages = Math.max(1, Math.ceil(fallback.length / PAGE_SIZE));
+                st.totalPages = Math.max(1, Math.ceil(fallback.length / SMALL_PAGE_SIZE));
                 if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
                 else {
                     pager.classList.remove("hidden");
@@ -486,7 +498,6 @@
         async function loadAllSections(keepScroll) {
             const keepY = keepScroll ? window.scrollY : null;
 
-            // Hero 텍스트(한식 서브 반영)
             const title = state.category ? state.category : "푸드";
             const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
             setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", qs("#heroImage").src);
@@ -504,7 +515,6 @@
         }
 
         function bindEvents() {
-            // Items 더보기(히어로와 동일)
             qs("#btnMoreItems").onclick = async () => {
                 const st = state.sectionState.items;
                 st.expanded = !st.expanded;
@@ -525,7 +535,6 @@
                 await renderItemsSection();
             };
 
-            // Best
             qs("#btnMoreBest").onclick = async (e) => {
                 e?.preventDefault?.();
                 const st = state.sectionState.best;
@@ -545,7 +554,6 @@
                 await renderBestSection();
             };
 
-            // New
             qs("#btnMoreNew").onclick = async (e) => {
                 e?.preventDefault?.();
                 const st = state.sectionState.newly;
@@ -567,7 +575,6 @@
         }
 
         async function includeHeaderFooter() {
-            // header/footer
             fetch("/components/header.html")
                 .then(r => r.text())
                 .then(d => (qs("#header-placeholder").innerHTML = d))
@@ -591,10 +598,8 @@
 
             const { category, sub } = readQuery();
             state.category = category || "";
-            // ✅ 한식이 아니면 subcategory는 무시(필터도 숨김)
             state.subcategory = (state.category === "한식") ? clean(sub) : "";
 
-            // 초기 상태
             state.sectionState.items.expanded = false;
             state.sectionState.items.page = 1;
             state.sectionState.best.expanded = false;
@@ -602,7 +607,6 @@
             state.sectionState.newly.expanded = false;
             state.sectionState.newly.page = 1;
 
-            // 기본 Hero 세팅
             const title = state.category ? state.category : "푸드";
             const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
             setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", "/uploads/no-image.png");
@@ -611,7 +615,6 @@
             await loadAllSections(false);
         });
 
-        // 고정 버튼
         function goBack() {
             if (document.referrer && document.referrer !== location.href) window.history.back();
             else window.location.href = "/category.html";
