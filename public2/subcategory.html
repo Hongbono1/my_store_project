@@ -101,7 +101,8 @@
         const TYPE = (params.get("type") || "food").toLowerCase();
 
         const RAW_CATEGORY = (params.get("category") || "").trim();
-        const RAW_SUB = (params.get("sub") || params.get("subcategory") || "").trim();
+        // ✅ subcategory만 읽기 (sub는 사용하지 않음)
+        const RAW_SUB = (params.get("subcategory") || "").trim();
 
         let CATEGORY = RAW_CATEGORY;
         let SUB = RAW_SUB;
@@ -209,11 +210,10 @@
             params.set("pageNo", String(pageNo || 1));
 
             if (CATEGORY) params.set("category", CATEGORY);
-
+            
+            // ✅ subcategory가 있으면 무조건 붙이기 (조건 제거)
             if (CURRENT_SUB) {
-                if (!(TYPE === "combined" && CATEGORY === "미용/이발")) {
-                    params.set("subcategory", CURRENT_SUB);
-                }
+                params.set("subcategory", CURRENT_SUB);
             }
 
             const url = `/subcategorymanager/ad/grid?${params.toString()}`;
@@ -669,6 +669,8 @@
                 if (TYPE === "food") {
                     const q = new URLSearchParams();
                     q.set("category", CATEGORY);
+                    // ✅ subcategory가 있으면 추가
+                    if (CURRENT_SUB) q.set("subcategory", CURRENT_SUB);
 
                     const json = await fetchJson(`/api/subcategory/food?${q.toString()}`);
                     ALL_STORES = json.stores || [];
@@ -692,7 +694,12 @@
                     } catch (_) { }
 
                 } else if (TYPE === "combined") {
-                    const json = await fetchJson(`/api/subcategory/combined?category=${encodeURIComponent(CATEGORY)}`);
+                    const q = new URLSearchParams();
+                    q.set("category", CATEGORY);
+                    // ✅ subcategory가 있으면 추가
+                    if (CURRENT_SUB) q.set("subcategory", CURRENT_SUB);
+                    
+                    const json = await fetchJson(`/api/subcategory/combined?${q.toString()}`);
                     ALL_STORES = json.stores || [];
 
                     if (CATEGORY === "미용/이발") {
