@@ -8,7 +8,6 @@ import {
   getSlot,
   upsertSlot,
   deleteSlot,
-  listCandidates,
   makeMulterStorage,
   fileFilter,
 } from "../controllers/subcategorymanagerAdController.js";
@@ -21,14 +20,14 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 20 * 1024 * 1024 },
 });
-
 const uploadSingleImage = upload.single("image");
 
+// 목록/검색
 router.get("/stores", listStores);
 router.get("/search", searchStore);
 
+// 슬롯 읽기/저장/삭제
 router.get("/slot", getSlot);
-router.get("/candidates", listCandidates);
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
 
