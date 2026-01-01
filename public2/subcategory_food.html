@@ -262,13 +262,15 @@
                 const dispName = clean(store.business_name) || "-";
 
                 // ✅ 카드에 표시할 카테고리 텍스트
-                let catText = (store.business_category || store.store_type || store.business_type || "").trim();
+                let cat = (store.business_category || "").trim();
+                let sub = (store.business_subcategory || store.detail_category || "").trim();
 
-                // ✅ 한식이면 괄호로 하위카테고리(국밥 등) 붙이기
-                if (catText === "한식") {
-                    const sub = (store.business_subcategory || store.detail_category || "").trim();
-                    if (sub) catText = `한식(${sub})`;
-                }
+                // ✅ 한식이면 "한식" 대신 하위카테고리(국밥 등)만 표시
+                let catText = cat;
+                if (cat === "한식" && sub) catText = sub;
+
+                // cat이 비면 fallback
+                if (!catText) catText = (store.store_type || store.business_type || "").trim();
 
                 const imgNorm = pickImage(store);
 
@@ -313,13 +315,15 @@
                 const name = clean(store.business_name) || "-";
 
                 // ✅ 카드에 표시할 카테고리 텍스트
-                let catText = (store.business_category || store.store_type || store.business_type || "").trim();
+                let cat = (store.business_category || "").trim();
+                let sub = (store.business_subcategory || store.detail_category || "").trim();
 
-                // ✅ 한식이면 괄호로 하위카테고리(국밥 등) 붙이기
-                if (catText === "한식") {
-                    const sub = (store.business_subcategory || store.detail_category || "").trim();
-                    if (sub) catText = `한식(${sub})`;
-                }
+                // ✅ 한식이면 "한식" 대신 하위카테고리(국밥 등)만 표시
+                let catText = cat;
+                if (cat === "한식" && sub) catText = sub;
+
+                // cat이 비면 fallback
+                if (!catText) catText = (store.store_type || store.business_type || "").trim();
 
                 const img = pickImage(store);
 
@@ -590,12 +594,62 @@
             }
         }
 
+        async function hydrateHeroFromManager() {
+            // manager/컨트롤러 방식: /subcategorymanager_food/ad/slot?page=subcategory&section=...&idx=1&category=...&subcategory=...
+            const sections = ["hero", "top", "top_banner"]; // 혹시 예전 섹션명 섮여있을 때 대비
+            const baseParams = new URLSearchParams();
+            baseParams.set("page", "subcategory");
+            baseParams.set("idx", "1");
+
+            // 카테고리/서브카테고리 (한식만 subcategory)
+            baseParams.set("category", state.category || "");
+            if (state.category === "한식" && clean(state.subcategory)) baseParams.set("subcategory", state.subcategory);
+
+            for (const sec of sections) {
+                try {
+                    const p = new URLSearchParams(baseParams);
+                    p.set("section", sec);
+
+                    const res = await fetch(`/subcategorymanager_food/ad/slot?${p.toString()}`, {
+                        cache: "no-store",
+                        headers: { Accept: "application/json" },
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (!res.ok || !data?.success) continue;
+
+                    const slot = data.slot;
+                    if (!slot) continue;
+
+                    const title = clean(slot.title) || clean(slot.text_title) || "";
+                    const subtitle = clean(slot.subtitle) || clean(slot.text) || "";
+                    const img = clean(slot.image_url) || "";
+                    const link = clean(slot.link_url) || "";
+
+                    // slot에 값이 하나라도 있으면 적용
+                    if (title || subtitle || img || link) {
+                        const fallbackTitle = state.category ? state.category : "푸드";
+                        setHero(title || fallbackTitle, subtitle || "푸드(store_info)에서만 불러옵니다.", img || "/uploads/no-image.png", link);
+                        return true;
+                    }
+                } catch (e) {
+                    // 다음 섹션명 계속 시도
+                }
+            }
+            return false;
+        }
+
         async function loadAllSections(keepScroll) {
             const keepY = keepScroll ? window.scrollY : null;
 
-            const title = state.category ? state.category : "푸드";
-            const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-            setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", qs("#heroImage").src);
+            // ✅ 먼저 hero는 매니저 슬롯로 시도
+            const applied = await hydrateHeroFromManager();
+
+            // ✅ 슬롯이 없으면 기본 타이틀
+            if (!applied) {
+                const title = state.category ? state.category : "푸드";
+                const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+                setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", "/uploads/no-image.png");
+            }
 
             renderFilters();
             syncMoreButtonLabels();
@@ -751,6 +805,8 @@
             window.history.forward();
         }
 
+        /*
+        // ✅ 기존 배너 hydrate IIFE - hydrateHeroFromManager()로 대체됨
         (async function () {
             const PAGE_NAME = "subcategory";
 
@@ -874,6 +930,10 @@
                 console.error("[subcategory banner hydrate] 실패:", e.message || e);
             }
         })();
+        */
+
+        // ✅ 기존 배너 hydrate IIFE 삭제됨 - hydrateHeroFromManager()로 대체
+
     </script>
 </body>
 
