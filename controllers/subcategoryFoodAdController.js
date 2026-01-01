@@ -102,15 +102,25 @@ function normalizeCategorySub(category, subcategory) {
  * subcategory|food|{category}|{subcategory}|{section}|{idx}
  */
 function buildPosition({ mode = "food", category = "", subcategory = "", section = "", idx = 1 }) {
-  // ✅ 한식만 subcategory 유지
-  const norm = normalizeCategorySub(category, subcategory);
+  const sec = clean(section);
+
+  // ✅ top 배너는 전체 공통 1장: category/subcategory 무조건 무시
+  if (sec === "top") {
+    category = "";
+    subcategory = "";
+  } else {
+    // ✅ 한식만 subcategory 유지(기존 규칙 유지)
+    const norm = normalizeCategorySub(category, subcategory);
+    category = norm.category;
+    subcategory = norm.subcategory;
+  }
 
   return [
     PAGE_NAME,
     keyPart(mode || "food"),
-    keyPart(norm.category),
-    keyPart(norm.subcategory),
-    keyPart(section),
+    keyPart(category),
+    keyPart(subcategory),
+    keyPart(sec),
     String(idx),
   ].join("|");
 }
@@ -433,8 +443,14 @@ export async function grid(req, res) {
 
     // ✅ 한식만 subcategory 유지
     const norm = normalizeCategorySub(req.query.category, req.query.subcategory);
-    const category = norm.category;
-    const subcategory = norm.subcategory;
+    let category = norm.category;
+    let subcategory = norm.subcategory;
+
+    // ✅ top 섹션은 공용
+    if (section === "top") {
+      category = "";
+      subcategory = "";
+    }
 
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
     const pageSize = clamp(safeInt(req.query.pageSize, 12), 1, 50);
