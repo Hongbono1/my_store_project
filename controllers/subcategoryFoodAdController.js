@@ -72,6 +72,13 @@ function keyPart(v) {
   return clean(v).replaceAll("|", "/");
 }
 
+// DB 제약: slot_type IN ('banner','text')
+function mapSlotType(adMode) {
+  const m = clean(adMode).toLowerCase();
+  if (m === "text") return "text";
+  return "banner";
+}
+
 /**
  * ✅ 핵심 규칙(요구사항 반영)
  * - 한식만 subcategory(detail_category) 사용
@@ -572,7 +579,9 @@ export async function upsertSlot(req, res) {
     const bodyImageUrl = clean(req.body.image_url);
     const imageUrl = normalizeImageUrl(uploadedImageUrl || bodyImageUrl);
 
-    const slotType = clean(req.body.slot_type || req.body.slotType);
+    // ✅ adMode를 slot_type으로 매핑 (banner/text만 허용)
+    const adMode = clean(req.body.adMode || req.body.ad_mode);
+    const slotType = mapSlotType(adMode);
     const slotMode = clean(req.body.slot_mode || req.body.slotMode);
 
     const title = clean(req.body.title);
