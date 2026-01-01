@@ -78,6 +78,11 @@
             background: rgb(185 28 28);
         }
 
+        .btn-disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
         .input {
             width: 100%;
             border-radius: .85rem;
@@ -160,6 +165,28 @@
             border-color: rgba(245, 158, 11, .45);
         }
 
+        /* 배너 메시지(버튼 바로 아래 표시) */
+        .banner-msg {
+            border-radius: .9rem;
+            padding: .75rem .85rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .85);
+            font-weight: 900;
+            font-size: .85rem;
+        }
+
+        .banner-msg.ok {
+            border-color: rgba(34, 197, 94, .45);
+        }
+
+        .banner-msg.bad {
+            border-color: rgba(239, 68, 68, .45);
+        }
+
+        .banner-msg.warn {
+            border-color: rgba(245, 158, 11, .45);
+        }
+
         /* 마지막 입력(상태+버튼) 항상 보이게 */
         .sticky-actions {
             position: sticky;
@@ -193,7 +220,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="chip" id="chipApiBase">API: -</span>
                     <span class="chip" id="chipMode">모드: -</span>
-                    <span class="chip" id="chipPosition">position: -</span>
+                    <span class="chip" id="chipPosition">선택: -</span>
                 </div>
             </div>
 
@@ -206,29 +233,29 @@
                     <button class="btn btn-ghost" id="btnClearImage" type="button">업로드 이미지 제거</button>
                 </div>
 
-                <!-- ✅ 배너 모드 버튼(푸드/통합) : 누르면 아래 모드까지 같이 바뀜 -->
+                <!-- ✅ 배너 모드 버튼(푸드/통합) : 푸드만 작동 -->
                 <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <div class="label">배너 모드(푸드/통합)</div>
+                        <div class="label">배너 모드(푸드 전용)</div>
 
                         <div class="seg" style="grid-template-columns:repeat(2, minmax(0, 1fr));" id="bannerModeSeg">
                             <button type="button" id="btnBannerModeFood" data-active="1">푸드</button>
-                            <button type="button" id="btnBannerModeCombined" data-active="0">통합</button>
+                            <button type="button" id="btnBannerModeCombined" data-active="0" class="btn-disabled"
+                                disabled>통합(비활성)</button>
                         </div>
 
-                        <!-- ✅ 기존 select는 값 저장/호환용으로 숨김 -->
+                        <!-- ✅ 기존 select는 값 저장/호환용으로 숨김 (food 고정) -->
                         <select class="input hidden" id="bannerMode">
-                            <option value="combined">통합 배너</option>
                             <option value="food" selected>푸드 배너</option>
                         </select>
 
-                        <div class="hint mt-1">배너 버튼을 누르면 하단 모드도 자동으로 함께 전환됩니다.</div>
+                        <div class="hint mt-1">이 매니저는 푸드 전용입니다.</div>
                     </div>
 
                     <div>
-                        <div class="label">배너 position(고정)</div>
+                        <div class="label">배너 section/idx(고정)</div>
                         <input class="input" id="bannerPositionView" readonly />
-                        <div class="hint mt-1">자동 생성됨(수정 불가)</div>
+                        <div class="hint mt-1">section=top, idx=1 (자동)</div>
                     </div>
                 </div>
 
@@ -241,6 +268,9 @@
                     <button class="btn btn-primary" id="btnBannerSave" type="button">배너 저장</button>
                     <button class="btn btn-danger" id="btnBannerDelete" type="button">배너 삭제</button>
                 </div>
+
+                <!-- ✅ 배너 저장 결과(버튼 바로 아래) -->
+                <div class="mt-3 hidden" id="bannerMsg"></div>
 
                 <!-- 이미지 입력 -->
                 <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3" id="imageInputs">
@@ -268,7 +298,7 @@
                         <option value="biz">사업자번호</option>
                         <option value="name">상호</option>
                     </select>
-                    <div class="hint mt-1">푸드/통합 모드에 따라 해당 모드에서만 검색됩니다.</div>
+                    <div class="hint mt-1">이 매니저는 푸드 모드에서만 검색됩니다.</div>
                 </div>
 
                 <div class="font-extrabold">가게 검색</div>
@@ -276,8 +306,6 @@
                 <div class="hint mt-1">
                     사업자번호로 검색 / 비워두고 검색하면 전체(일부) 표시
                 </div>
-
-                <!-- 배너 모드 버튼 블록은 상단 배너에서만 사용 (여기서는 제거) -->
 
                 <div class="mt-3">
                     <div class="label">사업자번호 (비우면 전체 보기)</div>
@@ -291,7 +319,7 @@
                     </div>
                 </div>
 
-                <!-- 검색 후 표시: 이제 “항상 보이게” -->
+                <!-- 검색 후 표시: 항상 보이게 -->
                 <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3" id="storePanelWrap">
                     <!-- 가게 정보 -->
                     <div class="md:col-span-5 soft p-3">
@@ -304,7 +332,7 @@
                             <div class="text-sm font-black" id="storeNameMini">선택된 가게 없음</div>
                             <div class="text-xs text-slate-600 mt-0.5" id="storeTypeMini">-</div>
                             <div class="text-xs text-slate-500 mt-0.5" id="storeBizMini">-</div>
-                            <div class="text-xs text-blue-700 font-black mt-2" id="storeLocMini">위치: -</div>
+                            <div class="text-xs text-blue-700 font-black mt-2" id="storeLocMini">하위: -</div>
                         </div>
                     </div>
 
@@ -329,7 +357,7 @@
                 <div>
                     <div class="font-extrabold">편집</div>
                     <div class="hint mt-1">
-                        선택한 가게의 “몇 페이지/몇 번째 박스” 위치 기준으로 슬롯을 불러오고 저장합니다.
+                        이 매니저는 subcategory.html 출력 규격(section/idx)을 그대로 사용합니다.
                     </div>
                 </div>
 
@@ -433,7 +461,7 @@
 
                                     <div class="hidden">
                                         <span id="pickedBoxText">-</span>
-                                        <span id="pickedBoxPos">position: -</span>
+                                        <span id="pickedBoxPos">-</span>
                                     </div>
                                 </div>
                             </div>
@@ -446,12 +474,12 @@
                     <div class="label">편집 위치 선택</div>
                     <select class="input" id="slotArea">
                         <option value="top">상단 배너(페이지 맨 위)</option>
-                        <option value="all_items" selected>All of the items (가게 선택 기반)</option>
-                        <option value="best_seller">Best Seller (가게 선택 기반)</option>
-                        <option value="new_registration">New registration (가게 선택 기반)</option>
+                        <option value="all_items" selected>All of the items (12칸)</option>
+                        <option value="best_seller">Best Seller (12칸)</option>
+                        <option value="new_registration">New registration (12칸)</option>
                     </select>
                     <div class="hint mt-1">
-                        상단 배너는 가게 선택 없이 저장 가능(모드로 자동 분리). 그 외는 가게 선택으로 위치가 결정됩니다.
+                        상단 배너는 가게 선택 없이 저장 가능. 그 외는 12칸에서 idx 선택 후 저장합니다.
                     </div>
                 </div>
 
@@ -469,7 +497,7 @@
                 <div class="mt-4 soft p-3" id="storeLinkInputs">
                     <div class="flex items-center justify-between gap-3">
                         <div class="font-black">가게 연결</div>
-                        <span class="chip" id="storeLocChip">위치: -</span>
+                        <span class="chip" id="storeLocChip">하위: -</span>
                     </div>
 
                     <div class="mt-3 grid grid-cols-12 gap-3 items-start">
@@ -481,7 +509,7 @@
                             <div class="text-base font-black leading-tight" id="storeName">선택된 가게 없음</div>
                             <div class="text-sm text-slate-600 mt-1" id="storeType">-</div>
                             <div class="text-sm text-slate-500 mt-1" id="storeBiz">-</div>
-                            <div class="text-sm text-blue-700 font-black mt-2" id="storeLocText">위치: -</div>
+                            <div class="text-sm text-blue-700 font-black mt-2" id="storeLocText">하위: -</div>
 
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <button class="btn btn-ghost" id="btnUseStore" type="button">이 가게로 연결</button>
@@ -529,14 +557,13 @@
                 <input type="hidden" id="storeNameHidden" />
                 <input type="hidden" id="storeTypeHidden" />
                 <input type="hidden" id="storeImageUrl" />
-                <input type="hidden" id="positionHidden" />
                 <input type="hidden" id="priorityHidden" value="1" />
 
                 <!-- 마지막 입력 영역: 항상 보이게 sticky -->
                 <div class="sticky-actions">
                     <div class="space-y-3">
                         <div id="statusBar" class="statusbar status-warn">
-                            <div class="text-sm font-black" id="statusText">대기 중: 가게를 검색하고 선택하세요.</div>
+                            <div class="text-sm font-black" id="statusText">대기 중: 12칸에서 idx를 선택하세요.</div>
                             <div class="text-xs text-slate-600 mt-1" id="statusSub">-</div>
                         </div>
 
@@ -556,40 +583,20 @@
         const PAGE_NAME = "subcategory";
         const DEFAULT_PRIORITY = 1;
 
-        // ✅ 모드별 API 엔드포인트
-        const API_ENDPOINTS = {
-            food: "/subcategorymanager_food/ad",
-            combined: "/subcategorymanager_combined/ad",
-        };
-        let API_BASE = API_ENDPOINTS.food;
+        // ✅ 푸드 고정
+        const MODE = "food";
+        const API_BASE = "/subcategorymanager_food/ad";
 
-        // ✅ 모드에 따라 API Base 설정
-        function updateApiBase(mode) {
-            API_BASE = API_ENDPOINTS[mode] || API_ENDPOINTS.food;
-            const chip = $("chipApiBase");
-            if (chip) chip.textContent = `API: ${API_BASE} (${mode})`;
-        }
-
-        // ✅ 초기 API Base 설정
-        async function detectApiBase() {
-            const currentMode = state.currentMode || "food";
-            updateApiBase(currentMode);
-        }
-
+        // 내부 상태
         let uiPick = "image";
         let selectedStore = null;
-        let selectedTarget = {
-            mode: "food",
-            area: "all_items",
-            pageNo: 1,
-            boxNo: 1,
-            priority: DEFAULT_PRIORITY,
-            position: ""
-        };
 
-        // 현재 모드 상태
-        const state = {
-            currentMode: "food",
+        // section/idx 기반 타겟
+        let selectedTarget = {
+            section: "all_items",
+            pageNo: 1,
+            idx: null,          // 1~12
+            priority: DEFAULT_PRIORITY
         };
 
         // 헤더 삽입 후 id 충돌 방지: main 내부를 먼저 찾고, 없으면 document에서 찾기
@@ -601,6 +608,38 @@
             }
             return document.getElementById(id);
         }
+
+        function nowStr() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function setStatus(type, text, sub = "") {
+            const bar = $("statusBar");
+            bar.classList.remove("status-ok", "status-bad", "status-warn");
+            bar.classList.add(type === "ok" ? "status-ok" : type === "bad" ? "status-bad" : "status-warn");
+            $("statusText").textContent = text;
+            $("statusSub").textContent = sub || "-";
+        }
+
+        function setBusy(on, msg) {
+            const save = $("btnSave");
+            const del = $("btnDelete");
+            const search = $("btnSearch");
+            const bsave = $("btnBannerSave");
+            const bdel = $("btnBannerDelete");
+
+            [save, del, search, bsave, bdel].forEach((el) => {
+                if (!el) return;
+                el.disabled = !!on;
+                el.classList.toggle("opacity-60", !!on);
+            });
+
+            if (on && msg) setStatus("warn", msg, `시간: ${nowStr()}`);
+        }
+
+        function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
         // 상위 카테고리 → 하위 카테고리 매핑
         const SUB_BY_CATEGORY = {
@@ -632,7 +671,6 @@
             const subs = SUB_BY_CATEGORY[cat] || [];
             subSel.disabled = false;
 
-            // "전체" 옵션(빈 값)은 항상 넣기
             const optAll = document.createElement("option");
             optAll.value = "";
             optAll.textContent = "전체";
@@ -651,325 +689,24 @@
             const subSel = $("placementSubFilter");
             if (!catSel || !subSel) return;
 
-            // 초기 상태
             setSubcategoryOptionsByCategory(catSel.value || "");
 
             catSel.addEventListener("change", () => {
-                // 상위 바뀌면 하위 목록 새로 구성 + 하위 선택 초기화
                 const cat = catSel.value || "";
                 setSubcategoryOptionsByCategory(cat);
                 if (subSel && !subSel.disabled) subSel.value = "";
-
                 loadGrid();
-                scheduleDraftSave();
             });
 
             subSel.addEventListener("change", () => {
                 loadGrid();
-                scheduleDraftSave();
             });
         }
-
-        function nowStr() {
-            const d = new Date();
-            const pad = (n) => String(n).padStart(2, "0");
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-        }
-
-        function ensureBottomVisible() { }
-
-        function setStatus(type, text, sub = "") {
-            const bar = $("statusBar");
-            bar.classList.remove("status-ok", "status-bad", "status-warn");
-            bar.classList.add(type === "ok" ? "status-ok" : type === "bad" ? "status-bad" : "status-warn");
-
-            $("statusText").textContent = text;
-            $("statusSub").textContent = sub || "-";
-
-            ensureBottomVisible();
-        }
-
-        function setBusy(on, msg) {
-            const save = $("btnSave");
-            const del = $("btnDelete");
-            const search = $("btnSearch");
-
-            save.disabled = !!on;
-            del.disabled = !!on;
-            search.disabled = !!on;
-
-            save.classList.toggle("opacity-60", !!on);
-            del.classList.toggle("opacity-60", !!on);
-            search.classList.toggle("opacity-60", !!on);
-
-            if (on && msg) {
-                setStatus("warn", msg, `시간: ${nowStr()}`);
-            }
-        }
-
-        function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
-
-        function buildPosition(area, mode, pageNo, boxNo) {
-            const suffix = mode === "food" ? "__food" : "__combined";
-
-            if (area === "top") return `subcategory_top${suffix}`;
-
-            const prefix =
-                area === "best_seller" ? "best_seller" :
-                    area === "new_registration" ? "new_registration" :
-                        "all_items";
-
-            return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
-        }
-
-        // 배너는 "서브카테고리 페이지가 읽는 키"와 동일하게 맞춘다
-        function buildBannerPosition(mode) {
-            const suffix = mode === "food" ? "__food" : "__combined";
-            return `subcategory_top${suffix}`;
-        }
-        function buildBannerLegacyPosition(mode) {
-            const suffix = mode === "food" ? "__food" : "__combined";
-            return `subcategory_top_banner${suffix}`;
-        }
-        function bannerPositionCandidates(mode) {
-            return [buildBannerPosition(mode), buildBannerLegacyPosition(mode)];
-        }
-
-        let bannerTarget = { mode: "food", position: buildBannerPosition("food"), priority: 1 };
-
-        function syncBannerUI() {
-            bannerTarget.mode = $("bannerMode").value || "food";
-            bannerTarget.position = buildBannerPosition(bannerTarget.mode);
-            $("bannerPositionView").value = bannerTarget.position;
-        }
-
-        // 배너 모드 버튼 UI 동기화
-        function syncBannerModeButtons(mode) {
-            const bf = $("btnBannerModeFood");
-            const bc = $("btnBannerModeCombined");
-            if (bf) bf.setAttribute("data-active", mode === "food" ? "1" : "0");
-            if (bc) bc.setAttribute("data-active", mode === "combined" ? "1" : "0");
-            const sel = $("bannerMode");
-            if (sel) sel.value = mode;
-        }
-
-        // ===============================
-        // Draft(임시저장) - 모드별 분리
-        // ===============================
-        const DRAFT_VER = "v2";
-        const DRAFT_BASE = `subcategorymanager:draft:${DRAFT_VER}`;
-
-        function keyMain(mode) { return `${DRAFT_BASE}:main:${mode}`; }
-        function keyBanner(mode) { return `${DRAFT_BASE}:banner:${mode}`; }
-
-        let _draftTimer = null;
-
-        function isBlobUrl(src) { return /^blob:/.test(String(src || "")); }
-        function safeJsonParse(s) { try { return JSON.parse(s); } catch (_e) { return null; } }
-
-        function scheduleDraftSave() {
-            clearTimeout(_draftTimer);
-            _draftTimer = setTimeout(() => {
-                saveDraftMain(state.currentMode);
-                saveDraftBanner(state.currentMode);
-            }, 180);
-        }
-
-        function bindDraftAutoSave() {
-            const watchIds = [
-                "managerMode", "section", "pageNo", "slotArea", "q", "searchType",
-                "linkUrl", "textTitle", "textDesc", "startAt", "endAt", "noEnd",
-                "placementCatFilter", "placementSubFilter",
-            ];
-
-            watchIds.forEach((id) => {
-                const el = $(id);
-                if (!el) return;
-                el.addEventListener("input", scheduleDraftSave);
-                el.addEventListener("change", scheduleDraftSave);
-            });
-
-            ["btnPickImage", "btnPickStore", "btnPickText"].forEach((id) => {
-                const el = $(id);
-                if (!el) return;
-                el.addEventListener("click", scheduleDraftSave);
-            });
-
-            const file = $("bannerFile");
-            if (file) file.addEventListener("change", () => scheduleDraftSave());
-        }
-
-        function saveDraftMain(mode) {
-            try {
-                const previewSrc = $("bannerPreview")?.src || "";
-                const store = selectedStore ? {
-                    id: selectedStore.id ?? "",
-                    business_number: selectedStore.business_number ?? "",
-                    business_name: selectedStore.business_name ?? "",
-                    business_type: selectedStore.business_type ?? "",
-                    image_url: selectedStore.image_url ?? "",
-                    page_number: selectedStore.page_number ?? "",
-                    index_in_page: selectedStore.index_in_page ?? "",
-                } : null;
-
-                const draft = {
-                    ts: Date.now(),
-                    uiPick,
-                    selectedTarget: { ...selectedTarget },
-
-                    mode: $("managerMode")?.value || "food",
-                    section: $("section")?.value || "all_items",
-                    pageNo: Number($("pageNo")?.value || 1),
-                    slotArea: $("slotArea")?.value || "all_items",
-
-                    q: $("q")?.value || "",
-                    searchType: $("searchType")?.value || "auto",
-
-                    placementCatFilter: $("placementCatFilter")?.value || "",
-                    placementSubFilter: $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || ""),
-
-                    linkUrl: $("linkUrl")?.value || "",
-                    textTitle: $("textTitle")?.value || "",
-                    textDesc: $("textDesc")?.value || "",
-                    startAt: $("startAt")?.value || "",
-                    endAt: $("endAt")?.value || "",
-                    noEnd: !!$("noEnd")?.checked,
-
-                    storeId: $("storeId")?.value || "",
-                    storeBusinessNumber: $("storeBusinessNumber")?.value || "",
-                    storeNameHidden: $("storeNameHidden")?.value || "",
-                    storeTypeHidden: $("storeTypeHidden")?.value || "",
-                    storeImageUrl: $("storeImageUrl")?.value || "",
-
-                    selectedStore: store,
-
-                    pickedBoxText: $("pickedBoxText")?.textContent || "-",
-                    pickedBoxPos: $("pickedBoxPos")?.textContent || "position: -",
-
-                    bannerPreview: isBlobUrl(previewSrc) ? "" : previewSrc,
-                };
-
-                localStorage.setItem(keyMain(mode), JSON.stringify(draft));
-            } catch (_e) { }
-        }
-
-        function saveDraftBanner(mode) {
-            try {
-                const previewSrc = $("bannerPreview")?.src || "";
-                const draft = {
-                    ts: Date.now(),
-                    bannerMode: mode,
-                    bannerPosition: $("bannerPositionView")?.value || "",
-                    bannerPreview: isBlobUrl(previewSrc) ? "" : previewSrc,
-                    linkUrl: $("linkUrl")?.value || "",
-                };
-                localStorage.setItem(keyBanner(mode), JSON.stringify(draft));
-            } catch (_e) { }
-        }
-
-        function restoreDraftMainForMode(mode) {
-            const raw = localStorage.getItem(keyMain(mode));
-            if (!raw) return false;
-
-            const d = safeJsonParse(raw);
-            if (!d) return false;
-
-            if ($("managerMode")) $("managerMode").value = mode;
-            if ($("section") && d.section) $("section").value = d.section;
-            if ($("pageNo") && d.pageNo) $("pageNo").value = String(Math.max(Number(d.pageNo || 1), 1));
-            if ($("slotArea") && d.slotArea) $("slotArea").value = d.slotArea;
-            if ($("q")) $("q").value = d.q ?? "";
-            if ($("searchType") && d.searchType) $("searchType").value = d.searchType;
-
-            if ($("placementCatFilter")) $("placementCatFilter").value = d.placementCatFilter ?? "";
-            setSubcategoryOptionsByCategory($("placementCatFilter")?.value || "");
-
-            if ($("placementSubFilter")) {
-                if ($("placementSubFilter").disabled) $("placementSubFilter").value = "";
-                else $("placementSubFilter").value = d.placementSubFilter ?? "";
-            }
-
-            if (d.uiPick) setPick(d.uiPick);
-
-            if ($("linkUrl")) $("linkUrl").value = d.linkUrl ?? "";
-            if ($("textTitle")) $("textTitle").value = d.textTitle ?? "";
-            if ($("textDesc")) $("textDesc").value = d.textDesc ?? "";
-            if ($("startAt")) $("startAt").value = d.startAt ?? "";
-            if ($("endAt")) $("endAt").value = d.endAt ?? "";
-            if ($("noEnd")) $("noEnd").checked = !!d.noEnd;
-
-            if ($("storeId")) $("storeId").value = d.storeId ?? "";
-            if ($("storeBusinessNumber")) $("storeBusinessNumber").value = d.storeBusinessNumber ?? "";
-            if ($("storeNameHidden")) $("storeNameHidden").value = d.storeNameHidden ?? "";
-            if ($("storeTypeHidden")) $("storeTypeHidden").value = d.storeTypeHidden ?? "";
-            if ($("storeImageUrl")) $("storeImageUrl").value = d.storeImageUrl ?? "";
-
-            if (d.selectedTarget && typeof d.selectedTarget === "object") {
-                selectedTarget = { ...selectedTarget, ...d.selectedTarget };
-            }
-
-            if ($("pickedBoxText")) $("pickedBoxText").textContent = d.pickedBoxText || "-";
-            if ($("pickedBoxPos")) $("pickedBoxPos").textContent = d.pickedBoxPos || "position: -";
-
-            if (d.selectedStore) {
-                selectedStore = d.selectedStore;
-                setMiniStoreInfo(selectedStore);
-                setStoreBox(selectedStore);
-            } else {
-                selectedStore = null;
-                setMiniStoreInfo(null);
-                setStoreBox(null);
-            }
-
-            if (d.bannerPreview) setBannerPreview(d.bannerPreview);
-            else {
-                const storeImg = $("storeImageUrl")?.value || "";
-                setBannerPreview(storeImg || "/uploads/no-image.png");
-            }
-
-            syncChips();
-            ensureBottomVisible();
-            return true;
-        }
-
-        function restoreDraftBannerForMode(mode) {
-            const raw = localStorage.getItem(keyBanner(mode));
-            if (!raw) return false;
-            const d = safeJsonParse(raw);
-            if (!d) return false;
-
-            if ($("linkUrl") && typeof d.linkUrl === "string") $("linkUrl").value = d.linkUrl;
-            if (d.bannerPreview) setBannerPreview(d.bannerPreview);
-            return true;
-        }
-
-        function setBannerPreview(src) {
-            $("bannerPreview").src = src || "/uploads/no-image.png";
-        }
-
-        function setPick(next) {
-            uiPick = next;
-            $("btnPickImage").setAttribute("data-active", uiPick === "image" ? "1" : "0");
-            $("btnPickStore").setAttribute("data-active", uiPick === "store" ? "1" : "0");
-            $("btnPickText").setAttribute("data-active", uiPick === "text" ? "1" : "0");
-
-            $("imageInputs").classList.toggle("hidden", uiPick === "text");
-            $("storeLinkInputs").classList.toggle("hidden", uiPick !== "store");
-            $("textInputs").classList.toggle("hidden", uiPick !== "text");
-
-            if (uiPick === "text") $("bannerFile").value = "";
-            ensureBottomVisible();
-        }
-
-        $("btnPickImage").addEventListener("click", () => { setPick("image"); scheduleDraftSave(); });
-        $("btnPickStore").addEventListener("click", () => { setPick("store"); scheduleDraftSave(); });
-        $("btnPickText").addEventListener("click", () => { setPick("text"); scheduleDraftSave(); });
 
         async function tryFetchJson(url, options) {
             const res = await fetch(url, options);
             let data = null;
             try { data = await res.json(); } catch (_e) { }
-
             if (!res.ok) {
                 const msg = data?.error || data?.message || `HTTP ${res.status}`;
                 throw new Error(msg);
@@ -982,163 +719,180 @@
         }
 
         function syncChips() {
-            $("chipMode").textContent = `모드: ${$("managerMode").value}`;
-            $("chipPosition").textContent = `position: ${selectedTarget.position || "-"}`;
-            $("positionHidden").value = selectedTarget.position || "";
-            $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
+            $("chipApiBase").textContent = `API: ${API_BASE}`;
+            $("chipMode").textContent = `모드: food(고정)`;
+            const s = selectedTarget.section || "-";
+            const p = selectedTarget.pageNo || "-";
+            const i = selectedTarget.idx || "-";
+            $("chipPosition").textContent = `선택: ${s} / p${p} / idx ${i}`;
+        }
+
+        // 배너 메시지(버튼 바로 아래)
+        function showBannerMsg(type, text) {
+            const box = $("bannerMsg");
+            box.className = `banner-msg ${type}`;
+            box.textContent = text;
+            box.classList.remove("hidden");
+        }
+
+        function hideBannerMsg() {
+            const box = $("bannerMsg");
+            box.classList.add("hidden");
+            box.textContent = "";
+        }
+
+        function setBannerPreview(src) {
+            $("bannerPreview").src = src || "/uploads/no-image.png";
+        }
+
+        function setPick(next) {
+            uiPick = next;
+
+            $("btnPickImage").setAttribute("data-active", uiPick === "image" ? "1" : "0");
+            $("btnPickStore").setAttribute("data-active", uiPick === "store" ? "1" : "0");
+            $("btnPickText").setAttribute("data-active", uiPick === "text" ? "1" : "0");
+
+            $("imageInputs").classList.toggle("hidden", uiPick === "text");
+            $("storeLinkInputs").classList.toggle("hidden", uiPick !== "store");
+            $("textInputs").classList.toggle("hidden", uiPick !== "text");
+
+            if (uiPick === "text") $("bannerFile").value = "";
+        }
+
+        $("btnPickImage").addEventListener("click", () => setPick("image"));
+        $("btnPickStore").addEventListener("click", () => setPick("store"));
+        $("btnPickText").addEventListener("click", () => setPick("text"));
+
+        // 배너: section=top idx=1 고정
+        function syncBannerUI() {
+            $("bannerPositionView").value = `section=top, idx=1`;
         }
 
         // 배너 슬롯 불러오기
         async function loadBannerSlot(silent = false) {
             try {
                 syncBannerUI();
-
                 if (!silent) setStatus("warn", "배너 불러오는 중...", `시간: ${nowStr()}`);
 
-                // ✅ 백엔드가 생성하는 position 형식 사용 (subcategory|food|||top|1)
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
-                    category: "",  // 배너는 카테고리 무관
-                    subcategory: "",
-                    section: "top",  // 배너는 top 섹션
+                    mode: MODE,
+                    section: "top",
                     idx: "1",
-                    priority: String(bannerTarget.priority),
+                    priority: "1",
                 }).toString();
 
                 const data = await apiFetch(`/slot?${qs}`);
-                const foundSlot = data?.slot || null;
-                const foundPos = data?.position || "N/A";
+                const slot = data?.slot || null;
 
-                if (!foundSlot) {
+                if (!slot) {
                     setBannerPreview("/uploads/no-image.png");
-                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `모드: ${bannerTarget.mode} / 시간: ${nowStr()}`);
-                    scheduleDraftSave();
+                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `시간: ${nowStr()}`);
                     return;
                 }
 
-                if (foundSlot.image_url) setBannerPreview(foundSlot.image_url);
+                if (slot.image_url) setBannerPreview(slot.image_url);
                 $("bannerFile").value = "";
-                if ($("linkUrl")) $("linkUrl").value = foundSlot.link_url || "";
+                $("linkUrl").value = slot.link_url || "";
 
-                // 화면에 표시되는 position은 "신키"로 유지
-                $("bannerPositionView").value = buildBannerPosition(bannerTarget.mode);
-
-                if (!silent) {
-                    const note = foundPos === buildBannerLegacyPosition(bannerTarget.mode)
-                        ? "※ 예전 키에서 불러옴(저장하면 자동으로 새 키로 정리됩니다)"
-                        : "";
-                    setStatus("ok", "배너 불러오기 완료", `position: ${foundPos} ${note} / 시간: ${nowStr()}`);
-                }
-
-                scheduleDraftSave();
+                if (!silent) setStatus("ok", "배너 불러오기 완료", `시간: ${nowStr()}`);
             } catch (e) {
                 if (!silent) setStatus("bad", "배너 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
-        // 배너 저장 (항상 신키로 저장)
-        // 배너 저장
+        // 배너 저장: 결과를 버튼 아래에 즉시 표시
         async function saveBannerSlot() {
             try {
+                hideBannerMsg();
                 syncBannerUI();
                 setBusy(true, "배너 저장 중...");
 
-                const mode = bannerTarget.mode;
-                const linkUrl = $("linkUrl") ? $("linkUrl").value || "" : "";
+                const linkUrl = $("linkUrl").value || "";
                 const fileInput = $("bannerFile");
                 const file = fileInput?.files?.[0] || null;
-                const storeImageUrl = $("storeImageUrl") ? $("storeImageUrl").value || "" : "";
+                const storeImageUrl = $("storeImageUrl").value || "";
 
-                // FormData 생성
                 const fd = new FormData();
                 fd.append("page", PAGE_NAME);
-                fd.append("category", "");  // 배너는 카테고리 무관
-                fd.append("subcategory", "");
-                fd.append("section", "top");  // 배너는 top 섹션
+                fd.append("mode", MODE);
+                fd.append("section", "top");
                 fd.append("idx", "1");
                 fd.append("priority", "1");
                 fd.append("adMode", "banner");
                 fd.append("slotMode", "custom");
-
                 if (linkUrl) fd.append("linkUrl", linkUrl);
 
-                // ✅ 1순위: 새로 업로드한 파일
-                if (file) {
-                    fd.append("image", file);
-                }
-                // ✅ 2순위: 선택된 가게 썸네일 이미지 경로
-                else if (storeImageUrl) {
-                    fd.append("storeImageUrl", storeImageUrl);
-                }
+                if (file) fd.append("image", file);
+                else if (storeImageUrl) fd.append("storeImageUrl", storeImageUrl);
 
-                const data = await apiFetch(`/update`, {
-                    method: "POST",
-                    body: fd,
-                });
-
-                if (!data.success) {
-                    throw new Error(data.error || "배너 저장 실패");
-                }
+                const data = await apiFetch(`/update`, { method: "POST", body: fd });
+                if (!data.success) throw new Error(data.error || "배너 저장 실패");
 
                 const slot = data.slot || null;
-                if (slot?.image_url) {
-                    setBannerPreview(slot.image_url);
-                }
+                if (slot?.image_url) setBannerPreview(slot.image_url);
 
-                if (fileInput) fileInput.value = "";
+                $("bannerFile").value = "";
 
-                setStatus(
-                    "ok",
-                    "배너 저장 완료 ✅",
-                    `mode:${mode} / position:${data.position || "N/A"} / 시간:${nowStr()}`
-                );
-                scheduleDraftSave();
+                showBannerMsg("ok", `배너 저장 완료 ✅ (${nowStr()})`);
+                setStatus("ok", "배너 저장 완료 ✅", `시간: ${nowStr()}`);
             } catch (e) {
-                setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간:${nowStr()}`);
+                showBannerMsg("bad", `배너 저장 실패 ❌: ${e.message} (${nowStr()})`);
+                setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
             } finally {
                 setBusy(false);
             }
         }
 
-
-        // 배너 삭제
+        // 배너 삭제: 결과를 버튼 아래에 즉시 표시
         async function deleteBannerSlot() {
             try {
+                hideBannerMsg();
                 syncBannerUI();
                 setBusy(true, "배너 삭제 중...");
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
-                    category: "",  // 배너는 카테고리 무관
-                    subcategory: "",
-                    section: "top",  // 배너는 top 섹션
+                    mode: MODE,
+                    section: "top",
                     idx: "1",
                     priority: "1",
                 }).toString();
 
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
-                
-                if (!data.success) {
-                    throw new Error(data.error || "배너 삭제 실패");
-                }
-
-                const delCount = Number(data.deleted || 0);
-                if (delCount === 0) {
-                    setStatus("warn", "배너 삭제 완료 (삭제된 행 0개)", `시간:${nowStr()}`);
-                } else {
-                    setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / 시간:${nowStr()}`);
-                }
+                if (!data.success) throw new Error(data.error || "배너 삭제 실패");
 
                 setBannerPreview("/uploads/no-image.png");
-                if ($("linkUrl")) $("linkUrl").value = "";
+                $("linkUrl").value = "";
+                $("bannerFile").value = "";
 
-                scheduleDraftSave();
+                showBannerMsg("ok", `배너 삭제 완료 ✅ (${nowStr()})`);
+                setStatus("ok", "배너 삭제 완료 ✅", `시간: ${nowStr()}`);
             } catch (e) {
-                setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간:${nowStr()}`);
+                showBannerMsg("bad", `배너 삭제 실패 ❌: ${e.message} (${nowStr()})`);
+                setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
             } finally {
                 setBusy(false);
             }
         }
+
+        $("btnBannerSave").addEventListener("click", saveBannerSlot);
+        $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
+
+        $("bannerFile").addEventListener("change", (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            hideBannerMsg();
+            setBannerPreview(URL.createObjectURL(f));
+        });
+
+        $("btnClearImage").addEventListener("click", () => {
+            $("bannerFile").value = "";
+            const storeImg = $("storeImageUrl").value;
+            setBannerPreview(storeImg || "/uploads/no-image.png");
+            showBannerMsg("warn", `업로드 이미지 제거됨 (${nowStr()})`);
+            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
+        });
 
         function toIsoLocalInputValue(iso) {
             if (!iso) return "";
@@ -1148,20 +902,26 @@
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
 
+        // ✅ 하위카테고리 표시 우선: business_subcategory
+        function subLabel(store) {
+            const sub = store?.business_subcategory || store?.detail_category || "";
+            return sub ? `하위: ${sub}` : "하위: -";
+        }
+
         function setMiniStoreInfo(store) {
             if (!store) {
                 $("storeThumb").src = "/uploads/no-image.png";
                 $("storeNameMini").textContent = "선택된 가게 없음";
                 $("storeTypeMini").textContent = "-";
                 $("storeBizMini").textContent = "-";
-                $("storeLocMini").textContent = "위치: -";
+                $("storeLocMini").textContent = "하위: -";
                 return;
             }
             $("storeThumb").src = store.image_url || "/uploads/no-image.png";
             $("storeNameMini").textContent = store.business_name || "-";
             $("storeTypeMini").textContent = store.business_type || "-";
             $("storeBizMini").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
-            $("storeLocMini").textContent = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
+            $("storeLocMini").textContent = subLabel(store);
         }
 
         function setStoreBox(store) {
@@ -1170,25 +930,32 @@
                 $("storeType").textContent = "-";
                 $("storeBiz").textContent = "-";
                 $("storeImage").src = "/uploads/no-image.png";
-                $("storeLocChip").textContent = "위치: -";
-                $("storeLocText").textContent = "위치: -";
+                $("storeLocChip").textContent = "하위: -";
+                $("storeLocText").textContent = "하위: -";
                 return;
             }
             $("storeName").textContent = store.business_name || "-";
-            $("storeType").textContent = store.business_type || "-";
+            $("storeType").textContent = `${store.business_type || "-"} / 상위:${store.business_category || "-"} / 하위:${store.business_subcategory || "-"}`;
             $("storeBiz").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
             $("storeImage").src = store.image_url || "/uploads/no-image.png";
-            const loc = `위치: ${store.page_number}페이지 / ${store.index_in_page}번째`;
-            $("storeLocChip").textContent = loc;
-            $("storeLocText").textContent = loc;
+            $("storeLocChip").textContent = subLabel(store);
+            $("storeLocText").textContent = subLabel(store);
         }
 
+        function getSlotModeByPick() { return uiPick === "store" ? "store" : "custom"; }
+        function getSlotTypeByPick() { return uiPick === "text" ? "text" : "banner"; }
+
+        // ✅ subcategory.html 규격: section + idx 기반 슬롯 로드
         async function loadSlot(silent = false) {
             try {
                 const section = selectedTarget.section || $("section")?.value || "all_items";
-                const idx = selectedTarget.boxNo || 1;
+                const idx = selectedTarget.idx;
                 const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
                 const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) return;
 
                 if (!silent) {
                     syncChips();
@@ -1197,18 +964,21 @@
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
+                    mode: MODE,
                     section,
                     idx: String(idx),
                     priority,
-                    pageNo, // 서버가 쓰면 쓰고, 안 쓰면 무시됨
-                }).toString();
+                    pageNo,
+                });
 
-                const data = await apiFetch(`/slot?${qs}`);
+                if (category) qs.append("category", category);
+                if (subcategory) qs.append("subcategory", subcategory);
+
+                const data = await apiFetch(`/slot?${qs.toString()}`);
                 const slot = data?.slot || null;
 
                 if (!slot) {
                     if (!silent) setStatus("warn", "저장된 슬롯이 없습니다", "가게 연결/이미지/텍스트 설정 후 저장하면 생성됩니다.");
-                    scheduleDraftSave();
                     return;
                 }
 
@@ -1232,12 +1002,144 @@
                 else setPick("image");
 
                 if (!silent) setStatus("ok", "슬롯 불러오기 완료", `section:${section} idx:${idx} / 시간: ${nowStr()}`);
-                scheduleDraftSave();
             } catch (e) {
                 if (!silent) setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
             }
         }
 
+        async function saveSlot() {
+            try {
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.idx;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) {
+                    setStatus("bad", "저장 실패", "먼저 12칸에서 박스를 클릭해서 idx를 선택하세요.");
+                    return;
+                }
+
+                setBusy(true, "저장 중...");
+                syncChips();
+
+                const fd = new FormData();
+                fd.append("page", PAGE_NAME);
+                fd.append("mode", MODE);
+                fd.append("section", section);
+                fd.append("idx", String(idx));
+                fd.append("priority", priority);
+                fd.append("pageNo", pageNo);
+
+                if (category) fd.append("category", category);
+                if (subcategory) fd.append("subcategory", subcategory);
+
+                fd.append("adMode", getSlotTypeByPick());
+                fd.append("slotMode", getSlotModeByPick());
+
+                fd.append("linkUrl", $("linkUrl").value || "");
+                fd.append("textTitle", $("textTitle").value || "");
+                fd.append("textDesc", $("textDesc").value || "");
+
+                fd.append("noEnd", $("noEnd").checked ? "true" : "false");
+                fd.append("startAt", $("startAt").value || "");
+                fd.append("endAt", $("endAt").value || "");
+
+                if (uiPick === "store") {
+                    if ($("storeId").value) fd.append("storeId", $("storeId").value);
+                    if ($("storeBusinessNumber").value) fd.append("storeBusinessNumber", $("storeBusinessNumber").value);
+                    if ($("storeNameHidden").value) fd.append("storeName", $("storeNameHidden").value);
+                    if ($("storeTypeHidden").value) fd.append("storeType", $("storeTypeHidden").value);
+                }
+
+                const storeImageUrl = $("storeImageUrl").value || "";
+                if (storeImageUrl) fd.append("storeImageUrl", storeImageUrl);
+
+                const f = $("bannerFile").files?.[0];
+                if (uiPick !== "text" && f) fd.append("image", f);
+
+                const data = await apiFetch(`/update`, { method: "POST", body: fd });
+                if (!data.success) throw new Error(data.error || "저장 실패");
+
+                const slot = data.slot || null;
+                if (slot?.image_url && uiPick !== "text") setBannerPreview(slot.image_url);
+                $("bannerFile").value = "";
+
+                await loadGrid();
+
+                setStatus("ok", "저장 완료 ✅", `section:${section} / p${pageNo} / idx:${idx} / 시간: ${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function deleteSlot() {
+            try {
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.idx;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) {
+                    setStatus("bad", "삭제 실패", "먼저 12칸에서 박스를 클릭해서 idx를 선택하세요.");
+                    return;
+                }
+
+                setBusy(true, "삭제 중...");
+                syncChips();
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    mode: MODE,
+                    section,
+                    idx: String(idx),
+                    priority,
+                    pageNo,
+                });
+
+                if (category) qs.append("category", category);
+                if (subcategory) qs.append("subcategory", subcategory);
+
+                const data = await apiFetch(`/delete?${qs.toString()}`, { method: "DELETE" });
+                if (!data.success) throw new Error(data.error || "삭제 실패");
+
+                const delCount = Number(data.deleted || 0);
+                if (delCount === 0) {
+                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개(키 불일치). section=${section}, idx=${idx}, priority=${priority}`);
+                    return;
+                }
+
+                await loadSlot(true);
+                await loadGrid();
+
+                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / section:${section} idx:${idx} / 시간:${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        $("btnSave").addEventListener("click", saveSlot);
+        $("btnDelete").addEventListener("click", deleteSlot);
+
+        async function hydrateLayout() {
+            try {
+                const h = await fetch("/public2/components/header.html").then(r => r.text());
+                $("header-placeholder").innerHTML = h;
+            } catch (_e) { }
+            try {
+                const f = await fetch("/public2/components/footer.html").then(r => r.text());
+                $("footer-placeholder").innerHTML = f;
+            } catch (_e) { }
+        }
+
+        // ✅ 검색은 food 고정
         function renderSearchResults(results) {
             const list = $("searchResults");
             list.innerHTML = "";
@@ -1248,10 +1150,6 @@
             }
 
             for (const r of results) {
-                const section = $("section")?.value || "all_items";
-                const mode = $("managerMode").value || "food";
-                const position = buildPosition(section, mode, Number(r.page_number || 1), Number(r.index_in_page || 1));
-
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "result-item w-full text-left soft p-3";
@@ -1261,10 +1159,10 @@
               <div class="font-black">${r.business_name || ""}</div>
               <div class="text-sm text-slate-600 mt-0.5">${r.business_type || ""}</div>
               <div class="text-xs text-blue-700 font-black mt-1">
-                위치: ${r.page_number}페이지 / ${r.index_in_page}번째
+                상위: ${r.business_category || "-"} / 하위: ${r.business_subcategory || "-"}
               </div>
               <div class="text-[11px] text-slate-500 mt-1 break-all">
-                position: <b>${position}</b>
+                사업자: <b>${r.business_number || "-"}</b>
               </div>
             </div>
             <div class="shrink-0">
@@ -1277,20 +1175,6 @@
                 btn.addEventListener("click", async () => {
                     selectedStore = r;
 
-                    const sec = $("section")?.value || "all_items";
-                    if ($("slotArea")) $("slotArea").value = sec;
-
-                    selectedTarget.section = sec;
-                    selectedTarget.area = sec;
-                    selectedTarget.mode = $("managerMode").value || "food";
-                    selectedTarget.pageNo = Number(r.page_number || 1);
-                    selectedTarget.boxNo = Number(r.index_in_page || 1);
-                    selectedTarget.priority = DEFAULT_PRIORITY;
-
-                    selectedTarget.position = buildPosition(sec, selectedTarget.mode, selectedTarget.pageNo, selectedTarget.boxNo);
-
-                    syncChips();
-
                     setMiniStoreInfo(r);
                     setStoreBox(r);
 
@@ -1300,10 +1184,9 @@
                     $("storeTypeHidden").value = r.business_type || "";
                     $("storeImageUrl").value = r.image_url || "";
 
-                    setStatus("warn", "가게 선택됨", `position 생성됨 / 시간: ${nowStr()}`);
-                    scheduleDraftSave();
+                    setStatus("ok", "가게 선택됨", `하위:${r.business_subcategory || "-"} / 시간:${nowStr()}`);
 
-                    await loadSlot();
+                    // 선택만 하고, 실제 저장 위치는 12칸(idx)에서 결정
                     await loadWhere();
                 });
 
@@ -1311,64 +1194,17 @@
             }
         }
 
-        async function loadWhere() {
-            try {
-                const biz = String($("storeBusinessNumber").value || "").trim();
-                const bizDigits = digitsOnly(biz);
-                const box = $("whereResults");
-                if (!box) return;
-
-                if (!bizDigits) {
-                    box.innerHTML = `<div class="text-slate-500">사업자번호가 없어 조회할 수 없습니다.</div>`;
-                    return;
-                }
-
-                const qs = new URLSearchParams({
-                    q: bizDigits,
-                    page: PAGE_NAME,
-                    limit: "100",
-                }).toString();
-
-                const data = await apiFetch(`/where?${qs}`);
-                const items = data?.items || [];
-
-                if (!items.length) {
-                    box.innerHTML = `<div class="text-slate-500">현재 등록된 슬롯이 없습니다.</div>`;
-                    return;
-                }
-
-                box.innerHTML = items.map((it) => {
-                    const p = it.parsed || {};
-                    return `
-        <div class="soft p-2">
-          <div class="font-black">${p.section_label || "(unknown section)"}</div>
-          <div class="text-xs text-slate-600 mt-1">
-            ${it.page} / ${p.page_number || "?"}페이지 / ${p.index_in_page || "?"}번째 / priority ${it.priority}
-          </div>
-          <div class="text-[11px] text-slate-500 break-all mt-1">position: <b>${it.position}</b></div>
-        </div>
-      `;
-                }).join("");
-            } catch (e) {
-                const box = $("whereResults");
-                if (box) box.innerHTML = `<div class="text-red-600">조회 실패: ${e.message}</div>`;
-            }
-        }
-
         async function doSearch() {
             try {
-                const mode = $("managerMode").value;
                 const qRaw = String($("q").value || "").trim();
                 const qDigits = digitsOnly(qRaw);
-
-                syncChips();
-
                 const qParam = qRaw ? (qDigits ? qDigits : qRaw) : "__all__";
 
-                setStatus("warn", "검색 중...", `모드: ${mode} / q: ${qParam} / 시간: ${nowStr()}`);
+                syncChips();
+                setStatus("warn", "검색 중...", `q: ${qParam} / 시간: ${nowStr()}`);
 
                 const qs = new URLSearchParams({
-                    mode,
+                    mode: MODE,
                     q: qParam,
                     pageSize: "12",
                 }).toString();
@@ -1384,8 +1220,6 @@
 
                 renderSearchResults(data.results || []);
                 setStatus("ok", "검색 완료", `결과: ${(data.results || []).length}개 / 시간: ${nowStr()}`);
-
-                scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "검색 실패", `${e.message} / 시간: ${nowStr()}`);
             }
@@ -1413,8 +1247,7 @@
                 setBannerPreview($("storeImageUrl").value);
             }
 
-            setStatus("ok", "가게 연결 준비 완료", `저장 버튼을 누르면 반영됩니다 / 시간: ${nowStr()}`);
-            scheduleDraftSave();
+            setStatus("ok", "가게 연결 준비 완료", `12칸(idx) 선택 후 저장하세요 / 시간: ${nowStr()}`);
         });
 
         $("btnUseStoreImage").addEventListener("click", () => {
@@ -1423,241 +1256,59 @@
                 $("bannerFile").value = "";
                 $("storeImageUrl").value = selectedStore.image_url;
                 setBannerPreview(selectedStore.image_url);
+                showBannerMsg("warn", `가게 이미지로 미리보기 적용 (${nowStr()})`);
                 setStatus("ok", "가게 이미지로 배너 미리보기 적용", `시간: ${nowStr()}`);
-                scheduleDraftSave();
             } else {
+                showBannerMsg("bad", `가게 이미지가 없습니다 (${nowStr()})`);
                 setStatus("bad", "적용 실패", `가게 이미지가 없습니다 / 시간: ${nowStr()}`);
             }
         });
 
-        function getSlotModeByPick() { return uiPick === "store" ? "store" : "custom"; }
-        function getSlotTypeByPick() { return uiPick === "text" ? "text" : "banner"; }
-
-        async function saveSlot() {
+        // where: 서버가 지원하면 표시, 없으면 실패 문구
+        async function loadWhere() {
             try {
-                if (!selectedTarget.position) {
-                    setStatus("bad", "저장 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
+                const biz = String($("storeBusinessNumber").value || "").trim();
+                const bizDigits = digitsOnly(biz);
+                const box = $("whereResults");
+                if (!box) return;
+
+                if (!bizDigits) {
+                    box.innerHTML = `<div class="text-slate-500">사업자번호가 없어 조회할 수 없습니다.</div>`;
                     return;
                 }
-
-                setBusy(true, "저장 중...");
-                syncChips();
-
-                const fd = new FormData();
-                fd.append("page", PAGE_NAME);
-                fd.append("position", selectedTarget.position);
-                fd.append("priority", String(selectedTarget.priority || DEFAULT_PRIORITY));
-
-                fd.append("adMode", getSlotTypeByPick());
-                fd.append("slotMode", getSlotModeByPick());
-
-                fd.append("linkUrl", $("linkUrl").value || "");
-                fd.append("textTitle", $("textTitle").value || "");
-                fd.append("textDesc", $("textDesc").value || "");
-
-                fd.append("noEnd", $("noEnd").checked ? "true" : "false");
-                fd.append("startAt", $("startAt").value || "");
-                fd.append("endAt", $("endAt").value || "");
-
-                if (uiPick === "store") {
-                    if ($("storeId").value) fd.append("storeId", $("storeId").value);
-                    if ($("storeBusinessNumber").value) fd.append("storeBusinessNumber", $("storeBusinessNumber").value);
-                    if ($("storeNameHidden").value) fd.append("storeName", $("storeNameHidden").value);
-                    if ($("storeTypeHidden").value) fd.append("storeType", $("storeTypeHidden").value);
-                }
-
-                // ✅ 가게 이미지 경로는 “store 모드”뿐 아니라 image 모드에서도 같이 보냄
-                const storeImageUrl = $("storeImageUrl").value || "";
-                if (storeImageUrl) {
-                    fd.append("storeImageUrl", storeImageUrl);
-                }
-
-                const f = $("bannerFile").files?.[0];
-                if (uiPick !== "text" && f) {
-                    fd.append("image", f);
-                }
-
-                const data = await apiFetch(`/update`, { method: "POST", body: fd });
-                if (!data.success) throw new Error(data.error || "저장 실패");
-
-                const slot = data.slot || null;
-                if (slot?.image_url && uiPick !== "text") setBannerPreview(slot.image_url);
-
-                $("bannerFile").value = "";
-
-                await loadGrid();
-
-                setStatus("ok", "저장 완료 ✅", `position: ${selectedTarget.position} / priority: ${selectedTarget.priority || 1} / 시간: ${nowStr()}`);
-                scheduleDraftSave();
-            } catch (e) {
-                setStatus("bad", "저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
-            } finally {
-                setBusy(false);
-            }
-        }
-
-        async function deleteSlot() {
-            try {
-                const section = selectedTarget.section || $("section")?.value || "all_items";
-                const idx = selectedTarget.boxNo || null;
-                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
-                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
-
-                if (!idx) {
-                    setStatus("bad", "삭제 실패", "먼저 그리드(12칸)에서 박스를 클릭해서 idx를 선택하세요.");
-                    return;
-                }
-
-                setBusy(true, "삭제 중...");
-                syncChips();
 
                 const qs = new URLSearchParams({
+                    q: bizDigits,
                     page: PAGE_NAME,
-                    section,
-                    idx: String(idx),
-                    priority,
-                    pageNo, // 옵션
+                    limit: "100",
+                    mode: MODE,
                 }).toString();
 
-                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
-                if (!data.success) throw new Error(data.error || "삭제 실패");
+                const data = await apiFetch(`/where?${qs}`);
+                const items = data?.items || [];
 
-                const delCount = Number(data.deleted || 0);
-
-                if (delCount === 0) {
-                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). section=${section}, idx=${idx}, priority=${priority}`);
+                if (!items.length) {
+                    box.innerHTML = `<div class="text-slate-500">현재 등록된 슬롯이 없습니다.</div>`;
                     return;
                 }
 
-                await loadSlot(true);
-                await loadGrid();
-
-                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / section:${section} idx:${idx} / 시간:${nowStr()}`);
-                scheduleDraftSave();
+                box.innerHTML = items.map((it) => {
+                    const p = it.parsed || {};
+                    return `
+        <div class="soft p-2">
+          <div class="font-black">${p.section_label || "(unknown section)"}</div>
+          <div class="text-xs text-slate-600 mt-1">
+            ${it.page} / p${p.page_number || "?"} / idx ${p.index_in_page || "?"} / priority ${it.priority}
+          </div>
+          <div class="text-[11px] text-slate-500 break-all mt-1">key: <b>${it.position || it.key || "-"}</b></div>
+        </div>
+      `;
+                }).join("");
             } catch (e) {
-                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
-            } finally {
-                setBusy(false);
+                const box = $("whereResults");
+                if (box) box.innerHTML = `<div class="text-red-600">조회 실패: ${e.message}</div>`;
             }
         }
-
-        $("btnSave").addEventListener("click", saveSlot);
-        $("btnDelete").addEventListener("click", deleteSlot);
-
-        async function hydrateLayout() {
-            try {
-                const h = await fetch("/public2/components/header.html").then(r => r.text());
-                $("header-placeholder").innerHTML = h;
-            } catch (_e) { }
-            try {
-                const f = await fetch("/public2/components/footer.html").then(r => r.text());
-                $("footer-placeholder").innerHTML = f;
-            } catch (_e) { }
-        }
-
-        // 모드 전환: “현재 모드 저장 → 전환 모드 복구”
-        async function switchMode(nextMode) {
-            const prev = state.currentMode || "food";
-
-            saveDraftMain(prev);
-            saveDraftBanner(prev);
-
-            $("managerMode").value = nextMode;
-            syncBannerModeButtons(nextMode);
-            syncBannerUI();
-
-            state.currentMode = nextMode;
-
-            // ✅ 모드 변경 시 API Base 업데이트
-            updateApiBase(nextMode);
-
-            const okMain = restoreDraftMainForMode(nextMode);
-            restoreDraftBannerForMode(nextMode);
-
-            // restore가 bannerMode 값을 건드릴 수 있으니 다시 강제 동기화
-            $("managerMode").value = nextMode;
-            syncBannerModeButtons(nextMode);
-            syncBannerUI();
-
-            await loadBannerSlot(true);
-            await loadGrid();
-
-            if (selectedTarget?.pageNo && selectedTarget?.boxNo) {
-                const sec = $("section")?.value || selectedTarget.section || "all_items";
-                selectedTarget.section = sec;
-                selectedTarget.area = sec;
-                selectedTarget.mode = nextMode;
-                selectedTarget.position = buildPosition(sec, nextMode, Number(selectedTarget.pageNo), Number(selectedTarget.boxNo));
-
-                if ($("slotArea")) $("slotArea").value = sec;
-                $("pickedBoxPos").textContent = `position: ${selectedTarget.position}`;
-                syncChips();
-            }
-
-            setStatus("ok", `모드 전환 완료 (${prev} → ${nextMode})`, `시간: ${nowStr()}`);
-            if (!okMain) setStatus("warn", `모드 전환 (${prev} → ${nextMode})`, `해당 모드에 저장된 마지막 입력이 없어 기본값으로 시작합니다 / 시간: ${nowStr()}`);
-
-            ensureBottomVisible();
-        }
-
-        // 하단 모드 변경 시에도 정상 동작
-        $("managerMode").addEventListener("change", async () => {
-            const next = $("managerMode").value || "food";
-            if (next === state.currentMode) return;
-            await switchMode(next);
-            scheduleDraftSave();
-        });
-
-        // 배너 버튼 클릭 → switchMode 호출
-        const _btnFood = $("btnBannerModeFood");
-        if (_btnFood) {
-            _btnFood.addEventListener("click", async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (state.currentMode === "food") return;
-                await switchMode("food");
-                scheduleDraftSave();
-            });
-        }
-
-        const _btnCombined = $("btnBannerModeCombined");
-        if (_btnCombined) {
-            _btnCombined.addEventListener("click", async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (state.currentMode === "combined") return;
-                await switchMode("combined");
-                scheduleDraftSave();
-            });
-        }
-
-        const _bannerSel = $("bannerMode");
-        if (_bannerSel) {
-            _bannerSel.addEventListener("change", async () => {
-                const next = _bannerSel.value || "food";
-                if (next === state.currentMode) { syncBannerModeButtons(next); syncBannerUI(); return; }
-                await switchMode(next);
-                scheduleDraftSave();
-            });
-        }
-
-        $("btnBannerSave").addEventListener("click", saveBannerSlot);
-        $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
-
-        $("bannerFile").addEventListener("change", (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            setBannerPreview(URL.createObjectURL(f));
-            scheduleDraftSave();
-        });
-
-        $("btnClearImage").addEventListener("click", () => {
-            $("bannerFile").value = "";
-            const storeImg = $("storeImageUrl").value;
-            setBannerPreview(storeImg || "/uploads/no-image.png");
-            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
-            scheduleDraftSave();
-        });
 
         let selectedBoxNo = null;
 
@@ -1667,10 +1318,10 @@
             const boxEl = $("selectedBoxNo");
 
             const name = item?.business_name || item?.store_name || "";
-            const biz = item?.business_no || item?.business_number || "";
+            const biz = item?.business_number || item?.business_no || "";
             const boxNo = item?.boxNo ?? null;
 
-            if (nameEl) nameEl.textContent = name || "-";
+            if (nameEl) nameEl.textContent = name || (item?.occupied ? "(사용중)" : "-");
             if (bizEl) bizEl.textContent = biz || "-";
             if (boxEl) boxEl.textContent = boxNo ? String(boxNo) : "-";
 
@@ -1686,164 +1337,158 @@
             });
         }
 
+        // ✅ grid: 서버가 subcategory.html 처럼 items 목록(최대 12개)을 주면 -> 12칸으로 변환
         async function loadGrid() {
-            const section = $("section").value || "all_items";
-            const mode = $("managerMode").value || "food";
-            const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
-            const category = $("placementCatFilter")?.value || "";
-            const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+            try {
+                const section = $("section").value || "all_items";
+                const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
 
-            const params = {
-                page: PAGE_NAME,
-                section,
-                mode,
-                pageNo: String(pageNo),
-            };
+                selectedTarget.section = section;
+                selectedTarget.pageNo = pageNo;
 
-            if (category) params.category = category;
-            if (subcategory) params.subcategory = subcategory;
+                syncChips();
 
-            const qs = new URLSearchParams(params).toString();
+                const params = {
+                    page: PAGE_NAME,
+                    section,
+                    mode: MODE,
+                    pageNo: String(pageNo),
+                };
 
-            const data = await apiFetch(`/grid?${qs}`);
-            const items = data.items || [];
+                if (category) params.category = category;
+                if (subcategory) params.subcategory = subcategory;
 
-            const grid = $("grid");
-            grid.innerHTML = "";
+                const qs = new URLSearchParams(params).toString();
+                const data = await apiFetch(`/grid?${qs}`);
 
-            for (const it of items) {
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.setAttribute("data-box", String(it.boxNo));
+                const list = Array.isArray(data.items) ? data.items : [];
+                const pageSize = Number(data.pageSize || 12) || 12;
 
-                btn.className =
-                    "text-left soft p-2 rounded-xl border transition " +
-                    (it.occupied
-                        ? "border-blue-500 bg-white"
-                        : "border-slate-200 bg-white/60");
+                // 12칸 고정
+                const boxes = [];
+                for (let i = 1; i <= 12; i++) {
+                    const store = list[i - 1] || null;
+                    boxes.push({
+                        boxNo: i,
+                        occupied: !!store,
+                        priority: DEFAULT_PRIORITY,
+                        store,
+                        label: store ? `${store.business_name || "(상호없음)"} / 하위:${store.business_subcategory || "-"}` : "(비었음)"
+                    });
+                }
 
-                btn.innerHTML = `
+                const grid = $("grid");
+                grid.innerHTML = "";
+
+                for (const it of boxes) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.setAttribute("data-box", String(it.boxNo));
+
+                    btn.className =
+                        "text-left soft p-2 rounded-xl border transition " +
+                        (it.occupied
+                            ? "border-blue-500 bg-white"
+                            : "border-slate-200 bg-white/60");
+
+                    btn.innerHTML = `
           <div class="flex items-start justify-between gap-2">
             <div>
-              <div class="text-xs text-slate-500 font-black">BOX ${it.boxNo}</div>
-              <div class="text-sm font-black mt-0.5">${it.occupied ? (it.label || "(사용중)") : "(비었음)"}</div>
-              <div class="text-[11px] text-slate-500 mt-1">priority: ${it.priority ?? "-"}</div>
+              <div class="text-xs text-slate-500 font-black">IDX ${it.boxNo}</div>
+              <div class="text-sm font-black mt-0.5">${it.label}</div>
+              <div class="text-[11px] text-slate-500 mt-1">priority: ${it.priority}</div>
             </div>
           </div>
         `;
 
-                btn.addEventListener("click", async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    btn.addEventListener("click", async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
 
-                    const s = $("section").value || "all_items";
-                    const m = $("managerMode").value || "food";
-                    const p = Math.max(Number($("pageNo").value || "1"), 1);
-                    const b = Number(it.boxNo);
+                        selectedTarget.section = section;
+                        selectedTarget.pageNo = pageNo;
+                        selectedTarget.idx = Number(it.boxNo);
+                        selectedTarget.priority = DEFAULT_PRIORITY;
 
-                    selectedTarget.mode = m;
-                    selectedTarget.pageNo = p;
-                    selectedTarget.boxNo = b;
-                    selectedTarget.section = s;
-                    selectedTarget.position = buildPosition(s, m, p, b);
-                    selectedTarget.priority = DEFAULT_PRIORITY;
+                        $("pickedBoxText").textContent = `${section} / p${pageNo} / idx ${it.boxNo}`;
+                        $("pickedBoxPos").textContent = `${section}|p${pageNo}|idx${it.boxNo}`;
 
-                    if ($("slotArea")) $("slotArea").value = s;
+                        fillSelectedStoreInfo({
+                            boxNo: it.boxNo,
+                            business_name: it.store?.business_name || "",
+                            business_number: it.store?.business_number || "",
+                            occupied: it.occupied
+                        });
 
-                    syncChips();
+                        syncChips();
+                        setStatus("warn", "배치 위치 선택됨", `section:${section} p${pageNo} idx:${it.boxNo} / 시간:${nowStr()}`);
 
-                    $("pickedBoxText").textContent = `${s} / p${p} / box ${b}`;
-                    $("pickedBoxPos").textContent = `position: ${selectedTarget.position}`;
+                        await loadSlot();
+                    });
 
-                    fillSelectedStoreInfo(it);
-
-                    setStatus("warn", "배치 위치 선택됨", `이제 저장하면 이 위치에 반영됩니다 / 시간: ${nowStr()}`);
-
-                    scheduleDraftSave();
-                    await loadSlot();
-                });
-
-                grid.appendChild(btn);
+                    grid.appendChild(btn);
+                }
+            } catch (e) {
+                setStatus("bad", "그리드 불러오기 실패", `${e.message} / 시간:${nowStr()}`);
             }
-
-            scheduleDraftSave();
         }
 
         $("btnLoadGrid").addEventListener("click", loadGrid);
 
         $("section").addEventListener("change", () => {
-            selectedTarget.position = "";
-            $("pickedBoxText").textContent = "-";
-            $("pickedBoxPos").textContent = "position: -";
+            selectedTarget.idx = null;
+            selectedBoxNo = null;
+            highlightSelectedBox();
             syncChips();
             loadGrid();
-            scheduleDraftSave();
         });
 
         $("slotArea").addEventListener("change", () => {
             const v = $("slotArea").value;
-
             if (v === "top") {
                 setStatus("warn", "상단 배너는 위의 '배너 저장/삭제'를 사용하세요.", `시간: ${nowStr()}`);
                 return;
             }
-
             $("section").value = v;
-            selectedTarget.position = "";
-            $("pickedBoxText").textContent = "-";
-            $("pickedBoxPos").textContent = "position: -";
+            selectedTarget.idx = null;
+            selectedBoxNo = null;
+            highlightSelectedBox();
             syncChips();
             loadGrid();
-            scheduleDraftSave();
         });
 
-        $("pageNo").addEventListener("change", () => { loadGrid(); scheduleDraftSave(); });
-
+        $("pageNo").addEventListener("change", () => loadGrid());
         $("btnPrevPage").addEventListener("click", () => {
             const v = Math.max(Number($("pageNo").value || "1") - 1, 1);
             $("pageNo").value = String(v);
             loadGrid();
-            scheduleDraftSave();
         });
         $("btnNextPage").addEventListener("click", () => {
             const v = Math.max(Number($("pageNo").value || "1") + 1, 1);
             $("pageNo").value = String(v);
             loadGrid();
-            scheduleDraftSave();
         });
 
-        // 초기화: 항상 푸드로 시작
-        // 초기화: 항상 푸드로 시작
+        // ✅ 푸드 고정 UI 초기화
         (async function init() {
             hydrateLayout();
 
             $("managerMode").value = "food";
-            syncBannerModeButtons("food");
-            state.currentMode = "food";
-
+            syncBannerUI();
             setPick("image");
-            bindDraftAutoSave();
+
             initCategoryFilterUI();
 
-            const restored = restoreDraftMainForMode("food");
-            restoreDraftBannerForMode("food");
-
-            $("managerMode").value = "food";
-            syncBannerModeButtons("food");
-            syncBannerUI();
-
-            // ✅ 여기에서 실제 살아있는 API Base 먼저 찾기
-            await detectApiBase();
+            syncChips();
+            hideBannerMsg();
 
             await loadBannerSlot(true);
             await loadGrid();
 
-            if (restored)
-                setStatus("ok", "푸드 마지막 입력 복구됨 ✅", `새로고침/재진입에도 유지 / 시간: ${nowStr()}`);
-            else
-                setStatus("warn", "푸드 기본 화면", `가게 검색 후 선택하세요 / 시간: ${nowStr()}`);
+            setStatus("ok", "푸드 전용 매니저 준비 완료 ✅", `API:${API_BASE} / 시간:${nowStr()}`);
         })();
-
     </script>
 </body>
 
