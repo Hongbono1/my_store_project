@@ -750,19 +750,25 @@ export async function upsertSlot(req, res) {
 
     const page = clean(req.body.page);
     const position = clean(req.body.position);
-    const priority = Math.max(safeInt(req.body.priority, safeInt(req.body.idx, 1)), 1);
+    const priority = Math.max(
+      safeInt(req.body.priority, safeInt(req.body.idx, 1)),
+      1
+    );
 
     if (!page || !position || !priority) {
-      return res.status(400).json({ success: false, error: "page/position/priority 필요" });
+      return res
+        .status(400)
+        .json({ success: false, error: "page/position/priority 필요" });
     }
 
     const adMode = clean(req.body.adMode || req.body.slot_type || "banner");
     const slot_type = mapSlotType(adMode);
-    const slot_mode = clean(req.body.slotMode || req.body.slot_mode || "store");
+    const slot_mode = clean(
+      req.body.slotMode || req.body.slot_mode || "store"
+    );
 
     const linkUrl = clean(req.body.linkUrl || req.body.link_url);
 
-    // ✅ text_content로 통일 (기존 필드 호환)
     const textContent = clean(
       req.body.textContent ||
       req.body.text_content ||
@@ -778,34 +784,44 @@ export async function upsertSlot(req, res) {
     const startAt = parseDateTimeLocalToTs(req.body.startAt);
     const endAt = parseDateTimeLocalToTs(req.body.endAt);
 
+    // ✅ 업로드 파일 여부 체크
     let imageUrl = "";
-    if (req.file?.filename) imageUrl = `${UPLOAD_PUBLIC_PREFIX}/${req.file.filename}`;
+    const hasUploadFile = !!req.file?.filename;
+    if (hasUploadFile) {
+      imageUrl = `${UPLOAD_PUBLIC_PREFIX}/${req.file.filename}`;
+    }
 
     const storeId = safeIntOrNull(req.body.storeId || req.body.store_id);
 
     let storeBusinessNumber = clean(
       req.body.storeBusinessNumber ||
-      req.body.business_no || // ✅ admin_ad_slots 실제 컬럼명
+      req.body.business_no ||
       req.body.business_number ||
       req.body.store_business_no
     );
-    let storeName = clean(req.body.storeName || req.body.business_name || req.body.store_name);
-    let storeType = clean(req.body.storeType || req.body.business_type || req.body.store_type);
+    let storeName = clean(
+      req.body.storeName || req.body.business_name || req.body.store_name
+    );
+    let storeType = clean(
+      req.body.storeType || req.body.business_type || req.body.store_type
+    );
 
-    // store 모드 + storeId만 있어도 DB에서 자동 채움
+    // ✅ store 모드 + storeId 있을 때: 가게 정보 자동 채우기
     if (slot_mode === "store" && storeId !== null) {
       const tableSource2 = inferTableSourceFromPosition(position);
       const table =
-        tableSource2 === "combined_store_info" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+        tableSource2 === "combined_store_info"
+          ? COMBINED_TABLE
+          : (await pickFoodTable()) || "public.store_info";
 
       if (table) {
         const tcols = await getColumns(table);
         const sel2 = buildStoreSelect(table, tcols);
 
-        const mode2 = tableSource2 === "combined_store_info" ? "combined" : "food";
+        const mode2 =
+          tableSource2 === "combined_store_info" ? "combined" : "food";
         const imgMeta2 = await pickImageMetaForMode(mode2);
 
-        // ✅ storeId($1) 기반으로 이미지 1장 뽑기 (alias 필요 없음)
         let imgPickSql = "NULL";
         if (imgMeta2) {
           const order = imgMeta2.orderCol
@@ -832,7 +848,10 @@ export async function upsertSlot(req, res) {
             "${sel2.idCol}"::text AS id,
             ${sel2.bnCol ? `"${sel2.bnCol}"::text` : `''`} AS business_number,
             "${sel2.nameCol}"::text AS business_name,
-            ${sel2.typeCol ? `COALESCE("${sel2.typeCol}"::text,'')` : `''`} AS business_type,
+            ${sel2.typeCol
+            ? `COALESCE("${sel2.typeCol}"::text,'')`
+            : `''`
+          } AS business_type,
             ${imageExpr2} AS image_url
           FROM ${table}
           WHERE "${sel2.idCol}" = $1
@@ -845,7 +864,9 @@ export async function upsertSlot(req, res) {
           if (!storeBusinessNumber) storeBusinessNumber = clean(s.business_number);
           if (!storeName) storeName = clean(s.business_name);
           if (!storeType) storeType = clean(s.business_type);
-          if (!imageUrl) imageUrl = clean(s.image_url); // ✅ 업로드 없으면 자동
+
+          // ✅ 업로드 파일이 없을 때만 가게이미지 fallback
+          if (!hasUploadFile && !imageUrl) imageUrl = clean(s.image_url);
         }
       }
     }
@@ -871,6 +892,8 @@ export async function upsertSlot(req, res) {
     add(m.slotMode, slot_mode);
 
     add(m.linkUrl, linkUrl);
+
+    // ✅ image_url: 항상 넣되, 업데이트 시에는 "빈 값이면 기존 유지" 처리
     if (m.imageUrl) add(m.imageUrl, imageUrl);
 
     if (m.textContent) add(m.textContent, textContent);
@@ -891,14 +914,25 @@ export async function upsertSlot(req, res) {
     const conflictTarget = `"${m.page}","${m.position}","${m.priority}"`;
 
     const updateSets = insertCols
-      .filter((c) => ![`"${m.page}"`, `"${m.position}"`, `"${m.priority}"`].includes(c))
-      .map((c) => `${c}=EXCLUDED.${c}`);
+      .filter(
+        (c) =>
+          ![`"${m.page}"`, `"${m.position}"`, `"${m.priority}"`].includes(c)
+      )
+      .map((c) => {
+        // ✅ image_url 은 빈 문자열이면 기존 값을 유지
+        if (m.imageUrl && c === `"${m.imageUrl}"`) {
+          return `${c} = CASE WHEN EXCLUDED.${m.imageUrl} IS NOT NULL AND EXCLUDED.${m.imageUrl} <> '' THEN EXCLUDED.${m.imageUrl} ELSE ${SLOTS_TABLE}.${m.imageUrl} END`;
+        }
+        return `${c} = EXCLUDED.${c}`;
+      });
 
     const sqlUpsert = `
       INSERT INTO ${SLOTS_TABLE} (${insertCols.join(",")})
       VALUES (${insertVals.join(",")})
       ON CONFLICT (${conflictTarget})
-      DO UPDATE SET ${updateSets.length ? updateSets.join(",") : `"${m.page}"=EXCLUDED."${m.page}"`
+      DO UPDATE SET ${updateSets.length
+        ? updateSets.join(",")
+        : `"${m.page}"=EXCLUDED."${m.page}"`
       }
       RETURNING *
     `;
@@ -910,7 +944,7 @@ export async function upsertSlot(req, res) {
       const code = e?.code;
       if (code !== "42P10") throw e;
 
-      // unique index/constraint 없음(42P10) fallback
+      // unique index 없는 구버전 fallback
       const delSql = `
         DELETE FROM ${SLOTS_TABLE}
         WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
@@ -926,12 +960,12 @@ export async function upsertSlot(req, res) {
       return res.json({ success: true, slot: rows[0], note: "fallback-insert" });
     }
   } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "upsertSlot 실패" });
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "upsertSlot 실패",
+    });
   }
 }
-
 // ------------------------------
 // ✅ GET /grid (12칸)
 // ✅ 핵심: 자동배치 12개 + admin_ad_slots(저장된 칸) 오버라이드 덮어쓰기
