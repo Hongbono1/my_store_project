@@ -3,7 +3,8 @@ import express from "express";
 import multer from "multer";
 
 import {
-  getGrid,
+  // ✅ 여기 이름들이 컨트롤러 export와 100% 일치해야 함
+  grid,
   searchStore,
   getSlot,
   upsertSlot,
@@ -22,8 +23,7 @@ const upload = multer({
 });
 const uploadSingleImage = upload.single("image");
 
-// ✅ 기존 매니저 엔드포인트(이름만 실제 컨트롤러 export에 맞춤)
-router.get("/grid", getGrid);
+router.get("/grid", grid);
 router.get("/search-store", searchStore);
 
 router.get("/slot", getSlot);
