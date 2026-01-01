@@ -231,6 +231,104 @@ function safeUnlinkIfMine(imageUrl) {
   }
 }
 
+/** ----------------- Store Info Hydration Helpers ----------------- */
+async function fetchStoreMapByIdsOrBiz(storeIds, bizNos) {
+  const ids = Array.from(new Set((storeIds || []).map((x) => String(x)).filter(Boolean)));
+  const biz = Array.from(new Set((bizNos || []).map((x) => String(x).replace(/[^\d]/g, "")).filter(Boolean)));
+
+  if (!ids.length && !biz.length) return { byId: new Map(), byBiz: new Map() };
+
+  const hasStoreImages = await ensureStoreImagesReady();
+  const imgSelectSql = hasStoreImages ? `, COALESCE(img.url, '') AS image_url` : `, '' AS image_url`;
+  const imgJoinSql = hasStoreImages
+    ? `
+      LEFT JOIN LATERAL (
+        SELECT i.url
+        FROM ${FOOD_IMAGE_TABLE} i
+        WHERE i.store_id = s.${STORE_MAP.id}
+        ORDER BY i.sort_order ASC NULLS LAST, i.id ASC
+        LIMIT 1
+      ) img ON true
+    `
+    : "";
+
+  const conds = [];
+  const params = [];
+  let i = 1;
+
+  if (ids.length) {
+    conds.push(`s.${STORE_MAP.id}::text = ANY($${i++}::text[])`);
+    params.push(ids);
+  }
+  if (biz.length) {
+    conds.push(`s.${STORE_MAP.businessNo} = ANY($${i++}::text[])`);
+    params.push(biz);
+  }
+
+  const sql = `
+    SELECT
+      s.${STORE_MAP.id} AS id,
+      s.${STORE_MAP.businessNo} AS business_number,
+      s.${STORE_MAP.businessName} AS business_name,
+      s.${STORE_MAP.businessType} AS business_type,
+      s.${STORE_MAP.category} AS business_category,
+      s.${STORE_MAP.subcategory} AS business_subcategory
+      ${imgSelectSql}
+    FROM ${FOOD_TABLE} s
+    ${imgJoinSql}
+    WHERE ${conds.join(" OR ")}
+  `;
+
+  const { rows } = await pool.query(sql, params);
+
+  const byId = new Map();
+  const byBiz = new Map();
+  for (const r of rows) {
+    r.image_url = normalizeImageUrl(r.image_url);
+    const id = String(r.id || "");
+    const bn = String(r.business_number || "");
+    if (id) byId.set(id, r);
+    if (bn) byBiz.set(bn, r);
+  }
+  return { byId, byBiz };
+}
+
+async function hydrateSlotRowsWithStoreInfo(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+
+  const storeIds = [];
+  const bizNos = [];
+  for (const r of rows) {
+    const sid = r?.store_id ?? r?.storeId ?? "";
+    const bn = r?.business_no ?? r?.business_number ?? "";
+    if (sid) storeIds.push(String(sid));
+    if (bn) bizNos.push(String(bn));
+  }
+
+  const { byId, byBiz } = await fetchStoreMapByIdsOrBiz(storeIds, bizNos);
+
+  for (const r of rows) {
+    const sid = String(r?.store_id ?? r?.storeId ?? "");
+    const bn = String((r?.business_no ?? r?.business_number ?? "")).replace(/[^\d]/g, "");
+
+    const s = (sid && byId.get(sid)) || (bn && byBiz.get(bn)) || null;
+    if (!s) continue;
+
+    // 슬롯에 비어 있으면 store_info 값으로 채움
+    if (!clean(r.business_name) && clean(s.business_name)) r.business_name = s.business_name;
+    if (!clean(r.business_type) && clean(s.business_type)) r.business_type = s.business_type;
+
+    // 응답에 business_category/subcategory를 "항상" 포함시키기(슬롯 테이블 컬럼 없어도 OK)
+    if (!clean(r.business_category) && clean(s.business_category)) r.business_category = s.business_category;
+    if (!clean(r.business_subcategory) && clean(s.business_subcategory)) r.business_subcategory = s.business_subcategory;
+
+    // 이미지도 비어 있으면 store_images 메인 1장으로 채움
+    if (!clean(r.image_url) && clean(s.image_url)) r.image_url = s.image_url;
+  }
+
+  return rows;
+}
+
 /** ----------------- API: stores (modal search/list) ----------------- */
 export async function listStores(req, res) {
   try {
@@ -470,6 +568,9 @@ export async function grid(req, res) {
 
     const params = hasCol(cols, "page") ? [page, likePrefix, pageSize, offset] : ["", likePrefix, pageSize, offset];
     const { rows } = await pool.query(sql, params);
+
+    // ✅ 슬롯에 store_id/business_no가 있으면 store_info + store_images로 보강
+    await hydrateSlotRowsWithStoreInfo(rows);
 
     for (const r of rows) if ("image_url" in r) r.image_url = normalizeImageUrl(r.image_url);
 
