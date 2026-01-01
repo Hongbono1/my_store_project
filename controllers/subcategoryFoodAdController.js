@@ -611,7 +611,17 @@ export async function getSlot(req, res) {
       return res.status(500).json({ success: false, error: "admin_ad_slots.position column missing" });
     }
 
-    const position = buildPosition({ mode: "food", category, subcategory, section, idx });
+    // ✅ 후보 position (전용 → 카테고리만 → 공용)
+    const posSpecific = buildPosition({ mode: "food", category, subcategory, section, idx });
+    const posCatOnly  = buildPosition({ mode: "food", category, subcategory: "", section, idx });
+    const posGlobal   = buildPosition({ mode: "food", category: "", subcategory: "", section, idx });
+
+    const candidates = [];
+    candidates.push(posSpecific);
+
+    // 전용이랑 다를 때만 추가
+    if (posCatOnly !== posSpecific) candidates.push(posCatOnly);
+    if (posGlobal !== posCatOnly) candidates.push(posGlobal);
 
     const selectCols = [];
     if (hasCol(cols, "id")) selectCols.push("id");
@@ -636,19 +646,30 @@ export async function getSlot(req, res) {
     if (hasCol(cols, "updated_at")) selectCols.push("updated_at");
     if (hasCol(cols, "created_at")) selectCols.push("created_at");
 
-    const sql = `
-      SELECT ${selectCols.join(", ")}
-      FROM ${SLOTS_TABLE}
-      WHERE ${hasCol(cols, "page") ? "page = $1 AND " : ""} position = $2
-      LIMIT 1
-    `;
-    const params = hasCol(cols, "page") ? [page, position] : ["", position];
-    const { rows } = await pool.query(sql, params);
+    // ✅ 하나씩 조회해서 첫 번째로 찾는 슬롯 반환
+    let slot = null;
+    let resolvedPosition = posSpecific;
 
-    const slot = rows[0] || null;
-    if (slot && slot.image_url) slot.image_url = normalizeImageUrl(slot.image_url);
+    for (const p of candidates) {
+      const sql = `
+        SELECT ${selectCols.join(", ")}
+        FROM ${SLOTS_TABLE}
+        WHERE ${hasCol(cols, "page") ? "page = $1 AND " : ""} position = $2
+        LIMIT 1
+      `;
+      const params = hasCol(cols, "page") ? [page, p] : ["", p];
+      const { rows } = await pool.query(sql, params);
 
-    return res.json({ success: true, mode: "food", page, position, slot });
+      if (rows[0]) {
+        slot = rows[0];
+        resolvedPosition = p;
+        break;
+      }
+    }
+
+    if (slot?.image_url) slot.image_url = normalizeImageUrl(slot.image_url);
+
+    return res.json({ success: true, mode: "food", page, position: resolvedPosition, slot });
   } catch (err) {
     console.error("❌ [subcategoryFood getSlot] error:", err);
     return res.status(500).json({ success: false, error: err?.message || "server error" });
