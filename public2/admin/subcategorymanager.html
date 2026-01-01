@@ -556,40 +556,24 @@
         const PAGE_NAME = "subcategory";
         const DEFAULT_PRIORITY = 1;
 
-        // ✅ 실제 서버 라우터 후보들 (food용 라우터도 포함)
-        const API_BASE_CANDIDATES = [
-            "/subcategorymanager/ad",
-            "/subcategorymanager_food/ad",
-            "/admin/subcategory",
-        ];
-        let API_BASE = "/subcategorymanager/ad";
+        // ✅ 모드별 API 엔드포인트
+        const API_ENDPOINTS = {
+            food: "/subcategorymanager_food/ad",
+            combined: "/subcategorymanager_combined/ad",
+        };
+        let API_BASE = API_ENDPOINTS.food;
 
-        // ✅ 실제로 살아있는 API Base 자동 탐색
-        async function detectApiBase() {
-            const testQs = new URLSearchParams({
-                page: PAGE_NAME,
-                section: "all_items",
-                mode: "food",
-                pageNo: "1",
-            }).toString();
-
-            for (const base of API_BASE_CANDIDATES) {
-                try {
-                    const res = await fetch(`${base}/grid?${testQs}`, { method: "GET" });
-                    // ✅ 2xx(정상 응답)일 때만 채택
-                    if (res.ok) {
-                        API_BASE = base;
-                        const chip = $("chipApiBase");
-                        if (chip) chip.textContent = `API: ${base}`;
-                        return;
-                    }
-                } catch (_e) {
-                    // 이 base는 죽어있는 것 → 다음 후보 시도
-                }
-            }
-
+        // ✅ 모드에 따라 API Base 설정
+        function updateApiBase(mode) {
+            API_BASE = API_ENDPOINTS[mode] || API_ENDPOINTS.food;
             const chip = $("chipApiBase");
-            if (chip) chip.textContent = `API: ${API_BASE} (기본값, 동작 확인 필요)`;
+            if (chip) chip.textContent = `API: ${API_BASE} (${mode})`;
+        }
+
+        // ✅ 초기 API Base 설정
+        async function detectApiBase() {
+            const currentMode = state.currentMode || "food";
+            updateApiBase(currentMode);
         }
 
         let uiPick = "image";
@@ -1620,6 +1604,9 @@
             syncBannerUI();
 
             state.currentMode = nextMode;
+
+            // ✅ 모드 변경 시 API Base 업데이트
+            updateApiBase(nextMode);
 
             const okMain = restoreDraftMainForMode(nextMode);
             restoreDraftBannerForMode(nextMode);
