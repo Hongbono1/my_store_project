@@ -358,7 +358,7 @@ export async function upsertSlot(req, res) {
     const adMode = s(req.body.adMode);     // "banner" | "text" 등
     const slotMode = s(req.body.slotMode); // "store" | "custom"
 
-    const slot_type = adMode === "text" ? "text" : "banner";
+    const slot_type = adMode === "text" ? "text" : "image";
     const slot_mode = slotMode === "store" ? "store" : "custom";
 
     const link_url = s(req.body.linkUrl);
