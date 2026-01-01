@@ -16,14 +16,21 @@ import {
 const router = express.Router();
 
 const storage = multer.diskStorage(makeMulterStorage());
-const upload = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
 const uploadSingleImage = upload.single("image");
 
 router.get("/grid", grid);
 router.get("/search-store", searchStore);
+
 router.get("/slot", getSlot);
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
+
 router.get("/where", whereSlots);
 
 export default router;
