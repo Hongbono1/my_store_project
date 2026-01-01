@@ -355,11 +355,14 @@ export async function upsertSlot(req, res) {
       return res.status(400).json({ success: false, error: "position is required" });
     }
 
-    const adMode = s(req.body.adMode);     // "banner" | "text" 등
-    const slotMode = s(req.body.slotMode); // "store" | "custom"
+    // ✅ 어떤 필드명이 오든 강제로 정규화 (꼬임 방지)
+    const rawType = s(req.body.slotType || req.body.slot_type || req.body.adMode || req.body.type);
+    const rawMode = s(req.body.slotMode || req.body.slot_mode || req.body.mode);
 
-    const slot_type = adMode === "text" ? "text" : "image";
-    const slot_mode = slotMode === "store" ? "store" : "custom";
+    const slot_type = rawType === "text" ? "text" : "banner";  // DB 체크 통과값만
+    const slot_mode = rawMode === "store" ? "store" : "custom";
+
+    console.log("[subcategoryFood upsertSlot] rawType=", rawType, "rawMode=", rawMode, "=> slot_type=", slot_type, "slot_mode=", slot_mode);
 
     const link_url = s(req.body.linkUrl);
     const text_title = s(req.body.textTitle);
