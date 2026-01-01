@@ -1185,17 +1185,22 @@
 
         async function loadSlot(silent = false) {
             try {
-                if (!selectedTarget.position) return;
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.boxNo || 1;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
 
                 if (!silent) {
                     syncChips();
-                    setStatus("warn", "슬롯 불러오는 중...", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                    setStatus("warn", "슬롯 불러오는 중...", `section:${section} idx:${idx} / 시간: ${nowStr()}`);
                 }
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
-                    position: selectedTarget.position,
-                    priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
+                    section,
+                    idx: String(idx),
+                    priority,
+                    pageNo, // 서버가 쓰면 쓰고, 안 쓰면 무시됨
                 }).toString();
 
                 const data = await apiFetch(`/slot?${qs}`);
@@ -1226,7 +1231,7 @@
                 else if (slot.slot_mode === "store") setPick("store");
                 else setPick("image");
 
-                if (!silent) setStatus("ok", "슬롯 불러오기 완료", `position: ${selectedTarget.position} / 시간: ${nowStr()}`);
+                if (!silent) setStatus("ok", "슬롯 불러오기 완료", `section:${section} idx:${idx} / 시간: ${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 if (!silent) setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
@@ -1493,8 +1498,13 @@
 
         async function deleteSlot() {
             try {
-                if (!selectedTarget.position) {
-                    setStatus("bad", "삭제 실패", "먼저 가게를 검색하고 결과를 선택하세요.");
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.boxNo || null;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+
+                if (!idx) {
+                    setStatus("bad", "삭제 실패", "먼저 그리드(12칸)에서 박스를 클릭해서 idx를 선택하세요.");
                     return;
                 }
 
@@ -1503,30 +1513,26 @@
 
                 const qs = new URLSearchParams({
                     page: PAGE_NAME,
-                    position: selectedTarget.position,
-                    priority: String(selectedTarget.priority || DEFAULT_PRIORITY),
-                    mode: $("managerMode").value,
+                    section,
+                    idx: String(idx),
+                    priority,
+                    pageNo, // 옵션
                 }).toString();
 
                 const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
                 if (!data.success) throw new Error(data.error || "삭제 실패");
 
-                const delCount = Number(data.deleted);
-
-                if (!Number.isFinite(delCount)) {
-                    setStatus("warn", "삭제 요청은 성공(확정값 없음)", `서버가 deleted(rowCount)를 반환하지 않습니다. 서버 deleteSlot 수정 필요`);
-                    return;
-                }
+                const delCount = Number(data.deleted || 0);
 
                 if (delCount === 0) {
-                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). page=${PAGE_NAME}, position=${selectedTarget.position}, priority=${selectedTarget.priority}`);
+                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개입니다(키 불일치). section=${section}, idx=${idx}, priority=${priority}`);
                     return;
                 }
 
                 await loadSlot(true);
                 await loadGrid();
 
-                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / position:${selectedTarget.position} / 시간:${nowStr()}`);
+                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / section:${section} idx:${idx} / 시간:${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
