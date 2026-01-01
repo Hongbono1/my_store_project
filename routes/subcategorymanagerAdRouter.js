@@ -22,14 +22,11 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
-// 프론트 field 이름: image
 const uploadSingleImage = upload.single("image");
 
-// 목록/검색
 router.get("/stores", listStores);
 router.get("/search", searchStore);
 
-// 슬롯 읽기/저장/삭제/후보
 router.get("/slot", getSlot);
 router.get("/candidates", listCandidates);
 router.post("/update", uploadSingleImage, upsertSlot);
