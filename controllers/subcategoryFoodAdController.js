@@ -699,10 +699,17 @@ export async function upsertSlot(req, res) {
     const page = clean(req.body.page) || PAGE_NAME;
     const section = clean(req.body.section);
 
-    // ✅ 한식만 subcategory 유지
-    const norm = normalizeCategorySub(req.body.category, req.body.subcategory);
-    const category = norm.category;
-    const subcategory = norm.subcategory;
+    // ✅ top 배너는 공용 1장: category/subcategory 무조건 무시
+    let category = clean(req.body.category);
+    let subcategory = clean(req.body.subcategory);
+    if (section === "top") {
+      category = "";
+      subcategory = "";
+    } else {
+      const norm = normalizeCategorySub(category, subcategory);
+      category = norm.category;
+      subcategory = norm.subcategory;
+    }
 
     const idx = Math.max(safeInt(req.body.idx, 1), 1);
 
@@ -826,10 +833,17 @@ export async function deleteSlot(req, res) {
     const page = clean(req.query.page) || PAGE_NAME;
     const section = clean(req.query.section);
 
-    // ✅ 한식만 subcategory 유지
-    const norm = normalizeCategorySub(req.query.category, req.query.subcategory);
-    const category = norm.category;
-    const subcategory = norm.subcategory;
+    // ✅ top 배너는 공용 1장: category/subcategory 무조건 무시
+    let category = clean(req.query.category);
+    let subcategory = clean(req.query.subcategory);
+    if (section === "top") {
+      category = "";
+      subcategory = "";
+    } else {
+      const norm = normalizeCategorySub(category, subcategory);
+      category = norm.category;
+      subcategory = norm.subcategory;
+    }
 
     const idx = Math.max(safeInt(req.query.idx, 1), 1);
 
