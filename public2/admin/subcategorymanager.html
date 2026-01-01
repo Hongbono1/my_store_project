@@ -988,36 +988,26 @@
             $("priorityHidden").value = String(selectedTarget.priority || DEFAULT_PRIORITY);
         }
 
-        // 배너 슬롯 불러오기 (신키/구키 모두 탐색)
+        // 배너 슬롯 불러오기
         async function loadBannerSlot(silent = false) {
             try {
                 syncBannerUI();
 
                 if (!silent) setStatus("warn", "배너 불러오는 중...", `시간: ${nowStr()}`);
 
-                const posList = bannerPositionCandidates(bannerTarget.mode);
+                // ✅ 백엔드가 생성하는 position 형식 사용 (subcategory|food|||top|1)
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    category: "",  // 배너는 카테고리 무관
+                    subcategory: "",
+                    section: "top",  // 배너는 top 섹션
+                    idx: "1",
+                    priority: String(bannerTarget.priority),
+                }).toString();
 
-                let foundSlot = null;
-                let foundPos = null;
-
-                for (const pos of posList) {
-                    const qs = new URLSearchParams({
-                        page: PAGE_NAME,
-                        category: "",  // 배너는 카테고리 무관
-                        subcategory: "",
-                        section: "top",  // 배너는 top 섹션
-                        idx: "1",
-                        priority: String(bannerTarget.priority),
-                    }).toString();
-
-                    const data = await apiFetch(`/slot?${qs}`);
-                    const slot = data?.slot || null;
-                    if (slot) {
-                        foundSlot = slot;
-                        foundPos = pos;
-                        break;
-                    }
-                }
+                const data = await apiFetch(`/slot?${qs}`);
+                const foundSlot = data?.slot || null;
+                const foundPos = data?.position || "N/A";
 
                 if (!foundSlot) {
                     setBannerPreview("/uploads/no-image.png");
@@ -1047,84 +1037,52 @@
         }
 
         // 배너 저장 (항상 신키로 저장)
-        // ✅ 배너 저장 (신 키 + 옛 키 둘 다 저장)
-        // 배너 저장 (신 키 + 옛 키 둘 다 저장)
+        // 배너 저장
         async function saveBannerSlot() {
             try {
                 syncBannerUI();
                 setBusy(true, "배너 저장 중...");
 
-                const mode = bannerTarget.mode; // food or combined
-                const posNew = buildBannerPosition(mode);         // 예: subcategory_top__food
-                const posOld = buildBannerLegacyPosition(mode);   // 예: subcategory_top_banner__food
-
+                const mode = bannerTarget.mode;
                 const linkUrl = $("linkUrl") ? $("linkUrl").value || "" : "";
                 const fileInput = $("bannerFile");
                 const file = fileInput?.files?.[0] || null;
                 const storeImageUrl = $("storeImageUrl") ? $("storeImageUrl").value || "" : "";
 
-                // 공통 FormData 생성 헬퍼
-                const makeFormData = (position) => {
-                    const fd = new FormData();
-                    fd.append("page", PAGE_NAME);
-                    // ✅ position 직접 전달하지 않고 구성요소 전달
-                    fd.append("category", "");  // 배너는 카테고리 무관
-                    fd.append("subcategory", "");
-                    fd.append("section", "top");  // 배너는 top 섹션
-                    fd.append("idx", "1");
-                    fd.append("priority", "1");
+                // FormData 생성
+                const fd = new FormData();
+                fd.append("page", PAGE_NAME);
+                fd.append("category", "");  // 배너는 카테고리 무관
+                fd.append("subcategory", "");
+                fd.append("section", "top");  // 배너는 top 섹션
+                fd.append("idx", "1");
+                fd.append("priority", "1");
+                fd.append("adMode", "banner");
+                fd.append("slotMode", "custom");
 
-                    fd.append("adMode", "banner");
-                    fd.append("slotMode", "custom");
+                if (linkUrl) fd.append("linkUrl", linkUrl);
 
-                    if (linkUrl) fd.append("linkUrl", linkUrl);
+                // ✅ 1순위: 새로 업로드한 파일
+                if (file) {
+                    fd.append("image", file);
+                }
+                // ✅ 2순위: 선택된 가게 썸네일 이미지 경로
+                else if (storeImageUrl) {
+                    fd.append("storeImageUrl", storeImageUrl);
+                }
 
-                    // ✅ 1순위: 새로 업로드한 파일
-                    if (file) {
-                        fd.append("image", file);
-                    }
-                    // ✅ 2순위: 선택된 가게 썸네일 이미지 경로
-                    else if (storeImageUrl) {
-                        fd.append("storeImageUrl", storeImageUrl);
-                    }
-
-                    return fd;
-                };
-
-                // 1) 새 키로 저장
-                const dataNew = await apiFetch(`/update`, {
+                const data = await apiFetch(`/update`, {
                     method: "POST",
-                    body: makeFormData(posNew),
+                    body: fd,
                 });
 
-                if (!dataNew.success) {
-                    throw new Error(dataNew.error || "배너 저장 실패(신 키)");
+                if (!data.success) {
+                    throw new Error(data.error || "배너 저장 실패");
                 }
 
-                const slotNew = dataNew.slot || null;
-                if (slotNew?.image_url) {
-                    setBannerPreview(slotNew.image_url);
-                }
-
-                // 2) 옛 키로도 최대한 동일하게 저장
-                try {
-                    const dataOld = await apiFetch(`/update`, {
-                        method: "POST",
-                        body: makeFormData(posOld),
-                    });
-                    if (!dataOld.success) {
-                        setStatus(
-                            "warn",
-                            "배너 저장(신 키 OK, 옛 키는 경고)",
-                            `old position:${posOld} / msg:${dataOld.error || "unknown"} / 시간:${nowStr()}`
-                        );
-                    }
-                } catch (e2) {
-                    setStatus(
-                        "warn",
-                        "배너 저장(신 키 OK, 옛 키는 오류)",
-                        `${e2.message} / old position:${posOld} / 시간:${nowStr()}`
-                    );
+                const slot = data.slot || null;
+                if (slot?.image_url) {
+                    setBannerPreview(slot.image_url);
                 }
 
                 if (fileInput) fileInput.value = "";
@@ -1132,7 +1090,7 @@
                 setStatus(
                     "ok",
                     "배너 저장 완료 ✅",
-                    `mode:${mode} / new:${posNew} / old:${posOld} / 시간:${nowStr()}`
+                    `mode:${mode} / position:${data.position || "N/A"} / 시간:${nowStr()}`
                 );
                 scheduleDraftSave();
             } catch (e) {
@@ -1143,48 +1101,37 @@
         }
 
 
-        // 배너 삭제 (신키 먼저 → 0개면 구키도 삭제 시도)
+        // 배너 삭제
         async function deleteBannerSlot() {
             try {
                 syncBannerUI();
                 setBusy(true, "배너 삭제 중...");
 
-                const tryDelete = async (pos) => {
-                    const qs = new URLSearchParams({
-                        page: PAGE_NAME,
-                        category: "",  // 배너는 카테고리 무관
-                        subcategory: "",
-                        section: "top",  // 배너는 top 섹션
-                        idx: "1",
-                        priority: "1",
-                    }).toString();
-                    const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
-                    return data;
-                };
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    category: "",  // 배너는 카테고리 무관
+                    subcategory: "",
+                    section: "top",  // 배너는 top 섹션
+                    idx: "1",
+                    priority: "1",
+                }).toString();
 
-                const posNew = buildBannerPosition(bannerTarget.mode);
-                const posOld = buildBannerLegacyPosition(bannerTarget.mode);
-
-                let data = await tryDelete(posNew);
-                if (!data.success) throw new Error(data.error || "배너 삭제 실패");
-
-                let delCount = Number(data.deleted || 0);
-
-                if (delCount === 0) {
-                    // 구키도 시도
-                    data = await tryDelete(posOld);
-                    if (data.success) delCount = Number(data.deleted || 0);
+                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                
+                if (!data.success) {
+                    throw new Error(data.error || "배너 삭제 실패");
                 }
 
+                const delCount = Number(data.deleted || 0);
                 if (delCount === 0) {
-                    setStatus("bad", "배너 삭제 실패 ❌", `삭제된 행 0개(키 불일치) / new:${posNew} / old:${posOld}`);
-                    return;
+                    setStatus("warn", "배너 삭제 완료 (삭제된 행 0개)", `시간:${nowStr()}`);
+                } else {
+                    setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / 시간:${nowStr()}`);
                 }
 
                 setBannerPreview("/uploads/no-image.png");
                 if ($("linkUrl")) $("linkUrl").value = "";
 
-                setStatus("ok", "배너 삭제 완료 ✅", `mode:${bannerTarget.mode} / 시간:${nowStr()}`);
                 scheduleDraftSave();
             } catch (e) {
                 setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간:${nowStr()}`);
