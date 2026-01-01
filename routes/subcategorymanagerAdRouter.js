@@ -1,6 +1,7 @@
 // routes/subcategorymanagerAdRouter.js
 import express from "express";
 import multer from "multer";
+
 import {
   listStores,
   searchStore,
@@ -8,11 +9,9 @@ import {
   upsertSlot,
   deleteSlot,
   listCandidates,
-  grid,
-  whereSlots,
   makeMulterStorage,
   fileFilter,
-} from "../controllers/subcategoryFoodAdController.js";
+} from "../controllers/subcategorymanagerAdController.js";
 
 const router = express.Router();
 
@@ -29,19 +28,11 @@ const uploadSingleImage = upload.single("image");
 // 목록/검색
 router.get("/stores", listStores);
 router.get("/search", searchStore);
-// alias
-router.get("/search-store", searchStore);
 
 // 슬롯 읽기/저장/삭제/후보
 router.get("/slot", getSlot);
 router.get("/candidates", listCandidates);
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
-
-// ✅ 12칸 grid
-router.get("/grid", grid);
-
-// where
-router.get("/where", whereSlots);
 
 export default router;
