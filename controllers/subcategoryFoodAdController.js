@@ -831,3 +831,84 @@ export async function deleteSlot(req, res) {
     return res.status(500).json({ success: false, error: err?.message || "server error" });
   }
 }
+
+/** ----------------- API: where (optional) ----------------- */
+/**
+ * GET /subcategorymanager_food/ad/where?q=사업자번호
+ * - admin_ad_slots에서 해당 사업자번호가 저장된 슬롯 위치들을 반환
+ */
+export async function whereSlots(req, res) {
+  try {
+    const cols = await getSlotsColumns();
+
+    const page = clean(req.query.page) || PAGE_NAME; // subcategory
+    const q = digitsOnly(req.query.q);
+    const limit = clamp(safeInt(req.query.limit, 200), 1, 500);
+
+    if (!q) return res.status(400).json({ success: false, error: "q is required" });
+
+    // 슬롯 테이블에 어떤 컬럼이 있는지에 따라 조건 구성 (프로젝트마다 다르니까 안전하게)
+    const bnCol =
+      hasCol(cols, "business_number") ? "business_number" :
+      hasCol(cols, "business_no") ? "business_no" :
+      null;
+
+    if (!bnCol) {
+      return res.status(500).json({
+        success: false,
+        error: "admin_ad_slots에 business_number/business_no 컬럼이 없습니다.",
+      });
+    }
+
+    const selectCols = [];
+    if (hasCol(cols, "page")) selectCols.push("page");
+    if (hasCol(cols, "position")) selectCols.push("position");
+    if (hasCol(cols, "priority")) selectCols.push("priority");
+    if (hasCol(cols, "slot_type")) selectCols.push("slot_type");
+    if (hasCol(cols, "slot_mode")) selectCols.push("slot_mode");
+    if (hasCol(cols, "start_date")) selectCols.push("start_date");
+    if (hasCol(cols, "end_date")) selectCols.push("end_date");
+    if (hasCol(cols, "no_end")) selectCols.push("no_end");
+    if (hasCol(cols, "updated_at")) selectCols.push("updated_at");
+    if (hasCol(cols, "created_at")) selectCols.push("created_at");
+
+    // 최소 컬럼
+    if (!selectCols.length) selectCols.push("*");
+
+    const sql = `
+      SELECT ${selectCols.join(", ")}
+      FROM ${SLOTS_TABLE}
+      WHERE ${hasCol(cols, "page") ? "page = $1 AND " : ""} ${bnCol} LIKE $2
+      ORDER BY updated_at DESC NULLS LAST
+      LIMIT $3
+    `;
+    const params = hasCol(cols, "page") ? [page, `%${q}%`, limit] : ["", `%${q}%`, limit];
+
+    const { rows } = await pool.query(sql, params);
+
+    // position 파싱(우리 position 규칙: subcategory|food|category|subcategory|section|idx)
+    const parsed = (pos) => {
+      const parts = String(pos || "").split("|");
+      if (parts.length < 6) return null;
+      return {
+        page: parts[0] || "",
+        mode: parts[1] || "",
+        category: parts[2] || "",
+        subcategory: parts[3] || "",
+        section: parts[4] || "",
+        idx: safeInt(parts[5], null),
+      };
+    };
+
+    const items = rows.map((r) => ({
+      ...r,
+      parsed: hasCol(cols, "position") ? parsed(r.position) : null,
+    }));
+
+    return res.json({ success: true, mode: "food", page, q, items });
+  } catch (err) {
+    console.error("❌ [subcategoryFood whereSlots] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "server error" });
+  }
+}
+
