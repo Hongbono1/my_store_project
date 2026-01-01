@@ -8,7 +8,6 @@ import {
   getSlot,
   upsertSlot,
   deleteSlot,
-  whereSlots,
   makeMulterStorage,
   fileFilter,
 } from "../controllers/subcategoryFoodAdController.js";
@@ -28,8 +27,5 @@ router.get("/search-store", searchStore);
 router.get("/slot", getSlot);
 router.post("/update", upload.single("image"), upsertSlot);
 router.delete("/delete", deleteSlot);
-
-// 옵션(없어도 됨) - 가게가 어디에 등록됐는지 조회
-router.get("/where", whereSlots);
 
 export default router;
