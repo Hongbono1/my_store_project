@@ -1,1519 +1,523 @@
+// controllers/subcategoryFoodAdController.js
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import pool from "../db.js";
 
-// 업로드 경로(다른 매니저와 동일)
+// 업로드 경로(고정)
 export const UPLOAD_SUBDIR = "manager_ad";
 export const UPLOAD_ABS_DIR = path.join("/data/uploads", UPLOAD_SUBDIR);
 export const UPLOAD_PUBLIC_PREFIX = `/uploads/${UPLOAD_SUBDIR}`;
 
-// 슬롯 테이블(기존 재사용)
+// 슬롯 테이블
 const SLOTS_TABLE = "public.admin_ad_slots";
 
-// combined 테이블(확정)
-const COMBINED_TABLE = "public.combined_store_info";
-
-// food 후보 테이블(존재하는 것 중 첫 번째 사용)
-const FOOD_TABLE_CANDIDATES = [
-  "public.store_info",
-  "public.food_stores",
-  "public.food_store_info",
-  "public.food_store",
-];
+// FOOD 테이블 / 이미지 테이블(확정)
+const FOOD_TABLE = "public.store_info";
+const FOOD_IMAGES_TABLE = "public.store_images";
 
 function ensureUploadDir() {
   fs.mkdirSync(UPLOAD_ABS_DIR, { recursive: true });
 }
 
-// ✅ mode별 테이블/컬럼 매핑 헬퍼 (필수)
-function getStoreSource(mode) {
-  const m = String(mode || "food").trim().toLowerCase();
-  if (m === "combined") {
-    return {
-      table: "public.combined_store_info",
-      subcol: "business_subcategory", // ✅ 여기로
-      idcol: "id",
-      bno: "business_number",
-      bname: "business_name",
-      bcat: "business_category",
-      btype: "business_type",
-      img: "main_image_url",
-    };
-  }
-  return {
-    table: "public.store_info",
-    subcol: "detail_category",
-    idcol: "id",
-    bno: "business_number",
-    bname: "business_name",
-    bcat: "business_category",
-    btype: "business_type",
-    img: "main_image_url",
-  };
-}
-
-function clean(v) {
-  if (v === undefined || v === null) return "";
-  return String(v)
-    .replace(/\u00a0/g, " ")  // ✅ NBSP 제거
-    .trim();                 // ✅ 앞/뒤 공백 제거
-}
-
-function digitsOnly(v) {
-  return clean(v).replace(/[^\d]/g, "");
-}
-
-function safeInt(v, def = 0) {
-  const n = Number(String(v ?? "").replace(/[^\d-]/g, ""));
-  return Number.isFinite(n) ? n : def;
-}
-
-function safeIntOrNull(v) {
-  const s = clean(v);
-  if (!s) return null;
-  const n = Number(s.replace(/[^\d-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
-function toBool(v) {
-  const s = String(v ?? "").toLowerCase();
-  return s === "1" || s === "true" || s === "y" || s === "yes" || s === "on";
-}
-
-function parseDateTimeLocalToTs(v) {
-  const s = clean(v);
-  if (!s) return null;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
-}
-
-// ✅ detail_category 표현식 (mode별로 다른 컬럼 매핑)
-function detailCategoryExpr(mode, alias = "s") {
-  const prefix = alias ? `${alias}.` : "";
-
-  // mode=combined => combined_store_info에는 detail_category가 없으니 business_subcategory를 사용
-  if (String(mode) === "combined") {
-    return `
-      COALESCE(
-        NULLIF(TRIM(${prefix}"business_subcategory"::text), ''),
-        NULLIF(TRIM(${prefix}"business_type"::text), ''),
-        ''
-      )
-    `;
-  }
-
-  // food(store_info 등) => detail_category 존재
-  return `
-    COALESCE(
-      NULLIF(TRIM(${prefix}"detail_category"::text), ''),
-      ''
-    )
-  `;
-}
-
+// multer helpers
 export function makeMulterStorage() {
+  ensureUploadDir();
   return {
-    destination(_req, _file, cb) {
-      try {
-        ensureUploadDir();
-        cb(null, UPLOAD_ABS_DIR);
-      } catch (e) {
-        cb(e);
-      }
-    },
-    filename(_req, file, cb) {
-      const ext = path.extname(file.originalname || "").toLowerCase() || ".png";
-      const name = `${crypto.randomUUID()}${ext}`;
+    destination: (_req, _file, cb) => cb(null, UPLOAD_ABS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const safeExt = ext && ext.length <= 10 ? ext : "";
+      const name = `${Date.now()}_${crypto.randomBytes(6).toString("hex")}${safeExt}`;
       cb(null, name);
     },
   };
 }
-
 export function fileFilter(_req, file, cb) {
-  const ok = /^image\/(png|jpeg|jpg|webp|gif)$/i.test(file.mimetype || "");
-  if (!ok) return cb(new Error("이미지 파일만 업로드 가능합니다."));
+  const ok = /^image\/(png|jpeg|jpg|webp|gif)$/.test(file.mimetype || "");
+  if (!ok) return cb(new Error("Only image files are allowed"));
   cb(null, true);
 }
 
-// ------------------------------
-// ✅ 스키마 유틸 (동적 컬럼 매핑)
-// ------------------------------
-const columnsCache = new Map(); // key=tableName, value=Set(columns)
+// utils
+const s = (v) => String(v ?? "").trim();
+const digitsOnly = (v) => String(v ?? "").replace(/[^\d]/g, "");
+const toInt = (v, def) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+};
 
-async function getColumns(tableFullName) {
-  if (columnsCache.has(tableFullName)) return columnsCache.get(tableFullName);
+// ✅ 프론트 buildPosition 과 동일(푸드 전용 suffix)
+function buildPosition(area, pageNo, boxNo) {
+  const suffix = "__food";
+  if (area === "top") return `subcategory_top${suffix}`;
 
-  const [schema, table] = tableFullName.includes(".")
-    ? tableFullName.split(".")
-    : ["public", tableFullName];
+  const prefix =
+    area === "best_seller" ? "best_seller" :
+    area === "new_registration" ? "new_registration" :
+    "all_items";
 
-  const q = `
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema=$1 AND table_name=$2
-  `;
-  const { rows } = await pool.query(q, [schema, table]);
-  const set = new Set(rows.map((r) => r.column_name));
-  columnsCache.set(tableFullName, set);
-  return set;
+  return `${prefix}__p${pageNo}__b${boxNo}${suffix}`;
 }
 
-async function tableExists(tableFullName) {
-  const [schema, table] = tableFullName.includes(".")
-    ? tableFullName.split(".")
-    : ["public", tableFullName];
+// ✅ position을 줬으면 그걸 우선, 없으면 section/idx를 position으로 변환(배너용)
+function resolvePositionFromReq(req) {
+  const position = s(req.query.position || req.body.position);
+  if (position) return position;
 
-  const q = `
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema=$1 AND table_name=$2
-    LIMIT 1
-  `;
-  const { rows } = await pool.query(q, [schema, table]);
-  return rows.length > 0;
+  // 레거시/배너: section=top, idx=1 형태 지원
+  const section = s(req.query.section || req.body.section);
+  const idx = s(req.query.idx || req.body.idx);
+  const pageNo = toInt(req.query.pageNo || req.body.pageNo, 1);
+
+  if (!section) return "";
+  if (section === "top") return buildPosition("top", 1, 1);
+
+  const boxNo = toInt(idx, 1);
+  return buildPosition(section, pageNo, boxNo);
 }
 
-async function pickFoodTable() {
-  for (const t of FOOD_TABLE_CANDIDATES) {
-    // eslint-disable-next-line no-await-in-loop
-    if (await tableExists(t)) return t;
-  }
-  return null;
-}
-
-function pickCol(cols, candidates) {
-  for (const c of candidates) {
-    if (cols.has(c)) return c;
-  }
-  return null;
-}
-
-function buildStoreSelect(tableFullName, cols) {
-  const idCol = pickCol(cols, ["id"]);
-  const bnCol = pickCol(cols, [
-    "business_number",
-    "business_no",
-    "biz_no",
-    "biz_number",
-  ]);
-  const nameCol = pickCol(cols, ["business_name", "store_name", "name"]);
-  const typeCol = pickCol(cols, ["business_type", "store_type", "type"]);
-  const catCol = pickCol(cols, ["business_category", "category"]);
-  const subCol = pickCol(cols, [
-    "business_subcategory",
-    "detail_category",
-    "sub_category",
-  ]);
-  const createdCol = pickCol(cols, ["created_at", "createdat", "created"]);
-  const viewsCol = pickCol(cols, ["view_count", "views", "viewcount"]);
-  const imgCol = pickCol(cols, [
-    "main_image_url",
-    "image_url",
-    "image1",
-    "thumbnail_url",
-  ]);
-
-  if (!idCol || !nameCol) {
-    throw new Error(
-      `스토어 테이블(${tableFullName})에서 id/name 컬럼을 찾지 못했습니다.`
-    );
-  }
-
-  return {
-    idCol,
-    bnCol,
-    nameCol,
-    typeCol,
-    catCol,
-    subCol,
-    createdCol,
-    viewsCol,
-    imgCol,
+function parsePosition(position) {
+  // all_items__p1__b3__food
+  const p = String(position || "");
+  const out = {
+    section_label: "",
+    page_number: null,
+    index_in_page: null,
   };
+
+  if (p.startsWith("subcategory_top__")) {
+    out.section_label = "top";
+    out.page_number = 1;
+    out.index_in_page = 1;
+    return out;
+  }
+
+  const m = p.match(/^(all_items|best_seller|new_registration)__p(\d+)__b(\d+)__/);
+  if (m) {
+    out.section_label = m[1];
+    out.page_number = Number(m[2]);
+    out.index_in_page = Number(m[3]);
+  }
+  return out;
 }
 
-function buildOrderBy(sort, sel) {
-  if (sort === "newest" && sel.createdCol) {
-    return `"${sel.createdCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
-  }
-  if (sort === "views" && sel.viewsCol) {
-    return `"${sel.viewsCol}" DESC NULLS LAST, "${sel.idCol}" DESC`;
-  }
-  return `"${sel.nameCol}" ASC NULLS LAST, "${sel.idCol}" ASC`;
+function normalizeLocalDateTime(v) {
+  // datetime-local: "2026-01-01T21:05"
+  const t = s(v);
+  if (!t) return null;
+  // DB가 timestamp/timestamptz 어느쪽이든 무난하게 들어가도록 ISO로 변환
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
 }
 
-function buildFilterWhere(params, sel, values) {
-  const where = [];
-  const category = clean(params.category);
-  const subcategory = clean(params.subcategory);
-
-  if (category && sel.catCol) {
-    values.push(category);
-    where.push(`btrim(replace("${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
-  }
-  if (subcategory && sel.subCol) {
-    values.push(subcategory);
-    where.push(`btrim(replace("${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
-  }
-
-  const qRaw = clean(params.q);
-  if (qRaw) {
-    const qDigits = digitsOnly(qRaw);
-    const parts = [];
-
-    if (qDigits && sel.bnCol) {
-      values.push(qDigits);
-      parts.push(`
-        (
-          regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') = $${values.length}
-          OR ltrim(regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g'), '0') = ltrim($${values.length}, '0')
-        )
-      `);
-
-      values.push(`%${qDigits}%`);
-      parts.push(
-        `regexp_replace("${sel.bnCol}"::text, '\\\\D', '', 'g') LIKE $${values.length}`
-      );
-    }
-
-    values.push(`%${qRaw}%`);
-    parts.push(`"${sel.nameCol}"::text ILIKE $${values.length}`);
-
-    if (sel.typeCol) {
-      values.push(`%${qRaw}%`);
-      parts.push(`"${sel.typeCol}"::text ILIKE $${values.length}`);
-    }
-
-    if (parts.length) where.push(`(${parts.join(" OR ")})`);
-  }
-
-  return where.length ? `WHERE ${where.join(" AND ")}` : "";
-}
-
-// ------------------------------
-// ✅ 대표 이미지 1장 추출 (mode별 이미지 테이블)
-// ------------------------------
-const IMG_URL_COLS = [
-  "image_url",
-  "url",
-  "path",
-  "image_path",
-  "file_url",
-  "file_path",
-];
-const IMG_FK_COLS = [
-  "store_id",
-  "store_info_id",
-  "storeinfo_id",
-  "food_store_id",
-  "combined_store_id",
-  "parent_id",
-  "ref_store_id",
-];
-const IMG_ORDER_COLS = ["sort_order", "priority", "idx", "created_at", "id"];
-
-const imageMetaCache = new Map(); // key: mode|tableName -> meta
-
-async function pickImageMetaForMode(mode) {
-  const m = clean(mode) || "combined";
-
-  const candidates =
-    m === "combined"
-      ? [
-        "public.combined_store_images",
-        "public.store_images",
-        "public.food_store_images",
-      ]
-      : [
-        "public.store_images",
-        "public.food_store_images",
-        "public.combined_store_images",
-      ];
-
-  for (const t of candidates) {
-    const cacheKey = `${m}|${t}`;
-    if (imageMetaCache.has(cacheKey)) return imageMetaCache.get(cacheKey);
-
-    // eslint-disable-next-line no-await-in-loop
-    if (!(await tableExists(t))) continue;
-
-    // eslint-disable-next-line no-await-in-loop
-    const cols = await getColumns(t);
-
-    const fkCol = pickCol(cols, IMG_FK_COLS);
-    const urlCol = pickCol(cols, IMG_URL_COLS);
-    const orderCol = pickCol(cols, IMG_ORDER_COLS);
-
-    if (fkCol && urlCol) {
-      const meta = { table: t, fkCol, urlCol, orderCol };
-      imageMetaCache.set(cacheKey, meta);
-      return meta;
-    }
-  }
-  return null;
-}
-
-function buildImageSubquery(outerAlias, outerIdCol, meta) {
-  if (!meta) return "NULL";
-
-  const order = meta.orderCol
-    ? `"${meta.orderCol}" ASC NULLS LAST`
-    : `"${meta.urlCol}" ASC NULLS LAST`;
-
-  // ✅ 핵심: 바깥(store) alias를 명시해서 fk = s.id 로 비교
-  const outerIdExpr = `${outerAlias}."${outerIdCol}"`;
-
-  return `
-    (
-      SELECT NULLIF("${meta.urlCol}"::text,'')
-      FROM ${meta.table}
-      WHERE "${meta.fkCol}"::text = ${outerIdExpr}::text
-      ORDER BY ${order}
-      LIMIT 1
-    )
-  `;
-}
-
-// ------------------------------
-// ✅ GET /stores
-// ------------------------------
-export async function listStores(req, res) {
+// ------------------------------------------------------------------
+// 1) GRID: 12개 가게 + 각 박스에 슬롯이 저장되어 있으면 occupied 표시
+// ------------------------------------------------------------------
+export async function grid(req, res) {
   try {
-    const mode = clean(req.query.mode) || "food";
-    const category = clean(req.query.category);
-    const subcategory = clean(req.query.subcategory ?? req.query.sub ?? req.query.business_subcategory);
+    const page = s(req.query.page) || "subcategory";
+    const section = s(req.query.section) || "all_items";
+    const pageNo = Math.max(toInt(req.query.pageNo, 1), 1);
 
-    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 50);
-    const page = Math.max(safeInt(req.query.page, 1), 1);
-    const offset = (page - 1) * pageSize;
+    // (선택) 필터
+    const category = s(req.query.category);
+    const subcategory = s(req.query.subcategory);
 
-    // ✅ grid와 동일하게 테이블 선택
-    const storeTable =
-      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
+    const pageSize = 12;
+    const offset = (pageNo - 1) * pageSize;
 
-    const tcols = await getColumns(storeTable);
-    const sel = buildStoreSelect(storeTable, tcols);
+    const where = [];
+    const vals = [];
+    let k = 1;
 
-    // ✅ alias 설정
-    const A = "s";
-    const col = (c) => `${A}."${c}"`;
-
-    // ✅ 공백/NBSP 정규화 (컬럼/파라미터 동일 규칙)
-    const normCol = (c) =>
-      `btrim(replace(COALESCE(${col(c)}::text,''), chr(160), ' '))`;
-    const normParam = (idx) => `btrim(replace($${idx}::text, chr(160), ' '))`;
-
-    const values = [];
-    const whereParts = [];
-
-    if (category && sel.catCol) {
-      values.push(category);
-      whereParts.push(`${normCol(sel.catCol)} = ${normParam(values.length)}`);
+    if (category) {
+      where.push(`s.business_category = $${k++}`);
+      vals.push(category);
+    }
+    if (subcategory) {
+      // store_info에 detail_category가 “하위”로 쓰이는 케이스가 많아서 우선 여기로 매핑
+      where.push(`COALESCE(NULLIF(s.detail_category,''), '') = $${k++}`);
+      vals.push(subcategory);
     }
 
-    if (subcategory && sel.subCol) {
-      values.push(subcategory);
-      whereParts.push(`${normCol(sel.subCol)} = ${normParam(values.length)}`);
-    }
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
-
-    // ✅ 대표 이미지: 스토어 테이블 imgCol or 이미지테이블 1장
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${A} ${whereSql}`;
-    const { rows: crows } = await pool.query(countSql, values);
-    const total = crows[0]?.cnt || 0;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-    const selectSql = `
+    // ✅ store_images에서 첫 장만(url)
+    const storeSql = `
       SELECT
-        ${col(sel.idCol)}::text AS id,
-        ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_number,
-        ${col(sel.nameCol)}::text AS business_name,
-        ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS business_type,
-        ${sel.catCol ? `COALESCE(${col(sel.catCol)}::text,'')` : `''`} AS business_category,
-        ${sel.subCol ? `${normCol(sel.subCol)} AS subcategory` : `'' AS subcategory`},
-        ${imageExpr} AS image_url
-      FROM ${storeTable} ${A}
+        s.id,
+        s.business_number,
+        s.business_name,
+        s.business_type,
+        s.business_category,
+        COALESCE(NULLIF(s.detail_category,''), NULL) AS business_subcategory,
+        COALESCE(img.url, '') AS image_url
+      FROM ${FOOD_TABLE} s
+      LEFT JOIN LATERAL (
+        SELECT si.url
+        FROM ${FOOD_IMAGES_TABLE} si
+        WHERE si.store_id = s.id
+        ORDER BY si.id ASC
+        LIMIT 1
+      ) img ON true
       ${whereSql}
-      ORDER BY ${col(sel.idCol)} DESC
-      LIMIT ${pageSize} OFFSET ${offset}
+      ORDER BY s.id DESC
+      LIMIT ${pageSize} OFFSET ${offset};
     `;
 
-    const { rows } = await pool.query(selectSql, values);
+    const stores = (await pool.query(storeSql, vals)).rows || [];
+
+    // 이번 페이지의 12칸 position들
+    const positions = [];
+    for (let box = 1; box <= 12; box++) {
+      positions.push(buildPosition(section, pageNo, box));
+    }
+
+    // 슬롯 한방 조회
+    const slotSql = `
+      SELECT *
+      FROM ${SLOTS_TABLE}
+      WHERE page = $1
+        AND position = ANY($2)
+        AND priority = 1
+      ;
+    `;
+    const slotRows = (await pool.query(slotSql, [page, positions])).rows || [];
+    const slotMap = new Map(slotRows.map((r) => [r.position, r]));
+
+    // 12칸 반환(스토어 없으면 빈칸)
+    const items = [];
+    for (let box = 1; box <= 12; box++) {
+      const store = stores[box - 1] || null;
+      const pos = buildPosition(section, pageNo, box);
+      const slot = slotMap.get(pos);
+
+      const label =
+        slot?.slot_type === "text"
+          ? (slot.text_title || "(텍스트)")
+          : slot?.slot_mode === "store"
+            ? (slot.store_name || store?.business_name || "(가게연결)")
+            : (store?.business_name || (slot?.image_url ? "(이미지)" : "(비었음)"));
+
+      items.push({
+        boxNo: box,
+        position: pos,
+        priority: slot?.priority ?? 1,
+        occupied: !!slot,
+
+        // grid 클릭 시 우측 파란박스에 채우기 위한 값들
+        id: store?.id ?? null,
+        business_number: store?.business_number ?? "",
+        business_name: store?.business_name ?? "",
+        business_type: store?.business_type ?? "",
+        business_category: store?.business_category ?? "",
+        business_subcategory: store?.business_subcategory ?? "",
+        image_url: store?.image_url ?? "",
+
+        label,
+      });
+    }
+
+    return res.json({
+      success: true,
+      mode: "food",
+      page,
+      section,
+      category: category || "",
+      subcategory: subcategory || "",
+      pageNo,
+      pageSize: 12,
+      items,
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || "grid failed" });
+  }
+}
+
+// ------------------------------------------------------------------
+// 2) SEARCH: 사업자번호/상호 검색 + 페이지/박스 위치(rn 기반) 계산
+// ------------------------------------------------------------------
+export async function searchStore(req, res) {
+  try {
+    const mode = "food";
+    const qRaw = s(req.query.q);
+    const q = qRaw === "__all__" ? "" : qRaw;
+    const pageSize = Math.min(Math.max(toInt(req.query.pageSize, 12), 1), 50);
+
+    const qDigits = digitsOnly(q);
+    const isBiz = !!qDigits && qDigits.length >= 4;
+
+    const where = [];
+    const vals = [];
+    let k = 1;
+
+    if (q) {
+      if (isBiz) {
+        where.push(`REPLACE(REPLACE(COALESCE(s.business_number,''),'-',''),' ','') LIKE $${k++}`);
+        vals.push(`%${qDigits}%`);
+      } else {
+        where.push(`COALESCE(s.business_name,'') ILIKE $${k++}`);
+        vals.push(`%${q}%`);
+      }
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const sql = `
+      WITH base AS (
+        SELECT
+          s.id,
+          s.business_number,
+          s.business_name,
+          s.business_type,
+          s.business_category,
+          COALESCE(NULLIF(s.detail_category,''), NULL) AS business_subcategory,
+          COALESCE(img.url, '') AS image_url,
+          ROW_NUMBER() OVER (ORDER BY s.id DESC) AS rn
+        FROM ${FOOD_TABLE} s
+        LEFT JOIN LATERAL (
+          SELECT si.url
+          FROM ${FOOD_IMAGES_TABLE} si
+          WHERE si.store_id = s.id
+          ORDER BY si.id ASC
+          LIMIT 1
+        ) img ON true
+        ${whereSql}
+      )
+      SELECT
+        *,
+        CEIL(rn / 12.0)::int AS page_number,
+        ((rn - 1) % 12 + 1)::int AS index_in_page
+      FROM base
+      ORDER BY rn
+      LIMIT ${pageSize};
+    `;
+
+    const rows = (await pool.query(sql, vals)).rows || [];
 
     return res.json({
       success: true,
       mode,
-      category,
-      subcategory,
-      page,
-      pageSize,
-      total,
-      totalPages,
-      stores: rows,
+      q: qRaw || "",
+      results: rows,
     });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "listStores 실패" });
-  }
-}
-
-// ------------------------------
-// ✅ GET /search  (+ /search-store alias는 router에서 처리)
-// ------------------------------
-export async function searchStore(req, res) {
-  try {
-    const mode = clean(req.query.mode) || "food";
-    const qRaw = clean(req.query.q) || "__all__";
-    const pageSize = Math.min(Math.max(safeInt(req.query.pageSize, 12), 1), 200);
-
-    const isAll = qRaw === "__all__" || qRaw === "";
-    const qDigits = digitsOnly(qRaw);
-
-    const storeTable =
-      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
-
-    const tcols = await getColumns(storeTable);
-    const sel = buildStoreSelect(storeTable, tcols);
-
-    // ✅ alias 설정
-    const A = "s";
-    const col = (c) => `${A}."${c}"`;
-
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    const params = [];
-    const whereParts = [];
-
-    if (!isAll) {
-      const parts = [];
-
-      // 사업자번호 검색(가능할 때만)
-      if (qDigits && sel.bnCol) {
-        params.push(qDigits);
-        parts.push(`regexp_replace(COALESCE(${col(sel.bnCol)}::text,''), '\\\\D', '', 'g') = $${params.length}`);
-
-        params.push(`%${qDigits}%`);
-        parts.push(`regexp_replace(COALESCE(${col(sel.bnCol)}::text,''), '\\\\D', '', 'g') LIKE $${params.length}`);
-      }
-
-      // 상호명
-      params.push(`%${qRaw}%`);
-      parts.push(`${col(sel.nameCol)}::text ILIKE $${params.length}`);
-
-      // 업종(있을 때만)
-      if (sel.typeCol) {
-        params.push(`%${qRaw}%`);
-        parts.push(`COALESCE(${col(sel.typeCol)}::text,'') ILIKE $${params.length}`);
-      }
-
-      if (parts.length) whereParts.push(`(${parts.join(" OR ")})`);
-    }
-
-    const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
-
-    const orderBy = `${col(sel.nameCol)} ASC NULLS LAST, ${col(sel.idCol)} ASC`;
-
-    // rn 기반 페이지/인덱스 계산 (12개 기준)
-    const sql = `
-      WITH base AS (
-        SELECT
-          ${col(sel.idCol)}::text AS id,
-          ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_number,
-          ${col(sel.nameCol)}::text AS business_name,
-          ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS business_type,
-          ${imageExpr} AS image_url,
-          ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${storeTable} ${A}
-        ${where}
-      )
-      SELECT
-        id, business_number, business_name, business_type, image_url,
-        ( (rn - 1) / 12 )::int + 1 AS page_number,
-        ( (rn - 1) % 12 )::int + 1 AS index_in_page,
-        rn::text AS rn
-      FROM base
-      ORDER BY rn
-      LIMIT $${params.length + 1};
-    `;
-
-    params.push(pageSize);
-
-    const { rows } = await pool.query(sql, params);
-    return res.json({ success: true, mode, q: qRaw, results: rows });
   } catch (e) {
-    console.error("[searchStore ERROR]", e);
-    return res
-      .status(500)
-      .json({ success: false, error: e?.message || "searchStore 실패" });
+    return res.status(500).json({ success: false, error: e.message || "search failed" });
   }
 }
 
-// ------------------------------
-// ✅ 슬롯 테이블 컬럼 매핑(동적)
-// ------------------------------
-let slotsColsCached = null;
-async function getSlotCols() {
-  if (slotsColsCached) return slotsColsCached;
-  const cols = await getColumns(SLOTS_TABLE);
-  slotsColsCached = cols;
-  return cols;
-}
-
-function pickSlotCol(cols, candidates) {
-  for (const c of candidates) if (cols.has(c)) return c;
-  return null;
-}
-
-function buildSlotColumnMap(cols) {
-  return {
-    page: pickSlotCol(cols, ["page"]),
-    position: pickSlotCol(cols, ["position"]),
-    priority: pickSlotCol(cols, ["priority", "slot_priority", "sort_order", "rank"]),
-    slotType: pickSlotCol(cols, ["slot_type", "type"]),
-    slotMode: pickSlotCol(cols, ["slot_mode", "mode"]),
-    linkUrl: pickSlotCol(cols, ["link_url", "url"]),
-    imageUrl: pickSlotCol(cols, ["image_url", "image_path", "image"]),
-    // ✅ 네 스키마에 맞춤: text_content
-    textContent: pickSlotCol(cols, ["text_content", "text_desc", "text", "content", "description", "text_title", "title"]),
-    storeId: pickSlotCol(cols, ["store_id"]),
-    storeBiz: pickSlotCol(cols, [
-      "business_no", // ✅ 실제 컬럼(네온 admin_ad_slots)
-      "business_number",
-      "store_business_no",
-    ]),
-    storeName: pickSlotCol(cols, ["business_name", "store_name"]),
-    storeType: pickSlotCol(cols, ["store_type", "business_type"]),
-    tableSource: pickSlotCol(cols, ["table_source", "source_table"]),
-    noEnd: pickSlotCol(cols, ["no_end", "noend"]),
-    startAt: pickSlotCol(cols, ["start_at", "start_datetime"]),
-    endAt: pickSlotCol(cols, ["end_at", "end_datetime"]),
-    startDate: pickSlotCol(cols, ["start_date"]),
-    endDate: pickSlotCol(cols, ["end_date"]),
-    updatedAt: pickSlotCol(cols, ["updated_at"]),
-    createdAt: pickSlotCol(cols, ["created_at"]),
-  };
-}
-
-// DB 제약: slot_type IN ('banner','text')
-function mapSlotType(adMode) {
-  const m = clean(adMode).toLowerCase();
-  if (m === "text") return "text";
-  return "banner";
-}
-
-function inferTableSourceFromPosition(position) {
-  const p = clean(position);
-  if (p.endsWith("__combined")) return "combined_store_info";
-  if (p.endsWith("__food")) return "food";
-  return "";
-}
-
-// ------------------------------
-// ✅ GET /slot
-// ------------------------------
+// ------------------------------------------------------------------
+// 3) SLOT: page+position+priority 로 조회 (section 강제 금지!)
+// ------------------------------------------------------------------
 export async function getSlot(req, res) {
   try {
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
+    const page = s(req.query.page) || "subcategory";
+    const priority = Math.max(toInt(req.query.priority, 1), 1);
 
-    if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({
-        success: false,
-        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
-      });
-    }
-
-    const page = clean(req.query.page);
-    const position = clean(req.query.position);
-    const priority = safeIntOrNull(req.query.priority);
-
-    if (!page || !position || priority === null) {
-      return res.status(400).json({ success: false, error: "page/position/priority 필요" });
+    const position = resolvePositionFromReq(req);
+    if (!position) {
+      return res.status(400).json({ success: false, error: "position is required" });
     }
 
     const sql = `
       SELECT *
       FROM ${SLOTS_TABLE}
-      WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
-      LIMIT 1
+      WHERE page = $1 AND position = $2 AND priority = $3
+      LIMIT 1;
     `;
-    const { rows } = await pool.query(sql, [page, position, priority]);
-    return res.json({ success: true, slot: rows[0] || null });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "getSlot 실패" });
+    const r = await pool.query(sql, [page, position, priority]);
+    const slot = r.rows?.[0] || null;
+
+    return res.json({
+      success: true,
+      page,
+      position,
+      priority,
+      slot,
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || "slot failed" });
   }
 }
 
-// ------------------------------
-// ✅ GET /candidates (priority 1~6)
-// ------------------------------
-export async function listCandidates(req, res) {
+// ------------------------------------------------------------------
+// 4) UPDATE: multipart/form-data 저장 (image 필드) + storeImageUrl도 허용
+// ------------------------------------------------------------------
+export async function upsertSlot(req, res) {
   try {
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
+    const page = s(req.body.page) || "subcategory";
+    const priority = Math.max(toInt(req.body.priority, 1), 1);
 
-    const page = clean(req.query.page);
-    const position = clean(req.query.position);
-    if (!page || !position) {
-      return res.status(400).json({ success: false, error: "page/position 필요" });
-    }
-    if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({
-        success: false,
-        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
-      });
+    const position = resolvePositionFromReq(req);
+    if (!position) {
+      return res.status(400).json({ success: false, error: "position is required" });
     }
 
+    const adMode = s(req.body.adMode);     // "banner" | "text" 등
+    const slotMode = s(req.body.slotMode); // "store" | "custom"
+
+    const slot_type = adMode === "text" ? "text" : "banner";
+    const slot_mode = slotMode === "store" ? "store" : "custom";
+
+    const link_url = s(req.body.linkUrl);
+    const text_title = s(req.body.textTitle);
+    const text_desc = s(req.body.textDesc);
+
+    const store_id = s(req.body.storeId) || null;
+    const store_business_number = s(req.body.storeBusinessNumber) || null;
+    const store_name = s(req.body.storeName) || null;
+    const store_type = s(req.body.storeType) || null;
+
+    const store_image_url = s(req.body.storeImageUrl) || null;
+
+    // ✅ 업로드 파일 우선
+    let image_url = null;
+    if (req.file?.filename) {
+      image_url = `${UPLOAD_PUBLIC_PREFIX}/${req.file.filename}`;
+    } else if (store_image_url) {
+      // ✅ 파일 없으면 storeImageUrl로 대체
+      image_url = store_image_url;
+    }
+
+    const no_end = String(req.body.noEnd || "").toLowerCase() === "true";
+    const start_at = normalizeLocalDateTime(req.body.startAt);
+    const end_at = normalizeLocalDateTime(req.body.endAt);
+
+    // ✅ DB 컬럼들이 기존에 있다고 가정(현재 프로젝트에서 이미 사용 중)
     const sql = `
-      SELECT *
-      FROM ${SLOTS_TABLE}
-      WHERE "${m.page}"=$1 AND "${m.position}"=$2
-        AND "${m.priority}" BETWEEN 1 AND 6
-      ORDER BY "${m.priority}" ASC
+      INSERT INTO ${SLOTS_TABLE}
+      (page, position, priority,
+       slot_type, slot_mode,
+       image_url, link_url,
+       text_title, text_desc,
+       store_id, store_business_number, store_name, store_type, store_image_url,
+       start_at, end_at, no_end,
+       updated_at)
+      VALUES
+      ($1,$2,$3,
+       $4,$5,
+       COALESCE($6,''), $7,
+       $8,$9,
+       $10,$11,$12,$13,$14,
+       $15,$16,$17,
+       NOW())
+      ON CONFLICT (page, position, priority)
+      DO UPDATE SET
+        slot_type = EXCLUDED.slot_type,
+        slot_mode = EXCLUDED.slot_mode,
+        image_url = CASE
+          WHEN $6 IS NULL OR $6 = '' THEN ${SLOTS_TABLE.split(".").pop()}.image_url
+          ELSE EXCLUDED.image_url
+        END,
+        link_url = EXCLUDED.link_url,
+        text_title = EXCLUDED.text_title,
+        text_desc = EXCLUDED.text_desc,
+        store_id = EXCLUDED.store_id,
+        store_business_number = EXCLUDED.store_business_number,
+        store_name = EXCLUDED.store_name,
+        store_type = EXCLUDED.store_type,
+        store_image_url = EXCLUDED.store_image_url,
+        start_at = EXCLUDED.start_at,
+        end_at = EXCLUDED.end_at,
+        no_end = EXCLUDED.no_end,
+        updated_at = NOW()
+      RETURNING *;
     `;
-    const { rows } = await pool.query(sql, [page, position]);
-    return res.json({ success: true, items: rows });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "listCandidates 실패" });
+
+    const params = [
+      page, position, priority,
+      slot_type, slot_mode,
+      image_url || "",
+      link_url,
+      text_title,
+      text_desc,
+      store_id,
+      store_business_number,
+      store_name,
+      store_type,
+      store_image_url,
+      start_at,
+      end_at,
+      no_end,
+    ];
+
+    const r = await pool.query(sql, params);
+    const slot = r.rows?.[0] || null;
+
+    return res.json({
+      success: true,
+      page,
+      position,
+      priority,
+      slot,
+      image_url: slot?.image_url || "",
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || "update failed" });
   }
 }
 
-// ------------------------------
-// ✅ DELETE /delete
-// ------------------------------
+// ------------------------------------------------------------------
+// 5) DELETE: page+position+priority 로 삭제
+// ------------------------------------------------------------------
 export async function deleteSlot(req, res) {
   try {
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
+    const page = s(req.query.page) || "subcategory";
+    const priority = Math.max(toInt(req.query.priority, 1), 1);
 
-    const page = clean(req.query.page);
-    const position = clean(req.query.position);
-    const priority = safeIntOrNull(req.query.priority);
-
-    if (!page || !position || priority === null) {
-      return res.status(400).json({ success: false, error: "page/position/priority 필요" });
-    }
-    if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({
-        success: false,
-        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
-      });
+    const position = resolvePositionFromReq(req);
+    if (!position) {
+      return res.status(400).json({ success: false, error: "position is required" });
     }
 
     const sql = `
       DELETE FROM ${SLOTS_TABLE}
-      WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
-      RETURNING *
+      WHERE page = $1 AND position = $2 AND priority = $3;
     `;
-    const del = await pool.query(sql, [page, position, priority]);
-
-    return res.json({ success: true, deleted: del.rowCount });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "deleteSlot 실패" });
-  }
-}
-
-// ------------------------------
-// ✅ POST /update (multipart: image optional)
-// ------------------------------
-export async function upsertSlot(req, res) {
-  try {
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
-
-    if (!m.page || !m.position || !m.priority) {
-      return res.status(500).json({
-        success: false,
-        error: "admin_ad_slots에 page/position/priority 컬럼이 필요합니다.",
-      });
-    }
-
-    const page = clean(req.body.page);
-    const position = clean(req.body.position);
-    const priority = Math.max(
-      safeInt(req.body.priority, safeInt(req.body.idx, 1)),
-      1
-    );
-
-    if (!page || !position || !priority) {
-      return res
-        .status(400)
-        .json({ success: false, error: "page/position/priority 필요" });
-    }
-
-    const adMode = clean(req.body.adMode || req.body.slot_type || "banner");
-    const slot_type = mapSlotType(adMode);
-    const slot_mode = clean(
-      req.body.slotMode || req.body.slot_mode || "store"
-    );
-
-    const linkUrl = clean(req.body.linkUrl || req.body.link_url);
-
-    const textContent = clean(
-      req.body.textContent ||
-      req.body.text_content ||
-      req.body.textDesc ||
-      req.body.desc ||
-      req.body.description ||
-      req.body.textTitle ||
-      req.body.title ||
-      req.body.text_title
-    );
-
-    const noEnd = toBool(req.body.noEnd);
-    const startAt = parseDateTimeLocalToTs(req.body.startAt);
-    const endAt = parseDateTimeLocalToTs(req.body.endAt);
-
-    // ✅ 업로드 파일 여부 체크
-    let imageUrl = "";
-    const hasUploadFile = !!req.file?.filename;
-    if (hasUploadFile) {
-      imageUrl = `${UPLOAD_PUBLIC_PREFIX}/${req.file.filename}`;
-    }
-
-    const storeId = safeIntOrNull(req.body.storeId || req.body.store_id);
-
-    let storeBusinessNumber = clean(
-      req.body.storeBusinessNumber ||
-      req.body.business_no ||
-      req.body.business_number ||
-      req.body.store_business_no
-    );
-    let storeName = clean(
-      req.body.storeName || req.body.business_name || req.body.store_name
-    );
-    let storeType = clean(
-      req.body.storeType || req.body.business_type || req.body.store_type
-    );
-
-    // ✅ store 모드 + storeId 있을 때: 가게 정보 자동 채우기
-    if (slot_mode === "store" && storeId !== null) {
-      const tableSource2 = inferTableSourceFromPosition(position);
-      const table =
-        tableSource2 === "combined_store_info"
-          ? COMBINED_TABLE
-          : (await pickFoodTable()) || "public.store_info";
-
-      if (table) {
-        const tcols = await getColumns(table);
-        const sel2 = buildStoreSelect(table, tcols);
-
-        const mode2 =
-          tableSource2 === "combined_store_info" ? "combined" : "food";
-        const imgMeta2 = await pickImageMetaForMode(mode2);
-
-        let imgPickSql = "NULL";
-        if (imgMeta2) {
-          const order = imgMeta2.orderCol
-            ? `"${imgMeta2.orderCol}" ASC NULLS LAST`
-            : `"${imgMeta2.urlCol}" ASC NULLS LAST`;
-
-          imgPickSql = `
-            (
-              SELECT NULLIF("${imgMeta2.urlCol}"::text,'')
-              FROM ${imgMeta2.table}
-              WHERE "${imgMeta2.fkCol}"::text = $1::text
-              ORDER BY ${order}
-              LIMIT 1
-            )
-          `;
-        }
-
-        const imageExpr2 = sel2.imgCol
-          ? `COALESCE(NULLIF("${sel2.imgCol}"::text,''), COALESCE(${imgPickSql},''))`
-          : `COALESCE(${imgPickSql},'')`;
-
-        const sql2 = `
-          SELECT
-            "${sel2.idCol}"::text AS id,
-            ${sel2.bnCol ? `"${sel2.bnCol}"::text` : `''`} AS business_number,
-            "${sel2.nameCol}"::text AS business_name,
-            ${sel2.typeCol
-            ? `COALESCE("${sel2.typeCol}"::text,'')`
-            : `''`
-          } AS business_type,
-            ${imageExpr2} AS image_url
-          FROM ${table}
-          WHERE "${sel2.idCol}" = $1
-          LIMIT 1
-        `;
-        const { rows: srows } = await pool.query(sql2, [storeId]);
-        const s = srows[0];
-
-        if (s) {
-          if (!storeBusinessNumber) storeBusinessNumber = clean(s.business_number);
-          if (!storeName) storeName = clean(s.business_name);
-          if (!storeType) storeType = clean(s.business_type);
-
-          // ✅ 업로드 파일이 없을 때만 가게이미지 fallback
-          if (!hasUploadFile && !imageUrl) imageUrl = clean(s.image_url);
-        }
-      }
-    }
-
-    const tableSource = inferTableSourceFromPosition(position);
-
-    const insertCols = [];
-    const insertVals = [];
-    const params = [];
-
-    function add(colName, value) {
-      if (!colName) return;
-      insertCols.push(`"${colName}"`);
-      params.push(value);
-      insertVals.push(`$${params.length}`);
-    }
-
-    add(m.page, page);
-    add(m.position, position);
-    add(m.priority, priority);
-
-    add(m.slotType, slot_type);
-    add(m.slotMode, slot_mode);
-
-    add(m.linkUrl, linkUrl);
-
-    // ✅ image_url: 항상 넣되, 업데이트 시에는 "빈 값이면 기존 유지" 처리
-    if (m.imageUrl) add(m.imageUrl, imageUrl);
-
-    if (m.textContent) add(m.textContent, textContent);
-
-    if (m.storeId && storeId !== null) add(m.storeId, storeId);
-    if (m.storeBiz) add(m.storeBiz, storeBusinessNumber);
-    if (m.storeName) add(m.storeName, storeName);
-    if (m.storeType) add(m.storeType, storeType);
-
-    if (m.tableSource && tableSource) add(m.tableSource, tableSource);
-
-    if (m.noEnd) add(m.noEnd, noEnd);
-    if (m.startAt) add(m.startAt, startAt);
-    if (m.endAt) add(m.endAt, endAt);
-
-    if (m.updatedAt) add(m.updatedAt, new Date().toISOString());
-
-    const conflictTarget = `"${m.page}","${m.position}","${m.priority}"`;
-
-    const updateSets = insertCols
-      .filter(
-        (c) =>
-          ![`"${m.page}"`, `"${m.position}"`, `"${m.priority}"`].includes(c)
-      )
-      .map((c) => {
-        // ✅ image_url 은 빈 문자열이면 기존 값을 유지
-        if (m.imageUrl && c === `"${m.imageUrl}"`) {
-          return `${c} = CASE WHEN EXCLUDED.${m.imageUrl} IS NOT NULL AND EXCLUDED.${m.imageUrl} <> '' THEN EXCLUDED.${m.imageUrl} ELSE ${SLOTS_TABLE}.${m.imageUrl} END`;
-        }
-        return `${c} = EXCLUDED.${c}`;
-      });
-
-    const sqlUpsert = `
-      INSERT INTO ${SLOTS_TABLE} (${insertCols.join(",")})
-      VALUES (${insertVals.join(",")})
-      ON CONFLICT (${conflictTarget})
-      DO UPDATE SET ${updateSets.length
-        ? updateSets.join(",")
-        : `"${m.page}"=EXCLUDED."${m.page}"`
-      }
-      RETURNING *
-    `;
-
-    try {
-      const { rows } = await pool.query(sqlUpsert, params);
-      return res.json({ success: true, slot: rows[0] });
-    } catch (e) {
-      const code = e?.code;
-      if (code !== "42P10") throw e;
-
-      // unique index 없는 구버전 fallback
-      const delSql = `
-        DELETE FROM ${SLOTS_TABLE}
-        WHERE "${m.page}"=$1 AND "${m.position}"=$2 AND "${m.priority}"=$3
-      `;
-      await pool.query(delSql, [page, position, priority]);
-
-      const insSql = `
-        INSERT INTO ${SLOTS_TABLE} (${insertCols.join(",")})
-        VALUES (${insertVals.join(",")})
-        RETURNING *
-      `;
-      const { rows } = await pool.query(insSql, params);
-      return res.json({ success: true, slot: rows[0], note: "fallback-insert" });
-    }
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err?.message || "upsertSlot 실패",
-    });
-  }
-}
-// ------------------------------
-// ✅ GET /grid (12칸)
-// ✅ 핵심: 자동배치 12개 + admin_ad_slots(저장된 칸) 오버라이드 덮어쓰기
-// ------------------------------
-function buildAutoOrderBy(section, sel, alias = "s") {
-  const s = clean(section).toLowerCase();
-  const col = (c) => `${alias}."${c}"`;
-
-  // ✅ newly 별칭 지원
-  if ((s === "new_registration" || s === "newly" || s === "new") && sel.createdCol) {
-    return `${col(sel.createdCol)} DESC NULLS LAST, ${col(sel.idCol)} DESC`;
-  }
-
-  // ✅ best 별칭 지원
-  if ((s === "best_seller" || s === "best") && sel.viewsCol) {
-    return `${col(sel.viewsCol)} DESC NULLS LAST, ${col(sel.idCol)} DESC`;
-  }
-
-  // all_items 기본
-  return `${col(sel.idCol)} DESC`;
-}
-
-export async function getGrid(req, res) {
-  try {
-    console.log("[getGrid] === START ===");
-    console.log("[getGrid] query:", req.query);
-
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
-
-    if (!m.page || !m.position) {
-      return res.status(500).json({
-        success: false,
-        error: "admin_ad_slots에 page/position 컬럼이 필요합니다.",
-      });
-    }
-
-    console.log("[grid] raw.category:", JSON.stringify(req.query.category));
-    console.log("[grid] raw.subcategory:", JSON.stringify(req.query.subcategory));
-    console.log("[grid] raw.sub:", JSON.stringify(req.query.sub));
-
-    const page = clean(req.query.page);
-    const section = clean(req.query.section) || "all_items";
-    const mode = clean(req.query.mode) || "food";
-    const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
-
-    const category = clean(req.query.category);
-    // ✅ 여러 파라미터 이름 지원
-    const subcategory = clean(req.query.subcategory || req.query.sub || req.query.detail_category || req.query.business_subcategory || "");
-
-    console.log("[getGrid] parsed - page:", page, "section:", section, "mode:", mode, "pageNo:", pageNo);
-    console.log("[getGrid] parsed - category:", category, "subcategory:", subcategory);
-
-    if (!page) return res.status(400).json({ success: false, error: "page 필요" });
-
-    const suffix = mode === "food" ? "__food" : "__combined";
-    const like = `${section}__p${pageNo}__b%${suffix}`;
-
-    console.log("[getGrid] suffix:", suffix, "like pattern:", like);
-
-    // --------------------------
-    // 0) 스토어 테이블 선택(자동배치용)
-    // --------------------------
-    const storeTable =
-      mode === "combined" ? COMBINED_TABLE : (await pickFoodTable()) || "public.store_info";
-
-    console.log("[getGrid] storeTable:", storeTable);
-    const tcols = await getColumns(storeTable);
-    const sel = buildStoreSelect(storeTable, tcols);
-
-    // ✅ alias 설정
-    const A = "s";
-    const col = (c) => `${A}."${c}"`;
-
-    // 대표 이미지(스토어 테이블 imgCol or 이미지 테이블 subquery)
-    const imgMeta = await pickImageMetaForMode(mode);
-    const imgSub = buildImageSubquery(A, sel.idCol, imgMeta);
-    const imageExpr = sel.imgCol
-      ? `COALESCE(NULLIF(${col(sel.imgCol)}::text,''), COALESCE(${imgSub},''))`
-      : `COALESCE(${imgSub},'')`;
-
-    // --------------------------
-    // 1) 오버라이드 슬롯 조회(저장된 칸)
-    //    ✅ 이제 category/subcategory 필터가 있으면 override도 같이 필터링
-    // --------------------------
-    const paramsSlots = [page, like];
-
-    const posCol = m.position;
-    const priCol = m.priority;
-    const slotTypeCol = m.slotType;
-    const slotModeCol = m.slotMode;
-    const storeIdCol = m.storeId;
-    const storeBizCol = m.storeBiz;
-    const storeNameCol = m.storeName;
-    const storeTypeCol = m.storeType;
-    const imageUrlCol = m.imageUrl;
-    const textContentCol = m.textContent;
-    const linkUrlCol = m.linkUrl;  // ✅ link_url 컴럼 추가
-    const updatedAtCol = m.updatedAt;
-
-    // ✅ store 필터(override용) - 값이 있을 때만 적용
-    const storeWherePartsForSlots = [];
-    const hasCatFilter = !!(category && sel.catCol);
-    const hasSubFilter = !!(subcategory && sel.subCol);
-
-    if (hasCatFilter) {
-      paramsSlots.push(category);
-      storeWherePartsForSlots.push(
-        `btrim(replace(st."${sel.catCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
-      );
-    }
-
-    if (hasSubFilter) {
-      paramsSlots.push(subcategory);
-      storeWherePartsForSlots.push(
-        `btrim(replace(st."${sel.subCol}"::text, chr(160), ' ')) = btrim(replace($${paramsSlots.length}::text, chr(160), ' '))`
-      );
-    }
-
-    const storeWhereSqlForSlots = storeWherePartsForSlots.length
-      ? `WHERE ${storeWherePartsForSlots.join(" AND ")}`
-      : "";
-
-    // ✅ category/subcategory 필터가 있을 때만 override를 store 범위로 제한
-    const overrideFilterSql =
-      (storeWherePartsForSlots.length && storeIdCol)
-        ? `
-      AND (
-        slots."${storeIdCol}" IS NULL
-        OR slots."${storeIdCol}"::text IN (
-          SELECT st."${sel.idCol}"::text
-          FROM ${storeTable} st
-          ${storeWhereSqlForSlots}
-        )
-      )
-    `
-        : "";
-
-    // ✅ override도 카테고리/세부카테고리 표시용 JOIN
-    const joinStoreSql =
-      storeIdCol
-        ? `LEFT JOIN ${storeTable} st2 ON st2."${sel.idCol}"::text = slots."${storeIdCol}"::text`
-        : "";
-
-    const st2CategoryExpr = sel.catCol
-      ? `COALESCE(st2."${sel.catCol}"::text,'')`
-      : `''`;
-
-    const st2SubcategoryExpr = sel.subCol
-      ? `btrim(replace(COALESCE(st2."${sel.subCol}"::text,''), chr(160), ' '))`
-      : `''`;
-
-    const slotSql = `
-      SELECT DISTINCT ON (slots."${posCol}")
-        slots."${posCol}"::text AS position,
-        ${priCol ? `slots."${priCol}"::int` : `1`} AS priority,
-        ${slotTypeCol ? `COALESCE(slots."${slotTypeCol}"::text,'')` : `''`} AS slot_type,
-        ${slotModeCol ? `COALESCE(slots."${slotModeCol}"::text,'')` : `''`} AS slot_mode,
-        ${storeIdCol ? `slots."${storeIdCol}"` : `NULL`} AS store_id,
-        ${storeBizCol ? `COALESCE(slots."${storeBizCol}"::text,'')` : `''`} AS business_no,
-        ${storeNameCol ? `COALESCE(slots."${storeNameCol}"::text,'')` : `''`} AS business_name,
-        ${storeTypeCol ? `COALESCE(slots."${storeTypeCol}"::text,'')` : `''`} AS store_type,
-        ${st2CategoryExpr} AS business_category,
-        ${st2SubcategoryExpr} AS business_subcategory,
-        ${imageUrlCol ? `COALESCE(slots."${imageUrlCol}"::text,'')` : `''`} AS image_url,
-        ${textContentCol ? `COALESCE(slots."${textContentCol}"::text,'')` : `''`} AS text_content,
-        ${linkUrlCol ? `COALESCE(slots."${linkUrlCol}"::text,'')` : `''`} AS link_url,
-        ${updatedAtCol ? `slots."${updatedAtCol}"` : `NULL`} AS updated_at
-      FROM ${SLOTS_TABLE} slots
-      ${joinStoreSql}
-      WHERE slots."${m.page}"=$1
-        AND slots."${posCol}" LIKE $2
-      ${overrideFilterSql}
-      ${priCol ? `ORDER BY slots."${posCol}" ASC, slots."${priCol}" ASC` : `ORDER BY slots."${posCol}" ASC`}
-    `;
-
-    const { rows: slotRows } = await pool.query(slotSql, paramsSlots);
-
-    // ✅ override 슬롯에 이미 들어간 store_id는 auto에서 제외 (중복 방지)
-    const overrideStoreIds = new Set(
-      (slotRows || [])
-        .filter((r) => r && r.slot_mode === "store" && r.store_id !== null && r.store_id !== undefined)
-        .map((r) => Number(r.store_id))
-        .filter((n) => Number.isFinite(n))
-    );
-
-    const overrideMap = new Map(); // boxNo -> row
-    for (const r of slotRows) {
-      const pos = String(r.position || "");
-      const mm = pos.match(/__b(\d+)__/);
-      if (!mm) continue;
-      const boxNo = Number(mm[1]);
-      if (!Number.isFinite(boxNo)) continue;
-      overrideMap.set(boxNo, r);
-    }
-
-    // --------------------------
-    // 2) 자동배치 12개 계산(스토어 테이블에서 row_number)
-    // --------------------------
-    const values = [];
-    const whereParts = [];
-
-    if (category && sel.catCol) {
-      values.push(category);
-      whereParts.push(`btrim(replace(${col(sel.catCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}, chr(160), ' '))`);
-    }
-
-    if (subcategory && sel.subCol) {
-      values.push(subcategory);
-      whereParts.push(
-        `btrim(replace(${col(sel.subCol)}::text, chr(160), ' ')) = btrim(replace($${values.length}::text, chr(160), ' '))`
-      );
-    }
-
-    const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
-
-    // ✅ 전체 건수/총페이지 계산 (12칸 기준)
-    const countSql = `SELECT COUNT(*)::int AS cnt FROM ${storeTable} ${A} ${whereSql}`;
-    const { rows: cntRows } = await pool.query(countSql, values.slice(0, whereParts.length));
-    let total = cntRows?.[0]?.cnt ?? 0;
-    let totalPages = Math.max(1, Math.ceil(total / 12));
-    let hasPrev = pageNo > 1;
-    let hasNext = pageNo < totalPages;
-
-    const orderBy = buildAutoOrderBy(section, sel, A);
-
-    const startRn = (pageNo - 1) * 12 + 1;
-    const endRn = pageNo * 12;
-
-    values.push(startRn);
-    const pStart = values.length;
-    values.push(endRn);
-    const pEnd = values.length;
-
-    // ✅ 대분류/세부카테고리 expr (응답에 실어보내기용)
-    const categoryExpr = sel.catCol
-      ? `COALESCE(${col(sel.catCol)}::text,'')`
-      : `''`;
-
-    const subcategoryExpr = sel.subCol
-      ? `btrim(replace(COALESCE(${col(sel.subCol)}::text,''), chr(160), ' '))`
-      : `''`;
-
-    const autoSql = `
-      WITH ranked AS (
-        SELECT
-          ${col(sel.idCol)}::text AS id,
-          ${sel.bnCol ? `${col(sel.bnCol)}::text` : `''`} AS business_no,
-          ${col(sel.nameCol)}::text AS business_name,
-          ${sel.typeCol ? `COALESCE(${col(sel.typeCol)}::text,'')` : `''`} AS store_type,
-          ${categoryExpr} AS business_category,
-          ${subcategoryExpr} AS business_subcategory,
-          ${imageExpr} AS image_url,
-          ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS rn
-        FROM ${storeTable} ${A}
-        ${whereSql}
-      )
-      SELECT *
-      FROM ranked
-      WHERE rn BETWEEN $${pStart} AND $${pEnd}
-      ORDER BY rn ASC
-    `;
-
-    const { rows: autoRows } = await pool.query(autoSql, values);
-
-    // ✅ override에 이미 들어간 가게는 자동 채우기에서 제외
-    let autoStores = (autoRows || []).filter((s) => !overrideStoreIds.has(Number(s.id)));
-
-    // ✅ auto 채우기 시 중복 2차 방지
-    const usedAutoStoreIds = new Set();
-
-    function pickNextAutoStore() {
-      while (autoStores.length > 0) {
-        const s = autoStores.shift();
-        const sid = Number(s?.id);
-        if (!Number.isFinite(sid)) continue;
-        if (usedAutoStoreIds.has(sid)) continue;
-        usedAutoStoreIds.add(sid);
-        return s;
-      }
-      return null;
-    }
-
-    // --------------------------
-    // 3) 12칸 합성(override 우선)
-    // --------------------------
-    let items = [];
-    for (let b = 1; b <= 12; b += 1) {
-      const position = `${section}__p${pageNo}__b${b}${suffix}`;
-
-      const over = overrideMap.get(b);
-
-      if (over) {
-        items.push({
-          boxNo: b,
-          position,
-          occupied: true,
-          source: "override",
-          priority: over.priority ?? null,
-          slot_type: clean(over.slot_type),
-          slot_mode: clean(over.slot_mode),
-          store_id: over.store_id ?? null,
-          business_no: clean(over.business_no),
-          business_name: clean(over.business_name),
-          store_type: String(over.store_type || "").trim(),
-          business_category: clean(over.business_category),
-          business_subcategory: clean(over.business_subcategory),
-          image_url: clean(over.image_url),
-          text_content: clean(over.text_content),
-          link_url: clean(over.link_url),  // ✅ DB에서 가져온 link_url
-          label: clean(over.business_name || over.text_content),
-          updated_at: over.updated_at ?? null,
-        });
-        continue;
-      }
-
-      // ✅ pickNextAutoStore로 중복 없이 다음 가게 가져오기
-      const auto = pickNextAutoStore();
-
-      if (auto) {
-        // ✅ mode 기반 link_url 생성 (store_type이 아닌 mode 사용)
-        const autoStoreId = auto.id ? safeIntOrNull(auto.id) : null;
-        const autoLinkUrl = autoStoreId
-          ? (mode === "combined"
-            ? `/ndetail.html?id=${encodeURIComponent(autoStoreId)}&type=combined`
-            : `/ndetail.html?id=${encodeURIComponent(autoStoreId)}&type=food`)
-          : "";
-
-        items.push({
-          boxNo: b,
-          position,
-          occupied: true,
-          source: "auto",
-          priority: null,
-          slot_type: "banner",
-          slot_mode: "store",
-          store_id: autoStoreId,
-          business_no: clean(auto.business_no),
-          business_name: clean(auto.business_name),
-          store_type: String(auto.store_type || "").trim(),
-          business_category: clean(auto.business_category),
-          business_subcategory: clean(auto.business_subcategory),
-          image_url: clean(auto.image_url),
-          text_content: "",
-          link_url: autoLinkUrl,  // ✅ 자동 생성된 link_url
-          label: clean(auto.business_name),
-          updated_at: null,
-        });
-        continue;
-      }
-
-      items.push({
-        boxNo: b,
-        position,
-        occupied: false,
-        source: "empty",
-        priority: null,
-        slot_type: "",
-        slot_mode: "",
-        store_id: null,
-        business_no: "",
-        business_name: "",
-        store_type: "",
-        business_category: "",
-        business_subcategory: "",
-        image_url: "",
-        text_content: "",
-        label: "",
-        updated_at: null,
-      });
-    }
-
-    // ✅ 서브카테고리 필터가 있으면, occupied 아이템을 1번 박스부터 당겨서 재배치
-    const hasSub = String(subcategory || "").trim().length > 0;
-
-    if (hasSub) {
-      const occupied = items.filter(it => it.occupied);
-
-      const buildPos = (sec, pNo, bNo, m) => {
-        const sfx = m === "food" ? "__food" : "__combined";
-        return `${sec}__p${pNo}__b${bNo}${sfx}`;
-      };
-
-      const emptyBox = (boxNo) => ({
-        boxNo,
-        position: buildPos(section, pageNo, boxNo, mode),
-        occupied: false,
-        source: "empty",
-        priority: null,
-        slot_type: "",
-        slot_mode: "",
-        store_id: null,
-        business_no: "",
-        business_name: "",
-        store_type: "",
-        image_url: "",
-        link_url: "",
-        text_content: "",
-        label: "",
-        updated_at: null,
-      });
-
-      const compacted = Array.from({ length: 12 }, (_, i) => {
-        const boxNo = i + 1;
-        const it = occupied[i];
-        if (!it) return emptyBox(boxNo);
-
-        // boxNo/position만 앞으로 당겨서 재세팅
-        return {
-          ...it,
-          boxNo,
-          position: buildPos(section, pageNo, boxNo, mode),
-        };
-      });
-
-      items = compacted;
-      total = occupied.length;         // ✅ total도 "보이는 개수"로 통일
-      totalPages = Math.max(1, Math.ceil(total / 12));
-      hasPrev = false;
-      hasNext = totalPages > 1;
-    }
-
-    // ✅ 응답 직전 최종 clean 처리
-    const categoryClean = clean(category);
-    const subcategoryClean = clean(subcategory);
+    const r = await pool.query(sql, [page, position, priority]);
 
     return res.json({
       success: true,
-      version: "grid-v-2025-12-31-01",
-      page: clean(page),
-      section: clean(section),
-      mode: clean(mode),
-      pageNo,
-      category: categoryClean,
-      subcategory: subcategoryClean,
-      total,
-      totalPages,
-      hasPrev,
-      hasNext,
-      items,
+      page,
+      position,
+      priority,
+      deleted: r.rowCount || 0,
     });
-  } catch (err) {
-    console.error("[getGrid ERROR] ====================");
-    console.error("[getGrid ERROR] Message:", err?.message);
-    console.error("[getGrid ERROR] Stack:", err?.stack);
-    console.error("[getGrid ERROR] Full error:", err);
-    console.error("[getGrid ERROR] ====================");
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "getGrid 실패", details: err?.stack });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || "delete failed" });
   }
 }
 
-// ------------------------------
-// ✅ GET /where (사업자번호로 admin_ad_slots 역검색)
-// ------------------------------
-function parsePosition(position) {
-  const p = clean(position);
-  const m = p.match(/^([a-z_]+)__p(\d+)__b(\d+)(?:__(food|combined))?$/i);
-  if (!m) return { raw: p, section: "", page_number: null, index_in_page: null, mode: "" };
-
-  const section = (m[1] || "").toLowerCase();
-  const page_number = Number(m[2] || 0) || null;
-  const index_in_page = Number(m[3] || 0) || null;
-  const mode = (m[4] || "").toLowerCase();
-
-  const labelMap = {
-    all_items: "All items",
-    best_seller: "Best Seller",
-    new_registration: "New registration",
-  };
-
-  return {
-    raw: p,
-    section,
-    section_label: labelMap[section] || section,
-    page_number,
-    index_in_page,
-    mode,
-  };
-}
-
-export async function whereStore(req, res) {
+// ------------------------------------------------------------------
+// 6) WHERE: 사업자번호로 이 가게가 어디에 등록됐는지 조회
+// ------------------------------------------------------------------
+export async function whereSlots(req, res) {
   try {
-    const cols = await getSlotCols();
-    const m = buildSlotColumnMap(cols);
+    const page = s(req.query.page) || "subcategory";
+    const q = digitsOnly(req.query.q);
+    const limit = Math.min(Math.max(toInt(req.query.limit, 100), 1), 300);
 
-    if (!m.storeBiz || !m.position || !m.page || !m.priority) {
-      return res.status(500).json({
-        success: false,
-        error:
-          "admin_ad_slots에 business_no(또는 business_number) / page / position / priority 컬럼이 필요합니다.",
-      });
-    }
-
-    const qRaw = clean(req.query.q || req.query.business_number || "");
-    const biz = digitsOnly(qRaw);
-    if (!biz) return res.status(400).json({ success: false, error: "q(사업자번호)가 필요합니다." });
-
-    const page = clean(req.query.page || "subcategory"); // subcategory | all
-    const limit = Math.min(Math.max(safeInt(req.query.limit, 50), 1), 200);
-
-    const params = [biz];
-    let where = `
-      (
-        regexp_replace(COALESCE("${m.storeBiz}"::text,''), '\\\\D', '', 'g') = $1
-        OR ltrim(regexp_replace(COALESCE("${m.storeBiz}"::text,''), '\\\\D', '', 'g'), '0') = ltrim($1, '0')
-      )
-    `;
-
-    if (page && page !== "all") {
-      params.push(page);
-      where += ` AND "${m.page}" = $${params.length}`;
-    }
-
-    params.push(limit);
+    if (!q) return res.status(400).json({ success: false, error: "q is required" });
 
     const sql = `
-      SELECT *
+      SELECT page, position, priority, slot_type, slot_mode, start_at, end_at, no_end, updated_at
       FROM ${SLOTS_TABLE}
-      WHERE ${where}
-      ORDER BY "${m.page}" ASC, "${m.position}" ASC, "${m.priority}" ASC
-      LIMIT $${params.length}
+      WHERE page = $1
+        AND COALESCE(store_business_number,'') LIKE $2
+      ORDER BY updated_at DESC NULLS LAST
+      LIMIT ${limit};
     `;
+    const rows = (await pool.query(sql, [page, `%${q}%`])).rows || [];
 
-    const { rows } = await pool.query(sql, params);
+    const items = rows.map((r) => ({
+      ...r,
+      parsed: parsePosition(r.position),
+    }));
 
-    const items = (rows || []).map((r) => {
-      const pos = parsePosition(r?.[m.position]);
-      return {
-        page: r?.[m.page],
-        priority: r?.[m.priority],
-        position: r?.[m.position],
-        parsed: pos,
-        row: r,
-      };
-    });
-
-    return res.json({
-      success: true,
-      q: biz,
-      pageFilter: page,
-      count: items.length,
-      items,
-    });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: err?.message || "whereStore 실패" });
+    return res.json({ success: true, items });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || "where failed" });
   }
 }
