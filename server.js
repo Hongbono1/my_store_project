@@ -50,7 +50,7 @@ import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
 
 import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
 import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
-import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js";
+// import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js"; // ✅ Legacy - 주석 처리
 
 import pool from "./db.js";
 
@@ -395,7 +395,7 @@ app.use("/store", foodregisterRouter);
 app.use("/combined", ncombinedregister);
 
 // 기존 매니저
-app.use("/subcategorymanager/ad", subcategorymanagerAdRouter);
+// app.use("/subcategorymanager/ad", subcategorymanagerAdRouter); // ✅ Legacy - 주석 처리
 
 // hot
 app.use("/api/hotblog", hotblogRouter);
