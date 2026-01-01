@@ -20,6 +20,7 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 20 * 1024 * 1024 },
 });
+
 const uploadSingleImage = upload.single("image");
 
 router.get("/grid", grid);

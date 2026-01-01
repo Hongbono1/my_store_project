@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 
 import {
-  listStores,
+  getGrid,
   searchStore,
   getSlot,
   upsertSlot,
@@ -22,11 +22,10 @@ const upload = multer({
 });
 const uploadSingleImage = upload.single("image");
 
-// 목록/검색
-router.get("/stores", listStores);
-router.get("/search", searchStore);
+// ✅ 기존 매니저 엔드포인트(이름만 실제 컨트롤러 export에 맞춤)
+router.get("/grid", getGrid);
+router.get("/search-store", searchStore);
 
-// 슬롯 읽기/저장/삭제
 router.get("/slot", getSlot);
 router.post("/update", uploadSingleImage, upsertSlot);
 router.delete("/delete", deleteSlot);
