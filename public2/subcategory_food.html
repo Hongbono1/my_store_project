@@ -351,37 +351,15 @@
             });
         }
 
-        function setHero(title, subtitle, imageUrl, linkUrl) {
-            const titleEl = document.getElementById("heroTitle");
-            const subtitleEl = document.getElementById("heroSubtitle");
-            const imgEl = document.getElementById("heroImage");
-            const linkEl = document.getElementById("heroLink");
+        function syncModeButtons() {
+            const btnFood = qs("#btnModeFood");
+            const btnCombined = qs("#btnModeCombined");
 
-            if (titleEl && typeof title === "string") {
-                titleEl.textContent = title;
-            } else if (titleEl) {
-                titleEl.textContent = "카테고리";
-            }
+            if (!btnFood || !btnCombined) return;
 
-            if (subtitleEl && typeof subtitle === "string") {
-                subtitleEl.textContent = subtitle;
-            } else if (subtitleEl) {
-                subtitleEl.textContent = "카테고리별 가게를 확인하세요.";
-            }
-
-            if (imgEl && typeof imageUrl === "string" && imageUrl) {
-                imgEl.src = normalizeSrc(imageUrl);
-            } else if (imgEl) {
-                imgEl.src = normalizeSrc("/uploads/no-image.png");
-            }
-
-            if (linkEl) {
-                if (typeof linkUrl === "string" && linkUrl) {
-                    linkEl.href = linkUrl;
-                } else {
-                    linkEl.removeAttribute("href");
-                }
-            }
+            const mode = state.mode;
+            btnFood.classList.toggle("active", mode === "food");
+            btnCombined.classList.toggle("active", mode === "combined");
         }
 
         function syncMoreButtonLabels() {
@@ -595,47 +573,82 @@
         }
 
         async function hydrateHeroFromManager() {
-            // manager/컨트롤러 방식: /subcategorymanager_food/ad/slot?page=subcategory&section=...&idx=1&category=...&subcategory=...
-            const sections = ["hero", "top", "top_banner"]; // 혹시 예전 섹션명 섮여있을 때 대비
+            // 🆕 Dual-banner system: idx=1 (image), idx=2 (text with styles)
+            const section = "hero";
             const baseParams = new URLSearchParams();
             baseParams.set("page", "subcategory");
-            baseParams.set("idx", "1");
-
-            // 카테고리/서브카테고리 (한식만 subcategory)
+            baseParams.set("section", section);
             baseParams.set("category", state.category || "");
-            if (state.category === "한식" && clean(state.subcategory)) baseParams.set("subcategory", state.subcategory);
-
-            for (const sec of sections) {
-                try {
-                    const p = new URLSearchParams(baseParams);
-                    p.set("section", sec);
-
-                    const res = await fetch(`/subcategorymanager_food/ad/slot?${p.toString()}`, {
-                        cache: "no-store",
-                        headers: { Accept: "application/json" },
-                    });
-                    const data = await res.json().catch(() => null);
-                    if (!res.ok || !data?.success) continue;
-
-                    const slot = data.slot;
-                    if (!slot) continue;
-
-                    const title = clean(slot.title) || clean(slot.text_title) || "";
-                    const subtitle = clean(slot.subtitle) || clean(slot.text) || "";
-                    const img = clean(slot.image_url) || "";
-                    const link = clean(slot.link_url) || "";
-
-                    // slot에 값이 하나라도 있으면 적용
-                    if (title || subtitle || img || link) {
-                        const fallbackTitle = state.category ? state.category : "푸드";
-                        setHero(title || fallbackTitle, subtitle || "푸드(store_info)에서만 불러옵니다.", img || "/uploads/no-image.png", link);
-                        return true;
-                    }
-                } catch (e) {
-                    // 다음 섹션명 계속 시도
-                }
+            if (state.category === "한식" && clean(state.subcategory)) {
+                baseParams.set("subcategory", state.subcategory);
             }
-            return false;
+
+            // 1️⃣ Fetch Image Banner (idx=1)
+            try {
+                const imgParams = new URLSearchParams(baseParams);
+                imgParams.set("idx", "1");
+                const imgRes = await fetch(`/subcategorymanager_food/ad/slot?${imgParams.toString()}`, {
+                    cache: "no-store",
+                    headers: { Accept: "application/json" },
+                });
+                const imgData = await imgRes.json().catch(() => null);
+                if (imgRes.ok && imgData?.success && imgData.slot) {
+                    const slot = imgData.slot;
+                    const imgUrl = clean(slot.image_url) || "/uploads/no-image.png";
+                    const linkUrl = clean(slot.link_url) || "";
+
+                    const imgEl = document.getElementById("heroImage");
+                    const linkEl = document.getElementById("heroLink");
+                    if (imgEl) imgEl.src = normalizeSrc(imgUrl);
+                    if (linkEl) {
+                        if (linkUrl) linkEl.href = linkUrl;
+                        else linkEl.removeAttribute("href");
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load image banner (idx=1):", e);
+            }
+
+            // 2️⃣ Fetch Text Banner (idx=2) with styling
+            try {
+                const txtParams = new URLSearchParams(baseParams);
+                txtParams.set("idx", "2");
+                const txtRes = await fetch(`/subcategorymanager_food/ad/slot?${txtParams.toString()}`, {
+                    cache: "no-store",
+                    headers: { Accept: "application/json" },
+                });
+                const txtData = await txtRes.json().catch(() => null);
+                if (txtRes.ok && txtData?.success && txtData.slot) {
+                    const txtSlot = txtData.slot;
+                    const text = clean(txtSlot.title) || clean(txtSlot.text) || "";
+                    const styleJSON = clean(txtSlot.subtitle) || "{}";
+
+                    let styles = {};
+                    try {
+                        styles = JSON.parse(styleJSON);
+                    } catch (e) {
+                        styles = {};
+                    }
+
+                    const titleEl = document.getElementById("heroTitle");
+                    const subtitleEl = document.getElementById("heroSubtitle");
+
+                    if (titleEl && text) {
+                        titleEl.textContent = text;
+                        if (styles.fontSize) titleEl.style.fontSize = styles.fontSize;
+                        if (styles.fontWeight) titleEl.style.fontWeight = styles.fontWeight;
+                        if (styles.color) titleEl.style.color = styles.color;
+                    }
+
+                    if (subtitleEl && styles.bgColor) {
+                        subtitleEl.style.backgroundColor = styles.bgColor;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load text banner (idx=2):", e);
+            }
+
+            return true;
         }
 
         async function loadAllSections(keepScroll) {

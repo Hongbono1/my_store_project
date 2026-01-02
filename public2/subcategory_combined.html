@@ -338,22 +338,6 @@
             });
         }
 
-        function setHero(title, subtitle, imageUrl, linkUrl) {
-            const titleEl = document.getElementById("heroTitle");
-            const subtitleEl = document.getElementById("heroSubtitle");
-            const imgEl = document.getElementById("heroImage");
-            const linkEl = document.getElementById("heroLink");
-
-            if (titleEl) titleEl.textContent = title || "카테고리";
-            if (subtitleEl) subtitleEl.textContent = subtitle || "카테고리별 가게를 확인하세요.";
-            if (imgEl) imgEl.src = normalizeSrc(imageUrl || "/uploads/no-image.png");
-
-            if (linkEl) {
-                if (clean(linkUrl)) linkEl.href = linkUrl;
-                else linkEl.removeAttribute("href");
-            }
-        }
-
         function syncModeButtons() {
             const btnFood = qs("#btnModeFood");
             const btnCombined = qs("#btnModeCombined");
@@ -521,7 +505,7 @@
             }
         }
 
-        // ✅ 배너: (1) category/subcategory 포함 조회 → 없으면 (2) 공용 조회로 fallback
+        // ✅ 배너: 이미지(idx=1) + 텍스트(idx=2) 둘 다 조회
         async function fetchHeroSlotTry(paramsObj) {
             const p = new URLSearchParams(paramsObj);
             const url = `${getSlotEndpoint()}?${p.toString()}`;
@@ -532,43 +516,95 @@
         }
 
         async function hydrateHeroFromManager() {
-            const base = {
-                page: "subcategory",
-                section: "top",
-                idx: "1",
-            };
-
-            // 1) 카테고리 포함(미래 대비)
-            const withCat = { ...base, category: state.category || "" };
+            // ========== 이미지 배너 (idx=1) ==========
+            const imgBase = { page: "subcategory", section: "top", idx: "1" };
+            const imgWithCat = { ...imgBase, category: state.category || "" };
             if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
-                withCat.subcategory = state.subcategory;
+                imgWithCat.subcategory = state.subcategory;
             }
 
-            let slot = await fetchHeroSlotTry(withCat);
+            let imgSlot = await fetchHeroSlotTry(imgWithCat);
+            if (!imgSlot) imgSlot = await fetchHeroSlotTry(imgBase);
 
-            // 2) 없으면 공용(카테고리/서브카테고리 제거)
-            if (!slot) {
-                slot = await fetchHeroSlotTry(base);
+            // ========== 텍스트 배너 (idx=2) ==========
+            const txtBase = { page: "subcategory", section: "top", idx: "2" };
+            const txtWithCat = { ...txtBase, category: state.category || "" };
+            if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
+                txtWithCat.subcategory = state.subcategory;
             }
 
-            if (!slot) return false;
+            let txtSlot = await fetchHeroSlotTry(txtWithCat);
+            if (!txtSlot) txtSlot = await fetchHeroSlotTry(txtBase);
 
-            const title = clean(slot.title) || "";
-            const subtitle = clean(slot.subtitle) || clean(slot.text) || "";
-            const img = clean(slot.image_url) || "";
-            const link = clean(slot.link_url) || "";
+            // ========== 이미지 적용 ==========
+            const imgEl = document.getElementById("heroImage");
+            const linkEl = document.getElementById("heroLink");
 
-            const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-            const catLabel = state.category ? state.category : modeLabel;
-            const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+            if (imgSlot) {
+                const img = clean(imgSlot.image_url) || "";
+                const link = clean(imgSlot.link_url) || "";
 
-            setHero(
-                title || `${catLabel}${subLabel}`,
-                subtitle || `${modeLabel} 서브카테고리`,
-                img || "/uploads/no-image.png",
-                link || ""
-            );
-            return true;
+                if (imgEl) imgEl.src = normalizeSrc(img || "/uploads/no-image.png");
+                if (linkEl) {
+                    if (clean(link)) linkEl.href = link;
+                    else linkEl.removeAttribute("href");
+                }
+            } else {
+                if (imgEl) imgEl.src = "/uploads/no-image.png";
+                if (linkEl) linkEl.removeAttribute("href");
+            }
+
+            // ========== 텍스트 적용 ==========
+            const titleEl = document.getElementById("heroTitle");
+            const subtitleEl = document.getElementById("heroSubtitle");
+
+            if (txtSlot) {
+                const text = clean(txtSlot.title || txtSlot.text) || "";
+                
+                // 스타일 정보 파싱 (subtitle에 JSON 저장되어 있음)
+                let style = { fontSize: "24", fontWeight: "700", color: "#1e293b", bgColor: "#ffffff" };
+                try {
+                    const parsed = JSON.parse(clean(txtSlot.subtitle) || "{}");
+                    if (parsed.fontSize) style.fontSize = parsed.fontSize;
+                    if (parsed.fontWeight) style.fontWeight = parsed.fontWeight;
+                    if (parsed.color) style.color = parsed.color;
+                    if (parsed.bgColor) style.bgColor = parsed.bgColor;
+                } catch {}
+
+                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
+                const catLabel = state.category ? state.category : modeLabel;
+                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+
+                if (titleEl) {
+                    titleEl.textContent = text || `${catLabel}${subLabel}`;
+                    titleEl.style.fontSize = `${style.fontSize}px`;
+                    titleEl.style.fontWeight = style.fontWeight;
+                    titleEl.style.color = style.color;
+                }
+
+                if (subtitleEl) {
+                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
+                    subtitleEl.style.backgroundColor = style.bgColor;
+                }
+            } else {
+                // 텍스트 배너 없을 때 기본값
+                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
+                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+                const title = state.category ? state.category : modeLabel;
+                
+                if (titleEl) {
+                    titleEl.textContent = `${title}${subLabel}`;
+                    titleEl.style.fontSize = "";
+                    titleEl.style.fontWeight = "";
+                    titleEl.style.color = "";
+                }
+                if (subtitleEl) {
+                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
+                    subtitleEl.style.backgroundColor = "";
+                }
+            }
+
+            return !!(imgSlot || txtSlot);
         }
 
         async function loadAllSections(keepScroll) {
@@ -576,13 +612,7 @@
 
             syncModeButtons();
 
-            const applied = await hydrateHeroFromManager();
-            if (!applied) {
-                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-                const title = state.category ? state.category : modeLabel;
-                setHero(`${title}${subLabel}`, `${modeLabel} 서브카테고리`, "/uploads/no-image.png");
-            }
+            await hydrateHeroFromManager();
 
             renderFilters();
             syncMoreButtonLabels();
