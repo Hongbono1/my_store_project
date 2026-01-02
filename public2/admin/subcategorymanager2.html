@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>서브카테고리 매니저 (통합)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+        }
+
+        .neo {
+            background: rgba(255, 255, 255, .92);
+            border: 1px solid rgba(59, 130, 246, .18);
+            border-radius: 1rem;
+            box-shadow: 10px 10px 24px rgba(0, 0, 0, .08), -10px -10px 24px rgba(255, 255, 255, .7);
+            backdrop-filter: blur(12px);
+        }
+
+        .soft {
+            background: rgba(255, 255, 255, .75);
+            border: 1px solid rgba(148, 163, 184, .35);
+            border-radius: .9rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .chip {
+            border: 1px solid rgba(59, 130, 246, .25);
+            background: rgba(59, 130, 246, .08);
+            padding: .25rem .55rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            color: rgb(30 64 175);
+            display: inline-flex;
+            gap: .35rem;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .btn {
+            border-radius: .85rem;
+            padding: .6rem .85rem;
+            font-weight: 900;
+            transition: .15s;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary {
+            background: rgb(37 99 235);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: rgb(29 78 216);
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, .7);
+            border: 1px solid rgba(148, 163, 184, .45);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, .92);
+        }
+
+        .btn-danger {
+            background: rgb(220 38 38);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: rgb(185 28 28);
+        }
+
+        .btn-disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .input {
+            width: 100%;
+            border-radius: .85rem;
+            border: 1px solid rgba(148, 163, 184, .5);
+            background: rgba(255, 255, 255, .9);
+            padding: .65rem .8rem;
+            outline: none;
+        }
+
+        .input:focus {
+            border-color: rgba(37, 99, 235, .8);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+        }
+
+        .label {
+            font-size: .85rem;
+            color: rgb(71 85 105);
+            margin-bottom: .35rem;
+            font-weight: 900;
+        }
+
+        .hint {
+            font-size: .75rem;
+            color: rgb(100 116 139);
+        }
+
+        .seg {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .5rem;
+        }
+
+        .seg button {
+            border-radius: .95rem;
+            padding: .7rem .6rem;
+            font-weight: 900;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .75);
+            transition: .15s;
+        }
+
+        .seg button:hover {
+            background: rgba(255, 255, 255, .95);
+        }
+
+        .seg button[data-active="1"] {
+            border-color: rgba(37, 99, 235, .75);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+            background: rgba(37, 99, 235, .10);
+            color: rgb(30 64 175);
+        }
+
+        .banner-box {
+            background: linear-gradient(180deg, rgba(37, 99, 235, .08), rgba(255, 255, 255, .0));
+            border: 1px solid rgba(37, 99, 235, .18);
+            border-radius: 1.2rem;
+        }
+
+        .result-item:hover {
+            background: rgba(59, 130, 246, .06);
+        }
+
+        /* 상태바 */
+        .statusbar {
+            border-radius: 1rem;
+            padding: .85rem 1rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .75);
+        }
+
+        .status-ok {
+            border-color: rgba(34, 197, 94, .45);
+        }
+
+        .status-bad {
+            border-color: rgba(239, 68, 68, .45);
+        }
+
+        .status-warn {
+            border-color: rgba(245, 158, 11, .45);
+        }
+
+        /* 배너 메시지(버튼 바로 아래 표시) */
+        .banner-msg {
+            border-radius: .9rem;
+            padding: .75rem .85rem;
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .85);
+            font-weight: 900;
+            font-size: .85rem;
+        }
+
+        .banner-msg.ok {
+            border-color: rgba(34, 197, 94, .45);
+        }
+
+        .banner-msg.bad {
+            border-color: rgba(239, 68, 68, .45);
+        }
+
+        .banner-msg.warn {
+            border-color: rgba(245, 158, 11, .45);
+        }
+
+        /* 마지막 입력(상태+버튼) 항상 보이게 */
+        .sticky-actions {
+            position: sticky;
+            bottom: 0;
+            z-index: 30;
+            padding-top: .75rem;
+            margin-top: 1rem;
+            background: linear-gradient(to top, rgba(241, 245, 249, 0.98), rgba(241, 245, 249, 0.60), rgba(241, 245, 249, 0));
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-slate-50 text-slate-800">
+    <div id="header-placeholder"></div>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <!-- managerMode는 JS에서 상태 관리용으로만 사용 (hidden) -->
+        <input type="hidden" id="managerMode" value="food" />
+
+        <!-- 상단 배너 -->
+        <section class="banner-box p-4 md:p-5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                    <div class="text-lg md:text-xl font-black tracking-tight">서브카테고리 매니저 (통합)</div>
+                    <div class="text-sm text-slate-600 mt-1">
+                        이미지/가게연결/텍스트 선택에 따라 입력창이 전환됩니다.
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="chip" id="chipApiBase">API: -</span>
+                    <span class="chip" id="chipMode">모드: -</span>
+                    <span class="chip" id="chipPosition">선택: -</span>
+                </div>
+            </div>
+
+            <div class="mt-4 neo p-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-extrabold">배너 미리보기</div>
+                        <div class="hint mt-1">이미지/가게연결 모드에서 사용 (텍스트면 업로드 숨김)</div>
+                    </div>
+                    <button class="btn btn-ghost" id="btnClearImage" type="button">업로드 이미지 제거</button>
+                </div>
+
+                <!-- ✅ 배너 모드: 통합 고정 (변경 불가) -->
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <div class="label">배너 모드(통합 고정)</div>
+
+                        <div class="seg" style="grid-template-columns:repeat(2, minmax(0, 1fr));" id="bannerModeSeg">
+                            <button type="button" id="btnBannerModeFood" data-active="0" class="btn-disabled"
+                                disabled>푸드</button>
+                            <button type="button" id="btnBannerModeCombined" data-active="1" class="btn-disabled"
+                                disabled>통합 (고정)</button>
+                        </div>
+
+                        <!-- ✅ 기존 select는 값 저장/호환용으로 숨김 (combined 고정) -->
+                        <select class="input hidden" id="bannerMode">
+                            <option value="combined" selected>통합 배너</option>
+                        </select>
+
+                        <div class="hint mt-1">이 매니저는 통합(전체 업종) 매니저이며 모드 변경이 불가능합니다.</div>
+                    </div>
+
+                    <div>
+                        <div class="label">배너 section/idx(고정)</div>
+                        <input class="input" id="bannerPositionView" readonly />
+                        <div class="hint mt-1">section=top, idx=1 (자동)</div>
+                    </div>
+                </div>
+
+                <div class="mt-3 soft p-3">
+                    <img id="bannerPreview" src="/uploads/no-image.png" alt="banner"
+                        class="w-full h-[220px] md:h-[280px] object-cover rounded-xl bg-white" />
+                </div>
+
+                <div class="mt-3 flex items-center justify-end gap-2">
+                    <button class="btn btn-primary" id="btnBannerSave" type="button">배너 저장</button>
+                    <button class="btn btn-danger" id="btnBannerDelete" type="button">배너 삭제</button>
+                </div>
+
+                <!-- ✅ 배너 저장 결과(버튼 바로 아래) -->
+                <div class="mt-3 hidden" id="bannerMsg"></div>
+
+                <!-- 이미지 입력 -->
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3" id="imageInputs">
+                    <div>
+                        <div class="label">배너 이미지 업로드</div>
+                        <input class="input" id="bannerFile" type="file" accept="image/*" />
+                        <div class="hint mt-1">서버 필드명: <b>image</b></div>
+                    </div>
+                    <div>
+                        <div class="label">링크 URL (선택)</div>
+                        <input class="input" id="linkUrl" placeholder="https://..." />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 하단 -->
+        <section class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- 좌: 검색 -->
+            <aside class="lg:col-span-6 neo p-4">
+                <div class="mb-3">
+                    <div class="label">검색 기준</div>
+                    <select class="input" id="searchType">
+                        <option value="auto" selected>자동</option>
+                        <option value="biz">사업자번호</option>
+                        <option value="name">상호</option>
+                    </select>
+                    <div class="hint mt-1">이 매니저는 통합 모드에서 검색됩니다.</div>
+                </div>
+
+                <div class="font-extrabold">가게 검색</div>
+
+                <div class="hint mt-1">
+                    사업자번호로 검색 / 비워두고 검색하면 전체(일부) 표시
+                </div>
+
+                <div class="mt-3">
+                    <div class="label">사업자번호 (비우면 전체 보기)</div>
+                    <div class="flex gap-2">
+                        <input class="input" id="q" placeholder="예: 0000000003 (또는 비움)" inputmode="numeric" />
+                        <button class="btn btn-primary" id="btnSearch" type="button">가게 검색</button>
+                    </div>
+                    <div class="hint mt-1">
+                        - 숫자만 비교(하이픈/공백 자동 제거)<br />
+                        - 비워두고 검색 → q=__all__ (서버 제한 수 만큼)
+                    </div>
+                </div>
+
+                <!-- 검색 후 표시: 항상 보이게 -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3" id="storePanelWrap">
+                    <!-- 가게 정보 -->
+                    <div class="md:col-span-5 soft p-3">
+                        <div class="text-sm font-black">가게 정보</div>
+                        <div class="mt-2">
+                            <img id="storeThumb" src="/uploads/no-image.png"
+                                class="w-full h-[120px] rounded-xl object-cover bg-white border" alt="thumb" />
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-sm font-black" id="storeNameMini">선택된 가게 없음</div>
+                            <div class="text-xs text-slate-600 mt-0.5" id="storeTypeMini">-</div>
+                            <div class="text-xs text-slate-500 mt-0.5" id="storeBizMini">-</div>
+                            <div class="text-xs text-blue-700 font-black mt-2" id="storeLocMini">하위: -</div>
+                        </div>
+                    </div>
+
+                    <!-- 검색 결과 -->
+                    <div class="md:col-span-7 soft p-3">
+                        <div class="text-sm font-black mb-2">검색 결과</div>
+                        <div id="searchResults" class="space-y-2"></div>
+                    </div>
+
+                    <!-- 현재 등록 위치 -->
+                    <div class="md:col-span-12 soft p-3">
+                        <div class="text-sm font-black mb-2">현재 등록 위치(사업자번호 기준)</div>
+                        <div id="whereResults" class="space-y-2 text-sm text-slate-700">
+                            <div class="text-slate-500">가게를 선택하면 자동 조회됩니다.</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 우: 편집 -->
+            <section class="lg:col-span-6 neo p-4 flex flex-col" id="editPanel">
+                <div>
+                    <div class="font-extrabold">편집</div>
+                    <div class="hint mt-1">
+                        이 매니저는 subcategory.html 출력 규격(section/idx)을 그대로 사용합니다.
+                    </div>
+                </div>
+
+                <!-- 배치 위치 선택 -->
+                <div class="mt-4 soft p-3" id="placementPanel">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="font-black">배치 위치 선택</div>
+                        <button class="btn btn-ghost" id="btnLoadGrid" type="button">배치현황 새로고침</button>
+                    </div>
+
+                    <!-- 배치현황 상단 필터: 상위 → 하위 -->
+                    <div class="mt-3 mb-2 grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                        <div class="md:col-span-5">
+                            <label class="text-sm text-gray-600 font-black">상위 카테고리</label>
+                            <select id="placementCatFilter" class="input">
+                                <option value="">전체</option>
+                                <option value="한식">한식</option>
+                                <option value="중식">중식</option>
+                                <option value="일식">일식</option>
+                                <option value="양식">양식</option>
+                                <option value="분식">분식</option>
+                                <option value="치킨">치킨</option>
+                                <option value="피자">피자</option>
+                                <option value="카페/디저트">카페/디저트</option>
+                                <option value="야식">야식</option>
+                                <option value="패스트푸드">패스트푸드</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-7">
+                            <label class="text-sm text-gray-600 font-black">하위 카테고리</label>
+                            <select id="placementSubFilter" class="input" disabled>
+                                <option value="">(상위 카테고리를 먼저 선택)</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-12">
+                            <div class="hint">
+                                상위 카테고리를 고르면 하위 카테고리 목록이 자동으로 바뀝니다. (전체=필터 없음)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <div class="label">섹션</div>
+                            <select class="input" id="section">
+                                <option value="all_items">All of the items</option>
+                                <option value="best_seller">Best Seller</option>
+                                <option value="new_registration">New registration</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <div class="label">페이지</div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-ghost" id="btnPrevPage" type="button">-</button>
+                                <input class="input" id="pageNo" type="number" min="1" value="1" />
+                                <button class="btn btn-ghost" id="btnNextPage" type="button">+</button>
+                            </div>
+                            <div class="hint mt-1">해당 섹션의 페이지 번호</div>
+                        </div>
+                    </div>
+
+                    <!-- 배치현황(12칸) + 선택정보(파란박스) -->
+                    <div class="mt-3">
+                        <div class="label">배치 현황 (12칸)</div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                            <!-- 왼쪽: 12칸 그리드 -->
+                            <div class="lg:col-span-9">
+                                <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+                                <div class="hint mt-2">빈칸은 회색, 사용중은 파란색 테두리로 표시됩니다.</div>
+                            </div>
+
+                            <!-- 오른쪽: 선택 정보(파란색) -->
+                            <div class="lg:col-span-3">
+                                <div class="sticky top-4 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                                    <div class="text-sm font-semibold text-blue-700">
+                                        아래 그리드에서 클릭하여 선택
+                                    </div>
+
+                                    <div class="mt-3 text-sm">
+                                        <div class="text-blue-600/80">상호</div>
+                                        <div id="selectedBusinessName" class="mt-1 text-base font-bold text-blue-900">
+                                            -
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 text-sm">
+                                        <div class="text-blue-600/80">사업자</div>
+                                        <div id="selectedBusinessNo"
+                                            class="mt-1 font-mono text-base font-bold text-blue-900">
+                                            -
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 text-xs text-blue-700/80">
+                                        선택 박스: <span id="selectedBoxNo">-</span>
+                                    </div>
+
+                                    <div class="hidden">
+                                        <span id="pickedBoxText">-</span>
+                                        <span id="pickedBoxPos">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 편집 위치 선택 -->
+                <div class="mt-4">
+                    <div class="label">편집 위치 선택</div>
+                    <select class="input" id="slotArea">
+                        <option value="top">상단 배너(페이지 맨 위)</option>
+                        <option value="all_items" selected>All of the items (12칸)</option>
+                        <option value="best_seller">Best Seller (12칸)</option>
+                        <option value="new_registration">New registration (12칸)</option>
+                    </select>
+                    <div class="hint mt-1">
+                        상단 배너는 가게 선택 없이 저장 가능. 그 외는 12칸에서 idx 선택 후 저장합니다.
+                    </div>
+                </div>
+
+                <!-- 타입 선택 -->
+                <div class="mt-4">
+                    <div class="label">작업 유형 선택</div>
+                    <div class="seg">
+                        <button type="button" id="btnPickImage" data-active="1">이미지</button>
+                        <button type="button" id="btnPickStore" data-active="0">가게연결</button>
+                        <button type="button" id="btnPickText" data-active="0">텍스트</button>
+                    </div>
+                </div>
+
+                <!-- 가게연결 -->
+                <div class="mt-4 soft p-3" id="storeLinkInputs">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="font-black">가게 연결</div>
+                        <span class="chip" id="storeLocChip">하위: -</span>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-12 gap-3 items-start">
+                        <div class="col-span-5">
+                            <img id="storeImage" src="/uploads/no-image.png"
+                                class="w-full h-[120px] object-cover rounded-xl bg-white border" alt="store" />
+                        </div>
+                        <div class="col-span-7">
+                            <div class="text-base font-black leading-tight" id="storeName">선택된 가게 없음</div>
+                            <div class="text-sm text-slate-600 mt-1" id="storeType">-</div>
+                            <div class="text-sm text-slate-500 mt-1" id="storeBiz">-</div>
+                            <div class="text-sm text-blue-700 font-black mt-2" id="storeLocText">하위: -</div>
+
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <button class="btn btn-ghost" id="btnUseStore" type="button">이 가게로 연결</button>
+                                <button class="btn btn-ghost" id="btnUseStoreImage" type="button">가게 이미지로 배너</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 텍스트 -->
+                <div class="mt-4 soft p-3 hidden" id="textInputs">
+                    <div class="font-black">텍스트 입력</div>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="label">텍스트 제목</div>
+                            <input class="input" id="textTitle" placeholder="제목" />
+                        </div>
+                        <div>
+                            <div class="label">텍스트 설명</div>
+                            <input class="input" id="textDesc" placeholder="설명" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 공통 옵션 -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="label">기간 시작(선택)</div>
+                        <input class="input" id="startAt" type="datetime-local" />
+                    </div>
+                    <div>
+                        <div class="label">기간 종료(선택)</div>
+                        <input class="input" id="endAt" type="datetime-local" />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="inline-flex items-center gap-2 select-none">
+                            <input id="noEnd" type="checkbox" class="h-4 w-4" />
+                            <span class="text-sm text-slate-700 font-black">종료 없음(no_end)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <input type="hidden" id="storeId" />
+                <input type="hidden" id="storeBusinessNumber" />
+                <input type="hidden" id="storeNameHidden" />
+                <input type="hidden" id="storeTypeHidden" />
+                <input type="hidden" id="storeImageUrl" />
+                <input type="hidden" id="priorityHidden" value="1" />
+
+                <!-- 마지막 입력 영역: 항상 보이게 sticky -->
+                <div class="sticky-actions">
+                    <div class="space-y-3">
+                        <div id="statusBar" class="statusbar status-warn">
+                            <div class="text-sm font-black" id="statusText">대기 중: 12칸에서 idx를 선택하세요.</div>
+                            <div class="text-xs text-slate-600 mt-1" id="statusSub">-</div>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2">
+                            <button class="btn btn-primary" id="btnSave" type="button">저장</button>
+                            <button class="btn btn-danger" id="btnDelete" type="button">삭제</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script>
+        const PAGE_NAME = "subcategory";
+        const DEFAULT_PRIORITY = 1;
+
+        // ✅ 통합(Combined) 전용 매니저
+        const MODE = "combined";
+        const API_BASE = "/subcategorymanager_combined/ad";
+
+        // 내부 상태
+        let uiPick = "image";
+        let selectedStore = null;
+
+        // section/idx 기반 타겟
+        let selectedTarget = {
+            section: "all_items",
+            pageNo: 1,
+            idx: null,          // 1~12
+            priority: DEFAULT_PRIORITY
+        };
+
+        // 헤더 삽입 후 id 충돌 방지: main 내부를 먼저 찾고, 없으면 document에서 찾기
+        const MAIN_ROOT = document.querySelector("main");
+        function $(id) {
+            if (MAIN_ROOT) {
+                const el = MAIN_ROOT.querySelector(`#${id}`);
+                if (el) return el;
+            }
+            return document.getElementById(id);
+        }
+
+        function nowStr() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function setStatus(type, text, sub = "") {
+            const bar = $("statusBar");
+            bar.classList.remove("status-ok", "status-bad", "status-warn");
+            bar.classList.add(type === "ok" ? "status-ok" : type === "bad" ? "status-bad" : "status-warn");
+            $("statusText").textContent = text;
+            $("statusSub").textContent = sub || "-";
+        }
+
+        function setBusy(on, msg) {
+            const save = $("btnSave");
+            const del = $("btnDelete");
+            const search = $("btnSearch");
+            const bsave = $("btnBannerSave");
+            const bdel = $("btnBannerDelete");
+
+            [save, del, search, bsave, bdel].forEach((el) => {
+                if (!el) return;
+                el.disabled = !!on;
+                el.classList.toggle("opacity-60", !!on);
+            });
+
+            if (on && msg) setStatus("warn", msg, `시간: ${nowStr()}`);
+        }
+
+        function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
+
+        // 상위 카테고리 → 하위 카테고리 매핑
+        const SUB_BY_CATEGORY = {
+            "한식": ["밥", "찌개/탕", "고기/구이", "생선", "족발/보쌈", "국밥", "반찬", "기타"],
+            "중식": ["짜장", "짬뽕", "탕수육", "마라", "딤섬", "기타"],
+            "일식": ["초밥", "라멘", "돈카츠", "우동/소바", "기타"],
+            "양식": ["파스타", "스테이크", "샐러드", "피자(양식)", "기타"],
+            "분식": ["떡볶이", "김밥", "순대", "튀김", "라면", "기타"],
+            "치킨": ["후라이드", "양념", "간장", "파닭", "기타"],
+            "피자": ["오리지널", "씬", "프리미엄", "기타"],
+            "카페/디저트": ["커피", "음료", "케이크", "빵", "빙수", "기타"],
+            "야식": ["족발/보쌈(야식)", "찜/탕(야식)", "분식(야식)", "기타"],
+            "패스트푸드": ["버거", "치킨(패푸)", "샌드위치", "기타"],
+            "기타": ["기타"],
+        };
+
+        function setSubcategoryOptionsByCategory(cat) {
+            const subSel = $("placementSubFilter");
+            if (!subSel) return;
+
+            subSel.innerHTML = "";
+
+            if (!cat) {
+                subSel.disabled = true;
+                subSel.innerHTML = `<option value="">(상위 카테고리를 먼저 선택)</option>`;
+                return;
+            }
+
+            const subs = SUB_BY_CATEGORY[cat] || [];
+            subSel.disabled = false;
+
+            const optAll = document.createElement("option");
+            optAll.value = "";
+            optAll.textContent = "전체";
+            subSel.appendChild(optAll);
+
+            for (const s of subs) {
+                const opt = document.createElement("option");
+                opt.value = s;
+                opt.textContent = s;
+                subSel.appendChild(opt);
+            }
+        }
+
+        function initCategoryFilterUI() {
+            const catSel = $("placementCatFilter");
+            const subSel = $("placementSubFilter");
+            if (!catSel || !subSel) return;
+
+            setSubcategoryOptionsByCategory(catSel.value || "");
+
+            catSel.addEventListener("change", () => {
+                const cat = catSel.value || "";
+                setSubcategoryOptionsByCategory(cat);
+                if (subSel && !subSel.disabled) subSel.value = "";
+                loadGrid();
+            });
+
+            subSel.addEventListener("change", () => {
+                loadGrid();
+            });
+        }
+
+        async function tryFetchJson(url, options) {
+            const res = await fetch(url, options);
+            let data = null;
+            try { data = await res.json(); } catch (_e) { }
+            if (!res.ok) {
+                const msg = data?.error || data?.message || `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            return data;
+        }
+
+        async function apiFetch(path, options) {
+            return await tryFetchJson(`${API_BASE}${path}`, options);
+        }
+
+        function syncChips() {
+            $("chipApiBase").textContent = `API: ${API_BASE}`;
+            $("chipMode").textContent = `모드: combined(통합)`;
+            const s = selectedTarget.section || "-";
+            const p = selectedTarget.pageNo || "-";
+            const i = selectedTarget.idx || "-";
+            $("chipPosition").textContent = `선택: ${s} / p${p} / idx ${i}`;
+        }
+
+        // 배너 메시지(버튼 바로 아래)
+        function showBannerMsg(type, text) {
+            const box = $("bannerMsg");
+            box.className = `banner-msg ${type}`;
+            box.textContent = text;
+            box.classList.remove("hidden");
+        }
+
+        function hideBannerMsg() {
+            const box = $("bannerMsg");
+            box.classList.add("hidden");
+            box.textContent = "";
+        }
+
+        function setBannerPreview(src) {
+            $("bannerPreview").src = src || "/uploads/no-image.png";
+        }
+
+        function setPick(next) {
+            uiPick = next;
+
+            $("btnPickImage").setAttribute("data-active", uiPick === "image" ? "1" : "0");
+            $("btnPickStore").setAttribute("data-active", uiPick === "store" ? "1" : "0");
+            $("btnPickText").setAttribute("data-active", uiPick === "text" ? "1" : "0");
+
+            $("imageInputs").classList.toggle("hidden", uiPick === "text");
+            $("storeLinkInputs").classList.toggle("hidden", uiPick !== "store");
+            $("textInputs").classList.toggle("hidden", uiPick !== "text");
+
+            if (uiPick === "text") $("bannerFile").value = "";
+        }
+
+        $("btnPickImage").addEventListener("click", () => setPick("image"));
+        $("btnPickStore").addEventListener("click", () => setPick("store"));
+        $("btnPickText").addEventListener("click", () => setPick("text"));
+
+        // 배너: section=top idx=1 고정
+        function syncBannerUI() {
+            $("bannerPositionView").value = `section=top, idx=1`;
+        }
+
+        // 배너 슬롯 불러오기
+        async function loadBannerSlot(silent = false) {
+            try {
+                syncBannerUI();
+                if (!silent) setStatus("warn", "배너 불러오는 중...", `시간: ${nowStr()}`);
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    mode: MODE,
+                    section: "top",
+                    idx: "1",
+                    priority: "1",
+                }).toString();
+
+                const data = await apiFetch(`/slot?${qs}`);
+                const slot = data?.slot || null;
+
+                if (!slot) {
+                    setBannerPreview("/uploads/no-image.png");
+                    if (!silent) setStatus("warn", "저장된 배너가 없습니다", `시간: ${nowStr()}`);
+                    return;
+                }
+
+                if (slot.image_url) setBannerPreview(slot.image_url);
+                $("bannerFile").value = "";
+                $("linkUrl").value = slot.link_url || "";
+
+                if (!silent) setStatus("ok", "배너 불러오기 완료", `시간: ${nowStr()}`);
+            } catch (e) {
+                if (!silent) setStatus("bad", "배너 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
+            }
+        }
+
+        // 배너 저장: 결과를 버튼 아래에 즉시 표시
+        async function saveBannerSlot() {
+            try {
+                hideBannerMsg();
+                syncBannerUI();
+                setBusy(true, "배너 저장 중...");
+
+                const linkUrl = $("linkUrl").value || "";
+                const fileInput = $("bannerFile");
+                const file = fileInput?.files?.[0] || null;
+                const storeImageUrl = $("storeImageUrl").value || "";
+
+                const fd = new FormData();
+                fd.append("page", PAGE_NAME);
+                fd.append("mode", MODE);
+                fd.append("section", "top");
+                fd.append("idx", "1");
+                fd.append("priority", "1");
+                fd.append("adMode", "banner");
+                fd.append("slotMode", "custom");
+                if (linkUrl) fd.append("linkUrl", linkUrl);
+
+                if (file) fd.append("image", file);
+                else if (storeImageUrl) fd.append("storeImageUrl", storeImageUrl);
+
+                const data = await apiFetch(`/update`, { method: "POST", body: fd });
+                if (!data.success) throw new Error(data.error || "배너 저장 실패");
+
+                const slot = data.slot || null;
+                if (slot?.image_url) setBannerPreview(slot.image_url);
+
+                $("bannerFile").value = "";
+
+                showBannerMsg("ok", `배너 저장 완료 ✅ (${nowStr()})`);
+                setStatus("ok", "배너 저장 완료 ✅", `시간: ${nowStr()}`);
+            } catch (e) {
+                showBannerMsg("bad", `배너 저장 실패 ❌: ${e.message} (${nowStr()})`);
+                setStatus("bad", "배너 저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        // 배너 삭제: 결과를 버튼 아래에 즉시 표시
+        async function deleteBannerSlot() {
+            try {
+                hideBannerMsg();
+                syncBannerUI();
+                setBusy(true, "배너 삭제 중...");
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    mode: MODE,
+                    section: "top",
+                    idx: "1",
+                    priority: "1",
+                }).toString();
+
+                const data = await apiFetch(`/delete?${qs}`, { method: "DELETE" });
+                if (!data.success) throw new Error(data.error || "배너 삭제 실패");
+
+                setBannerPreview("/uploads/no-image.png");
+                $("linkUrl").value = "";
+                $("bannerFile").value = "";
+
+                showBannerMsg("ok", `배너 삭제 완료 ✅ (${nowStr()})`);
+                setStatus("ok", "배너 삭제 완료 ✅", `시간: ${nowStr()}`);
+            } catch (e) {
+                showBannerMsg("bad", `배너 삭제 실패 ❌: ${e.message} (${nowStr()})`);
+                setStatus("bad", "배너 삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        $("btnBannerSave").addEventListener("click", saveBannerSlot);
+        $("btnBannerDelete").addEventListener("click", deleteBannerSlot);
+
+        $("bannerFile").addEventListener("change", (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            hideBannerMsg();
+            setBannerPreview(URL.createObjectURL(f));
+        });
+
+        $("btnClearImage").addEventListener("click", () => {
+            $("bannerFile").value = "";
+            const storeImg = $("storeImageUrl").value;
+            setBannerPreview(storeImg || "/uploads/no-image.png");
+            showBannerMsg("warn", `업로드 이미지 제거됨 (${nowStr()})`);
+            setStatus("warn", "업로드 이미지 제거됨", `시간: ${nowStr()}`);
+        });
+
+        function toIsoLocalInputValue(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return "";
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        // ✅ 하위카테고리 표시 우선: business_subcategory
+        function subLabel(store) {
+            const sub = store?.business_subcategory || store?.detail_category || "";
+            return sub ? `하위: ${sub}` : "하위: -";
+        }
+
+        function setMiniStoreInfo(store) {
+            if (!store) {
+                $("storeThumb").src = "/uploads/no-image.png";
+                $("storeNameMini").textContent = "선택된 가게 없음";
+                $("storeTypeMini").textContent = "-";
+                $("storeBizMini").textContent = "-";
+                $("storeLocMini").textContent = "하위: -";
+                return;
+            }
+            $("storeThumb").src = store.image_url || "/uploads/no-image.png";
+            $("storeNameMini").textContent = store.business_name || "-";
+            $("storeTypeMini").textContent = store.business_type || "-";
+            $("storeBizMini").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
+            $("storeLocMini").textContent = subLabel(store);
+        }
+
+        function setStoreBox(store) {
+            if (!store) {
+                $("storeName").textContent = "선택된 가게 없음";
+                $("storeType").textContent = "-";
+                $("storeBiz").textContent = "-";
+                $("storeImage").src = "/uploads/no-image.png";
+                $("storeLocChip").textContent = "하위: -";
+                $("storeLocText").textContent = "하위: -";
+                return;
+            }
+            $("storeName").textContent = store.business_name || "-";
+            $("storeType").textContent = `${store.business_type || "-"} / 상위:${store.business_category || "-"} / 하위:${store.business_subcategory || "-"}`;
+            $("storeBiz").textContent = store.business_number ? `사업자번호: ${store.business_number}` : "-";
+            $("storeImage").src = store.image_url || "/uploads/no-image.png";
+            $("storeLocChip").textContent = subLabel(store);
+            $("storeLocText").textContent = subLabel(store);
+        }
+
+        function getSlotModeByPick() { return uiPick === "store" ? "store" : "custom"; }
+        function getSlotTypeByPick() { return uiPick === "text" ? "text" : "banner"; }
+
+        // ✅ subcategory.html 규격: section + idx 기반 슬롯 로드
+        async function loadSlot(silent = false) {
+            try {
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.idx;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) return;
+
+                if (!silent) {
+                    syncChips();
+                    setStatus("warn", "슬롯 불러오는 중...", `section:${section} idx:${idx} / 시간: ${nowStr()}`);
+                }
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    mode: MODE,
+                    section,
+                    idx: String(idx),
+                    priority,
+                    pageNo,
+                });
+
+                if (category) qs.append("category", category);
+                if (subcategory) qs.append("subcategory", subcategory);
+
+                const data = await apiFetch(`/slot?${qs.toString()}`);
+                const slot = data?.slot || null;
+
+                if (!slot) {
+                    if (!silent) setStatus("warn", "저장된 슬롯이 없습니다", "가게 연결/이미지/텍스트 설정 후 저장하면 생성됩니다.");
+                    return;
+                }
+
+                $("linkUrl").value = slot.link_url || "";
+                $("textTitle").value = slot.text_title || "";
+                $("textDesc").value = slot.text_desc || "";
+                $("noEnd").checked = !!slot.no_end;
+                $("startAt").value = toIsoLocalInputValue(slot.start_at);
+                $("endAt").value = toIsoLocalInputValue(slot.end_at);
+
+                if (slot.image_url) setBannerPreview(slot.image_url);
+
+                $("storeId").value = slot.store_id ?? "";
+                $("storeBusinessNumber").value = slot.store_business_number ?? slot.business_number ?? "";
+                $("storeNameHidden").value = slot.store_name ?? slot.business_name ?? "";
+                $("storeTypeHidden").value = slot.store_type ?? slot.business_type ?? "";
+                $("storeImageUrl").value = slot.store_image_url ?? slot.store_image ?? "";
+
+                if (slot.slot_type === "text") setPick("text");
+                else if (slot.slot_mode === "store") setPick("store");
+                else setPick("image");
+
+                if (!silent) setStatus("ok", "슬롯 불러오기 완료", `section:${section} idx:${idx} / 시간: ${nowStr()}`);
+            } catch (e) {
+                if (!silent) setStatus("bad", "슬롯 불러오기 실패", `${e.message} / 시간: ${nowStr()}`);
+            }
+        }
+
+        async function saveSlot() {
+            try {
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.idx;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) {
+                    setStatus("bad", "저장 실패", "먼저 12칸에서 박스를 클릭해서 idx를 선택하세요.");
+                    return;
+                }
+
+                setBusy(true, "저장 중...");
+                syncChips();
+
+                const fd = new FormData();
+                fd.append("page", PAGE_NAME);
+                fd.append("mode", MODE);
+                fd.append("section", section);
+                fd.append("idx", String(idx));
+                fd.append("priority", priority);
+                fd.append("pageNo", pageNo);
+
+                if (category) fd.append("category", category);
+                if (subcategory) fd.append("subcategory", subcategory);
+
+                fd.append("adMode", getSlotTypeByPick());
+                fd.append("slotMode", getSlotModeByPick());
+
+                fd.append("linkUrl", $("linkUrl").value || "");
+                fd.append("textTitle", $("textTitle").value || "");
+                fd.append("textDesc", $("textDesc").value || "");
+
+                fd.append("noEnd", $("noEnd").checked ? "true" : "false");
+                fd.append("startAt", $("startAt").value || "");
+                fd.append("endAt", $("endAt").value || "");
+
+                if (uiPick === "store") {
+                    if ($("storeId").value) fd.append("storeId", $("storeId").value);
+                    if ($("storeBusinessNumber").value) fd.append("storeBusinessNumber", $("storeBusinessNumber").value);
+                    if ($("storeNameHidden").value) fd.append("storeName", $("storeNameHidden").value);
+                    if ($("storeTypeHidden").value) fd.append("storeType", $("storeTypeHidden").value);
+                }
+
+                const storeImageUrl = $("storeImageUrl").value || "";
+                if (storeImageUrl) fd.append("storeImageUrl", storeImageUrl);
+
+                const f = $("bannerFile").files?.[0];
+                if (uiPick !== "text" && f) fd.append("image", f);
+
+                const data = await apiFetch(`/update`, { method: "POST", body: fd });
+                if (!data.success) throw new Error(data.error || "저장 실패");
+
+                const slot = data.slot || null;
+                if (slot?.image_url && uiPick !== "text") setBannerPreview(slot.image_url);
+                $("bannerFile").value = "";
+
+                await loadGrid();
+
+                setStatus("ok", "저장 완료 ✅", `section:${section} / p${pageNo} / idx:${idx} / 시간: ${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "저장 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function deleteSlot() {
+            try {
+                const section = selectedTarget.section || $("section")?.value || "all_items";
+                const idx = selectedTarget.idx;
+                const priority = String(selectedTarget.priority || DEFAULT_PRIORITY);
+                const pageNo = String(selectedTarget.pageNo || Number($("pageNo")?.value || 1));
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                if (!idx) {
+                    setStatus("bad", "삭제 실패", "먼저 12칸에서 박스를 클릭해서 idx를 선택하세요.");
+                    return;
+                }
+
+                setBusy(true, "삭제 중...");
+                syncChips();
+
+                const qs = new URLSearchParams({
+                    page: PAGE_NAME,
+                    mode: MODE,
+                    section,
+                    idx: String(idx),
+                    priority,
+                    pageNo,
+                });
+
+                if (category) qs.append("category", category);
+                if (subcategory) qs.append("subcategory", subcategory);
+
+                const data = await apiFetch(`/delete?${qs.toString()}`, { method: "DELETE" });
+                if (!data.success) throw new Error(data.error || "삭제 실패");
+
+                const delCount = Number(data.deleted || 0);
+                if (delCount === 0) {
+                    setStatus("bad", "삭제 실패 ❌", `서버에서 삭제된 행이 0개(키 불일치). section=${section}, idx=${idx}, priority=${priority}`);
+                    return;
+                }
+
+                await loadSlot(true);
+                await loadGrid();
+
+                setStatus("ok", "삭제 완료 ✅", `deleted=${delCount} / section:${section} idx:${idx} / 시간:${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "삭제 실패 ❌", `${e.message} / 시간: ${nowStr()}`);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        $("btnSave").addEventListener("click", saveSlot);
+        $("btnDelete").addEventListener("click", deleteSlot);
+
+        async function hydrateLayout() {
+            try {
+                const h = await fetch("/components/header.html").then(r => r.text());
+                $("header-placeholder").innerHTML = h;
+            } catch (_e) { }
+            try {
+                const f = await fetch("/components/footer.html").then(r => r.text());
+                $("footer-placeholder").innerHTML = f;
+            } catch (_e) { }
+        }
+
+        // ✅ 검색은 food 고정
+        function renderSearchResults(results) {
+            const list = $("searchResults");
+            list.innerHTML = "";
+
+            if (!results || results.length === 0) {
+                list.innerHTML = `<div class="text-sm text-slate-500">검색 결과 없음</div>`;
+                return;
+            }
+
+            for (const r of results) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "result-item w-full text-left soft p-3";
+                btn.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="font-black">${r.business_name || ""}</div>
+              <div class="text-sm text-slate-600 mt-0.5">${r.business_type || ""}</div>
+              <div class="text-xs text-blue-700 font-black mt-1">
+                상위: ${r.business_category || "-"} / 하위: ${r.business_subcategory || "-"}
+              </div>
+              <div class="text-[11px] text-slate-500 mt-1 break-all">
+                사업자: <b>${r.business_number || "-"}</b>
+              </div>
+            </div>
+            <div class="shrink-0">
+              <img src="${r.image_url || "/uploads/no-image.png"}"
+                   class="w-12 h-12 rounded-xl object-cover border bg-white" alt="thumb">
+            </div>
+          </div>
+        `;
+
+                btn.addEventListener("click", async () => {
+                    selectedStore = r;
+
+                    setMiniStoreInfo(r);
+                    setStoreBox(r);
+
+                    $("storeId").value = r.id || "";
+                    $("storeBusinessNumber").value = r.business_number || "";
+                    $("storeNameHidden").value = r.business_name || "";
+                    $("storeTypeHidden").value = r.business_type || "";
+                    $("storeImageUrl").value = r.image_url || "";
+
+                    setStatus("ok", "가게 선택됨", `하위:${r.business_subcategory || "-"} / 시간:${nowStr()}`);
+
+                    // 선택만 하고, 실제 저장 위치는 12칸(idx)에서 결정
+                    await loadWhere();
+                });
+
+                list.appendChild(btn);
+            }
+        }
+
+        async function doSearch() {
+            try {
+                const qRaw = String($("q").value || "").trim();
+                const qDigits = digitsOnly(qRaw);
+                const qParam = qRaw ? (qDigits ? qDigits : qRaw) : "__all__";
+
+                syncChips();
+                setStatus("warn", "검색 중...", `q: ${qParam} / 시간: ${nowStr()}`);
+
+                const qs = new URLSearchParams({
+                    mode: MODE,
+                    q: qParam,
+                    pageSize: "12",
+                }).toString();
+
+                let data;
+                try {
+                    data = await apiFetch(`/search?${qs}`);
+                } catch (_e) {
+                    data = await apiFetch(`/search-store?${qs}`);
+                }
+
+                if (!data.success) throw new Error(data.error || "검색 실패");
+
+                renderSearchResults(data.results || []);
+                setStatus("ok", "검색 완료", `결과: ${(data.results || []).length}개 / 시간: ${nowStr()}`);
+            } catch (e) {
+                setStatus("bad", "검색 실패", `${e.message} / 시간: ${nowStr()}`);
+            }
+        }
+
+        $("btnSearch").addEventListener("click", doSearch);
+        $("q").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                doSearch();
+            }
+        });
+
+        $("btnUseStore").addEventListener("click", () => {
+            if (!selectedStore) return setStatus("bad", "가게 연결 실패", `가게를 먼저 선택하세요 / 시간: ${nowStr()}`);
+            setPick("store");
+
+            $("storeId").value = selectedStore.id || "";
+            $("storeBusinessNumber").value = selectedStore.business_number || "";
+            $("storeNameHidden").value = selectedStore.business_name || "";
+            $("storeTypeHidden").value = selectedStore.business_type || "";
+            $("storeImageUrl").value = selectedStore.image_url || "";
+
+            if (!$("bannerFile").files?.length && $("storeImageUrl").value) {
+                setBannerPreview($("storeImageUrl").value);
+            }
+
+            setStatus("ok", "가게 연결 준비 완료", `12칸(idx) 선택 후 저장하세요 / 시간: ${nowStr()}`);
+        });
+
+        $("btnUseStoreImage").addEventListener("click", () => {
+            if (!selectedStore) return setStatus("bad", "적용 실패", `가게를 먼저 선택하세요 / 시간: ${nowStr()}`);
+            if (selectedStore.image_url) {
+                $("bannerFile").value = "";
+                $("storeImageUrl").value = selectedStore.image_url;
+                setBannerPreview(selectedStore.image_url);
+                showBannerMsg("warn", `가게 이미지로 미리보기 적용 (${nowStr()})`);
+                setStatus("ok", "가게 이미지로 배너 미리보기 적용", `시간: ${nowStr()}`);
+            } else {
+                showBannerMsg("bad", `가게 이미지가 없습니다 (${nowStr()})`);
+                setStatus("bad", "적용 실패", `가게 이미지가 없습니다 / 시간: ${nowStr()}`);
+            }
+        });
+
+        // where: 서버가 지원하면 표시, 없으면 실패 문구
+        async function loadWhere() {
+            try {
+                const biz = String($("storeBusinessNumber").value || "").trim();
+                const bizDigits = digitsOnly(biz);
+                const box = $("whereResults");
+                if (!box) return;
+
+                if (!bizDigits) {
+                    box.innerHTML = `<div class="text-slate-500">사업자번호가 없어 조회할 수 없습니다.</div>`;
+                    return;
+                }
+
+                const qs = new URLSearchParams({
+                    q: bizDigits,
+                    page: PAGE_NAME,
+                    limit: "100",
+                    mode: MODE,
+                }).toString();
+
+                const data = await apiFetch(`/where?${qs}`);
+                const items = data?.items || [];
+
+                if (!items.length) {
+                    box.innerHTML = `<div class="text-slate-500">현재 등록된 슬롯이 없습니다.</div>`;
+                    return;
+                }
+
+                box.innerHTML = items.map((it) => {
+                    const p = it.parsed || {};
+                    return `
+        <div class="soft p-2">
+          <div class="font-black">${p.section_label || "(unknown section)"}</div>
+          <div class="text-xs text-slate-600 mt-1">
+            ${it.page} / p${p.page_number || "?"} / idx ${p.index_in_page || "?"} / priority ${it.priority}
+          </div>
+          <div class="text-[11px] text-slate-500 break-all mt-1">key: <b>${it.position || it.key || "-"}</b></div>
+        </div>
+      `;
+                }).join("");
+            } catch (e) {
+                const box = $("whereResults");
+                if (box) box.innerHTML = `<div class="text-red-600">조회 실패: ${e.message}</div>`;
+            }
+        }
+
+        let selectedBoxNo = null;
+
+        function fillSelectedStoreInfo(item) {
+            const nameEl = $("selectedBusinessName");
+            const bizEl = $("selectedBusinessNo");
+            const boxEl = $("selectedBoxNo");
+
+            const name = item?.business_name || item?.store_name || "";
+            const biz = item?.business_number || item?.business_no || "";
+            const boxNo = item?.boxNo ?? null;
+
+            if (nameEl) nameEl.textContent = name || (item?.occupied ? "(사용중)" : "-");
+            if (bizEl) bizEl.textContent = biz || "-";
+            if (boxEl) boxEl.textContent = boxNo ? String(boxNo) : "-";
+
+            selectedBoxNo = boxNo;
+            highlightSelectedBox();
+        }
+
+        function highlightSelectedBox() {
+            document.querySelectorAll("[data-box]").forEach((el) => {
+                const n = Number(el.getAttribute("data-box"));
+                if (n && selectedBoxNo === n) el.classList.add("ring-2", "ring-blue-500");
+                else el.classList.remove("ring-2", "ring-blue-500");
+            });
+        }
+
+        // ✅ grid: 서버가 subcategory.html 처럼 items 목록(최대 12개)을 주면 -> 12칸으로 변환
+        async function loadGrid() {
+            try {
+                const section = $("section").value || "all_items";
+                const pageNo = Math.max(Number($("pageNo").value || "1"), 1);
+                const category = $("placementCatFilter")?.value || "";
+                const subcategory = $("placementSubFilter")?.disabled ? "" : ($("placementSubFilter")?.value || "");
+
+                selectedTarget.section = section;
+                selectedTarget.pageNo = pageNo;
+
+                syncChips();
+
+                const params = {
+                    page: PAGE_NAME,
+                    section,
+                    mode: MODE,
+                    pageNo: String(pageNo),
+                };
+
+                if (category) params.category = category;
+                if (subcategory) params.subcategory = subcategory;
+
+                const qs = new URLSearchParams(params).toString();
+                const data = await apiFetch(`/grid?${qs}`);
+
+                const list = Array.isArray(data.items) ? data.items : [];
+                const pageSize = Number(data.pageSize || 12) || 12;
+
+                // 12칸 고정
+                const boxes = [];
+                for (let i = 1; i <= 12; i++) {
+                    const store = list[i - 1] || null;
+                    boxes.push({
+                        boxNo: i,
+                        occupied: !!store,
+                        priority: DEFAULT_PRIORITY,
+                        store,
+                        label: store ? `${store.business_name || "(상호없음)"} / 하위:${store.business_subcategory || "-"}` : "(비었음)"
+                    });
+                }
+
+                const grid = $("grid");
+                grid.innerHTML = "";
+
+                for (const it of boxes) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.setAttribute("data-box", String(it.boxNo));
+
+                    btn.className =
+                        "text-left soft p-2 rounded-xl border transition " +
+                        (it.occupied
+                            ? "border-blue-500 bg-white"
+                            : "border-slate-200 bg-white/60");
+
+                    btn.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs text-slate-500 font-black">IDX ${it.boxNo}</div>
+              <div class="text-sm font-black mt-0.5">${it.label}</div>
+              <div class="text-[11px] text-slate-500 mt-1">priority: ${it.priority}</div>
+            </div>
+          </div>
+        `;
+
+                    btn.addEventListener("click", async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        selectedTarget.section = section;
+                        selectedTarget.pageNo = pageNo;
+                        selectedTarget.idx = Number(it.boxNo);
+                        selectedTarget.priority = DEFAULT_PRIORITY;
+
+                        $("pickedBoxText").textContent = `${section} / p${pageNo} / idx ${it.boxNo}`;
+                        $("pickedBoxPos").textContent = `${section}|p${pageNo}|idx${it.boxNo}`;
+
+                        fillSelectedStoreInfo({
+                            boxNo: it.boxNo,
+                            business_name: it.store?.business_name || "",
+                            business_number: it.store?.business_number || "",
+                            occupied: it.occupied
+                        });
+
+                        syncChips();
+                        setStatus("warn", "배치 위치 선택됨", `section:${section} p${pageNo} idx:${it.boxNo} / 시간:${nowStr()}`);
+
+                        await loadSlot();
+                    });
+
+                    grid.appendChild(btn);
+                }
+            } catch (e) {
+                setStatus("bad", "그리드 불러오기 실패", `${e.message} / 시간:${nowStr()}`);
+            }
+        }
+
+        $("btnLoadGrid").addEventListener("click", loadGrid);
+
+        $("section").addEventListener("change", () => {
+            selectedTarget.idx = null;
+            selectedBoxNo = null;
+            highlightSelectedBox();
+            syncChips();
+            loadGrid();
+        });
+
+        $("slotArea").addEventListener("change", () => {
+            const v = $("slotArea").value;
+            if (v === "top") {
+                setStatus("warn", "상단 배너는 위의 '배너 저장/삭제'를 사용하세요.", `시간: ${nowStr()}`);
+                return;
+            }
+            $("section").value = v;
+            selectedTarget.idx = null;
+            selectedBoxNo = null;
+            highlightSelectedBox();
+            syncChips();
+            loadGrid();
+        });
+
+        $("pageNo").addEventListener("change", () => loadGrid());
+        $("btnPrevPage").addEventListener("click", () => {
+            const v = Math.max(Number($("pageNo").value || "1") - 1, 1);
+            $("pageNo").value = String(v);
+            loadGrid();
+        });
+        $("btnNextPage").addEventListener("click", () => {
+            const v = Math.max(Number($("pageNo").value || "1") + 1, 1);
+            $("pageNo").value = String(v);
+            loadGrid();
+        });
+
+        // ✅ 푸드 고정 UI 초기화
+        (async function init() {
+            hydrateLayout();
+
+            $("managerMode").value = "food";
+            syncBannerUI();
+            setPick("image");
+
+            initCategoryFilterUI();
+
+            syncChips();
+            hideBannerMsg();
+
+            await loadBannerSlot(true);
+            await loadGrid();
+
+            setStatus("ok", "푸드 전용 매니저 준비 완료 ✅", `API:${API_BASE} / 시간:${nowStr()}`);
+        })();
+    </script>
+</body>
+
+</html>
