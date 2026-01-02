@@ -648,25 +648,26 @@
         // ✅ 사이드바 카테고리 동적 생성 (DB에서 생성)
         // ===============================
         async function fetchCategoryTreeFromStores() {
-            // ✅ 기존: /ncategory2manager/ad/search-store?q=__all__
-            // ✅ 변경: 이미 정상인 API 사용
-            const url = `/admin/subcategory/stores?mode=combined&page=1&pageSize=5000`;
+            // ✅ 존재하는 엔드포인트 사용
+            const url = `/admin/subcategory/search-store?q=__all__&mode=combined&page=1&pageSize=5000`;
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) throw new Error(`category HTTP ${res.status}`);
 
             const json = await res.json();
-            const stores = json.stores || [];
+
+            // ✅ search-store 응답은 results 에 있을 가능성이 높음
+            const stores = json.stores || json.results || [];
 
             const map = new Map(); // category -> Set(subcategory)
 
             for (const s of stores) {
-                const cat = cleanStr(s.business_category || s.category);
+                const cat = cleanStr(s.business_category || s.category || s.business_type);
                 if (!cat) continue;
 
                 if (!map.has(cat)) map.set(cat, new Set());
 
-                // ✅ 이 API는 subcategory 키로 내려옴
-                const sub = cleanStr(s.subcategory || s.business_subcategory);
+                // 서브카테고리: 있으면 사용, 없으면 생략
+                const sub = cleanStr(s.subcategory || s.business_subcategory || s.detail_category);
                 if (sub) map.get(cat).add(sub);
             }
 
