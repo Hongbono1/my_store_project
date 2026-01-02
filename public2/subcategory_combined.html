@@ -124,13 +124,13 @@
         // endpoints (mode별)
         function getGridEndpoint() {
             return state.mode === "combined"
-                ? "/subcategorymanager_combined/ad/grid"
-                : "/subcategorymanager_food/ad/grid";
+                ? "/subcategorymanager/ad/grid"          // ✅ 통합: 이걸로
+                : "/subcategorymanager_food/ad/grid";    // ✅ 푸드: 그대로
         }
         function getSlotEndpoint() {
             return state.mode === "combined"
-                ? "/subcategorymanager_combined/ad/slot"
-                : "/subcategorymanager_food/ad/slot";
+                ? "/subcategorymanager/ad/slot"          // ✅ 통합: 이걸로
+                : "/subcategorymanager_food/ad/slot";    // ✅ 푸드: 그대로
         }
 
         // All items: 접힘 4개 / 펼침 12개 + 페이지네이션
@@ -144,128 +144,128 @@
         // 한식 서브(고정) - food에서만 사용
         const HANSIK_SUBS = ["밥", "찌개탕", "고기구이", "생선", "족발보쌈", "국밥", "반찬", "기타한식"];
 
-        function qs(sel) { return document.querySelector(sel); }
-        function clean(v) { return (v ?? "").toString().trim(); }
+            function qs(sel) { return document.querySelector(sel); }
+            function clean(v) { return (v ?? "").toString().trim(); }
 
-        function escapeHtml(input) {
-            const s = input == null ? "" : String(input);
-            return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-        }
-
-        function normalizeSrc(src) {
-            const v = clean(src);
-            if (!v) return "/uploads/no-image.png";
-            if (/^https?:\/\//i.test(v)) return v;
-            return v.startsWith("/") ? v : "/" + v;
-        }
-
-        function pickImage(store) {
-            const cand = store.image_url || store.main_image_url || store.image || store.url || "";
-            return normalizeSrc(cand);
-        }
-
-        // ✅ 카드에 표시할 카테고리 텍스트 (mode별)
-        function getCardCategoryText(store) {
-            const cat = clean(store.business_category || store.category || "");
-            const sub = clean(store.business_subcategory || store.detail_category || store.subcategory || "");
-            const type = clean(store.business_type || store.store_type || store.type || "");
-
-            // food: 한식이면 sub만 보여주기
-            if (state.mode === "food") {
-                if (cat === "한식" && sub) return sub;
-                return cat || type || "";
+            function escapeHtml(input) {
+                const s = input == null ? "" : String(input);
+                return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
             }
 
-            // combined: cat 우선, 없으면 type
-            // (통합은 '한식 규칙' 없음)
-            return cat || type || sub || "";
-        }
-
-        // ✅ 모든 섹션에 category/subcategory 전송 (통합도 동일)
-        function buildUrl(section, pageNo, pageSize) {
-            const params = new URLSearchParams();
-            params.set("page", "subcategory");
-            params.set("section", section);
-            params.set("pageNo", String(pageNo || 1));
-            params.set("pageSize", String(pageSize || ITEMS_PAGE_SIZE));
-
-            // mode 전달(백엔드가 무시해도 상관없음)
-            params.set("mode", state.mode);
-
-            // category는 항상
-            params.set("category", state.category);
-
-            // ✅ subcategory는 food + 한식일 때만
-            if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
-                params.set("subcategory", state.subcategory);
+            function normalizeSrc(src) {
+                const v = clean(src);
+                if (!v) return "/uploads/no-image.png";
+                if (/^https?:\/\//i.test(v)) return v;
+                return v.startsWith("/") ? v : "/" + v;
             }
 
-            return `${getGridEndpoint()}?${params.toString()}`;
-        }
-
-        function normalizeItems(data) {
-            const items = data?.items || data?.rows || data?.list || data?.results || [];
-            return Array.isArray(items) ? items : [];
-        }
-
-        function mapItemsToStores(items) {
-            return (items || [])
-                .filter(it => it && (it.occupied === undefined ? true : !!it.occupied))
-                .map(it => ({
-                    id: it.store_id ?? it.id ?? it.storeId ?? "",
-                    business_name: it.business_name ?? it.store_name ?? it.name ?? "",
-                    business_type: it.store_type ?? it.business_type ?? it.type ?? "",
-                    business_category: it.business_category ?? it.category ?? "",
-                    business_subcategory: it.business_subcategory ?? it.detail_category ?? it.subcategory ?? "",
-                    detail_category: it.business_subcategory ?? it.detail_category ?? it.subcategory ?? "",
-                    image_url: it.image_url ?? it.main_image_url ?? it.image ?? "",
-                    _raw: it
-                }));
-        }
-
-        async function fetchGrid(section, pageNo, pageSize) {
-            const url = buildUrl(section, pageNo, pageSize);
-            const res = await fetch(url, { cache: "no-store", headers: { "Accept": "application/json" } });
-
-            let json = null;
-            try { json = await res.json(); } catch (_) { }
-
-            if (!res.ok) {
-                const msg = json?.error || `grid fetch 실패: ${res.status}`;
-                throw new Error(msg);
+            function pickImage(store) {
+                const cand = store.image_url || store.main_image_url || store.image || store.url || "";
+                return normalizeSrc(cand);
             }
-            if (!json?.success) {
-                throw new Error(json?.error || "grid 응답 실패");
+
+            // ✅ 카드에 표시할 카테고리 텍스트 (mode별)
+            function getCardCategoryText(store) {
+                const cat = clean(store.business_category || store.category || "");
+                const sub = clean(store.business_subcategory || store.detail_category || store.subcategory || "");
+                const type = clean(store.business_type || store.store_type || store.type || "");
+
+                // food: 한식이면 sub만 보여주기
+                if (state.mode === "food") {
+                    if (cat === "한식" && sub) return sub;
+                    return cat || type || "";
+                }
+
+                // combined: cat 우선, 없으면 type
+                // (통합은 '한식 규칙' 없음)
+                return cat || type || sub || "";
             }
-            return json;
-        }
 
-        function renderStoresGrid(stores, gridEl) {
-            gridEl.innerHTML = "";
+            // ✅ 모든 섹션에 category/subcategory 전송 (통합도 동일)
+            function buildUrl(section, pageNo, pageSize) {
+                const params = new URLSearchParams();
+                params.set("page", "subcategory");
+                params.set("section", section);
+                params.set("pageNo", String(pageNo || 1));
+                params.set("pageSize", String(pageSize || ITEMS_PAGE_SIZE));
 
-            if (!stores || !stores.length) {
-                gridEl.innerHTML = `
+                // mode 전달(백엔드가 무시해도 상관없음)
+                params.set("mode", state.mode);
+
+                // category는 항상
+                params.set("category", state.category);
+
+                // ✅ subcategory는 food + 한식일 때만
+                if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
+                    params.set("subcategory", state.subcategory);
+                }
+
+                return `${getGridEndpoint()}?${params.toString()}`;
+            }
+
+            function normalizeItems(data) {
+                const items = data?.items || data?.rows || data?.list || data?.results || [];
+                return Array.isArray(items) ? items : [];
+            }
+
+            function mapItemsToStores(items) {
+                return (items || [])
+                    .filter(it => it && (it.occupied === undefined ? true : !!it.occupied))
+                    .map(it => ({
+                        id: it.store_id ?? it.id ?? it.storeId ?? "",
+                        business_name: it.business_name ?? it.store_name ?? it.name ?? "",
+                        business_type: it.store_type ?? it.business_type ?? it.type ?? "",
+                        business_category: it.business_category ?? it.category ?? "",
+                        business_subcategory: it.business_subcategory ?? it.detail_category ?? it.subcategory ?? "",
+                        detail_category: it.business_subcategory ?? it.detail_category ?? it.subcategory ?? "",
+                        image_url: it.image_url ?? it.main_image_url ?? it.image ?? "",
+                        _raw: it
+                    }));
+            }
+
+            async function fetchGrid(section, pageNo, pageSize) {
+                const url = buildUrl(section, pageNo, pageSize);
+                const res = await fetch(url, { cache: "no-store", headers: { "Accept": "application/json" } });
+
+                let json = null;
+                try { json = await res.json(); } catch (_) { }
+
+                if (!res.ok) {
+                    const msg = json?.error || `grid fetch 실패: ${res.status}`;
+                    throw new Error(msg);
+                }
+                if (!json?.success) {
+                    throw new Error(json?.error || "grid 응답 실패");
+                }
+                return json;
+            }
+
+            function renderStoresGrid(stores, gridEl) {
+                gridEl.innerHTML = "";
+
+                if (!stores || !stores.length) {
+                    gridEl.innerHTML = `
                   <div class="col-span-full flex justify-center items-center py-16">
                     <div class="p-8 text-center max-w-md">
                       <h3 class="text-lg font-semibold text-gray-700 mb-2">등록된 가게가 없습니다</h3>
                       <p class="text-sm text-gray-500">빠른 시일 내에 새로운 가게가 추가될 예정입니다.</p>
                     </div>
                   </div>`;
-                return;
-            }
+                    return;
+                }
 
-            const wrapper = document.createElement("div");
-            wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
+                const wrapper = document.createElement("div");
+                wrapper.className = "col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
 
-            stores.forEach(store => {
-                const dispName = clean(store.business_name) || "-";
-                const catText = getCardCategoryText(store);
-                const imgNorm = pickImage(store);
+                stores.forEach(store => {
+                    const dispName = clean(store.business_name) || "-";
+                    const catText = getCardCategoryText(store);
+                    const imgNorm = pickImage(store);
 
-                const card = document.createElement("div");
-                card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col bg-white";
-                card.innerHTML = `
+                    const card = document.createElement("div");
+                    card.className = "rounded-2xl cursor-pointer hover:shadow-lg transition overflow-hidden flex flex-col bg-white";
+                    card.innerHTML = `
                   <div class="relative h-[260px]">
                     <img src="${imgNorm}" alt="${escapeHtml(dispName)}" class="w-full h-full object-cover rounded-t-2xl">
                     <div class="absolute left-0 right-0 bottom-0 bg-white/90 backdrop-blur px-4 py-2 text-center rounded-b-2xl">
@@ -275,37 +275,37 @@
                   </div>
                 `;
 
-                card.addEventListener("click", () => {
-                    const id = store.id;
-                    if (!id) return;
-                    // ✅ mode에 따라 ndetail type 변경
-                    window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(state.mode)}`;
+                    card.addEventListener("click", () => {
+                        const id = store.id;
+                        if (!id) return;
+                        // ✅ mode에 따라 ndetail type 변경
+                        window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(state.mode)}`;
+                    });
+
+                    wrapper.appendChild(card);
                 });
 
-                wrapper.appendChild(card);
-            });
-
-            gridEl.appendChild(wrapper);
-        }
-
-        function renderSmallGrid(gridId, stores) {
-            const grid = qs(`#${gridId}`);
-            grid.innerHTML = "";
-
-            if (!stores || !stores.length) {
-                grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
-                return;
+                gridEl.appendChild(wrapper);
             }
 
-            stores.forEach(store => {
-                const name = clean(store.business_name) || "-";
-                const catText = getCardCategoryText(store);
-                const img = pickImage(store);
+            function renderSmallGrid(gridId, stores) {
+                const grid = qs(`#${gridId}`);
+                grid.innerHTML = "";
 
-                const card = document.createElement("a");
-                card.href = "javascript:void(0)";
-                card.className = "block rounded-2xl overflow-hidden bg-white hover:shadow-lg transition";
-                card.innerHTML = `
+                if (!stores || !stores.length) {
+                    grid.innerHTML = `<div class="col-span-full text-center text-gray-500">등록된 가게가 없습니다.</div>`;
+                    return;
+                }
+
+                stores.forEach(store => {
+                    const name = clean(store.business_name) || "-";
+                    const catText = getCardCategoryText(store);
+                    const img = pickImage(store);
+
+                    const card = document.createElement("a");
+                    card.href = "javascript:void(0)";
+                    card.className = "block rounded-2xl overflow-hidden bg-white hover:shadow-lg transition";
+                    card.innerHTML = `
                   <div class="h-40">
                     <img src="${img}" alt="${escapeHtml(name)}" class="w-full h-full object-cover">
                   </div>
@@ -315,456 +315,420 @@
                   </div>
                 `;
 
-                card.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    const id = store.id;
-                    if (!id) return;
-                    window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(state.mode)}`;
+                    card.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        const id = store.id;
+                        if (!id) return;
+                        window.location.href = `/ndetail.html?id=${encodeURIComponent(id)}&type=${encodeURIComponent(state.mode)}`;
+                    });
+
+                    grid.appendChild(card);
                 });
-
-                grid.appendChild(card);
-            });
-        }
-
-        function syncMoreButtonLabels() {
-            const btnItems = qs("#btnMoreItems");
-            const btnBest = qs("#btnMoreBest");
-            const btnNew = qs("#btnMoreNew");
-
-            if (btnItems) btnItems.textContent = state.sectionState.items.expanded ? "접기" : "더보기";
-            if (btnBest) btnBest.textContent = state.sectionState.best.expanded ? "접기" : "더보기";
-            if (btnNew) btnNew.textContent = state.sectionState.newly.expanded ? "접기" : "더보기";
-        }
-
-        function resetAllPages() {
-            state.sectionState.items.page = 1;
-            state.sectionState.best.page = 1;
-            state.sectionState.newly.page = 1;
-        }
-
-        function updateUrlMode(mode) {
-            const q = new URLSearchParams(location.search);
-            q.set("type", mode);
-            history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-        }
-
-        function updateUrlSubcategory(sub) {
-            const q = new URLSearchParams(location.search);
-            if (sub) q.set("subcategory", sub);
-            else { q.delete("subcategory"); q.delete("sub"); }
-            history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
-        }
-
-        function makeFilterBtn(label, value) {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            const active = clean(state.subcategory) === clean(value);
-            btn.className = active
-                ? "px-3 py-1.5 rounded-full bg-black text-white text-sm"
-                : "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
-            btn.textContent = label;
-
-            btn.onclick = async () => {
-                state.subcategory = clean(value);
-                resetAllPages();
-                updateUrlSubcategory(state.subcategory);
-                await loadAllSections(true);
-            };
-
-            return btn;
-        }
-
-        function renderFilters() {
-            const wrap = qs("#filterWrap");
-            const container = qs("#filterContainer");
-            if (!wrap || !container) return;
-
-            container.innerHTML = "";
-
-            // ✅ food + 한식일 때만 필터 표시
-            if (!(state.mode === "food" && state.category === "한식")) {
-                wrap.classList.add("hidden");
-                state.subcategory = "";
-                return;
             }
 
-            wrap.classList.remove("hidden");
-            container.appendChild(makeFilterBtn("All", ""));
-            HANSIK_SUBS.forEach(s => container.appendChild(makeFilterBtn(s, s)));
-        }
+            function syncMoreButtonLabels() {
+                const btnItems = qs("#btnMoreItems");
+                const btnBest = qs("#btnMoreBest");
+                const btnNew = qs("#btnMoreNew");
 
-        async function renderItemsSection() {
-            const grid = qs("#lineGrid");
-            const pager = qs("#itemsPager");
-            const prev = qs("#itemsPrev");
-            const next = qs("#itemsNext");
-            const info = qs("#itemsPageInfo");
-
-            const st = state.sectionState.items;
-            const pageNo = st.expanded ? st.page : 1;
-
-            const json = await fetchGrid("all_items", pageNo, ITEMS_PAGE_SIZE);
-            const stores = mapItemsToStores(normalizeItems(json));
-
-            if (pageNo === 1) state.cacheAllFirstPage = stores.slice();
-
-            const visible = st.expanded ? stores : stores.slice(0, ITEMS_COLLAPSED_COUNT);
-            renderStoresGrid(visible, grid);
-
-            const totalPages = Number(json.totalPages || 1);
-            st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
-
-            if (!st.expanded || st.totalPages <= 1) {
-                pager.classList.add("hidden");
-            } else {
-                pager.classList.remove("hidden");
-                info.textContent = `${st.page} / ${st.totalPages}`;
-                prev.disabled = st.page <= 1;
-                next.disabled = st.page >= st.totalPages;
-            }
-        }
-
-        // Best
-        async function renderBestSection() {
-            const st = state.sectionState.best;
-            const pager = qs("#bestPager");
-            const prev = qs("#bestPrev");
-            const next = qs("#bestNext");
-            const info = qs("#bestPageInfo");
-
-            const pageNo = st.expanded ? st.page : 1;
-
-            const json = await fetchGrid("best_seller", pageNo, SMALL_PAGE_SIZE);
-            const stores = mapItemsToStores(normalizeItems(json));
-            const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
-
-            renderSmallGrid("bestGrid", visible);
-
-            const totalPages = Number(json.totalPages || 1);
-            st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
-
-            if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
-            else {
-                pager.classList.remove("hidden");
-                info.textContent = `${st.page} / ${st.totalPages}`;
-                prev.disabled = st.page <= 1;
-                next.disabled = st.page >= st.totalPages;
-            }
-        }
-
-        // New
-        async function renderNewSection() {
-            const st = state.sectionState.newly;
-            const pager = qs("#newPager");
-            const prev = qs("#newPrev");
-            const next = qs("#newNext");
-            const info = qs("#newPageInfo");
-
-            const pageNo = st.expanded ? st.page : 1;
-
-            const json = await fetchGrid("new_registration", pageNo, SMALL_PAGE_SIZE);
-            const stores = mapItemsToStores(normalizeItems(json));
-            const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
-
-            renderSmallGrid("newGrid", visible);
-
-            const totalPages = Number(json.totalPages || 1);
-            st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
-
-            if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
-            else {
-                pager.classList.remove("hidden");
-                info.textContent = `${st.page} / ${st.totalPages}`;
-                prev.disabled = st.page <= 1;
-                next.disabled = st.page >= st.totalPages;
-            }
-        }
-
-        // ✅ 배너: 이미지(idx=1) + 텍스트(idx=2) 둘 다 조회
-        async function fetchHeroSlotTry(paramsObj) {
-            const p = new URLSearchParams(paramsObj);
-            const url = `${getSlotEndpoint()}?${p.toString()}`;
-            const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
-            const data = await res.json().catch(() => null);
-            if (!res.ok || !data?.success) return null;
-            return data.slot || null;
-        }
-
-        async function hydrateHeroFromManager() {
-            // ========== 이미지 배너 (idx=1) ==========
-            const imgBase = { page: "subcategory", section: "top", idx: "1" };
-            const imgWithCat = { ...imgBase, category: state.category || "" };
-            if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
-                imgWithCat.subcategory = state.subcategory;
+                if (btnItems) btnItems.textContent = state.sectionState.items.expanded ? "접기" : "더보기";
+                if (btnBest) btnBest.textContent = state.sectionState.best.expanded ? "접기" : "더보기";
+                if (btnNew) btnNew.textContent = state.sectionState.newly.expanded ? "접기" : "더보기";
             }
 
-            let imgSlot = await fetchHeroSlotTry(imgWithCat);
-            if (!imgSlot) imgSlot = await fetchHeroSlotTry(imgBase);
-
-            // ========== 텍스트 배너 (idx=2) ==========
-            const txtBase = { page: "subcategory", section: "top", idx: "2" };
-            const txtWithCat = { ...txtBase, category: state.category || "" };
-            if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
-                txtWithCat.subcategory = state.subcategory;
+            function resetAllPages() {
+                state.sectionState.items.page = 1;
+                state.sectionState.best.page = 1;
+                state.sectionState.newly.page = 1;
             }
 
-            let txtSlot = await fetchHeroSlotTry(txtWithCat);
-            if (!txtSlot) txtSlot = await fetchHeroSlotTry(txtBase);
-
-            // ========== 이미지 적용 ==========
-            const imgEl = document.getElementById("heroImage");
-            const linkEl = document.getElementById("heroLink");
-
-            if (imgSlot) {
-                const img = clean(imgSlot.image_url) || "";
-                const link = clean(imgSlot.link_url) || "";
-
-                if (imgEl) imgEl.src = normalizeSrc(img || "/uploads/no-image.png");
-                if (linkEl) {
-                    if (clean(link)) linkEl.href = link;
-                    else linkEl.removeAttribute("href");
-                }
-            } else {
-                if (imgEl) imgEl.src = "/uploads/no-image.png";
-                if (linkEl) linkEl.removeAttribute("href");
+            function updateUrlSubcategory(sub) {
+                const q = new URLSearchParams(location.search);
+                if (sub) q.set("subcategory", sub);
+                else { q.delete("subcategory"); q.delete("sub"); }
+                history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
             }
 
-            // ========== 텍스트 적용 ==========
-            const titleEl = document.getElementById("heroTitle");
-            const subtitleEl = document.getElementById("heroSubtitle");
+            function makeFilterBtn(label, value) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                const active = clean(state.subcategory) === clean(value);
+                btn.className = active
+                    ? "px-3 py-1.5 rounded-full bg-black text-white text-sm"
+                    : "px-3 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-sm";
+                btn.textContent = label;
 
-            if (txtSlot) {
-                const text = clean(txtSlot.title || txtSlot.text) || "";
-                
-                // 스타일 정보 파싱 (subtitle에 JSON 저장되어 있음)
-                let style = { fontSize: "24", fontWeight: "700", color: "#1e293b", bgColor: "#ffffff" };
-                try {
-                    const parsed = JSON.parse(clean(txtSlot.subtitle) || "{}");
-                    if (parsed.fontSize) style.fontSize = parsed.fontSize;
-                    if (parsed.fontWeight) style.fontWeight = parsed.fontWeight;
-                    if (parsed.color) style.color = parsed.color;
-                    if (parsed.bgColor) style.bgColor = parsed.bgColor;
-                } catch {}
-
-                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-                const catLabel = state.category ? state.category : modeLabel;
-                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-
-                if (titleEl) {
-                    titleEl.textContent = text || `${catLabel}${subLabel}`;
-                    titleEl.style.fontSize = `${style.fontSize}px`;
-                    titleEl.style.fontWeight = style.fontWeight;
-                    titleEl.style.color = style.color;
-                }
-
-                if (subtitleEl) {
-                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
-                    subtitleEl.style.backgroundColor = style.bgColor;
-                }
-            } else {
-                // 텍스트 배너 없을 때 기본값
-                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-                const title = state.category ? state.category : modeLabel;
-                
-                if (titleEl) {
-                    titleEl.textContent = `${title}${subLabel}`;
-                    titleEl.style.fontSize = "";
-                    titleEl.style.fontWeight = "";
-                    titleEl.style.color = "";
-                }
-                if (subtitleEl) {
-                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
-                    subtitleEl.style.backgroundColor = "";
-                }
-            }
-
-            return !!(imgSlot || txtSlot);
-        }
-
-        async function loadAllSections(keepScroll) {
-            const keepY = keepScroll ? window.scrollY : null;
-
-            await hydrateHeroFromManager();
-
-            renderFilters();
-            syncMoreButtonLabels();
-
-            await renderItemsSection();
-            await renderBestSection();
-            await renderNewSection();
-
-            if (keepY != null) {
-                requestAnimationFrame(() => window.scrollTo({ top: keepY, behavior: "auto" }));
-            }
-        }
-
-        function bindEvents() {
-            const btnMoreItems = qs("#btnMoreItems");
-            const btnMoreBest = qs("#btnMoreBest");
-            const btnMoreNew = qs("#btnMoreNew");
-            const bestPrev = qs("#bestPrev");
-            const bestNext = qs("#bestNext");
-            const newPrev = qs("#newPrev");
-            const newNext = qs("#newNext");
-            const itemsPrev = qs("#itemsPrev");
-            const itemsNext = qs("#itemsNext");
-
-            // mode toggle
-            const btnFood = qs("#btnModeFood");
-            const btnCombined = qs("#btnModeCombined");
-
-            if (btnFood) {
-                btnFood.onclick = async () => {
-                    if (state.mode === "food") return;
-                    state.mode = "food";
-                    updateUrlMode("food");
-
-                    // food로 오면 한식 sub는 유지 가능하지만, 비한식이면 제거
-                    if (state.category !== "한식") state.subcategory = "";
+                btn.onclick = async () => {
+                    state.subcategory = clean(value);
                     resetAllPages();
-                    await loadAllSections(false);
+                    updateUrlSubcategory(state.subcategory);
+                    await loadAllSections(true);
                 };
+
+                return btn;
             }
 
-            if (btnCombined) {
-                btnCombined.onclick = async () => {
-                    if (state.mode === "combined") return;
-                    state.mode = "combined";
-                    updateUrlMode("combined");
+            function renderFilters() {
+                const wrap = qs("#filterWrap");
+                const container = qs("#filterContainer");
+                if (!wrap || !container) return;
 
-                    // 통합은 한식 sub 개념 없음
+                container.innerHTML = "";
+
+                // ✅ food + 한식일 때만 필터 표시
+                if (!(state.mode === "food" && state.category === "한식")) {
+                    wrap.classList.add("hidden");
                     state.subcategory = "";
-                    resetAllPages();
-                    await loadAllSections(false);
-                };
+                    return;
+                }
+
+                wrap.classList.remove("hidden");
+                container.appendChild(makeFilterBtn("All", ""));
+                HANSIK_SUBS.forEach(s => container.appendChild(makeFilterBtn(s, s)));
             }
 
-            if (btnMoreItems) {
-                btnMoreItems.onclick = async () => {
-                    const st = state.sectionState.items;
-                    st.expanded = !st.expanded;
-                    st.page = 1;
-                    syncMoreButtonLabels();
-                    await renderItemsSection();
-                };
+            async function renderItemsSection() {
+                const grid = qs("#lineGrid");
+                const pager = qs("#itemsPager");
+                const prev = qs("#itemsPrev");
+                const next = qs("#itemsNext");
+                const info = qs("#itemsPageInfo");
+
+                const st = state.sectionState.items;
+                const pageNo = st.expanded ? st.page : 1;
+
+                const json = await fetchGrid("all_items", pageNo, ITEMS_PAGE_SIZE);
+                const stores = mapItemsToStores(normalizeItems(json));
+
+                if (pageNo === 1) state.cacheAllFirstPage = stores.slice();
+
+                const visible = st.expanded ? stores : stores.slice(0, ITEMS_COLLAPSED_COUNT);
+                renderStoresGrid(visible, grid);
+
+                const totalPages = Number(json.totalPages || 1);
+                st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
+
+                if (!st.expanded || st.totalPages <= 1) {
+                    pager.classList.add("hidden");
+                } else {
+                    pager.classList.remove("hidden");
+                    info.textContent = `${st.page} / ${st.totalPages}`;
+                    prev.disabled = st.page <= 1;
+                    next.disabled = st.page >= st.totalPages;
+                }
             }
 
-            if (itemsPrev) {
-                itemsPrev.onclick = async () => {
-                    const st = state.sectionState.items;
-                    st.page = Math.max(1, st.page - 1);
-                    await renderItemsSection();
-                };
-            }
-            if (itemsNext) {
-                itemsNext.onclick = async () => {
-                    const st = state.sectionState.items;
-                    st.page = Math.min(st.totalPages || 1, st.page + 1);
-                    await renderItemsSection();
-                };
-            }
+            // Best
+            async function renderBestSection() {
+                const st = state.sectionState.best;
+                const pager = qs("#bestPager");
+                const prev = qs("#bestPrev");
+                const next = qs("#bestNext");
+                const info = qs("#bestPageInfo");
 
-            if (btnMoreBest) {
-                btnMoreBest.onclick = async (e) => {
-                    e?.preventDefault?.();
-                    const st = state.sectionState.best;
-                    st.expanded = !st.expanded;
-                    st.page = 1;
-                    syncMoreButtonLabels();
-                    await renderBestSection();
-                };
-            }
-            if (bestPrev) {
-                bestPrev.onclick = async () => {
-                    const st = state.sectionState.best;
-                    st.page = Math.max(1, st.page - 1);
-                    await renderBestSection();
-                };
-            }
-            if (bestNext) {
-                bestNext.onclick = async () => {
-                    const st = state.sectionState.best;
-                    st.page = Math.min(st.totalPages || 1, st.page + 1);
-                    await renderBestSection();
-                };
+                const pageNo = st.expanded ? st.page : 1;
+
+                const json = await fetchGrid("best_seller", pageNo, SMALL_PAGE_SIZE);
+                const stores = mapItemsToStores(normalizeItems(json));
+                const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
+
+                renderSmallGrid("bestGrid", visible);
+
+                const totalPages = Number(json.totalPages || 1);
+                st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
+
+                if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
+                else {
+                    pager.classList.remove("hidden");
+                    info.textContent = `${st.page} / ${st.totalPages}`;
+                    prev.disabled = st.page <= 1;
+                    next.disabled = st.page >= st.totalPages;
+                }
             }
 
-            if (btnMoreNew) {
-                btnMoreNew.onclick = async (e) => {
-                    e?.preventDefault?.();
-                    const st = state.sectionState.newly;
-                    st.expanded = !st.expanded;
-                    st.page = 1;
-                    syncMoreButtonLabels();
-                    await renderNewSection();
-                };
+            // New
+            async function renderNewSection() {
+                const st = state.sectionState.newly;
+                const pager = qs("#newPager");
+                const prev = qs("#newPrev");
+                const next = qs("#newNext");
+                const info = qs("#newPageInfo");
+
+                const pageNo = st.expanded ? st.page : 1;
+
+                const json = await fetchGrid("new_registration", pageNo, SMALL_PAGE_SIZE);
+                const stores = mapItemsToStores(normalizeItems(json));
+                const visible = st.expanded ? stores : stores.slice(0, SMALL_COLLAPSED_COUNT);
+
+                renderSmallGrid("newGrid", visible);
+
+                const totalPages = Number(json.totalPages || 1);
+                st.totalPages = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
+
+                if (!st.expanded || st.totalPages <= 1) pager.classList.add("hidden");
+                else {
+                    pager.classList.remove("hidden");
+                    info.textContent = `${st.page} / ${st.totalPages}`;
+                    prev.disabled = st.page <= 1;
+                    next.disabled = st.page >= st.totalPages;
+                }
             }
-            if (newPrev) {
-                newPrev.onclick = async () => {
-                    const st = state.sectionState.newly;
-                    st.page = Math.max(1, st.page - 1);
-                    await renderNewSection();
-                };
+
+            // ✅ 배너: 이미지(idx=1) + 텍스트(idx=2) 둘 다 조회
+            async function fetchHeroSlotTry(paramsObj) {
+                const p = new URLSearchParams(paramsObj);
+                const url = `${getSlotEndpoint()}?${p.toString()}`;
+                const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data?.success) return null;
+                return data.slot || null;
             }
-            if (newNext) {
-                newNext.onclick = async () => {
-                    const st = state.sectionState.newly;
-                    st.page = Math.min(st.totalPages || 1, st.page + 1);
-                    await renderNewSection();
-                };
+
+            async function hydrateHeroFromManager() {
+                // ========== 이미지 배너 (idx=1) ==========
+                const imgBase = { page: "subcategory", section: "top", idx: "1" };
+                const imgWithCat = { ...imgBase, category: state.category || "" };
+                if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
+                    imgWithCat.subcategory = state.subcategory;
+                }
+
+                let imgSlot = await fetchHeroSlotTry(imgWithCat);
+                if (!imgSlot) imgSlot = await fetchHeroSlotTry(imgBase);
+
+                // ========== 텍스트 배너 (idx=2) ==========
+                const txtBase = { page: "subcategory", section: "top", idx: "2" };
+                const txtWithCat = { ...txtBase, category: state.category || "" };
+                if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
+                    txtWithCat.subcategory = state.subcategory;
+                }
+
+                let txtSlot = await fetchHeroSlotTry(txtWithCat);
+                if (!txtSlot) txtSlot = await fetchHeroSlotTry(txtBase);
+
+                // ========== 이미지 적용 ==========
+                const imgEl = document.getElementById("heroImage");
+                const linkEl = document.getElementById("heroLink");
+
+                if (imgSlot) {
+                    const img = clean(imgSlot.image_url) || "";
+                    const link = clean(imgSlot.link_url) || "";
+
+                    if (imgEl) imgEl.src = normalizeSrc(img || "/uploads/no-image.png");
+                    if (linkEl) {
+                        if (clean(link)) linkEl.href = link;
+                        else linkEl.removeAttribute("href");
+                    }
+                } else {
+                    if (imgEl) imgEl.src = "/uploads/no-image.png";
+                    if (linkEl) linkEl.removeAttribute("href");
+                }
+
+                // ========== 텍스트 적용 ==========
+                const titleEl = document.getElementById("heroTitle");
+                const subtitleEl = document.getElementById("heroSubtitle");
+
+                if (txtSlot) {
+                    const text = clean(txtSlot.title || txtSlot.text) || "";
+
+                    // 스타일 정보 파싱 (subtitle에 JSON 저장되어 있음)
+                    let style = { fontSize: "24", fontWeight: "700", color: "#1e293b", bgColor: "#ffffff" };
+                    try {
+                        const parsed = JSON.parse(clean(txtSlot.subtitle) || "{}");
+                        if (parsed.fontSize) style.fontSize = parsed.fontSize;
+                        if (parsed.fontWeight) style.fontWeight = parsed.fontWeight;
+                        if (parsed.color) style.color = parsed.color;
+                        if (parsed.bgColor) style.bgColor = parsed.bgColor;
+                    } catch { }
+
+                    const modeLabel = state.mode === "combined" ? "통합" : "푸드";
+                    const catLabel = state.category ? state.category : modeLabel;
+                    const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+
+                    if (titleEl) {
+                        titleEl.textContent = text || `${catLabel}${subLabel}`;
+                        titleEl.style.fontSize = `${style.fontSize}px`;
+                        titleEl.style.fontWeight = style.fontWeight;
+                        titleEl.style.color = style.color;
+                    }
+
+                    if (subtitleEl) {
+                        subtitleEl.textContent = `${modeLabel} 서브카테고리`;
+                        subtitleEl.style.backgroundColor = style.bgColor;
+                    }
+                } else {
+                    // 텍스트 배너 없을 때 기본값
+                    const modeLabel = state.mode === "combined" ? "통합" : "푸드";
+                    const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+                    const title = state.category ? state.category : modeLabel;
+
+                    if (titleEl) {
+                        titleEl.textContent = `${title}${subLabel}`;
+                        titleEl.style.fontSize = "";
+                        titleEl.style.fontWeight = "";
+                        titleEl.style.color = "";
+                    }
+                    if (subtitleEl) {
+                        subtitleEl.textContent = `${modeLabel} 서브카테고리`;
+                        subtitleEl.style.backgroundColor = "";
+                    }
+                }
+
+                return !!(imgSlot || txtSlot);
             }
-        }
 
-        async function includeHeaderFooter() {
-            fetch("/components/header.html")
-                .then(r => r.text())
-                .then(d => (qs("#header-placeholder").innerHTML = d))
-                .catch(() => { });
+            async function loadAllSections(keepScroll) {
+                const keepY = keepScroll ? window.scrollY : null;
 
-            fetch("/components/footer.html")
-                .then(r => r.text())
-                .then(d => (qs("#footer-placeholder").innerHTML = d))
-                .catch(() => { });
-        }
+                await hydrateHeroFromManager();
 
-        function readQuery() {
-            const u = new URL(location.href);
-            const type = clean(u.searchParams.get("type")) || "food";
-            const category = clean(u.searchParams.get("category"));
-            const sub = clean(u.searchParams.get("subcategory") || u.searchParams.get("sub"));
-            return { type, category, sub };
-        }
+                renderFilters();
+                syncMoreButtonLabels();
 
-        document.addEventListener("DOMContentLoaded", async () => {
-            await includeHeaderFooter();
+                await renderItemsSection();
+                await renderBestSection();
+                await renderNewSection();
 
-            const { type, category, sub } = readQuery();
-            state.mode = (type === "combined") ? "combined" : "food";
-            state.category = category || "";
+                if (keepY != null) {
+                    requestAnimationFrame(() => window.scrollTo({ top: keepY, behavior: "auto" }));
+                }
+            }
 
-            // food+한식일 때만 subcategory 사용
-            state.subcategory = (state.mode === "food" && state.category === "한식") ? clean(sub) : "";
+            function bindEvents() {
+                const btnMoreItems = qs("#btnMoreItems");
+                const btnMoreBest = qs("#btnMoreBest");
+                const btnMoreNew = qs("#btnMoreNew");
+                const bestPrev = qs("#bestPrev");
+                const bestNext = qs("#bestNext");
+                const newPrev = qs("#newPrev");
+                const newNext = qs("#newNext");
+                const itemsPrev = qs("#itemsPrev");
+                const itemsNext = qs("#itemsNext");
 
-            // 초기화
-            state.sectionState.items.expanded = false;
-            state.sectionState.items.page = 1;
-            state.sectionState.best.expanded = false;
-            state.sectionState.best.page = 1;
-            state.sectionState.newly.expanded = false;
-            state.sectionState.newly.page = 1;
+                if (btnMoreItems) {
+                    btnMoreItems.onclick = async () => {
+                        const st = state.sectionState.items;
+                        st.expanded = !st.expanded;
+                        st.page = 1;
+                        syncMoreButtonLabels();
+                        await renderItemsSection();
+                    };
+                }
 
-            bindEvents();
-            await loadAllSections(false);
-        });
+                if (itemsPrev) {
+                    itemsPrev.onclick = async () => {
+                        const st = state.sectionState.items;
+                        st.page = Math.max(1, st.page - 1);
+                        await renderItemsSection();
+                    };
+                }
+                if (itemsNext) {
+                    itemsNext.onclick = async () => {
+                        const st = state.sectionState.items;
+                        st.page = Math.min(st.totalPages || 1, st.page + 1);
+                        await renderItemsSection();
+                    };
+                }
 
-        function goBack() {
-            if (document.referrer && document.referrer !== location.href) window.history.back();
-            else window.location.href = "/category.html";
-        }
-        function goNext() {
-            window.history.forward();
-        }
+                if (btnMoreBest) {
+                    btnMoreBest.onclick = async (e) => {
+                        e?.preventDefault?.();
+                        const st = state.sectionState.best;
+                        st.expanded = !st.expanded;
+                        st.page = 1;
+                        syncMoreButtonLabels();
+                        await renderBestSection();
+                    };
+                }
+                if (bestPrev) {
+                    bestPrev.onclick = async () => {
+                        const st = state.sectionState.best;
+                        st.page = Math.max(1, st.page - 1);
+                        await renderBestSection();
+                    };
+                }
+                if (bestNext) {
+                    bestNext.onclick = async () => {
+                        const st = state.sectionState.best;
+                        st.page = Math.min(st.totalPages || 1, st.page + 1);
+                        await renderBestSection();
+                    };
+                }
+
+                if (btnMoreNew) {
+                    btnMoreNew.onclick = async (e) => {
+                        e?.preventDefault?.();
+                        const st = state.sectionState.newly;
+                        st.expanded = !st.expanded;
+                        st.page = 1;
+                        syncMoreButtonLabels();
+                        await renderNewSection();
+                    };
+                }
+                if (newPrev) {
+                    newPrev.onclick = async () => {
+                        const st = state.sectionState.newly;
+                        st.page = Math.max(1, st.page - 1);
+                        await renderNewSection();
+                    };
+                }
+                if (newNext) {
+                    newNext.onclick = async () => {
+                        const st = state.sectionState.newly;
+                        st.page = Math.min(st.totalPages || 1, st.page + 1);
+                        await renderNewSection();
+                    };
+                }
+            }
+
+            async function includeHeaderFooter() {
+                fetch("/components/header.html")
+                    .then(r => r.text())
+                    .then(d => (qs("#header-placeholder").innerHTML = d))
+                    .catch(() => { });
+
+                fetch("/components/footer.html")
+                    .then(r => r.text())
+                    .then(d => (qs("#footer-placeholder").innerHTML = d))
+                    .catch(() => { });
+            }
+
+            function readQuery() {
+                const u = new URL(location.href);
+                const type = clean(u.searchParams.get("type")) || "food";
+                const category = clean(u.searchParams.get("category"));
+                const sub = clean(u.searchParams.get("subcategory") || u.searchParams.get("sub"));
+                return { type, category, sub };
+            }
+
+            document.addEventListener("DOMContentLoaded", async () => {
+                await includeHeaderFooter();
+
+                const { type, category, sub } = readQuery();
+                state.mode = (type === "combined") ? "combined" : "food";
+                state.category = category || "";
+
+                // food+한식일 때만 subcategory 사용
+                state.subcategory = (state.mode === "food" && state.category === "한식") ? clean(sub) : "";
+
+                // 초기화
+                state.sectionState.items.expanded = false;
+                state.sectionState.items.page = 1;
+                state.sectionState.best.expanded = false;
+                state.sectionState.best.page = 1;
+                state.sectionState.newly.expanded = false;
+                state.sectionState.newly.page = 1;
+
+                bindEvents();
+                await loadAllSections(false);
+            });
+
+            function goBack() {
+                if (document.referrer && document.referrer !== location.href) window.history.back();
+                else window.location.href = "/category.html";
+            }
+            function goNext() {
+                window.history.forward();
+            }
     </script>
 </body>
 
