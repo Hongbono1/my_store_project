@@ -353,75 +353,85 @@ app.use("/api/subcategory", subcategoryRouter);
 
 // ------------------------------------------------------------
 // 3-1. 카테고리 트리 API (사이드바용)
+// - 통합 가게(combined_store_info) 기준
 // ------------------------------------------------------------
 app.get("/api/category-tree", async (req, res) => {
-    try {
-        const mode = String(req.query.mode || "combined").trim();
-        
-        // ✅ 테이블 존재 확인
-        const tableCheck = await pool.query(`
-            SELECT to_regclass('public.combined_store_info') AS exists
-        `);
-        
-        if (!tableCheck.rows[0]?.exists) {
-            console.warn("⚠️ combined_store_info 테이블 없음");
-            return res.json({
-                success: true,
-                categories: [] // ✅ 테이블 없으면 빈 배열
-            });
-        }
-        
-        // combined_store_info에서 카테고리 목록 가져오기
-        // ✅ 전통시장, 공연전시, 쇼핑, 푸드 카테고리는 별도 페이지가 있으므로 제외
-        const sql = `
-            SELECT DISTINCT 
-                business_category AS category,
-                detail_category AS subcategory
-            FROM combined_store_info
-            WHERE business_category IS NOT NULL 
-                AND business_category != ''
-                AND business_category NOT IN ('전통시장', '공연전시', '쇼핑', '음식점', '맛집', '푸드', 'food', 'Food')
-            ORDER BY business_category, detail_category
-        `;
-        
-        const { rows } = await pool.query(sql);
-        
-        // 카테고리별로 그룹화
-        const map = new Map();
-        for (const row of rows) {
-            const cat = (row.category || "").trim();
-            if (!cat) continue;
-            
-            if (!map.has(cat)) {
-                map.set(cat, new Set());
-            }
-            
-            const sub = (row.subcategory || "").trim();
-            if (sub) {
-                map.get(cat).add(sub);
-            }
-        }
-        
-        // 배열로 변환
-        const categories = [...map.entries()].map(([category, subSet]) => ({
-            category,
-            subcategories: [...subSet].sort((a, b) => a.localeCompare(b, "ko"))
-        })).sort((a, b) => a.category.localeCompare(b.category, "ko"));
-        
-        // ✅ 데이터가 없어도 빈 배열 반환
-        if (categories.length === 0) {
-            console.warn("⚠️ combined_store_info에 통합 가게 데이터 없음");
-        }
-        
-        res.json({ success: true, categories });
-    } catch (err) {
-        console.error("❌ /api/category-tree error:", err?.message || err);
-        // ✅ 에러 시 빈 배열 반환
-        res.json({
-            success: true,
-            categories: []
-        });
+  try {
+    const mode = String(req.query.mode || "combined").trim();
+
+    // ✅ combined_store_info 테이블 존재 여부 확인
+    const tableCheck = await pool.query(`
+      SELECT to_regclass('public.combined_store_info') AS exists
+    `);
+
+    if (!tableCheck.rows[0]?.exists) {
+      console.warn("⚠️ combined_store_info 테이블 없음");
+      return res.json({
+        success: true,
+        categories: [],
+      });
     }
+
+    // ✅ 통합 가게(combined_store_info)에서 카테고리/서브카테고리 추출
+    //    - business_category
+    //    - business_subcategory  ← 여기!
+    //    - 전통시장/공연전시/쇼핑/푸드 계열은 제외
+    const sql = `
+      SELECT DISTINCT 
+        btrim(replace(business_category::text, chr(160), ' ')) AS category,
+        btrim(replace(business_subcategory::text, chr(160), ' ')) AS subcategory
+      FROM public.combined_store_info
+      WHERE business_category IS NOT NULL
+        AND business_category <> ''
+        AND business_category NOT IN (
+          '전통시장', '공연전시', '쇼핑',
+          '음식점', '맛집', '푸드', 'food', 'Food'
+        )
+      ORDER BY category, subcategory
+    `;
+
+    const { rows } = await pool.query(sql);
+
+    // ✅ 카테고리별로 서브카테고리 묶기
+    const map = new Map();
+    for (const row of rows) {
+      const cat = (row.category || "").trim();
+      if (!cat) continue;
+
+      if (!map.has(cat)) {
+        map.set(cat, new Set());
+      }
+
+      const sub = (row.subcategory || "").trim();
+      if (sub) {
+        map.get(cat).add(sub);
+      }
+    }
+
+    const categories = [...map.entries()]
+      .map(([category, subSet]) => ({
+        category,
+        subcategories: [...subSet].sort((a, b) => a.localeCompare(b, "ko")),
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category, "ko"));
+
+    if (categories.length === 0) {
+      console.warn("⚠️ combined_store_info에 통합 가게 데이터 없음");
+    } else {
+      console.log(
+        `✅ /api/category-tree: 카테고리 ${categories.length}개 응답`
+      );
+    }
+
+    res.json({ success: true, categories });
+  } catch (err) {
+    console.error("❌ /api/category-tree error:", err?.message || err);
+    // ✅ 에러 시에도 프론트가 죽지 않도록 빈 배열
+    res.json({
+      success: true,
+      categories: [],
+    });
+  }
 });
 
 // ------------------------------------------------------------
