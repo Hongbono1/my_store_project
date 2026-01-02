@@ -27,6 +27,11 @@
         </div>
     </section>
 
+    <!-- 서브카테고리 액션 버튼 줄 -->
+    <div class="max-w-6xl mx-auto px-4 w-full">
+        <div id="subcategory-filter" class="mt-4 mb-6 flex flex-wrap gap-2"></div>
+    </div>
+
     <!-- All of the items -->
     <section id="aboutSection" class="max-w-6xl mx-auto py-12 px-4 w-full">
         <div class="flex items-center justify-between mb-4">
@@ -716,9 +721,76 @@
                 state.sectionState.newly.expanded = false;
                 state.sectionState.newly.page = 1;
 
+                // ✅ 액션 버튼 렌더링 (combined 모드일 때만)
+                if (state.mode === "combined") {
+                    await renderSubcategoryFilter(state.category, clean(sub));
+                }
+
                 bindEvents();
                 await loadAllSections(false);
             });
+
+            // ✅ 서브카테고리 필터 버튼 렌더링
+            async function renderSubcategoryFilter(category, selectedSubcategory) {
+                const container = document.getElementById("subcategory-filter");
+                if (!container || !category) return;
+
+                try {
+                    const res = await fetch("/api/category-tree?mode=combined");
+                    const data = await res.json();
+                    if (!data.success || !Array.isArray(data.categories)) return;
+
+                    // 현재 상위 카테고리(예: "미용/이발") 찾기
+                    const catObj = data.categories.find((c) => (c.category || "").trim() === category.trim());
+                    if (!catObj) return;
+
+                    const subs = Array.isArray(catObj.subcategories) ? catObj.subcategories : [];
+
+                    container.innerHTML = "";
+
+                    // 공통 버튼 생성 함수
+                    const makeBtn = (label, value) => {
+                        const isActive = (value || "") === (selectedSubcategory || "");
+                        const btn = document.createElement("button");
+                        btn.type = "button";
+                        btn.textContent = label;
+
+                        btn.className =
+                            "px-3 py-1 rounded-full text-sm border transition " +
+                            (isActive
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-gray-700 border-gray-300 hover:bg-blue-50");
+
+                        btn.addEventListener("click", () => {
+                            const url = new URL(window.location.href);
+
+                            if (value) {
+                                url.searchParams.set("subcategory", value);
+                            } else {
+                                // ALL(전체)인 경우 하위 파라미터 제거
+                                url.searchParams.delete("subcategory");
+                            }
+
+                            // 같은 페이지에서 파라미터만 바꿔서 이동
+                            window.location.href = url.toString();
+                        });
+
+                        container.appendChild(btn);
+                    };
+
+                    // ✅ 1) ALL(전체) 버튼
+                    makeBtn("전체", "");
+
+                    // ✅ 2) 하위 카테고리 버튼들 (예: 미용실, 이발소)
+                    subs.forEach((sub) => {
+                        const s = (sub || "").trim();
+                        if (!s) return;
+                        makeBtn(s, s);
+                    });
+                } catch (err) {
+                    console.error("subcategory filter error:", err);
+                }
+            }
 
             function goBack() {
                 if (document.referrer && document.referrer !== location.href) window.history.back();
