@@ -351,8 +351,55 @@ subcategoryRouter.get("/food", async (req, res) => {
 // ✅ 여기 “반드시” 있어야 /api/subcategory/* 가 404가 안 남
 app.use("/api/subcategory", subcategoryRouter);
 
+// ------------------------------------------------------------// 3-1. 카테고리 트리 API (사이드바용)
 // ------------------------------------------------------------
-// 4. 문의 게시판 라우트
+app.get("/api/category-tree", async (req, res) => {
+    try {
+        const mode = String(req.query.mode || "combined").trim();
+        
+        // combined_store_info에서 카테고리 목록 가져오기
+        const sql = `
+            SELECT DISTINCT 
+                business_category AS category,
+                detail_category AS subcategory
+            FROM combined_store_info
+            WHERE business_category IS NOT NULL 
+                AND business_category != ''
+            ORDER BY business_category, detail_category
+        `;
+        
+        const { rows } = await pool.query(sql);
+        
+        // 카테고리별로 그룹화
+        const map = new Map();
+        for (const row of rows) {
+            const cat = (row.category || "").trim();
+            if (!cat) continue;
+            
+            if (!map.has(cat)) {
+                map.set(cat, new Set());
+            }
+            
+            const sub = (row.subcategory || "").trim();
+            if (sub) {
+                map.get(cat).add(sub);
+            }
+        }
+        
+        // 배열로 변환
+        const categories = [...map.entries()].map(([category, subSet]) => ({
+            category,
+            subcategories: [...subSet].sort((a, b) => a.localeCompare(b, "ko"))
+        })).sort((a, b) => a.category.localeCompare(b.category, "ko"));
+        
+        res.json({ success: true, categories });
+    } catch (err) {
+        console.error("❌ /api/category-tree error:", err?.message || err);
+        res.status(500).json({ success: false, error: err?.message || "server error" });
+    }
+});
+
+// ------------------------------------------------------------// 4. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
 app.use("/api/inquiry", inquiryBoardRouter);

@@ -648,37 +648,22 @@
         // ✅ 사이드바 카테고리 동적 생성 (DB에서 생성)
         // ===============================
         async function fetchCategoryTreeFromStores() {
-            // ✅ 통합 모드의 search-store 엔드포인트 사용
-            const url = `/subcategorymanager_combined/ad/search-store?q=__all__&mode=combined&page=1&pageSize=5000`;
+            // ✅ 간단하게 combined_store_info에서 카테고리 목록만 가져오기
+            const url = `/api/category-tree?mode=combined`;
             const res = await fetch(url, { cache: "no-store" });
-            if (!res.ok) throw new Error(`category HTTP ${res.status}`);
-
-            const json = await res.json();
-
-            // ✅ search-store 응답은 results 에 있을 가능성이 높음
-            const stores = json.stores || json.results || [];
-
-            const map = new Map(); // category -> Set(subcategory)
-
-            for (const s of stores) {
-                const cat = cleanStr(s.business_category || s.category || s.business_type);
-                if (!cat) continue;
-
-                if (!map.has(cat)) map.set(cat, new Set());
-
-                // 서브카테고리: 있으면 사용, 없으면 생략
-                const sub = cleanStr(s.subcategory || s.business_subcategory || s.detail_category);
-                if (sub) map.get(cat).add(sub);
+            if (!res.ok) {
+                // Fallback: 기본 카테고리 목록 사용
+                console.warn("⚠️ [sidebar] 카테고리 API 실패, 기본 목록 사용");
+                return [
+                    { category: "반려동물", subcategories: [] },
+                    { category: "쇼핑", subcategories: [] },
+                    { category: "공연전시", subcategories: [] },
+                    { category: "전통시장", subcategories: [] },
+                ];
             }
 
-            const list = [...map.entries()]
-                .map(([category, set]) => ({
-                    category,
-                    subcategories: [...set].sort((a, b) => a.localeCompare(b, "ko")),
-                }))
-                .sort((a, b) => a.category.localeCompare(b.category, "ko"));
-
-            return list;
+            const json = await res.json();
+            return json.categories || [];
         }
 
         function buildSubcategoryLink(category, subcategory) {
