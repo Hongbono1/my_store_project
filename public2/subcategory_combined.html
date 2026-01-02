@@ -202,9 +202,13 @@
             // category는 항상
             params.set("category", state.category);
 
-            // ✅ subcategory는 food + 한식일 때만
-            if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
-                params.set("subcategory", state.subcategory);
+            // ✅ 하위 카테고리 전달 기준
+            // - combined : 선택된 하위가 있으면 항상 전송
+            // - food     : "한식"일 때만 전송
+            if (clean(state.subcategory)) {
+                if (state.mode === "combined" || (state.mode === "food" && state.category === "한식")) {
+                    params.set("subcategory", state.subcategory);
+                }
             }
 
             return `${getGridEndpoint()}?${params.toString()}`;
@@ -713,9 +717,15 @@
             state.mode = (type === "combined") ? "combined" : "food";
             state.category = category || "";
 
-            // food+한식일 때만 subcategory 사용
-            state.subcategory = (state.mode === "food" && state.category === "한식") ? clean(sub) : "";
-
+            if (state.mode === "combined") {
+                // 통합 페이지는 어떤 카테고리든 하위 사용
+                state.subcategory = clean(sub);
+            } else if (state.mode === "food" && state.category === "한식") {
+                // food 모드에서는 한식만 하위 사용
+                state.subcategory = clean(sub);
+            } else {
+                state.subcategory = "";
+            }
             // 초기화
             state.sectionState.items.expanded = false;
             state.sectionState.items.page = 1;
