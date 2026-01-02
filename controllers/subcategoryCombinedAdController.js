@@ -358,6 +358,9 @@ async function listCombinedStores({ q = "", pageNo = 1, pageSize = 20, category 
   const cat = clean(category);
   const sub = clean(subcategory);
 
+  // 🔍 디버깅 로그
+  console.log("[listCombinedStores] 필터 값:", { cat, sub });
+
   if (cat) {
     where.push(normalizeEqSql(`s.${MAP.category}`, i++));
     params.push(cat);
@@ -366,6 +369,10 @@ async function listCombinedStores({ q = "", pageNo = 1, pageSize = 20, category 
     where.push(normalizeEqSql(`s.${MAP.subcategory}`, i++));
     params.push(sub);
   }
+
+  // 🔍 WHERE 절과 params 로그
+  console.log("[listCombinedStores] WHERE:", where);
+  console.log("[listCombinedStores] PARAMS:", params);
 
   // 이미지 select/join
   let imgSelectSql = `, '' AS image_url`;
@@ -460,6 +467,13 @@ export async function grid(req, res) {
 
     const category = clean(req.query.category);
     const subcategory = clean(req.query.subcategory);
+
+    // 🔍 디버깅 로그
+    console.log("[subcategoryCombinedAdController.grid] 받은 파라미터:", {
+      category,
+      subcategory,
+      section
+    });
 
     const pageNo = Math.max(safeInt(req.query.pageNo, 1), 1);
     const pageSize = clamp(safeInt(req.query.pageSize, 12), 1, 50);
