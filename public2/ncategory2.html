@@ -652,18 +652,19 @@
             const url = `/api/category-tree?mode=combined`;
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) {
-                // Fallback: 기본 카테고리 목록 사용
-                console.warn("⚠️ [sidebar] 카테고리 API 실패, 기본 목록 사용");
-                return [
-                    { category: "반려동물", subcategories: [] },
-                    { category: "쇼핑", subcategories: [] },
-                    { category: "공연전시", subcategories: [] },
-                    { category: "전통시장", subcategories: [] },
-                ];
+                console.warn("⚠️ [sidebar] 카테고리 API 실패");
+                return []; // ✅ 빈 배열 반환 (fallback 카테고리 제거)
             }
 
             const json = await res.json();
-            return json.categories || [];
+            const categories = json.categories || [];
+            
+            // ✅ API가 성공했지만 데이터가 없으면 빈 배열
+            if (categories.length === 0) {
+                console.warn("⚠️ [sidebar] 카테고리 데이터 없음");
+            }
+            
+            return categories;
         }
 
         function buildSubcategoryLink(category, subcategory) {
@@ -677,7 +678,10 @@
             if (!listEl) return;
 
             if (!tree.length) {
-                listEl.innerHTML = `<li class="text-center text-sm text-gray-500 py-8">표시할 카테고리가 없습니다.</li>`;
+                listEl.innerHTML = `<li class="text-center text-sm text-gray-500 py-8">
+                    <div class="font-semibold mb-2">카테고리 준비 중</div>
+                    <div class="text-xs">통합 가게 정보를 등록하면<br>자동으로 카테고리가 생성됩니다.</div>
+                </li>`;
                 return;
             }
 

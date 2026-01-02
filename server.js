@@ -364,19 +364,15 @@ app.get("/api/category-tree", async (req, res) => {
         `);
         
         if (!tableCheck.rows[0]?.exists) {
-            console.warn("⚠️ combined_store_info 테이블 없음, 기본 카테고리 반환");
+            console.warn("⚠️ combined_store_info 테이블 없음");
             return res.json({
                 success: true,
-                categories: [
-                    { category: "반려동물", subcategories: [] },
-                    { category: "쇼핑", subcategories: [] },
-                    { category: "공연전시", subcategories: [] },
-                    { category: "전통시장", subcategories: [] }
-                ]
+                categories: [] // ✅ 테이블 없으면 빈 배열
             });
         }
         
         // combined_store_info에서 카테고리 목록 가져오기
+        // ✅ 전통시장, 공연전시, 쇼핑, 푸드 카테고리는 별도 페이지가 있으므로 제외
         const sql = `
             SELECT DISTINCT 
                 business_category AS category,
@@ -384,6 +380,7 @@ app.get("/api/category-tree", async (req, res) => {
             FROM combined_store_info
             WHERE business_category IS NOT NULL 
                 AND business_category != ''
+                AND business_category NOT IN ('전통시장', '공연전시', '쇼핑', '음식점', '맛집', '푸드', 'food', 'Food')
             ORDER BY business_category, detail_category
         `;
         
@@ -411,32 +408,18 @@ app.get("/api/category-tree", async (req, res) => {
             subcategories: [...subSet].sort((a, b) => a.localeCompare(b, "ko"))
         })).sort((a, b) => a.category.localeCompare(b.category, "ko"));
         
-        // ✅ 데이터가 없으면 기본값 반환
+        // ✅ 데이터가 없어도 빈 배열 반환
         if (categories.length === 0) {
-            console.warn("⚠️ combined_store_info에 데이터 없음, 기본 카테고리 반환");
-            return res.json({
-                success: true,
-                categories: [
-                    { category: "반려동물", subcategories: [] },
-                    { category: "쇼핑", subcategories: [] },
-                    { category: "공연전시", subcategories: [] },
-                    { category: "전통시장", subcategories: [] }
-                ]
-            });
+            console.warn("⚠️ combined_store_info에 통합 가게 데이터 없음");
         }
         
         res.json({ success: true, categories });
     } catch (err) {
         console.error("❌ /api/category-tree error:", err?.message || err);
-        // ✅ 에러 시에도 기본 카테고리 반환 (500 에러 대신)
+        // ✅ 에러 시 빈 배열 반환
         res.json({
             success: true,
-            categories: [
-                { category: "반려동물", subcategories: [] },
-                { category: "쇼핑", subcategories: [] },
-                { category: "공연전시", subcategories: [] },
-                { category: "전통시장", subcategories: [] }
-            ]
+            categories: []
         });
     }
 });
