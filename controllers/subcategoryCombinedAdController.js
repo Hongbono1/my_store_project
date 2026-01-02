@@ -362,18 +362,18 @@ async function listCombinedStores({ q = "", pageNo = 1, pageSize = 20, category 
   console.log("[listCombinedStores] 필터 값:", { cat, sub });
 
   if (cat && !sub) {
-    // 상위 카테고리만 있는 경우: category 매칭
+    // ✅ 상위 카테고리만 있는 경우: 상위 기준으로만 필터
     where.push(normalizeEqSql(`s.${MAP.category}`, i++));
     params.push(cat);
-  } else if (cat && sub) {
-    // 상위 + 하위 모두 있는 경우: 
-    // (category = '상위' AND subcategory = '하위') OR (category = '하위')
-    // → 하위 카테고리가 business_category나 business_subcategory 둘 중 하나에 있으면 표시
+  } else if (sub) {
+    // ✅ 하위 카테고리가 들어온 경우: "하위 이름"을 우선 기준으로 필터
+    //  - detail_category / business_subcategory 중 하나에 들어있거나
+    //  - business_category에 바로 들어있는 경우(예: SK, KT를 카테고리로 저장한 경우)
     where.push(`(
-      (${normalizeEqSql(`s.${MAP.category}`, i++)} AND ${normalizeEqSql(`s.${MAP.subcategory}`, i++)})
+      ${normalizeEqSql(`s.${MAP.subcategory}`, i++)}
       OR ${normalizeEqSql(`s.${MAP.category}`, i++)}
     )`);
-    params.push(cat, sub, sub);  // cat, sub, sub (3개 파라미터)
+    params.push(sub, sub);
   }
 
   // 🔍 WHERE 절과 params 로그
