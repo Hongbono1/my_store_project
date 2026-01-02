@@ -651,6 +651,51 @@
             priority: DEFAULT_PRIORITY
         };
 
+        // ===============================
+        // 🔐 마지막 저장 슬롯 기억하기
+        // ===============================
+        const LAST_SUBCATEGORY_SLOT_KEY = "mh_subcategory_manager_last_slot_v1";
+
+        function saveLastSlotToStorage(info) {
+            try {
+                const catSel = $("placementCatFilter");
+                const subSel = $("placementSubFilter");
+                const data = {
+                    mode: MODE,
+                    category: info.category || (catSel && catSel.value) || "",
+                    subcategory: info.subcategory || (subSel && subSel.value) || "",
+                    section: info.section || selectedTarget.section || "",
+                    idx: Number(info.idx || selectedTarget.idx || 1) || 1,
+                };
+                localStorage.setItem(LAST_SUBCATEGORY_SLOT_KEY, JSON.stringify(data));
+                console.log("[LAST SLOT] saved:", data);
+            } catch (e) {
+                console.warn("saveLastSlotToStorage error:", e);
+            }
+        }
+
+        function loadLastSlotFromStorage() {
+            try {
+                const raw = localStorage.getItem(LAST_SUBCATEGORY_SLOT_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                console.log("[LAST SLOT] loaded:", data);
+                return data;
+            } catch (e) {
+                console.warn("loadLastSlotFromStorage error:", e);
+                return null;
+            }
+        }
+
+        function scrollToSlotCard(section, idx) {
+            const selector = `[data-section="${section}"][data-idx="${idx}"]`;
+            const el = document.querySelector(selector);
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const top = window.scrollY + rect.top - 100;
+            window.scrollTo({ top, behavior: "smooth" });
+        }
+
         // 헤더 삽입 후 id 충돌 방지: main 내부를 먼저 찾고, 없으면 document에서 찾기
         const MAIN_ROOT = document.querySelector("main");
         function $(id) {
@@ -753,6 +798,63 @@
             subSel.addEventListener("change", () => {
                 loadGrid();
             });
+        }
+
+        async function restoreLastSlotIfAny() {
+            const last = loadLastSlotFromStorage();
+            if (!last) return;
+
+            try {
+                // 1) 카테고리 복원
+                const catSel = $("placementCatFilter");
+                const subSel = $("placementSubFilter");
+                
+                if (last.category && catSel) {
+                    catSel.value = last.category;
+                    setSubcategoryOptionsByCategory(last.category);
+                }
+
+                // 2) 하위 카테고리 복원
+                if (last.subcategory && subSel) {
+                    subSel.value = last.subcategory;
+                }
+
+                // 3) 섹션 복원
+                if (last.section) {
+                    const sectionSel = $("section");
+                    if (sectionSel) {
+                        sectionSel.value = last.section;
+                        selectedTarget.section = last.section;
+                    }
+                }
+
+                // 4) idx 복원
+                if (last.idx != null) {
+                    selectedTarget.idx = last.idx;
+                }
+
+                // 5) 그리드 재로드 & 슬롯 선택
+                await loadGrid();
+
+                // 6) 해당 슬롯 박스 하이라이트
+                if (last.idx != null) {
+                    selectedBoxNo = last.idx;
+                    highlightSelectedBox();
+                    syncChips();
+                    await loadSlot(false);
+                }
+
+                // 7) 스크롤 (옵션)
+                if (last.section && last.idx != null) {
+                    setTimeout(() => {
+                        scrollToSlotCard(last.section, last.idx);
+                    }, 500);
+                }
+
+                console.log("[LAST SLOT] 복원 완료:", last);
+            } catch (e) {
+                console.warn("restoreLastSlotIfAny error:", e);
+            }
         }
 
         async function tryFetchJson(url, options) {
@@ -1256,6 +1358,15 @@
                 const data = await apiFetch(`/update`, { method: "POST", body: fd });
                 if (!data.success) throw new Error(data.error || "저장 실패");
 
+                // ✅ 저장 성공 시 마지막 슬롯 기억
+                saveLastSlotToStorage({
+                    mode: MODE,
+                    category: category,
+                    subcategory: subcategory,
+                    section: section,
+                    idx: idx,
+                });
+
                 const slot = data.slot || null;
                 if (slot?.image_url && uiPick !== "text") setBannerPreview(slot.image_url);
                 $("bannerFile").value = "";
@@ -1580,6 +1691,8 @@
                     const btn = document.createElement("button");
                     btn.type = "button";
                     btn.setAttribute("data-box", String(it.boxNo));
+                    btn.setAttribute("data-section", section);
+                    btn.setAttribute("data-idx", String(it.boxNo));
 
                     btn.className =
                         "text-left soft p-2 rounded-xl border transition " +
@@ -1682,6 +1795,9 @@
             await loadImageBanner(true);
             await loadTextBanner(true);
             await loadGrid();
+
+            // 🔥 마지막 저장 슬롯 복원
+            await restoreLastSlotIfAny();
 
             setStatus("ok", "통합 매니저 준비 완료 ✅", `API:${API_BASE} / 시간:${nowStr()}`);
         })();
