@@ -167,15 +167,19 @@
             return clean(store.business_category || store.category || store.businessCategory || "");
         }
 
-        function formatFoodCategory(item) {
-            const cat = String(item?.business_category || "").trim();
-            const sub = String(
-                item?.business_subcategory || item?.detail_category || item?.subcategory || ""
-            ).trim();
+        // ✅ 카드에 표시할 카테고리 텍스트 (통일된 원칙)
+        function getCategoryLabel(item) {
+            const upper = clean(item.business_category || item.category || "");       // 상위
+            const lower = clean(item.business_subcategory || item.detail_category || item.subcategory || "");    // 하위
 
-            if (!cat) return sub || "";
-            if (cat === "한식" && sub && sub !== cat) return `${cat}(${sub})`;
-            return cat;
+            if (lower) return lower;      // ✅ 하위가 있으면 → 하위 표시
+            if (upper) return upper;      // ✅ 하위가 없으면 → 상위 표시
+            return "";                    // 둘 다 없으면 빈 문자열
+        }
+
+        // ✅ 호환성: 기존 함수는 유지하되 새 원칙 사용
+        function formatFoodCategory(item) {
+            return getCategoryLabel(item);
         }
 
         // ✅ 모든 섹션에 category/subcategory 전송
@@ -261,16 +265,8 @@
 
                 const dispName = clean(store.business_name) || "-";
 
-                // ✅ 카드에 표시할 카테고리 텍스트
-                let cat = (store.business_category || "").trim();
-                let sub = (store.business_subcategory || store.detail_category || "").trim();
-
-                // ✅ 한식이면 "한식" 대신 하위카테고리(국밥 등)만 표시
-                let catText = cat;
-                if (cat === "한식" && sub) catText = sub;
-
-                // cat이 비면 fallback
-                if (!catText) catText = (store.store_type || store.business_type || "").trim();
+                // ✅ 통일된 원칙으로 카테고리 텍스트 생성
+                const catText = getCategoryLabel(store);
 
                 const imgNorm = pickImage(store);
 
@@ -314,16 +310,8 @@
 
                 const name = clean(store.business_name) || "-";
 
-                // ✅ 카드에 표시할 카테고리 텍스트
-                let cat = (store.business_category || "").trim();
-                let sub = (store.business_subcategory || store.detail_category || "").trim();
-
-                // ✅ 한식이면 "한식" 대신 하위카테고리(국밥 등)만 표시
-                let catText = cat;
-                if (cat === "한식" && sub) catText = sub;
-
-                // cat이 비면 fallback
-                if (!catText) catText = (store.store_type || store.business_type || "").trim();
+                // ✅ 통일된 원칙으로 카테고리 텍스트 생성
+                const catText = getCategoryLabel(store);
 
                 const img = pickImage(store);
 
