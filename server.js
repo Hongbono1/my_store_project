@@ -351,11 +351,30 @@ subcategoryRouter.get("/food", async (req, res) => {
 // ✅ 여기 “반드시” 있어야 /api/subcategory/* 가 404가 안 남
 app.use("/api/subcategory", subcategoryRouter);
 
-// ------------------------------------------------------------// 3-1. 카테고리 트리 API (사이드바용)
+// ------------------------------------------------------------
+// 3-1. 카테고리 트리 API (사이드바용)
 // ------------------------------------------------------------
 app.get("/api/category-tree", async (req, res) => {
     try {
         const mode = String(req.query.mode || "combined").trim();
+        
+        // ✅ 테이블 존재 확인
+        const tableCheck = await pool.query(`
+            SELECT to_regclass('public.combined_store_info') AS exists
+        `);
+        
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn("⚠️ combined_store_info 테이블 없음, 기본 카테고리 반환");
+            return res.json({
+                success: true,
+                categories: [
+                    { category: "반려동물", subcategories: [] },
+                    { category: "쇼핑", subcategories: [] },
+                    { category: "공연전시", subcategories: [] },
+                    { category: "전통시장", subcategories: [] }
+                ]
+            });
+        }
         
         // combined_store_info에서 카테고리 목록 가져오기
         const sql = `
@@ -392,14 +411,38 @@ app.get("/api/category-tree", async (req, res) => {
             subcategories: [...subSet].sort((a, b) => a.localeCompare(b, "ko"))
         })).sort((a, b) => a.category.localeCompare(b.category, "ko"));
         
+        // ✅ 데이터가 없으면 기본값 반환
+        if (categories.length === 0) {
+            console.warn("⚠️ combined_store_info에 데이터 없음, 기본 카테고리 반환");
+            return res.json({
+                success: true,
+                categories: [
+                    { category: "반려동물", subcategories: [] },
+                    { category: "쇼핑", subcategories: [] },
+                    { category: "공연전시", subcategories: [] },
+                    { category: "전통시장", subcategories: [] }
+                ]
+            });
+        }
+        
         res.json({ success: true, categories });
     } catch (err) {
         console.error("❌ /api/category-tree error:", err?.message || err);
-        res.status(500).json({ success: false, error: err?.message || "server error" });
+        // ✅ 에러 시에도 기본 카테고리 반환 (500 에러 대신)
+        res.json({
+            success: true,
+            categories: [
+                { category: "반려동물", subcategories: [] },
+                { category: "쇼핑", subcategories: [] },
+                { category: "공연전시", subcategories: [] },
+                { category: "전통시장", subcategories: [] }
+            ]
+        });
     }
 });
 
-// ------------------------------------------------------------// 4. 문의 게시판 라우트
+// ------------------------------------------------------------
+// 4. 문의 게시판 라우트
 // ------------------------------------------------------------
 app.use("/api/inquiryBoard", inquiryBoardRouter);
 app.use("/api/inquiry", inquiryBoardRouter);
