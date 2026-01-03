@@ -142,7 +142,8 @@
                             class="ml-2 inline-flex items-center text-xs font-extrabold px-2 py-1 rounded-full border bg-gray-50 text-gray-700 hidden"></span>
                     </div>
 
-                    <div id="globalStoreResults" class="mt-3 grid grid-cols-1 gap-2 max-h-[320px] overflow-auto pr-1">
+                    <div id="globalStoreResults"
+                        class="mt-3 grid grid-cols-1 gap-2 max-h-[320px] overflow-auto pr-1 hidden">
                     </div>
                 </div>
             </section>
@@ -967,6 +968,7 @@
 
             const resultsBox = document.getElementById("globalStoreResults");
             resultsBox.innerHTML = `<div class="text-sm text-gray-500">검색 중...</div>`;
+            openGlobalResults();
 
             try {
                 // food / combined 2번 호출해서 합치기
@@ -1011,30 +1013,36 @@
                     btn.addEventListener("click", () => {
                         const r = JSON.parse(btn.getAttribute("data-pick"));
 
-                        // ✅ 전역 선택 저장 (모달 store 연결에도 그대로 사용)
+                        // ✅ 선택 저장(모달 store 연결에도 그대로 사용)
                         state.modal.pickedStore = {
                             id: r.id,
                             business_number: r.business_number,
                             business_name: r.business_name
                         };
 
-                        // 표시 갱신
+                        // ✅ 선택된 가게 정보 표시(상단)
+                        const name = r.business_name || "-";
+                        const bn = r.business_number || "-";
+                        const type = r.business_type || "-";
+                        const cat = r.business_category || "-";
+
                         document.getElementById("globalPickedStore").textContent =
-                            `${r.business_name || "-"} (${r.business_number || "-"})`;
+                            `${name} (사업자: ${bn}) | ${type} / ${cat}`;
 
                         const badge = document.getElementById("globalPickedBadge");
-                        badge.textContent = (r.__mode === "combined") ? "COMBINED" : "FOOD";
-                        badge.classList.remove("hidden");
+                        if (badge) {
+                            badge.textContent = (r.__mode === "combined") ? "COMBINED" : "FOOD";
+                            badge.classList.remove("hidden");
+                        }
 
                         // ✅ 모달이 열려있으면 모달의 '선택된 가게'도 즉시 반영
                         const pickedEl = document.getElementById("pickedStore");
                         if (pickedEl) {
-                            pickedEl.textContent = `${r.business_name || "-"} (${r.business_number || "-"})`;
+                            pickedEl.textContent = `${name} (${bn})`;
                         }
 
-                        // (옵션) 모달 검색 결과는 비우기
-                        const storeResults = document.getElementById("storeResults");
-                        if (storeResults) storeResults.innerHTML = "";
+                        // ✅ 선택 후 검색 결과 닫기
+                        closeGlobalResults();
                     });
                 });
 
@@ -1043,6 +1051,36 @@
                 resultsBox.innerHTML = `<div class="text-sm text-red-600 font-bold">검색 실패</div>`;
             }
         }
+
+        // =========================
+        // ✅ 전역 검색 결과 열기/닫기
+        // =========================
+        function closeGlobalResults() {
+            const box = document.getElementById("globalStoreResults");
+            if (!box) return;
+            box.innerHTML = "";
+            box.classList.add("hidden");
+        }
+
+        function openGlobalResults() {
+            const box = document.getElementById("globalStoreResults");
+            if (!box) return;
+            box.classList.remove("hidden");
+        }
+
+        // 결과 영역 클릭은 "바깥 클릭"으로 취급하지 않게
+        document.getElementById("globalStoreResults")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+
+        // 입력/버튼 클릭도 바깥 클릭으로 취급하지 않게
+        document.getElementById("globalStoreQuery")?.addEventListener("click", (e) => e.stopPropagation());
+        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", (e) => e.stopPropagation());
+
+        // ✅ 문서 아무데나 클릭하면 결과 닫기
+        document.addEventListener("click", () => {
+            closeGlobalResults();
+        });
 
         // 모달 바깥 클릭 닫기
         $("modal").addEventListener("click", (e) => {
