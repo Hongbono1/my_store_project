@@ -690,9 +690,12 @@ export async function upsertSlot(req, res) {
     const slotType = mapSlotType(adMode);
     const slotMode = clean(req.body.slot_mode || req.body.slotMode);
 
-    const title = clean(req.body.title);
-    const subtitle = clean(req.body.subtitle);
-    const text = clean(req.body.text);
+    // ✅ text_content 우선 사용, 없으면 기존 필드도 받아줌(호환용)
+    const textContent = clean(
+      req.body.text_content ||
+      req.body.text ||
+      req.body.title
+    );
     const linkUrl = clean(req.body.link_url || req.body.linkUrl);
 
     const storeId = clean(req.body.store_id || req.body.storeId);
@@ -730,9 +733,13 @@ export async function upsertSlot(req, res) {
     if (hasCol(cols, "image_url")) data.image_url = imageUrl;
     if (hasCol(cols, "link_url")) data.link_url = linkUrl;
 
-    if (hasCol(cols, "title")) data.title = title;
-    if (hasCol(cols, "subtitle")) data.subtitle = subtitle;
-    if (hasCol(cols, "text")) data.text = text;
+    // ✅ slots 테이블이 text_content만 가지고 있으니까 여기에 저장
+    if (hasCol(cols, "text_content")) data.text_content = textContent;
+
+    // (혹시 다른 페이지에서 title/text 쓰고 있을 수도 있으니 호환용으로 남겨도 됨)
+    if (hasCol(cols, "title")) data.title = textContent;
+    if (hasCol(cols, "subtitle")) data.subtitle = "";
+    if (hasCol(cols, "text")) data.text = textContent;
 
     if (hasCol(cols, "store_id")) data.store_id = storeId || null;
     if (hasCol(cols, "business_no")) data.business_no = businessNo;
