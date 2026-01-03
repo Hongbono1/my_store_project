@@ -652,6 +652,10 @@ export async function upsertSlot(req, res) {
   try {
     const cols = await getSlotsColumns();
 
+    // 🔍 디버깅: 받은 body 전체 로그
+    console.log("[upsertSlot] req.body:", JSON.stringify(req.body, null, 2));
+    console.log("[upsertSlot] req.file:", req.file ? req.file.filename : "없음");
+
     const page = clean(req.body.page) || PAGE_NAME;
 
     // ✅ section 이름이 조금 달라도 다 받아주도록 처리
@@ -662,20 +666,26 @@ export async function upsertSlot(req, res) {
       clean(req.body.area) ||
       "";
 
+    console.log("[upsertSlot] extracted section:", section);
+
     // ✅ position 문자열에서라도 section을 추출 (예: "subcategory|combined|||"...)
     if (!section && req.body.position) {
       const parts = String(req.body.position).split("|");
       if (parts.length >= 5) {
         section = clean(parts[4]); // [page, mode, cat, sub, section, idx]
       }
+      console.log("[upsertSlot] extracted from position:", section);
     }
 
     const category = clean(req.body.category);
     const subcategory = clean(req.body.subcategory);
     const idx = Math.max(safeInt(req.body.idx, 1), 1);
 
+    console.log("[upsertSlot] final values - page:", page, "section:", section, "idx:", idx);
+
     // section 최종 체크
     if (!section) {
+      console.error("[upsertSlot] ❌ section is missing!");
       return res
         .status(400)
         .json({ success: false, error: "section is required" });
