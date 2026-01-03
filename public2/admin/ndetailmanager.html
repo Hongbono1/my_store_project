@@ -635,9 +635,15 @@
         }
 
         async function fetchSlot(position) {
+            console.log('[fetchSlot] 요청:', position);
             const res = await fetch(`/ndetailmanager/ad/slot?position=${encodeURIComponent(position)}`, { cache: "no-store" });
-            if (!res.ok) return null;
+            console.log('[fetchSlot] 응답 상태:', res.status);
+            if (!res.ok) {
+                console.error('[fetchSlot] 실패:', res.status, res.statusText);
+                return null;
+            }
             const json = await res.json().catch(() => null);
+            console.log('[fetchSlot] 응답 데이터:', json);
             return json?.slot || null;
         }
 
@@ -690,10 +696,13 @@
 
             // 데이터 로드
             (async () => {
+                console.log('[openModal] 슬롯 로드 시작:', state.modal.position);
                 const slot = await fetchSlot(state.modal.position);
+                console.log('[openModal] 로드된 슬롯:', slot);
                 state.modal.slot = slot;
 
                 if (slot) {
+                    console.log('[openModal] 슬롯 데이터 있음 - UI 업데이트');
                     $("slotType").value = slot.slot_type || defaultType;
                     $("slotMode").value = slot.slot_mode || "custom";
                     $("textValue").value = slot.text || "";
@@ -706,6 +715,7 @@
                     if (slot.image_url) {
                         const img = normalizeSrc(slot.image_url);
                         $("imagePreview").innerHTML = `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
+                        console.log('[openModal] 이미지 설정:', img);
                     }
 
                     if (slot.slot_mode === "store" && (slot.store_id || slot.business_no || slot.business_name)) {
@@ -715,10 +725,12 @@
                             business_number: slot.business_no,
                             business_name: slot.business_name
                         };
+                        console.log('[openModal] 매장 정보 설정:', state.modal.pickedStore);
                     }
 
                     $("deleteBtn").classList.remove("hidden");
                 } else {
+                    console.log('[openModal] 슬롯 데이터 없음 - 신규 등록 모드');
                     $("deleteBtn").classList.add("hidden");
                 }
 
