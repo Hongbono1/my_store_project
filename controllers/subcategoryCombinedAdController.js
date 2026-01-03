@@ -338,7 +338,8 @@ async function listCombinedStores({ q = "", pageNo = 1, pageSize = 20, category 
   const qDigits = digitsOnly(qq);
 
   // 검색(사업자번호/상호/업종)
-  if (qq) {
+  // ✅ __all__은 "전체 보기" 의미이므로 검색 조건에서 제외
+  if (qq && qq !== "__all__") {
     const ors = [];
     if (qDigits) {
       ors.push(`s.${MAP.businessNo} ILIKE $${i++}`);
@@ -444,7 +445,8 @@ export async function listStores(req, res) {
       mode: "combined",
       pageNo,
       pageSize,
-      stores,
+      results: stores,    // ✅ 프론트엔드가 results 필드를 찾으므로 통일
+      stores,             // 하위 호환성을 위해 둘 다 포함
     });
   } catch (err) {
     console.error("❌ [subcategoryCombined listStores] error:", err);
