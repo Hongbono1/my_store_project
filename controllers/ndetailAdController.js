@@ -90,6 +90,7 @@ async function pickFoodTable() {
 export async function getSlot(req, res) {
     try {
         const position = String(req.query.position || "").trim();
+        console.log("[ndetailmanager:getSlot] 요청 position:", position);
         if (!position) return res.status(400).json({ success: false, message: "position required" });
 
         const q = `
@@ -98,11 +99,32 @@ export async function getSlot(req, res) {
       WHERE page='ndetail' AND position=$1
       LIMIT 1
     `;
+        console.log("[ndetailmanager:getSlot] 실행 쿼리:", q);
+        console.log("[ndetailmanager:getSlot] 파라미터:", [position]);
+        
         const r = await pool.query(q, [position]);
+        console.log("[ndetailmanager:getSlot] 조회된 행 수:", r.rowCount);
+        
         const slot = r.rows?.[0] || null;
+        if (slot) {
+            console.log("[ndetailmanager:getSlot] 슬롯 발견:", { 
+                id: slot.id, 
+                page: slot.page, 
+                position: slot.position, 
+                slot_type: slot.slot_type,
+                slot_mode: slot.slot_mode 
+            });
+        } else {
+            console.log("[ndetailmanager:getSlot] 슬롯 없음 - DB 전체 ndetail 데이터 확인 필요");
+            // 전체 ndetail 데이터 확인
+            const checkQ = `SELECT page, position FROM ${SLOTS_TABLE} WHERE page='ndetail' LIMIT 5`;
+            const checkR = await pool.query(checkQ);
+            console.log("[ndetailmanager:getSlot] DB에 있는 ndetail 슬롯들:", checkR.rows);
+        }
+        
         return res.json({ success: true, slot });
     } catch (e) {
-        console.error("[ndetailmanager:getSlot]", e);
+        console.error("[ndetailmanager:getSlot] 에러:", e);
         return res.status(500).json({ success: false, message: "server error" });
     }
 }
