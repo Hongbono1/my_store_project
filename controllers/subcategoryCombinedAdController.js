@@ -527,6 +527,8 @@ export async function grid(req, res) {
     if (hasCol(cols, "link_url")) selectCols.push("link_url");
     if (hasCol(cols, "title")) selectCols.push("title");
     if (hasCol(cols, "subtitle")) selectCols.push("subtitle");
+    // ✅ text_content 컬럼도 같이 내려보내기
+    if (hasCol(cols, "text_content")) selectCols.push("text_content");
     if (hasCol(cols, "text")) selectCols.push("text");
     if (hasCol(cols, "store_id")) selectCols.push("store_id");
     if (hasCol(cols, "business_no")) selectCols.push("business_no");
@@ -612,6 +614,8 @@ export async function getSlot(req, res) {
     if (hasCol(cols, "link_url")) selectCols.push("link_url");
     if (hasCol(cols, "title")) selectCols.push("title");
     if (hasCol(cols, "subtitle")) selectCols.push("subtitle");
+    // ✅ getSlot에서도 text_content 같이 조회
+    if (hasCol(cols, "text_content")) selectCols.push("text_content");
     if (hasCol(cols, "text")) selectCols.push("text");
     if (hasCol(cols, "store_id")) selectCols.push("store_id");
     if (hasCol(cols, "business_no")) selectCols.push("business_no");
