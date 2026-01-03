@@ -11,7 +11,7 @@ import {
   upsertSlot,
   deleteSlot,
   searchStore,
-} from "../controllers/ndetailAdController.js";
+} from "../controllers/ndetailmanagerAdController.js";
 
 const router = express.Router();
 
