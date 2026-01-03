@@ -1073,16 +1073,26 @@
                     return;
                 }
 
-                $("textBannerText").value = slot.title || slot.text || "";
+                // ✅ 서버에서 오는 필드 우선순위: text_title > text_content > 기타
+                const mainText = slot.text_title || slot.text_content || slot.text || slot.title || "";
+                $("textBannerText").value = mainText || "";
                 
-                // 스타일 정보 파싱 (subtitle에 JSON 저장)
+                // ✅ 스타일 정보는 text_desc 또는 subtitle에서 JSON으로 읽기
                 try {
-                    const style = JSON.parse(slot.subtitle || "{}");
+                    const styleJson = slot.text_desc || slot.subtitle || "";
+                    const style = styleJson ? JSON.parse(styleJson) : {};
+
                     $("textFontSize").value = style.fontSize || "24";
                     $("textFontWeight").value = style.fontWeight || "700";
                     $("textColor").value = style.color || "#1e293b";
                     $("textBgColor").value = style.bgColor || "#ffffff";
-                } catch {}
+                } catch {
+                    // 파싱 실패 시 기본값 유지
+                    $("textFontSize").value = "24";
+                    $("textFontWeight").value = "700";
+                    $("textColor").value = "#1e293b";
+                    $("textBgColor").value = "#ffffff";
+                }
 
                 updateTextPreview();
                 if (!silent) setStatus("ok", "텍스트 배너 로드 완료", `시간: ${nowStr()}`);
@@ -1114,8 +1124,13 @@
                 fd.append("priority", "1");
                 fd.append("adMode", "text");
                 fd.append("slotMode", "custom");
-                fd.append("title", text);
-                fd.append("subtitle", styleJson); // 스타일 정보 저장
+                
+                // ✅ 공통 슬롯과 동일한 필드명으로 보내기
+                fd.append("textTitle", text);          // 실제 문구
+                fd.append("textDesc", styleJson);      // 스타일 JSON (폰트/색상 등)
+                
+                // 안전빵으로 같이 보내기
+                fd.append("text_content", text);
 
                 const data = await apiFetch(`/update`, { method: "POST", body: fd });
                 if (!data.success) throw new Error(data.error || "저장 실패");
