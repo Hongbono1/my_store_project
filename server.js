@@ -51,6 +51,10 @@ import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
 import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
 import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
 // import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js"; // ✅ Legacy - 주석 처리
+import ndetailAdRouter from "./routes/ndetailAdRouter.js";
+
+
+
 
 import pool from "./db.js";
 
@@ -494,6 +498,8 @@ app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 // ✅ 서브카테고리 매니저 (FOOD/COMBINED 분리) — 이게 네 grid 엔드포인트
 app.use("/subcategorymanager_food/ad", subcategoryFoodAdRouter);
 app.use("/subcategorymanager_combined/ad", subcategoryCombinedAdRouter);
+
+app.use("/ndetailmanager/ad", ndetailAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
