@@ -546,20 +546,21 @@ export async function grid(req, res) {
     if (hasCol(cols, "slot_mode")) selectCols.push("slot_mode");
     if (hasCol(cols, "image_url")) selectCols.push("image_url");
     if (hasCol(cols, "link_url")) selectCols.push("link_url");
-    if (hasCol(cols, "title")) selectCols.push("title");
-    if (hasCol(cols, "subtitle")) selectCols.push("subtitle");
-    if (hasCol(cols, "text")) selectCols.push("text");
+
+    // ✅ DB에는 text_content만 있으므로, 이걸 text로 alias 해서 내려준다
+    if (hasCol(cols, "text_content")) selectCols.push("text_content AS text");
+
     if (hasCol(cols, "store_id")) selectCols.push("store_id");
     if (hasCol(cols, "business_no")) selectCols.push("business_no");
-    if (hasCol(cols, "business_number")) selectCols.push("business_number");
     if (hasCol(cols, "business_name")) selectCols.push("business_name");
-    if (hasCol(cols, "business_type")) selectCols.push("business_type");
     if (hasCol(cols, "start_date")) selectCols.push("start_date");
     if (hasCol(cols, "end_date")) selectCols.push("end_date");
     if (hasCol(cols, "no_end")) selectCols.push("no_end");
     if (hasCol(cols, "priority")) selectCols.push("priority");
     if (hasCol(cols, "updated_at")) selectCols.push("updated_at");
     if (hasCol(cols, "created_at")) selectCols.push("created_at");
+    if (hasCol(cols, "store_type")) selectCols.push("store_type");
+    if (hasCol(cols, "table_source")) selectCols.push("table_source");
 
     const selectSql = selectCols.length ? selectCols.join(", ") : "*";
 
@@ -647,20 +648,21 @@ export async function getSlot(req, res) {
     if (hasCol(cols, "slot_mode")) selectCols.push("slot_mode");
     if (hasCol(cols, "image_url")) selectCols.push("image_url");
     if (hasCol(cols, "link_url")) selectCols.push("link_url");
-    if (hasCol(cols, "title")) selectCols.push("title");
-    if (hasCol(cols, "subtitle")) selectCols.push("subtitle");
-    if (hasCol(cols, "text")) selectCols.push("text");
+
+    // ✅ 여기서도 text_content만 alias 해서 내려준다
+    if (hasCol(cols, "text_content")) selectCols.push("text_content AS text");
+
     if (hasCol(cols, "store_id")) selectCols.push("store_id");
     if (hasCol(cols, "business_no")) selectCols.push("business_no");
-    if (hasCol(cols, "business_number")) selectCols.push("business_number");
     if (hasCol(cols, "business_name")) selectCols.push("business_name");
-    if (hasCol(cols, "business_type")) selectCols.push("business_type");
     if (hasCol(cols, "start_date")) selectCols.push("start_date");
     if (hasCol(cols, "end_date")) selectCols.push("end_date");
     if (hasCol(cols, "no_end")) selectCols.push("no_end");
     if (hasCol(cols, "priority")) selectCols.push("priority");
     if (hasCol(cols, "updated_at")) selectCols.push("updated_at");
     if (hasCol(cols, "created_at")) selectCols.push("created_at");
+    if (hasCol(cols, "store_type")) selectCols.push("store_type");
+    if (hasCol(cols, "table_source")) selectCols.push("table_source");
 
     // ✅ 하나씩 조회해서 첫 번째로 찾는 슬롯 반환
     let slot = null;
@@ -729,9 +731,9 @@ export async function upsertSlot(req, res) {
     const slotType = mapSlotType(adMode);
     const slotMode = clean(req.body.slot_mode || req.body.slotMode);
 
-    const title = clean(req.body.title);
-    const subtitle = clean(req.body.subtitle);
-    const text = clean(req.body.text);
+    // ✅ 텍스트는 text/text_content 둘 다 받아서 text_content 에 저장
+    const text = clean(req.body.text || req.body.text_content);
+
     const linkUrl = clean(req.body.link_url || req.body.linkUrl);
 
     const storeId = clean(req.body.store_id || req.body.storeId);
@@ -769,16 +771,14 @@ export async function upsertSlot(req, res) {
     if (hasCol(cols, "image_url")) data.image_url = imageUrl;
     if (hasCol(cols, "link_url")) data.link_url = linkUrl;
 
-    if (hasCol(cols, "title")) data.title = title;
-    if (hasCol(cols, "subtitle")) data.subtitle = subtitle;
-    if (hasCol(cols, "text")) data.text = text;
+    // ✅ text_content 컬럼에만 저장
+    if (hasCol(cols, "text_content")) data.text_content = text;
 
     if (hasCol(cols, "store_id")) data.store_id = storeId || null;
     if (hasCol(cols, "business_no")) data.business_no = businessNo;
-    if (hasCol(cols, "business_number")) data.business_number = businessNo;
 
     if (hasCol(cols, "business_name")) data.business_name = businessName;
-    if (hasCol(cols, "business_type")) data.business_type = businessType;
+    if (hasCol(cols, "store_type")) data.store_type = businessType;
 
     if (hasCol(cols, "start_date")) data.start_date = startDate;
     if (hasCol(cols, "end_date")) data.end_date = endDate;
@@ -962,4 +962,3 @@ export async function whereSlots(req, res) {
     return res.status(500).json({ success: false, error: err?.message || "server error" });
   }
 }
-
