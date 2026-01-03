@@ -321,6 +321,23 @@ export async function searchStore(req, res) {
         if (mode === "combined") table = COMBINED_TABLE;
         else table = await pickFoodTable();
 
+        // ✅ food(store_info) 대표 이미지: public.store_images에서 1장 가져오기
+        const useFoodImagesJoin =
+            mode !== "combined" &&
+            table === "public.store_info" &&
+            (await tableExists("public.store_images"));
+
+        const foodImagesJoin = useFoodImagesJoin
+            ? `LEFT JOIN LATERAL (
+       SELECT url
+       FROM public.store_images
+       WHERE store_id = s.id
+       ORDER BY id ASC
+       LIMIT 1
+     ) img ON true`
+            : "";
+
+
         // 컬럼 동적 확인
         const cols = await getColumns(table);
         const imageSelect = buildImageSelect(cols);
@@ -339,17 +356,19 @@ export async function searchStore(req, res) {
         // ✅ q가 없으면 최근 10개
         if (!q) {
             const sqlRecent = `
-      SELECT
-        id,
-        ${bnCol},
-        ${nameCol},
-        ${typeCol},
-        ${catCol},
-        ${imageSelect}
-      FROM ${table}
-      ORDER BY id DESC
-      LIMIT 10
-    `;
+  SELECT
+    s.id,
+    ${bnCol},
+    ${nameCol},
+    ${typeCol},
+    ${catCol},
+    ${useFoodImagesJoin ? "COALESCE(img.url, '') AS image_url" : imageSelect}
+  FROM ${table} s
+  ${foodImagesJoin}
+  ORDER BY s.id DESC
+  LIMIT 10
+`;
+
             const r = await pool.query(sqlRecent);
             return res.json({ success: true, mode, q: "", results: r.rows || [] });
         }
