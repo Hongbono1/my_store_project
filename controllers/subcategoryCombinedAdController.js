@@ -649,13 +649,33 @@ export async function upsertSlot(req, res) {
     const cols = await getSlotsColumns();
 
     const page = clean(req.body.page) || PAGE_NAME;
-    const section = clean(req.body.section);
+
+    // ✅ section 이름이 조금 달라도 다 받아주도록 처리
+    let section =
+      clean(req.body.section) ||
+      clean(req.body.slot_section) ||
+      clean(req.body.slotSection) ||
+      clean(req.body.area) ||
+      "";
+
+    // ✅ position 문자열에서라도 section을 추출 (예: "subcategory|combined|||"...)
+    if (!section && req.body.position) {
+      const parts = String(req.body.position).split("|");
+      if (parts.length >= 5) {
+        section = clean(parts[4]); // [page, mode, cat, sub, section, idx]
+      }
+    }
 
     const category = clean(req.body.category);
     const subcategory = clean(req.body.subcategory);
     const idx = Math.max(safeInt(req.body.idx, 1), 1);
 
-    if (!section) return res.status(400).json({ success: false, error: "section is required" });
+    // section 최종 체크
+    if (!section) {
+      return res
+        .status(400)
+        .json({ success: false, error: "section is required" });
+    }
     if (!hasCol(cols, "position")) {
       return res.status(500).json({ success: false, error: "admin_ad_slots.position column missing" });
     }
