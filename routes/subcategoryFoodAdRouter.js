@@ -22,6 +22,7 @@ const upload = multer({
 });
 
 router.get("/grid", grid);
+router.get("/search", searchStore);        // ✅ /search 엔드포인트 추가
 router.get("/search-store", searchStore);
 
 router.get("/slot", getSlot);
