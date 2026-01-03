@@ -745,8 +745,33 @@
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
         // 상위 카테고리 → 하위 카테고리 매핑
-        // 상위 카테고리 → 하위 카테고리 매핑 (통합 모드)
-        const SUB_BY_CATEGORY = {
+        // ✅ 통합 모드: API에서 실제 카테고리 동적 로딩
+        async function loadCategoriesFromAPI() {
+            try {
+                const res = await fetch('/api/category-tree?mode=combined', { cache: 'no-store' });
+                if (!res.ok) {
+                    console.warn('[loadCategories] API 실패, 하드코딩 사용');
+                    return null;
+                }
+                const json = await res.json();
+                const categories = json.categories || [];
+                
+                console.log('[loadCategories] 로드된 카테고리:', categories.length);
+                
+                // categories = [{ category: "통신", subcategories: ["SK", "KT", ...] }, ...]
+                const mapping = {};
+                for (const item of categories) {
+                    mapping[item.category] = item.subcategories || [];
+                }
+                return mapping;
+            } catch (e) {
+                console.error('[loadCategories] 에러:', e);
+                return null;
+            }
+        }
+
+        // 하드코딩 카테고리 (fallback용)
+        const FALLBACK_SUB_BY_CATEGORY = {
             // 음식 카테고리
             "한식": ["밥", "찌개/탕", "고기/구이", "생선", "족발/보쌈", "국밥", "반찬", "기타"],
             "중식": ["짜장", "짬뽕", "탕수육", "마라", "딤섬", "기타"],
@@ -768,6 +793,9 @@
             // 기타
             "기타": ["기타"],
         };
+
+        // 실제 사용할 카테고리 매핑 (API 로드 후 업데이트됨)
+        let SUB_BY_CATEGORY = { ...FALLBACK_SUB_BY_CATEGORY };
 
         function setSubcategoryOptionsByCategory(cat) {
             const subSel = $("placementSubFilter");
@@ -797,8 +825,37 @@
             }
         }
 
-        function initCategoryFilterUI() {
+        // 🔄 placementCatFilter 업데이트 (API로부터 카테고리 로드)
+        async function initCategoryFilterUI() {
+            // 1) API에서 카테고리 로드
+            const loadedCategories = await loadCategoriesFromAPI();
+            if (loadedCategories) {
+                SUB_BY_CATEGORY = loadedCategories;
+                console.log('[initCategoryFilterUI] API 카테고리 적용:', Object.keys(SUB_BY_CATEGORY));
+            } else {
+                console.log('[initCategoryFilterUI] Fallback 카테고리 사용:', Object.keys(SUB_BY_CATEGORY));
+            }
+
+            // 2) placementCatFilter select 업데이트
             const catSel = $("placementCatFilter");
+            if (catSel) {
+                // 기존 옵션 제거 (첫 번째 "전체" 제외)
+                while (catSel.options.length > 1) {
+                    catSel.remove(1);
+                }
+
+                // 카테고리 추가
+                const categories = Object.keys(SUB_BY_CATEGORY).sort();
+                for (const cat of categories) {
+                    const opt = document.createElement("option");
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    catSel.appendChild(opt);
+                }
+                console.log('[initCategoryFilterUI] placementCatFilter 업데이트 완료:', categories.length);
+            }
+
+            // 3) 이벤트 리스너 설정
             const subSel = $("placementSubFilter");
             if (!catSel || !subSel) return;
 
