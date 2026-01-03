@@ -21,9 +21,7 @@
 
         <div class="flex-1 text-left">
             <h1 id="heroTitle" class="text-3xl md:text-4xl font-bold mb-4">카테고리 제목</h1>
-            <p id="heroSubtitle" class="text-slate-600 text-sm md:text-base mt-2">
-                설명 텍스트...
-            </p>
+            <p id="heroSubtitle" class="text-slate-600 text-sm md:text-base mt-2"></p>
         </div>
     </section>
 
@@ -509,6 +507,8 @@
             // ========== 이미지 배너 (idx=1) ==========
             const imgBase = { page: "subcategory", section: "top", idx: "1" };
             const imgWithCat = { ...imgBase, category: state.category || "" };
+
+            // food + 한식 + subcategory 있을 때만 subcategory 붙이기
             if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
                 imgWithCat.subcategory = state.subcategory;
             }
@@ -519,6 +519,7 @@
             // ========== 텍스트 배너 (idx=2) ==========
             const txtBase = { page: "subcategory", section: "top", idx: "2" };
             const txtWithCat = { ...txtBase, category: state.category || "" };
+
             if (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) {
                 txtWithCat.subcategory = state.subcategory;
             }
@@ -548,50 +549,42 @@
             const titleEl = document.getElementById("heroTitle");
             const subtitleEl = document.getElementById("heroSubtitle");
 
+            const modeLabel = state.mode === "combined" ? "통합" : "푸드";
+            const baseTitle = state.category || modeLabel;
+            const subLabel =
+                state.mode === "food" &&
+                    state.category === "한식" &&
+                    clean(state.subcategory)
+                    ? ` · ${state.subcategory}`
+                    : "";
+
             if (txtSlot) {
-                const text = clean(txtSlot.title || txtSlot.text) || "";
-
-                // 스타일 정보 파싱 (subtitle에 JSON 저장되어 있음)
-                let style = { fontSize: "24", fontWeight: "700", color: "#1e293b", bgColor: "#ffffff" };
-                try {
-                    const parsed = JSON.parse(clean(txtSlot.subtitle) || "{}");
-                    if (parsed.fontSize) style.fontSize = parsed.fontSize;
-                    if (parsed.fontWeight) style.fontWeight = parsed.fontWeight;
-                    if (parsed.color) style.color = parsed.color;
-                    if (parsed.bgColor) style.bgColor = parsed.bgColor;
-                } catch { }
-
-                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-                const catLabel = state.category ? state.category : modeLabel;
-                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+                // ✅ controller에서 text_content 쓰도록 맞춰둔 것 그대로 사용
+                const text = clean(
+                    txtSlot.text_content || txtSlot.text || txtSlot.title
+                ) || "";
 
                 if (titleEl) {
-                    titleEl.textContent = text || `${catLabel}${subLabel}`;
-                    titleEl.style.fontSize = `${style.fontSize}px`;
-                    titleEl.style.fontWeight = style.fontWeight;
-                    titleEl.style.color = style.color;
-                }
-
-                if (subtitleEl) {
-                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
-                    subtitleEl.style.backgroundColor = style.bgColor;
-                }
-            } else {
-                // 텍스트 배너 없을 때 기본값
-                const modeLabel = state.mode === "combined" ? "통합" : "푸드";
-                const subLabel = (state.mode === "food" && state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-                const title = state.category ? state.category : modeLabel;
-
-                if (titleEl) {
-                    titleEl.textContent = `${title}${subLabel}`;
+                    titleEl.textContent = text || `${baseTitle}${subLabel}`;
+                    // 폰트 스타일은 기본값 사용 (필요하면 나중에 스타일 JSON 다시 설계)
                     titleEl.style.fontSize = "";
                     titleEl.style.fontWeight = "";
                     titleEl.style.color = "";
                 }
-                if (subtitleEl) {
-                    subtitleEl.textContent = `${modeLabel} 서브카테고리`;
-                    subtitleEl.style.backgroundColor = "";
+            } else {
+                // 텍스트 슬롯이 아예 없으면 카테고리/모드로 기본 타이틀
+                if (titleEl) {
+                    titleEl.textContent = `${baseTitle}${subLabel}`;
+                    titleEl.style.fontSize = "";
+                    titleEl.style.fontWeight = "";
+                    titleEl.style.color = "";
                 }
+            }
+
+            // ✅ 서브타이틀은 쓸모없는 문구 제거 + 비우기
+            if (subtitleEl) {
+                subtitleEl.textContent = "";
+                subtitleEl.style.backgroundColor = "";
             }
 
             return !!(imgSlot || txtSlot);
@@ -744,11 +737,11 @@
                 state.subcategory = "";
                 console.log("[DOMContentLoaded] 기타 모드 - state.subcategory 초기화");
             }
-            
+
             // 🔍 디버깅: state.subcategory 설정 직후 값 확인
             console.log("[DOMContentLoaded] 최종 state.subcategory:", state.subcategory);
             console.log("[DOMContentLoaded] 최종 state 전체:", { ...state });
-            
+
             // 초기화
             state.sectionState.items.expanded = false;
             state.sectionState.items.page = 1;
