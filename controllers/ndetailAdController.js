@@ -86,6 +86,24 @@ async function pickFoodTable() {
     return "public.store_info";
 }
 
+async function getColumns(tableName) {
+    const [schema, name] = tableName.split(".");
+    const q = `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema=$1 AND table_name=$2
+  `;
+    const r = await pool.query(q, [schema, name]);
+    return new Set((r.rows || []).map(x => x.column_name));
+}
+
+function buildImageSelect(cols) {
+    const candidates = ["main_image_url", "image_url", "main_image", "image1", "image"];
+    const exist = candidates.filter(c => cols.has(c));
+    if (exist.length === 0) return `''::text AS image_url`;
+    return `COALESCE(${exist.join(", ")}, '') AS image_url`;
+}
+
 // ---------- Slots ----------
 export async function getSlot(req, res) {
     try {
@@ -303,39 +321,53 @@ export async function searchStore(req, res) {
         if (mode === "combined") table = COMBINED_TABLE;
         else table = await pickFoodTable();
 
+        // 컬럼 동적 확인
+        const cols = await getColumns(table);
+        const imageSelect = buildImageSelect(cols);
+
+        // business_* 컬럼도 혹시 다를 수 있으니 최소 방어 (없으면 빈 문자열로)
+        const hasBN = cols.has("business_number");
+        const hasName = cols.has("business_name");
+        const hasType = cols.has("business_type");
+        const hasCat = cols.has("business_category");
+
+        const bnCol = hasBN ? "business_number" : "''::text AS business_number";
+        const nameCol = hasName ? "business_name" : "''::text AS business_name";
+        const typeCol = hasType ? "business_type" : "''::text AS business_type";
+        const catCol = hasCat ? "business_category" : "''::text AS business_category";
+
         // ✅ q가 없으면 최근 10개
         if (!q) {
             const sqlRecent = `
-    SELECT
-      id,
-      business_number,
-      business_name,
-      business_type,
-      business_category,
-      COALESCE(main_image_url, image_url, main_image, image1, image, '') AS image_url
-    FROM ${table}
-    ORDER BY id DESC
-    LIMIT 10
-  `;
+      SELECT
+        id,
+        ${bnCol},
+        ${nameCol},
+        ${typeCol},
+        ${catCol},
+        ${imageSelect}
+      FROM ${table}
+      ORDER BY id DESC
+      LIMIT 10
+    `;
             const r = await pool.query(sqlRecent);
             return res.json({ success: true, mode, q: "", results: r.rows || [] });
         }
 
-        // 공통 컬럼 이름을 최대한 방어적으로
-        // - combined_store_info / store_info 모두: id, business_number, business_name, business_type, business_category 정도 기대
-        // - 이미지 컬럼은 main_image_url / image_url / main_image / image1 등 후보
+        // ✅ q 있을 때 검색
         const sql = `
       SELECT
         id,
-        business_number,
-        business_name,
-        business_type,
-        business_category,
-        COALESCE(main_image_url, image_url, main_image, image1, image, '') AS image_url
+        ${bnCol},
+        ${nameCol},
+        ${typeCol},
+        ${catCol},
+        ${imageSelect}
       FROM ${table}
       WHERE
-        business_number ILIKE $1
-        OR business_name ILIKE $1
+        ${hasBN ? "business_number ILIKE $1" : "FALSE"}
+        OR
+        ${hasName ? "business_name ILIKE $1" : "FALSE"}
       ORDER BY id DESC
       LIMIT 30
     `;
