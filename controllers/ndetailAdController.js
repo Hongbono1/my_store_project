@@ -101,18 +101,18 @@ export async function getSlot(req, res) {
     `;
         console.log("[ndetailmanager:getSlot] 실행 쿼리:", q);
         console.log("[ndetailmanager:getSlot] 파라미터:", [position]);
-        
+
         const r = await pool.query(q, [position]);
         console.log("[ndetailmanager:getSlot] 조회된 행 수:", r.rowCount);
-        
+
         const slot = r.rows?.[0] || null;
         if (slot) {
-            console.log("[ndetailmanager:getSlot] 슬롯 발견:", { 
-                id: slot.id, 
-                page: slot.page, 
-                position: slot.position, 
+            console.log("[ndetailmanager:getSlot] 슬롯 발견:", {
+                id: slot.id,
+                page: slot.page,
+                position: slot.position,
                 slot_type: slot.slot_type,
-                slot_mode: slot.slot_mode 
+                slot_mode: slot.slot_mode
             });
         } else {
             console.log("[ndetailmanager:getSlot] 슬롯 없음 - DB 전체 ndetail 데이터 확인 필요");
@@ -121,7 +121,7 @@ export async function getSlot(req, res) {
             const checkR = await pool.query(checkQ);
             console.log("[ndetailmanager:getSlot] DB에 있는 ndetail 슬롯들:", checkR.rows);
         }
-        
+
         return res.json({ success: true, slot });
     } catch (e) {
         console.error("[ndetailmanager:getSlot] 에러:", e);
@@ -298,11 +298,28 @@ export async function searchStore(req, res) {
     try {
         const q = String(req.query.q || "").trim();
         const mode = String(req.query.mode || "food").trim().toLowerCase();
-        if (!q) return res.json({ success: true, mode, q, results: [] });
 
         let table = "";
         if (mode === "combined") table = COMBINED_TABLE;
         else table = await pickFoodTable();
+
+        // ✅ q가 없으면 최근 10개
+        if (!q) {
+            const sqlRecent = `
+    SELECT
+      id,
+      business_number,
+      business_name,
+      business_type,
+      business_category,
+      COALESCE(main_image_url, image_url, main_image, image1, image, '') AS image_url
+    FROM ${table}
+    ORDER BY id DESC
+    LIMIT 10
+  `;
+            const r = await pool.query(sqlRecent);
+            return res.json({ success: true, mode, q: "", results: r.rows || [] });
+        }
 
         // 공통 컬럼 이름을 최대한 방어적으로
         // - combined_store_info / store_info 모두: id, business_number, business_name, business_type, business_category 정도 기대
