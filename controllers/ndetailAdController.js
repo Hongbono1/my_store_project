@@ -95,7 +95,7 @@ export async function getSlot(req, res) {
         const q = `
       SELECT *
       FROM ${SLOTS_TABLE}
-      WHERE position=$1
+      WHERE page='ndetail' AND position=$1
       LIMIT 1
     `;
         const r = await pool.query(q, [position]);
@@ -137,7 +137,7 @@ export async function upsertSlot(req, res) {
         }
 
         // 기존 레코드 확인(업데이트 vs 삽입)
-        const findQ = `SELECT id, image_url FROM ${SLOTS_TABLE} WHERE position=$1 LIMIT 1`;
+        const findQ = `SELECT id, image_url FROM ${SLOTS_TABLE} WHERE page='ndetail' AND position=$1 LIMIT 1`;
         const found = await pool.query(findQ, [position]);
         const existing = found.rows?.[0] || null;
 
@@ -173,7 +173,7 @@ export async function upsertSlot(req, res) {
           business_no=$12,
           business_name=$13,
           updated_at=NOW()
-        WHERE position=$1
+        WHERE page='ndetail' AND position=$1
         RETURNING *
       `;
             const ur = await pool.query(uq, [
@@ -243,7 +243,7 @@ export async function deleteSlot(req, res) {
         if (!position) return res.status(400).json({ success: false, message: "position required" });
 
         // 이미지 삭제 시도
-        const findQ = `SELECT id, image_url FROM ${SLOTS_TABLE} WHERE position=$1 LIMIT 1`;
+        const findQ = `SELECT id, image_url FROM ${SLOTS_TABLE} WHERE page='ndetail' AND position=$1 LIMIT 1`;
         const found = await pool.query(findQ, [position]);
         const existing = found.rows?.[0] || null;
 
@@ -262,7 +262,7 @@ export async function deleteSlot(req, res) {
             }
         }
 
-        const dq = `DELETE FROM ${SLOTS_TABLE} WHERE position=$1`;
+        const dq = `DELETE FROM ${SLOTS_TABLE} WHERE page='ndetail' AND position=$1`;
         await pool.query(dq, [position]);
         return res.json({ success: true, deleted: true });
     } catch (e) {
