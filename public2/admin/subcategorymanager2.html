@@ -857,19 +857,38 @@
             }
         }
 
-        async function tryFetchJson(url, options) {
+        async function tryFetchJson(url, options = {}) {
             const res = await fetch(url, options);
-            let data = null;
-            try { data = await res.json(); } catch (_e) { }
+            const text = await res.text();               // ✅ 무조건 text로 먼저 받기
+            console.log("[HTTP]", res.status, url);
+            console.log("[HTTP BODY]", text);            // ✅ 서버가 왜 400인지 메시지 여기 뜸
+
+            let data;
+            try { data = JSON.parse(text); }
+            catch { data = { raw: text }; }
+
             if (!res.ok) {
-                const msg = data?.error || data?.message || `HTTP ${res.status}`;
-                throw new Error(msg);
+                throw new Error(`${res.status} ${res.statusText} - ${text}`);
             }
             return data;
         }
 
-        async function apiFetch(path, options) {
-            return await tryFetchJson(`${API_BASE}${path}`, options);
+        async function apiFetch(path, { method = "GET", body, headers } = {}) {
+            const url = `${API_BASE}${path}`;
+            const opts = { method, headers: headers ? { ...headers } : {} };
+
+            // ✅ FormData면: 절대 Content-Type 설정 금지 (브라우저가 boundary 포함 자동 설정)
+            if (body instanceof FormData) {
+                opts.body = body;
+            } else if (body && typeof body === "object") {
+                opts.headers["Content-Type"] = "application/json";
+                opts.body = JSON.stringify(body);
+            } else if (typeof body === "string") {
+                opts.headers["Content-Type"] = "application/json";
+                opts.body = body;
+            }
+
+            return await tryFetchJson(url, opts);
         }
 
         function syncChips() {
@@ -1122,21 +1141,22 @@
                 const styleJson = JSON.stringify({ fontSize, fontWeight, color, bgColor });
 
                 const fd = new FormData();
-                fd.append("page", PAGE_NAME);
-                fd.append("mode", MODE);
-                fd.append("section", "top");
-                fd.append("idx", "2");
+                fd.append("page", PAGE_NAME);                    // "subcategory"
+                fd.append("mode", MODE);                         // "combined"
+                fd.append("section", "top");                     // ✅ 필수!
+                fd.append("idx", "2");                           // ✅ 필수!
                 fd.append("priority", "1");
+                fd.append("slot_type", "text");                  // ✅ 서버가 이 키로 받을 수도
                 fd.append("adMode", "text");
+                fd.append("slot_mode", "custom");                // ✅ 서버가 이 키로 받을 수도
                 fd.append("slotMode", "custom");
                 
-                // ✅ text_content 필드 우선 사용 (백엔드가 이걸 우선 처리)
-                fd.append("text_content", text);   // 실제 텍스트 내용
-                
-                // 호환성을 위해 기존 필드도 전송
-                fd.append("title", text);
+                // ✅ 필드명 중복 전송 - 서버가 어떤 키를 쓰든 대응
+                fd.append("text_content", text);                 // 최우선
+                fd.append("title", text);                        // 호환
+                fd.append("text", text);                         // 호환
                 fd.append("subtitle", styleJson);
-                fd.append("text", text);
+                fd.append("description", styleJson);
 
                 // 🔍 디버깅: FormData 내용 확인
                 console.log("[saveTextBanner] FormData entries:");
