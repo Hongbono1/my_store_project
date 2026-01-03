@@ -369,7 +369,8 @@ export async function listStores(req, res) {
     const params = [];
     let i = 1;
 
-    if (q) {
+    // ✅ __all__은 "전체 보기" 의미이므로 검색 조건에서 제외
+    if (q && q !== "__all__") {
       const ors = [];
 
       if (qDigits) {
@@ -414,7 +415,8 @@ export async function listStores(req, res) {
       mode: "food",
       pageNo,
       pageSize,
-      stores: rows,
+      results: rows,    // ✅ 프론트엔드가 results 필드를 찾으므로 통일
+      stores: rows,     // 하위 호환성을 위해 둘 다 포함
     });
   } catch (err) {
     console.error("❌ [subcategoryFood listStores] error:", err);
