@@ -176,7 +176,7 @@ async function getCombinedMap() {
     businessName: pickCol(cols, ["business_name", "store_name", "name"], "business_name"),
     businessType: pickCol(cols, ["business_type", "type", "store_type"], "business_type"),
     category: pickCol(cols, ["business_category", "category", "main_category"], "business_category"),
-    subcategory: pickCol(cols, ["business_subcategory", "detail_category", "subcategory", "sub_category", "subcat"], "business_subcategory"),
+    subcategory: pickCol(cols, ["business_subcategory", "subcategory", "sub_category", "subcat"], "business_subcategory"),
     // 이미지 직접 컬럼 후보
     mainImage: pickCol(cols, ["main_image_url", "image_url", "main_image", "thumbnail_url"], ""),
   };

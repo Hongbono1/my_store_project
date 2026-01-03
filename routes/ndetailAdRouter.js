@@ -1,4 +1,4 @@
-// routes/ndetailmanagerAdRouter.js
+// routes/ndetailAdRouter.js
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -11,7 +11,7 @@ import {
   upsertSlot,
   deleteSlot,
   searchStore,
-} from "../controllers/ndetailmanagerAdController.js";
+} from "../controllers/ndetailAdController.js";
 
 const router = express.Router();
 

@@ -51,7 +51,7 @@ import ncategory2managerAdRouter from "./routes/ncategory2managerAdRouter.js";
 import subcategoryFoodAdRouter from "./routes/subcategoryFoodAdRouter.js";
 import subcategoryCombinedAdRouter from "./routes/subcategoryCombinedAdRouter.js";
 // import subcategorymanagerAdRouter from "./routes/subcategorymanagerAdRouter.js"; // ✅ Legacy - 주석 처리
-import ndetailmanagerAdRouter from "./routes/ndetailmanagerAdRouter.js";
+import ndetailAdRouter from "./routes/ndetailAdRouter.js";
 
 
 
@@ -498,7 +498,7 @@ app.use("/ncategory2manager/ad", ncategory2managerAdRouter);
 app.use("/subcategorymanager_food/ad", subcategoryFoodAdRouter);
 app.use("/subcategorymanager_combined/ad", subcategoryCombinedAdRouter);
 
-app.use("/ndetailmanager/ad", ndetailmanagerAdRouter);
+app.use("/ndetailmanager/ad", ndetailAdRouter);
 
 // ------------------------------------------------------------
 // 6. 정적 파일 (public2)
