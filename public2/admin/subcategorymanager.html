@@ -704,7 +704,7 @@
         function digitsOnly(v) { return String(v ?? "").replace(/[^\d]/g, ""); }
 
         // 상위 카테고리 → 하위 카테고리 매핑
-        // ✅ 음식 모드: API에서 실제 카테고리 동적 로딩
+        // ✅ 음식 모드: API에서 실제 카테고리 동적 로딩 (foodcategory.html과 동일 - 한식만 하위 표시)
         async function loadFoodCategoriesFromAPI() {
             try {
                 const res = await fetch('/foodcategorymanager/ad/search-store?q=__all__', { cache: 'no-store' });
@@ -717,24 +717,41 @@
                 
                 console.log('[loadFoodCategories] 로드된 매장 수:', stores.length);
                 
-                // stores에서 business_category, detail_category 추출
-                const mapping = {};
+                // 상위 카테고리(버튼): category/business_category (한식/중식/일식...)
+                // 하위 카테고리(펼침): detail_category (한식만)
+                const cats = new Set();
+                const hansikDetails = new Set();
+                
                 for (const store of stores) {
-                    const mainCat = store.business_category || "기타";
-                    const detailCat = store.detail_category || "기타";
+                    const cat = String(store.category || store.business_category || "").trim();
+                    if (!cat) continue;
                     
-                    if (!mapping[mainCat]) {
-                        mapping[mainCat] = new Set();
+                    cats.add(cat);
+                    
+                    // 한식만 하위 카테고리 수집
+                    if (cat === "한식") {
+                        const detail = String(store.detail_category || store.detailCategory || "").trim();
+                        if (detail) hansikDetails.add(detail);
                     }
-                    mapping[mainCat].add(detailCat);
                 }
                 
-                // Set → Array 변환
+                // 한식을 맨 위로
+                let categories = [...cats];
+                const hansikIdx = categories.indexOf("한식");
+                if (hansikIdx > 0) {
+                    categories.splice(hansikIdx, 1);
+                    categories.unshift("한식");
+                }
+                
+                // 매핑 생성: 한식만 하위 배열, 나머지는 빈 배열
                 const result = {};
-                for (const [cat, subSet] of Object.entries(mapping)) {
-                    result[cat] = Array.from(subSet).sort();
+                for (const cat of categories) {
+                    result[cat] = cat === "한식" 
+                        ? [...hansikDetails].sort((a, b) => a.localeCompare(b, "ko"))
+                        : [];
                 }
                 
+                console.log('[loadFoodCategories] 카테고리 트리:', result);
                 return result;
             } catch (e) {
                 console.error('[loadFoodCategories] 에러:', e);
