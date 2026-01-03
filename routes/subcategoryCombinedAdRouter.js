@@ -66,6 +66,7 @@ const maybeMultipart = (req, res, next) => {
 
 // 가게 목록 / 검색 / 후보 목록
 router.get("/stores", listStores);
+router.get("/search", searchStore);        // ✅ /search 엔드포인트 추가
 router.get("/search-store", searchStore);
 router.get("/candidates", listCandidates);
 
