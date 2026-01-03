@@ -550,96 +550,104 @@
         }
 
         async function hydrateHeroFromManager() {
-            // 🆕 Dual-banner system: idx=1 (image), idx=2 (text with styles)
-            const section = "hero";
-            const baseParams = new URLSearchParams();
-            baseParams.set("page", "subcategory");
-            baseParams.set("section", section);
-            baseParams.set("category", state.category || "");
+            const baseParams = { page: "subcategory", section: "top" };
+            if (state.category) baseParams.category = state.category;
             if (state.category === "한식" && clean(state.subcategory)) {
-                baseParams.set("subcategory", state.subcategory);
+                baseParams.subcategory = state.subcategory;
             }
 
-            // 1️⃣ Fetch Image Banner (idx=1)
-            try {
-                const imgParams = new URLSearchParams(baseParams);
-                imgParams.set("idx", "1");
-                const imgRes = await fetch(`/subcategorymanager_food/ad/slot?${imgParams.toString()}`, {
-                    cache: "no-store",
-                    headers: { Accept: "application/json" },
-                });
-                const imgData = await imgRes.json().catch(() => null);
-                if (imgRes.ok && imgData?.success && imgData.slot) {
-                    const slot = imgData.slot;
-                    const imgUrl = clean(slot.image_url) || "/uploads/no-image.png";
-                    const linkUrl = clean(slot.link_url) || "";
+            // 이미지 슬롯 (idx=1)
+            const imgParams = { ...baseParams, idx: "1" };
+            let imgSlot = await fetchHeroSlotTry(imgParams);
+            if (!imgSlot) imgSlot = await fetchHeroSlotTry({ page: "subcategory", section: "top", idx: "1" });
 
-                    const imgEl = document.getElementById("heroImage");
-                    const linkEl = document.getElementById("heroLink");
-                    if (imgEl) imgEl.src = normalizeSrc(imgUrl);
-                    if (linkEl) {
-                        if (linkUrl) linkEl.href = linkUrl;
-                        else linkEl.removeAttribute("href");
-                    }
+            // 텍스트 슬롯 (idx=2)
+            const txtParams = { ...baseParams, idx: "2" };
+            let txtSlot = await fetchHeroSlotTry(txtParams);
+            if (!txtSlot) txtSlot = await fetchHeroSlotTry({ page: "subcategory", section: "top", idx: "2" });
+
+            // 이미지 적용
+            const imgEl = document.getElementById("heroImage");
+            const linkEl = document.getElementById("heroLink");
+
+            if (imgSlot) {
+                const img = clean(imgSlot.image_url) || "";
+                const link = clean(imgSlot.link_url) || "";
+
+                if (imgEl) imgEl.src = normalizeSrc(img || "/uploads/no-image.png");
+                if (linkEl) {
+                    if (clean(link)) linkEl.href = link;
+                    else linkEl.removeAttribute("href");
                 }
-            } catch (e) {
-                console.error("Failed to load image banner (idx=1):", e);
+            } else {
+                if (imgEl) imgEl.src = "/uploads/no-image.png";
+                if (linkEl) linkEl.removeAttribute("href");
             }
 
-            // 2️⃣ Fetch Text Banner (idx=2) with styling
-            try {
-                const txtParams = new URLSearchParams(baseParams);
-                txtParams.set("idx", "2");
-                const txtRes = await fetch(`/subcategorymanager_food/ad/slot?${txtParams.toString()}`, {
-                    cache: "no-store",
-                    headers: { Accept: "application/json" },
-                });
-                const txtData = await txtRes.json().catch(() => null);
-                if (txtRes.ok && txtData?.success && txtData.slot) {
-                    const txtSlot = txtData.slot;
-                    const text = clean(txtSlot.title) || clean(txtSlot.text) || "";
-                    const styleJSON = clean(txtSlot.subtitle) || "{}";
+            // 텍스트 적용
+            const titleEl = document.getElementById("heroTitle");
+            const subtitleEl = document.getElementById("heroSubtitle");
 
-                    let styles = {};
-                    try {
-                        styles = JSON.parse(styleJSON);
-                    } catch (e) {
-                        styles = {};
-                    }
+            if (txtSlot) {
+                const text = clean(txtSlot.title || txtSlot.text) || "";
 
-                    const titleEl = document.getElementById("heroTitle");
-                    const subtitleEl = document.getElementById("heroSubtitle");
+                let style = { fontSize: "24", fontWeight: "700", color: "#1e293b", bgColor: "#ffffff" };
+                try {
+                    const parsed = JSON.parse(clean(txtSlot.subtitle) || "{}");
+                    if (parsed.fontSize) style.fontSize = parsed.fontSize;
+                    if (parsed.fontWeight) style.fontWeight = parsed.fontWeight;
+                    if (parsed.color) style.color = parsed.color;
+                    if (parsed.bgColor) style.bgColor = parsed.bgColor;
+                } catch { }
 
-                    if (titleEl && text) {
-                        titleEl.textContent = text;
-                        if (styles.fontSize) titleEl.style.fontSize = styles.fontSize;
-                        if (styles.fontWeight) titleEl.style.fontWeight = styles.fontWeight;
-                        if (styles.color) titleEl.style.color = styles.color;
-                    }
+                const catLabel = state.category ? state.category : "푸드";
+                const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
 
-                    if (subtitleEl && styles.bgColor) {
-                        subtitleEl.style.backgroundColor = styles.bgColor;
-                    }
+                if (titleEl) {
+                    titleEl.textContent = text || `${catLabel}${subLabel}`;
+                    titleEl.style.fontSize = `${style.fontSize}px`;
+                    titleEl.style.fontWeight = style.fontWeight;
+                    titleEl.style.color = style.color;
                 }
-            } catch (e) {
-                console.error("Failed to load text banner (idx=2):", e);
+
+                if (subtitleEl) {
+                    subtitleEl.textContent = "푸드 서브카테고리";
+                    subtitleEl.style.backgroundColor = style.bgColor;
+                }
+            } else {
+                // 텍스트 배너 없을 때 기본값
+                const title = state.category ? state.category : "푸드";
+                const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
+
+                if (titleEl) {
+                    titleEl.textContent = `${title}${subLabel}`;
+                    titleEl.style.fontSize = "";
+                    titleEl.style.fontWeight = "";
+                    titleEl.style.color = "";
+                }
+                if (subtitleEl) {
+                    subtitleEl.textContent = "푸드 서브카테고리";
+                    subtitleEl.style.backgroundColor = "";
+                }
             }
 
-            return true;
+            return !!(imgSlot || txtSlot);
+        }
+
+        async function fetchHeroSlotTry(paramsObj) {
+            const p = new URLSearchParams(paramsObj);
+            const url = `/subcategorymanager_food/ad/slot?${p.toString()}`;
+            const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.success) return null;
+            return data.slot || null;
         }
 
         async function loadAllSections(keepScroll) {
             const keepY = keepScroll ? window.scrollY : null;
 
-            // ✅ 먼저 hero는 매니저 슬롯로 시도
-            const applied = await hydrateHeroFromManager();
-
-            // ✅ 슬롯이 없으면 기본 타이틀
-            if (!applied) {
-                const title = state.category ? state.category : "푸드";
-                const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-                setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", "/uploads/no-image.png");
-            }
+            // ✅ 매니저 슬롯에서 배너 로드
+            await hydrateHeroFromManager();
 
             renderFilters();
             syncMoreButtonLabels();
@@ -778,10 +786,6 @@
             state.sectionState.best.page = 1;
             state.sectionState.newly.expanded = false;
             state.sectionState.newly.page = 1;
-
-            const title = state.category ? state.category : "푸드";
-            const subLabel = (state.category === "한식" && clean(state.subcategory)) ? ` · ${state.subcategory}` : "";
-            setHero(`${title}${subLabel}`, "푸드(store_info)에서만 불러옵니다.", "/uploads/no-image.png");
 
             bindEvents();
             await loadAllSections(false);
