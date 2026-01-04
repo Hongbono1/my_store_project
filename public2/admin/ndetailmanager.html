@@ -568,10 +568,10 @@
         // 상태
         // =========================
         const state = {
-            mode: "food",
-            globalPicked: null, // ✅ 전역에서 선택된 가게(메인 박스 표시용)
-            modal: { section: "", position: "", slot: null, pickedStore: null }
-        };
+  mode: "food",
+  globalPicked: null, // ✅ 전역에서 선택된 가게(메인 박스 표시용)
+  modal: { section:"", position:"", slot:null, pickedStore:null }
+};
 
         const $ = (id) => document.getElementById(id);
 
@@ -636,33 +636,33 @@
                 : "";
 
             if (type === "image") {
-                const img = normalizeSrc(slot.image_url || "");
+  const img = normalizeSrc(slot.image_url || "");
 
-                body.innerHTML = img
-                    ? `
+  body.innerHTML = img
+    ? `
       <a href="${escapeHtml(linkUrl || "#")}" ${linkUrl ? `target="_blank" rel="noopener"` : ""} class="block w-full h-full">
         <img src="${escapeHtml(img)}" class="w-full h-full object-cover" alt="slot image" />
       </a>
       ${storeLabel}
     `
-                    : `
+    : `
       <div class="w-full h-full flex items-center justify-center text-gray-400 font-bold">
         이미지 없음 (가게 연결)
       </div>
       ${storeLabel}
     `;
-                return;
-            }
+  return;
+}
 
             // text
             const text = (slot.text || "").trim();
-            body.innerHTML = `
+body.innerHTML = `
   ${text ? `<div class="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>` : `<div class="slot-muted">텍스트 없음 (가게 연결)</div>`}
   ${linkUrl ? `<div class="mt-2 text-sm"><a class="text-blue-700 font-bold hover:underline" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">링크 열기</a></div>` : ""}
   ${storeLabel}
 `;
-            return;            // ✅ (선택이지만 안전)
-        }                  // ✅ renderSlot() 닫기
+return;            // ✅ (선택이지만 안전)
+}                  // ✅ renderSlot() 닫기
         async function fetchSlot(position) {
             console.log('[fetchSlot] 요청:', position);
             const res = await fetch(`/ndetailmanager/ad/slot?position=${encodeURIComponent(position)}`, { cache: "no-store" });
@@ -691,86 +691,86 @@
         }
 
         // =========================
-        // ✅ 전역 선택 가게 → 메인 박스들(슬롯) 미리보기 표시
-        // =========================
-        function applyPickedStoreToPage(r) {
-            if (!r) return;
+// ✅ 전역 선택 가게 → 메인 박스들(슬롯) 미리보기 표시
+// =========================
+function applyPickedStoreToPage(r) {
+  if (!r) return;
 
-            const name = r.business_name || "-";
-            const bn = r.business_number || "-";
-            const type = r.business_type || "-";
-            const cat = r.business_category || "-";
-            const img = normalizeSrc(r.image_url || "");
+  const name = r.business_name || "-";
+  const bn   = r.business_number || "-";
+  const type = r.business_type || "-";
+  const cat  = r.business_category || "-";
+  const img  = normalizeSrc(r.image_url || "");
 
-            // 1) 대표 이미지 박스
-            const imgEl = document.querySelector('[data-section="images"]');
-            if (imgEl) {
-                const body = imgEl.querySelector("[data-body]");
-                if (body) {
-                    body.innerHTML = img
-                        ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
-                        : `<div class="text-gray-400 font-bold">NO IMG</div>`;
-                }
-                // 배지: "가게연결"
-                const badge = imgEl.querySelector("[data-badge]");
-                if (badge) badge.textContent = "가게연결";
-            }
+  // 1) 대표 이미지 박스
+  const imgEl = document.querySelector('[data-section="images"]');
+  if (imgEl) {
+    const body = imgEl.querySelector("[data-body]");
+    if (body) {
+      body.innerHTML = img
+        ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+        : `<div class="text-gray-400 font-bold">NO IMG</div>`;
+    }
+    // 배지: "가게연결"
+    const badge = imgEl.querySelector("[data-badge]");
+    if (badge) badge.textContent = "가게연결";
+  }
 
-            // 2) 상호/상단 영역
-            const headerEl = document.querySelector('[data-section="header"]');
-            if (headerEl) {
-                const title = headerEl.querySelector("[data-title]");
-                if (title) title.textContent = name;
+  // 2) 상호/상단 영역
+  const headerEl = document.querySelector('[data-section="header"]');
+  if (headerEl) {
+    const title = headerEl.querySelector("[data-title]");
+    if (title) title.textContent = name;
 
-                const body = headerEl.querySelector("[data-body]");
-                if (body) {
-                    body.innerHTML = `
+    const body = headerEl.querySelector("[data-body]");
+    if (body) {
+      body.innerHTML = `
         <div class="text-sm text-gray-700">
           <div><b>사업자</b>: ${escapeHtml(bn)}</div>
           <div><b>업종/카테고리</b>: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
           <div class="mt-2 text-xs text-gray-500">※ 이 화면은 “전역 선택 미리보기”이며, 각 박스를 클릭해 저장할 수 있습니다.</div>
         </div>
       `;
-                }
-                const badge = headerEl.querySelector("[data-badge]");
-                if (badge) badge.textContent = "가게연결";
-            }
+    }
+    const badge = headerEl.querySelector("[data-badge]");
+    if (badge) badge.textContent = "가게연결";
+  }
 
-            // 3) 기본 정보 박스 (dl의 dd 순서: 업종, 카테고리, 배달, 영업시간)
-            const basicEl = document.querySelector('[data-section="basic"]');
-            if (basicEl) {
-                const dds = basicEl.querySelectorAll("dd");
-                if (dds?.length >= 4) {
-                    dds[0].textContent = type;
-                    dds[1].textContent = cat;
-                    dds[2].textContent = "-";
-                    dds[3].textContent = "-";
-                    dds.forEach(dd => dd.classList.remove("slot-muted"));
-                }
-                const badge = basicEl.querySelector("[data-badge]");
-                if (badge) badge.textContent = "가게연결";
-            }
+  // 3) 기본 정보 박스 (dl의 dd 순서: 업종, 카테고리, 배달, 영업시간)
+  const basicEl = document.querySelector('[data-section="basic"]');
+  if (basicEl) {
+    const dds = basicEl.querySelectorAll("dd");
+    if (dds?.length >= 4) {
+      dds[0].textContent = type;
+      dds[1].textContent = cat;
+      dds[2].textContent = "-";
+      dds[3].textContent = "-";
+      dds.forEach(dd => dd.classList.remove("slot-muted"));
+    }
+    const badge = basicEl.querySelector("[data-badge]");
+    if (badge) badge.textContent = "가게연결";
+  }
 
-            // 4) 나머지 박스들도 “가게 연결됨” 정도는 표시 (원하면 나중에 상세 API로 확장)
-            const sections = ["map", "ad1", "ad2", "service", "events", "etc", "additional", "contact", "menu", "cart"];
-            for (const sec of sections) {
-                const el = document.querySelector(`[data-section="${sec}"]`);
-                if (!el) continue;
-                const body = el.querySelector("[data-body]");
-                if (body) {
-                    // 기존 내용 유지하고 싶으면 아래 줄을 주석 처리하면 됨
-                    body.innerHTML = `
+  // 4) 나머지 박스들도 “가게 연결됨” 정도는 표시 (원하면 나중에 상세 API로 확장)
+  const sections = ["map","ad1","ad2","service","events","etc","additional","contact","menu","cart"];
+  for (const sec of sections) {
+    const el = document.querySelector(`[data-section="${sec}"]`);
+    if (!el) continue;
+    const body = el.querySelector("[data-body]");
+    if (body) {
+      // 기존 내용 유지하고 싶으면 아래 줄을 주석 처리하면 됨
+      body.innerHTML = `
         <div class="text-gray-700">
           <div class="font-bold">가게 연결됨</div>
           <div class="text-sm text-gray-600 mt-1">${escapeHtml(name)} (${escapeHtml(bn)})</div>
           <div class="text-sm text-gray-600">${escapeHtml(type)} / ${escapeHtml(cat)}</div>
         </div>
       `;
-                }
-                const badge = el.querySelector("[data-badge]");
-                if (badge) badge.textContent = "가게연결";
-            }
-        }
+    }
+    const badge = el.querySelector("[data-badge]");
+    if (badge) badge.textContent = "가게연결";
+  }
+}
 
         // =========================
         // 모달
@@ -1059,8 +1059,7 @@
         // ✅ 상단(전역) 가게 검색: food + combined 둘다 조회
         // =========================
         async function globalSearchStore() {
-            let q = (document.getElementById("globalStoreQuery").value || "").trim();
-            if (!q) q = "__recent10__"; // ✅ 빈 검색이면 최근 10개 모드
+            const q = (document.getElementById("globalStoreQuery").value || "").trim();
 
             const resultsBox = document.getElementById("globalStoreResults");
             resultsBox.innerHTML = `<div class="text-sm text-gray-500">검색 중...</div>`;
