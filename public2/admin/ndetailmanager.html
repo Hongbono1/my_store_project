@@ -438,21 +438,23 @@
             <!-- 본문 -->
             <div class="p-6 space-y-5 max-h-[72vh] overflow-auto">
                 <!-- 타입/모드 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <div class="font-bold text-gray-800 mb-2">슬롯 타입</div>
-                        <select id="slotType" class="input">
-                            <option value="image">image (이미지)</option>
-                            <option value="text">text (텍스트)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <div class="font-bold text-gray-800 mb-2">표시 모드</div>
-                        <select id="slotMode" class="input">
-                            <option value="custom">custom (직접 입력)</option>
-                            <option value="store">store (가게 연결)</option>
-                        </select>
-                    </div>
+                <!-- ✅ 기존 UX: 이미지 / 가게연결 / 텍스트 -->
+                <div class="flex flex-wrap gap-2">
+                    <button id="tabImage" type="button" class="btn btn-gray">이미지</button>
+                    <button id="tabStore" type="button" class="btn btn-gray">가게연결</button>
+                    <button id="tabText" type="button" class="btn btn-gray">텍스트</button>
+                </div>
+
+                <!-- (기존 로직 유지용) select는 숨김 -->
+                <div class="hidden">
+                    <select id="slotType">
+                        <option value="image">image</option>
+                        <option value="text">text</option>
+                    </select>
+                    <select id="slotMode">
+                        <option value="custom">custom</option>
+                        <option value="store">store</option>
+                    </select>
                 </div>
 
                 <!-- 이미지 업로드 -->
@@ -499,6 +501,9 @@
                         선택된 가게:
                         <span id="pickedStore" class="font-bold text-gray-900">없음</span>
                     </div>
+
+                    <!-- ✅ 가게 미리보기 -->
+                    <div id="pickedStorePreview" class="mt-3 rounded-xl border bg-white p-3 hidden"></div>
 
                     <div id="storeResults" class="mt-3 grid grid-cols-1 gap-2"></div>
                 </div>
@@ -810,12 +815,12 @@
                     if (!res.ok) continue;
                     json = await res.json().catch(() => null);
                     if (json) break;
-                } catch (_) {}
+                } catch (_) { }
             }
 
             const menus = (json?.menus && Array.isArray(json.menus)) ? json.menus
-                        : (json?.menu && Array.isArray(json.menu)) ? json.menu
-                        : (json?.items && Array.isArray(json.items)) ? json.items
+                : (json?.menu && Array.isArray(json.menu)) ? json.menu
+                    : (json?.items && Array.isArray(json.items)) ? json.items
                         : [];
 
             if (!menus.length) {
@@ -853,7 +858,7 @@
         async function renderMenuInModal(r) {
             const menuPreviewBox = $("menuPreviewBox");
             const menuPreviewContent = $("menuPreviewContent");
-            
+
             if (!menuPreviewBox || !menuPreviewContent) return;
 
             // 메뉴 박스 표시
@@ -876,12 +881,12 @@
                     if (!res.ok) continue;
                     json = await res.json().catch(() => null);
                     if (json) break;
-                } catch (_) {}
+                } catch (_) { }
             }
 
             const menus = (json?.menus && Array.isArray(json.menus)) ? json.menus
-                        : (json?.menu && Array.isArray(json.menu)) ? json.menu
-                        : (json?.items && Array.isArray(json.items)) ? json.items
+                : (json?.menu && Array.isArray(json.menu)) ? json.menu
+                    : (json?.items && Array.isArray(json.items)) ? json.items
                         : [];
 
             if (!menus.length) {
@@ -941,7 +946,7 @@
             const defaultType = (section === "ad1" || section === "ad2" || section === "images") ? "image" : "text";
             $("slotType").value = defaultType;
             $("slotMode").value = "custom";
-            toggleBoxes();
+            setActiveTab(defaultType); // ✅ image 또는 text 탭 활성화
 
             // ✅ 전역에서 가게를 이미 선택했다면, 모달 기본값을 "store 연결"로 채워둠(저장 편하게)
             if (state.globalPicked) {
@@ -953,7 +958,8 @@
                 };
                 $("slotMode").value = "store";
                 $("pickedStore").textContent = `${r.business_name || "-"} (${r.business_number || "-"})`;
-                toggleBoxes();
+                setActiveTab("store"); // ✅ store 탭 활성화
+                renderPickedStorePreview(r); // ✅ 미리보기 표시
             }
 
             // 데이터 로드
@@ -991,6 +997,13 @@
                     }
 
                     $("deleteBtn").classList.remove("hidden");
+
+                    // ✅ slot 로드 후 탭 동기화
+                    const t = String(slot.slot_type || "").toLowerCase();
+                    const m = String(slot.slot_mode || "").toLowerCase();
+                    if (m === "store") setActiveTab("store");
+                    else if (t === "image") setActiveTab("image");
+                    else setActiveTab("text");
                 } else {
                     console.log('[openModal] 슬롯 데이터 없음 - 신규 등록 모드');
                     $("deleteBtn").classList.add("hidden");
@@ -1030,6 +1043,81 @@
             // 종료없음 체크 시 종료일 비활성화
             $("endDate").disabled = $("noEnd").checked;
             if ($("noEnd").checked) $("endDate").value = "";
+        }
+
+        // =========================
+        // 탭 전환 함수
+        // =========================
+        function setActiveTab(kind) {
+            // kind: "image" | "text" | "store"
+            const btns = [
+                ["tabImage", "image"],
+                ["tabStore", "store"],
+                ["tabText", "text"],
+            ];
+            btns.forEach(([id, k]) => {
+                const b = $(id);
+                if (!b) return;
+                if (k === kind) {
+                    b.classList.remove("btn-gray");
+                    b.classList.add("btn-blue");
+                } else {
+                    b.classList.remove("btn-blue");
+                    b.classList.add("btn-gray");
+                }
+            });
+
+            // ✅ 기존 저장 로직과 연결
+            if (kind === "store") {
+                $("slotMode").value = "store";
+                // store는 이미지/텍스트 둘 다 가능하지만, 기본은 section별 추천값 유지
+                const sec = state.modal.section;
+                const defaultType = (sec === "ad1" || sec === "ad2" || sec === "images") ? "image" : "text";
+                if (!$("slotType").value) $("slotType").value = defaultType;
+            } else if (kind === "image") {
+                $("slotType").value = "image";
+                $("slotMode").value = "custom";
+            } else {
+                $("slotType").value = "text";
+                $("slotMode").value = "custom";
+            }
+
+            toggleBoxes();
+        }
+
+        // =========================
+        // 가게 미리보기 렌더
+        // =========================
+        function renderPickedStorePreview(r) {
+            const box = $("pickedStorePreview");
+            if (!box) return;
+
+            if (!r) {
+                box.classList.add("hidden");
+                box.innerHTML = "";
+                return;
+            }
+
+            const img = normalizeSrc(r.image_url || "");
+            const name = r.business_name || "-";
+            const bn = r.business_number || "-";
+            const type = r.business_type || "-";
+            const cat = r.business_category || "-";
+
+            box.classList.remove("hidden");
+            box.innerHTML = `
+    <div class="flex gap-3 items-center">
+      <div class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+        ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+              : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+        <div class="text-sm text-gray-600">사업자: ${escapeHtml(bn)}</div>
+        <div class="text-sm text-gray-600">업종/카테고리: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
+      </div>
+    </div>
+  `;
         }
 
         async function saveSlot() {
@@ -1183,6 +1271,11 @@
         $("slotMode").addEventListener("change", toggleBoxes);
         $("noEnd").addEventListener("change", toggleBoxes);
 
+        // ✅ 탭 버튼 이벤트 연결
+        $("tabImage")?.addEventListener("click", () => setActiveTab("image"));
+        $("tabStore")?.addEventListener("click", () => setActiveTab("store"));
+        $("tabText")?.addEventListener("click", () => setActiveTab("text"));
+
         $("modalClose").addEventListener("click", closeModal);
         $("cancelBtn").addEventListener("click", closeModal);
         $("saveBtn").addEventListener("click", saveSlot);
@@ -1288,6 +1381,9 @@
                         if (pickedEl) {
                             pickedEl.textContent = `${name} (${bn})`;
                         }
+
+                        // ✅ 미리보기 표시
+                        renderPickedStorePreview(r);
 
                         // ✅ 선택 후 검색 결과 닫기
                         closeGlobalResults();
