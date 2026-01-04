@@ -896,7 +896,7 @@
                     if (!res.ok) continue;
                     json = await res.json().catch(() => null);
                     if (json) break;
-                } catch (_) {}
+                } catch (_) { }
             }
 
             const menus =
@@ -1066,8 +1066,8 @@
                     $("textValue").value = slot.text_content || "";
                     $("linkUrl").value = slot.link_url || "";
                     $("startDate").value = slot.start_date ? String(slot.start_date).slice(0, 10) : "";
-                    $("endDate").value = 
-                    slot.end_date ? String(slot.end_date).slice(0, 10) : "";
+                    $("endDate").value =
+                        slot.end_date ? String(slot.end_date).slice(0, 10) : "";
                     $("noEnd").checked = !!slot.no_end;
                     $("priority").value = slot.priority ?? 1;
 
@@ -1236,7 +1236,7 @@
             fd.append("slot_type", $("slotType").value);
             fd.append("slot_mode", $("slotMode").value);
 
-fd.append("text_content", $("textValue").value || "");
+            fd.append("text_content", $("textValue").value || "");
             fd.append("link_url", $("linkUrl").value || "");
 
             fd.append("start_date", $("startDate").value || "");
@@ -1367,29 +1367,69 @@ fd.append("text_content", $("textValue").value || "");
         $("imagePreview").innerHTML = `<span class="text-gray-400 font-bold">없음</span>`;
         $("modeNow").textContent = state.mode;
 
-        // ✅ (중요) DB 슬롯이 없어도, 전역 선택(미리보기)이 있으면 모달에 먼저 보여주기
-        if (state.globalPicked) {
-            const r = state.globalPicked;
-
-            // storeBox 미리보기
-            renderPickedStorePreview(r);
-
-            // 대표이미지 슬롯이면 이미지 미리보기도 같이 채움
-            if (section === "images") {
-                const img = normalizeSrc(r.image_url || "");
-                if (img) {
-                    $("imagePreview").innerHTML =
-                        `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
-                }
-            }
-        }
-
+        // 각 영역 클릭 → 모달 열기
         document.querySelectorAll("[data-section]").forEach(el => {
             el.addEventListener("click", () => {
                 const section = el.getAttribute("data-section");
                 openModal(section);
             });
         });
+
+        // slotType/slotMode/noEnd 변경 시 UI 토글
+        $("slotType").addEventListener("change", toggleBoxes);
+        $("slotMode").addEventListener("change", toggleBoxes);
+        $("noEnd").addEventListener("change", toggleBoxes);
+
+        // 탭 버튼 (이미지 / 가게연결 / 텍스트)
+        $("tabImage")?.addEventListener("click", () => setActiveTab("image"));
+        $("tabStore")?.addEventListener("click", () => setActiveTab("store"));
+        $("tabText")?.addEventListener("click", () => setActiveTab("text"));
+
+        // 모달 버튼들
+        $("modalClose").addEventListener("click", closeModal);
+        $("cancelBtn").addEventListener("click", closeModal);
+        $("saveBtn").addEventListener("click", saveSlot);
+        $("deleteBtn").addEventListener("click", deleteSlot);
+
+        // 모달 안 가게 검색
+        $("storeSearchBtn").addEventListener("click", searchStore);
+        $("storeQuery").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                searchStore();
+            }
+        });
+
+        // 상단(전역) 가게 검색 버튼/엔터
+        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", globalSearchStore);
+        document.getElementById("globalStoreQuery")?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                globalSearchStore();
+            }
+        });
+
+        // 전역 검색 결과 영역: 바깥 클릭으로 취급되지 않게
+        document.getElementById("globalStoreResults")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+        document.getElementById("globalStoreQuery")?.addEventListener("click", (e) => e.stopPropagation());
+        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", (e) => e.stopPropagation());
+
+        // 문서 아무 데나 클릭하면 전역 검색 결과 닫기
+        document.addEventListener("click", () => {
+            closeGlobalResults();
+        });
+
+        // 모달 바깥 클릭 시 닫기
+        $("modal").addEventListener("click", (e) => {
+            if (e.target === $("modal")) closeModal();
+        });
+
+        // =========================
+        // 초기 슬롯 로드
+        // =========================
+        await loadAll();
 
         $("slotType").addEventListener("change", toggleBoxes);
         $("slotMode").addEventListener("change", toggleBoxes);
