@@ -124,7 +124,9 @@
                 <div class="flex flex-col lg:flex-row lg:items-center gap-3">
                     <div class="flex-1">
                         <div class="text-lg font-extrabold text-gray-900">가게 검색</div>
-                        <div class="text-sm text-gray-600 mt-1">사업자번호 또는 상호명으로 검색하면 (food + combined) 모두 조회합니다.</div>
+                        <div class="text-sm text-gray-600 mt-1">
+                            사업자번호 또는 상호명으로 검색하면 (food + combined) 모두 조회합니다.
+                        </div>
                     </div>
 
                     <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[520px]">
@@ -194,7 +196,9 @@
                         <span class="slot-badge" data-badge>미설정</span>
                     </div>
 
-                    <div class="text-sm text-gray-600 mb-2" data-subtitle>주소/좌표/링크 등을 텍스트로 넣거나, 가게 연결을 사용</div>
+                    <div class="text-sm text-gray-600 mb-2" data-subtitle>
+                        주소/좌표/링크 등을 텍스트로 넣거나, 가게 연결을 사용
+                    </div>
 
                     <div class="w-full h-[244px] rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center"
                         data-body>
@@ -419,7 +423,7 @@
 
     <!-- =========================
        설정 모달
-  ========================== -->
+    ========================== -->
     <div id="modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
         <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden">
             <!-- 헤더 -->
@@ -438,14 +442,13 @@
             <!-- 본문 -->
             <div class="p-6 space-y-5 max-h-[72vh] overflow-auto">
                 <!-- 타입/모드 -->
-                <!-- ✅ 기존 UX: 이미지 / 가게연결 / 텍스트 -->
                 <div class="flex flex-wrap gap-2">
                     <button id="tabImage" type="button" class="btn btn-gray">이미지</button>
                     <button id="tabStore" type="button" class="btn btn-gray">가게연결</button>
                     <button id="tabText" type="button" class="btn btn-gray">텍스트</button>
                 </div>
 
-                <!-- (기존 로직 유지용) select는 숨김 -->
+                <!-- select는 숨김(기존 백엔드 구조 연동용) -->
                 <div class="hidden">
                     <select id="slotType">
                         <option value="image">image</option>
@@ -482,7 +485,9 @@
                 <div>
                     <div class="font-bold text-gray-800 mb-2">링크 URL (선택)</div>
                     <input id="linkUrl" class="input" placeholder="https://..." />
-                    <div class="text-sm text-gray-500 mt-2">텍스트/이미지 클릭 시 이동할 링크. (store 모드면 store_id 기반 링크도 가능)</div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        텍스트/이미지 클릭 시 이동할 링크. (store 모드면 store_id 기반 링크도 가능)
+                    </div>
                 </div>
 
                 <!-- 가게 연결 -->
@@ -502,13 +507,13 @@
                         <span id="pickedStore" class="font-bold text-gray-900">없음</span>
                     </div>
 
-                    <!-- ✅ 가게 미리보기 -->
+                    <!-- 가게 미리보기 -->
                     <div id="pickedStorePreview" class="mt-3 rounded-xl border bg-white p-3 hidden"></div>
 
                     <div id="storeResults" class="mt-3 grid grid-cols-1 gap-2"></div>
                 </div>
 
-                <!-- ✅ 메뉴 미리보기 (menu 섹션일 때만 표시) -->
+                <!-- 메뉴 미리보기 (menu 섹션일 때만) -->
                 <div id="menuPreviewBox" class="rounded-xl border p-4 bg-blue-50" style="display:none;">
                     <div class="font-extrabold text-gray-900 mb-3">📋 메뉴 미리보기</div>
                     <div id="menuPreviewContent" class="space-y-2 max-h-80 overflow-y-auto"></div>
@@ -580,7 +585,7 @@
         // =========================
         const state = {
             mode: "food",
-            globalPicked: null, // ✅ 전역에서 선택된 가게(메인 박스 표시용)
+            globalPicked: null, // 상단에서 선택된 가게
             modal: { section: "", position: "", slot: null, pickedStore: null }
         };
 
@@ -594,13 +599,12 @@
                 ">": "&gt;",
                 '"': "&quot;",
                 "'": "&#39;",
-            }[m]));
+            })[m]);
         }
 
         function normalizeSrc(src) {
             if (!src) return "";
             if (src.startsWith("http") || src.startsWith("/")) return src;
-            // 업로드는 /uploads/ 로 접근
             return `/uploads/${src}`;
         }
 
@@ -626,24 +630,19 @@
             const body = el.querySelector("[data-body]");
             if (!body) return;
 
-            // ✅ 제목은 항상 보이게(요구사항)
             setBadge(el, slot);
 
-            // slot 데이터 없으면 기본 표시 유지
             if (!slot) return;
 
             const type = String(slot.slot_type || "").toLowerCase();
             const mode = String(slot.slot_mode || "").toLowerCase();
-
-            // 공통: 링크 만들기
             const linkUrl = slot.link_url ? String(slot.link_url) : "";
 
-            // store 연결이면 표시용 라벨
             const storeLabel = mode === "store"
                 ? `<div class="mt-2 text-sm text-gray-600">
-             <span class="font-bold text-gray-800">가게 연결:</span>
-             <span class="font-bold text-gray-900">${escapeHtml(slot.business_name || slot.business_no || slot.store_id || "")}</span>
-           </div>`
+                    <span class="font-bold text-gray-800">가게 연결:</span>
+                    <span class="font-bold text-gray-900">${escapeHtml(slot.business_name || slot.business_no || slot.store_id || "")}</span>
+                </div>`
                 : "";
 
             if (type === "image") {
@@ -651,39 +650,43 @@
 
                 body.innerHTML = img
                     ? `
-      <a href="${escapeHtml(linkUrl || "#")}" ${linkUrl ? `target="_blank" rel="noopener"` : ""} class="block w-full h-full">
-        <img src="${escapeHtml(img)}" class="w-full h-full object-cover" alt="slot image" />
-      </a>
-      ${storeLabel}
-    `
+                        <a href="${escapeHtml(linkUrl || "#")}" ${linkUrl ? `target="_blank" rel="noopener"` : ""} class="block w-full h-full">
+                            <img src="${escapeHtml(img)}" class="w-full h-full object-cover" alt="slot image" />
+                        </a>
+                        ${storeLabel}
+                    `
                     : `
-      <div class="w-full h-full flex items-center justify-center text-gray-400 font-bold">
-        이미지 없음 (가게 연결)
-      </div>
-      ${storeLabel}
-    `;
+                        <div class="w-full h-full flex items-center justify-center text-gray-400 font-bold">
+                            이미지 없음 (가게 연결)
+                        </div>
+                        ${storeLabel}
+                    `;
                 return;
             }
 
-            // text
             const text = (slot.text_content || "").trim();
             body.innerHTML = `
-  ${text ? `<div class="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>` : `<div class="slot-muted">텍스트 없음 (가게 연결)</div>`}
-  ${linkUrl ? `<div class="mt-2 text-sm"><a class="text-blue-700 font-bold hover:underline" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">링크 열기</a></div>` : ""}
-  ${storeLabel}
-`;
-            return;            // ✅ (선택이지만 안전)
-        }                  // ✅ renderSlot() 닫기
+                ${text
+                    ? `<div class="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>`
+                    : `<div class="slot-muted">텍스트 없음 (가게 연결)</div>`}
+                ${linkUrl
+                    ? `<div class="mt-2 text-sm"><a class="text-blue-700 font-bold hover:underline" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">링크 열기</a></div>`
+                    : ""}
+                ${storeLabel}
+            `;
+            return;
+        }
+
         async function fetchSlot(position) {
-            console.log('[fetchSlot] 요청:', position);
+            console.log("[fetchSlot] 요청:", position);
             const res = await fetch(`/ndetailmanager/ad/slot?position=${encodeURIComponent(position)}`, { cache: "no-store" });
-            console.log('[fetchSlot] 응답 상태:', res.status);
+            console.log("[fetchSlot] 응답 상태:", res.status);
             if (!res.ok) {
-                console.error('[fetchSlot] 실패:', res.status, res.statusText);
+                console.error("[fetchSlot] 실패:", res.status, res.statusText);
                 return null;
             }
             const json = await res.json().catch(() => null);
-            console.log('[fetchSlot] 응답 데이터:', json);
+            console.log("[fetchSlot] 응답 데이터:", json);
             return json?.slot || null;
         }
 
@@ -694,7 +697,7 @@
 
             const slot = await fetchSlot(position);
 
-            // ✅ menu는 슬롯 렌더 금지 → 메뉴 API로만 렌더
+            // menu는 슬롯 내용 대신 실제 메뉴 API 연동
             if (section === "menu") {
                 if (slot && String(slot.slot_mode || "").toLowerCase() === "store") {
                     await renderMenuFromSlot(slot);
@@ -712,12 +715,19 @@
         }
 
         async function loadAll() {
-            const sections = ["images", "map", "ad1", "ad2", "header", "basic", "service", "events", "etc", "additional", "contact", "menu", "cart"];
-            for (const s of sections) await loadSection(s);
+            const sections = [
+                "images", "map", "ad1", "ad2",
+                "header", "basic", "service", "events",
+                "etc", "additional", "contact",
+                "menu", "cart"
+            ];
+            for (const s of sections) {
+                await loadSection(s);
+            }
         }
 
         // =========================
-        // ✅ 전역 선택 가게 → 메인 박스들(슬롯) 미리보기 표시
+        // 전역 선택 가게 → 메인 레이아웃에 반영
         // =========================
         function applyPickedStoreToPage(r) {
             if (!r) return;
@@ -728,7 +738,7 @@
             const cat = r.business_category || "-";
             const img = normalizeSrc(r.image_url || "");
 
-            // 1) 대표 이미지 박스
+            // 대표 이미지
             const imgEl = document.querySelector('[data-section="images"]');
             if (imgEl) {
                 const body = imgEl.querySelector("[data-body]");
@@ -737,12 +747,11 @@
                         ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
                         : `<div class="text-gray-400 font-bold">NO IMG</div>`;
                 }
-                // 배지: "가게연결"
                 const badge = imgEl.querySelector("[data-badge]");
                 if (badge) badge.textContent = "가게연결";
             }
 
-            // 2) 상호/상단 영역
+            // 상호/상단
             const headerEl = document.querySelector('[data-section="header"]');
             if (headerEl) {
                 const title = headerEl.querySelector("[data-title]");
@@ -751,18 +760,20 @@
                 const body = headerEl.querySelector("[data-body]");
                 if (body) {
                     body.innerHTML = `
-        <div class="text-sm text-gray-700">
-          <div><b>사업자</b>: ${escapeHtml(bn)}</div>
-          <div><b>업종/카테고리</b>: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
-          <div class="mt-2 text-xs text-gray-500">※ 이 화면은 “전역 선택 미리보기”이며, 각 박스를 클릭해 저장할 수 있습니다.</div>
-        </div>
-      `;
+                        <div class="text-sm text-gray-700">
+                            <div><b>사업자</b>: ${escapeHtml(bn)}</div>
+                            <div><b>업종/카테고리</b>: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                ※ 이 화면은 “전역 선택 미리보기”이며, 각 박스를 클릭해 저장할 수 있습니다.
+                            </div>
+                        </div>
+                    `;
                 }
                 const badge = headerEl.querySelector("[data-badge]");
                 if (badge) badge.textContent = "가게연결";
             }
 
-            // 3) 기본 정보 박스 (dl의 dd 순서: 업종, 카테고리, 배달, 영업시간)
+            // 기본 정보
             const basicEl = document.querySelector('[data-section="basic"]');
             if (basicEl) {
                 const dds = basicEl.querySelectorAll("dd");
@@ -777,47 +788,42 @@
                 if (badge) badge.textContent = "가게연결";
             }
 
-            // 4) 나머지 박스들도 “가게 연결됨” 정도는 표시 (원하면 나중에 상세 API로 확장)
-            const sections = ["map", "ad1", "ad2", "service", "events", "etc", "additional", "contact", "cart"]; // ✅ menu 제외
+            // 나머지 박스
+            const sections = ["map", "ad1", "ad2", "service", "events", "etc", "additional", "contact", "cart"];
             for (const sec of sections) {
                 const el = document.querySelector(`[data-section="${sec}"]`);
                 if (!el) continue;
                 const body = el.querySelector("[data-body]");
                 if (body) {
-                    // 기존 내용 유지하고 싶으면 아래 줄을 주석 처리하면 됨
                     body.innerHTML = `
-        <div class="text-gray-700">
-          <div class="font-bold">가게 연결됨</div>
-          <div class="text-sm text-gray-600 mt-1">${escapeHtml(name)} (${escapeHtml(bn)})</div>
-          <div class="text-sm text-gray-600">${escapeHtml(type)} / ${escapeHtml(cat)}</div>
-        </div>
-      `;
+                        <div class="text-gray-700">
+                            <div class="font-bold">가게 연결됨</div>
+                            <div class="text-sm text-gray-600 mt-1">${escapeHtml(name)} (${escapeHtml(bn)})</div>
+                            <div class="text-sm text-gray-600">${escapeHtml(type)} / ${escapeHtml(cat)}</div>
+                        </div>
+                    `;
                 }
                 const badge = el.querySelector("[data-badge]");
                 if (badge) badge.textContent = "가게연결";
             }
 
-            // ✅ 전역 선택하면 메뉴도 실제로 렌더
+            // 메뉴까지 같이 미리보기
             renderMenuFromStore(r);
         }
 
         // =========================
-        // 메뉴 실제 렌더링
+        // 메뉴 렌더링 (전역 선택 가게 기준)
         // =========================
         async function renderMenuFromStore(r) {
             const menuEl = document.querySelector('[data-section="menu"]');
             if (!menuEl) return;
-
             const body = menuEl.querySelector("[data-body]");
             if (!body) return;
 
             body.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴 불러오는 중...</div>`;
 
-            // ✅ food/combined 구분(전역검색 merged에서 __mode 넣어둔 상태)
             const type = (r.__mode === "combined") ? "combined" : "food";
 
-            // ✅ 너 ndetail에서 쓰는 상세 API가 /store/:id/full 계열이었음(로그에 있었음)
-            // 환경 따라 query가 필요할 수 있어서 2가지로 "시도"함(안 깨지게)
             const candidates = [
                 `/store/${encodeURIComponent(r.id)}/full?type=${encodeURIComponent(type)}`,
                 `/store/${encodeURIComponent(r.id)}/full`,
@@ -830,73 +836,7 @@
                     if (!res.ok) continue;
                     json = await res.json().catch(() => null);
                     if (json) break;
-                } catch (_) { }
-            }
-
-            const menus = (json?.menus && Array.isArray(json.menus)) ? json.menus
-                : (json?.menu && Array.isArray(json.menu)) ? json.menu
-                    : (json?.items && Array.isArray(json.items)) ? json.items
-                        : [];
-
-            if (!menus.length) {
-                body.innerHTML = `<div class="text-center text-gray-500 py-4">등록된 메뉴가 없습니다.</div>`;
-                return;
-            }
-
-            // ✅ 컬럼명 방어적으로
-            body.innerHTML = menus.map(m => {
-                const name = m.menu_name || m.name || m.title || "-";
-                const price = m.menu_price ?? m.price ?? "";
-                const priceText = (price === "" || price == null) ? "" : `${Number(price).toLocaleString()}원`;
-                const img = normalizeSrc(m.image_url || m.menu_image_url || m.image || "");
-
-                return `
-      <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
-        <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-          ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />` : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
-          <div class="text-sm font-bold text-blue-700">${escapeHtml(priceText)}</div>
-        </div>
-      </div>
-    `;
-            }).join("");
-
-            const badge = menuEl.querySelector("[data-badge]");
-            if (badge) badge.textContent = "가게연결";
-        }
-
-        // =========================
-        // 메뉴 실제 렌더링 (slot에서)
-        // =========================
-        async function renderMenuFromSlot(slot) {
-            if (!slot || !slot.store_id) return;
-
-            const menuEl = document.querySelector('[data-section="menu"]');
-            if (!menuEl) return;
-
-            const body = menuEl.querySelector("[data-body]");
-            if (!body) return;
-
-            body.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴 불러오는 중...</div>`;
-
-            // ✅ slot에서 table_source 또는 store_type 판단
-            const type = (slot.table_source === "combined_store_info" || slot.store_type === "combined") ? "combined" : "food";
-
-            const candidates = [
-                `/store/${encodeURIComponent(slot.store_id)}/full?type=${encodeURIComponent(type)}`,
-                `/store/${encodeURIComponent(slot.store_id)}/full`,
-            ];
-
-            let json = null;
-            for (const url of candidates) {
-                try {
-                    const res = await fetch(url, { cache: "no-store" });
-                    if (!res.ok) continue;
-                    json = await res.json().catch(() => null);
-                    if (json) break;
-                } catch (_) { }
+                } catch { }
             }
 
             const menus =
@@ -917,16 +857,18 @@
                 const img = normalizeSrc(m.image_url || m.menu_image_url || m.image || "");
 
                 return `
-      <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
-        <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-          ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />` : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
-          <div class="text-sm font-bold text-blue-700">${escapeHtml(priceText)}</div>
-        </div>
-      </div>
-    `;
+                    <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
+                        <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                            ${img
+                        ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                        : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+                            <div class="text-sm font-bold text-blue-700">${escapeHtml(priceText)}</div>
+                        </div>
+                    </div>
+                `;
             }).join("");
 
             const badge = menuEl.querySelector("[data-badge]");
@@ -934,22 +876,87 @@
         }
 
         // =========================
-        // 모달에서 메뉴 렌더링
+        // 메뉴 렌더링 (slot 정보 기준)
+        // =========================
+        async function renderMenuFromSlot(slot) {
+            if (!slot || !slot.store_id) return;
+
+            const menuEl = document.querySelector('[data-section="menu"]');
+            if (!menuEl) return;
+            const body = menuEl.querySelector("[data-body]");
+            if (!body) return;
+
+            body.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴 불러오는 중...</div>`;
+
+            const type = (
+                slot.table_source === "combined_store_info" ||
+                slot.store_type === "combined"
+            ) ? "combined" : "food";
+
+            const candidates = [
+                `/store/${encodeURIComponent(slot.store_id)}/full?type=${encodeURIComponent(type)}`,
+                `/store/${encodeURIComponent(slot.store_id)}/full`,
+            ];
+
+            let json = null;
+            for (const url of candidates) {
+                try {
+                    const res = await fetch(url, { cache: "no-store" });
+                    if (!res.ok) continue;
+                    json = await res.json().catch(() => null);
+                    if (json) break;
+                } catch { }
+            }
+
+            const menus =
+                (Array.isArray(json?.menus) && json.menus) ||
+                (Array.isArray(json?.menu) && json.menu) ||
+                (Array.isArray(json?.items) && json.items) ||
+                [];
+
+            if (!menus.length) {
+                body.innerHTML = `<div class="text-center text-gray-500 py-4">등록된 메뉴가 없습니다.</div>`;
+                return;
+            }
+
+            body.innerHTML = menus.map(m => {
+                const name = m.menu_name || m.name || m.title || "-";
+                const price = m.menu_price ?? m.price ?? "";
+                const priceText = (price === "" || price == null) ? "" : `${Number(price).toLocaleString()}원`;
+                const img = normalizeSrc(m.image_url || m.menu_image_url || m.image || "");
+
+                return `
+                    <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
+                        <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                            ${img
+                        ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                        : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+                            <div class="text-sm font-bold text-blue-700">${escapeHtml(priceText)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+            const badge = menuEl.querySelector("[data-badge]");
+            if (badge) badge.textContent = "가게연결";
+        }
+
+        // =========================
+        // 모달에서 메뉴 미리보기
         // =========================
         async function renderMenuInModal(r) {
             const menuPreviewBox = $("menuPreviewBox");
             const menuPreviewContent = $("menuPreviewContent");
-
             if (!menuPreviewBox || !menuPreviewContent) return;
 
-            // 메뉴 박스 표시
             menuPreviewBox.style.display = "block";
             menuPreviewContent.innerHTML = `<div class="text-center text-gray-500 py-4">메뉴 불러오는 중...</div>`;
 
-            // food/combined 구분
             const type = (r.__mode === "combined") ? "combined" : "food";
 
-            // API 호출 (renderMenuFromStore와 동일한 로직)
             const candidates = [
                 `/store/${encodeURIComponent(r.id)}/full?type=${encodeURIComponent(type)}`,
                 `/store/${encodeURIComponent(r.id)}/full`,
@@ -962,20 +969,20 @@
                     if (!res.ok) continue;
                     json = await res.json().catch(() => null);
                     if (json) break;
-                } catch (_) { }
+                } catch { }
             }
 
-            const menus = (json?.menus && Array.isArray(json.menus)) ? json.menus
-                : (json?.menu && Array.isArray(json.menu)) ? json.menu
-                    : (json?.items && Array.isArray(json.items)) ? json.items
-                        : [];
+            const menus =
+                (Array.isArray(json?.menus) && json.menus) ||
+                (Array.isArray(json?.menu) && json.menu) ||
+                (Array.isArray(json?.items) && json.items) ||
+                [];
 
             if (!menus.length) {
                 menuPreviewContent.innerHTML = `<div class="text-center text-gray-500 py-4">등록된 메뉴가 없습니다.</div>`;
                 return;
             }
 
-            // 메뉴 렌더링
             menuPreviewContent.innerHTML = menus.map(m => {
                 const name = m.menu_name || m.name || m.title || "-";
                 const price = m.menu_price ?? m.price ?? "";
@@ -983,21 +990,23 @@
                 const img = normalizeSrc(m.image_url || m.menu_image_url || m.image || "");
 
                 return `
-      <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
-        <div class="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-          ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />` : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="font-bold text-gray-900 truncate text-sm">${escapeHtml(name)}</div>
-          <div class="text-xs font-bold text-blue-700">${escapeHtml(priceText)}</div>
-        </div>
-      </div>
-    `;
+                    <div class="rounded-xl border bg-white p-3 flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                            ${img
+                        ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                        : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-gray-900 truncate text-sm">${escapeHtml(name)}</div>
+                            <div class="text-xs font-bold text-blue-700">${escapeHtml(priceText)}</div>
+                        </div>
+                    </div>
+                `;
             }).join("");
         }
 
         // =========================
-        // 모달
+        // 모달 열기/닫기
         // =========================
         function openModal(section) {
             state.modal.section = section;
@@ -1020,16 +1029,14 @@
             $("pickedStore").textContent = "없음";
             $("storeResults").innerHTML = "";
             $("imagePreview").innerHTML = `<span class="text-gray-400 font-bold">없음</span>`;
-
             $("modeNow").textContent = state.mode;
 
-            // 기본값(섹션에 따라 초기 타입 추천)
             const defaultType = (section === "ad1" || section === "ad2" || section === "images") ? "image" : "text";
             $("slotType").value = defaultType;
             $("slotMode").value = "custom";
-            setActiveTab(defaultType); // ✅ image 또는 text 탭 활성화
+            setActiveTab(defaultType);
 
-            // ✅ 전역에서 가게를 이미 선택했다면, 모달 기본값을 "store 연결"로 채워둠(저장 편하게)
+            // 전역에서 이미 가게 선택되어 있으면 기본 store 연결로 세팅
             if (state.globalPicked) {
                 const r = state.globalPicked;
                 state.modal.pickedStore = {
@@ -1039,42 +1046,35 @@
                 };
                 $("slotMode").value = "store";
                 $("pickedStore").textContent = `${r.business_name || "-"} (${r.business_number || "-"})`;
-                setActiveTab("store"); // ✅ store 탭 활성화
-                renderPickedStorePreview(r); // ✅ 미리보기 표시
+                setActiveTab("store");
+                renderPickedStorePreview(r);
             }
 
-            // 데이터 로드
             (async () => {
-                console.log('[openModal] 슬롯 로드 시작:', state.modal.position);
                 const slot = await fetchSlot(state.modal.position);
-                console.log('[openModal] 로드된 슬롯:', slot);
                 state.modal.slot = slot;
 
                 if (slot) {
-                    console.log('[openModal] 슬롯 데이터 있음 - UI 업데이트');
                     $("slotType").value = slot.slot_type || defaultType;
                     $("slotMode").value = slot.slot_mode || "custom";
 
-                    // ✅ 먼저 탭/박스 상태부터 맞춘다 (imageBox가 보여야 preview가 의미 있음)
                     const t = String(slot.slot_type || "").toLowerCase();
                     const m = String(slot.slot_mode || "").toLowerCase();
                     if (m === "store") setActiveTab("store");
                     else if (t === "image") setActiveTab("image");
                     else setActiveTab("text");
 
-                    // ✅ 그 다음에 값/미리보기 넣기
                     $("textValue").value = slot.text_content || "";
                     $("linkUrl").value = slot.link_url || "";
                     $("startDate").value = slot.start_date ? String(slot.start_date).slice(0, 10) : "";
-                    $("endDate").value =
-                        slot.end_date ? String(slot.end_date).slice(0, 10) : "";
+                    $("endDate").value = slot.end_date ? String(slot.end_date).slice(0, 10) : "";
                     $("noEnd").checked = !!slot.no_end;
                     $("priority").value = slot.priority ?? 1;
 
                     if (slot.image_url) {
                         const img = normalizeSrc(slot.image_url);
-                        $("imagePreview").innerHTML = `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
-                        console.log('[openModal] 이미지 설정:', img);
+                        $("imagePreview").innerHTML =
+                            `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
                     }
 
                     if (slot.slot_mode === "store" && (slot.store_id || slot.business_no || slot.business_name)) {
@@ -1084,25 +1084,23 @@
                             business_number: slot.business_no,
                             business_name: slot.business_name
                         };
-                        console.log('[openModal] 매장 정보 설정:', state.modal.pickedStore);
 
-                        // ✅ store 슬롯이면 search-store로 상세(대표이미지 포함) 다시 받아서 미리보기 채우기
                         const q = (slot.business_no || slot.business_name || "").trim();
                         const mode = (slot.store_type || slot.table_source || state.mode || "food");
-
                         if (q) {
                             try {
-                                const res = await fetch(`/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`, { cache: "no-store" });
+                                const res = await fetch(
+                                    `/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`,
+                                    { cache: "no-store" }
+                                );
                                 const js = await res.json().catch(() => null);
                                 const r0 = Array.isArray(js?.results) ? js.results[0] : null;
                                 if (r0) {
-                                    // 모달 미리보기 갱신
                                     renderPickedStorePreview(r0);
-
-                                    // images 섹션인데 slot.image_url 없으면 가게 대표이미지라도 preview에 표시
                                     if (section === "images" && !slot.image_url && r0.image_url) {
                                         const img = normalizeSrc(r0.image_url);
-                                        $("imagePreview").innerHTML = `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
+                                        $("imagePreview").innerHTML =
+                                            `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
                                     }
                                 }
                             } catch (e) {
@@ -1113,13 +1111,11 @@
 
                     $("deleteBtn").classList.remove("hidden");
                 } else {
-                    console.log('[openModal] 슬롯 데이터 없음 - 신규 등록 모드');
                     $("deleteBtn").classList.add("hidden");
                 }
 
                 toggleBoxes();
 
-                // ✅ menu 섹션이고 전역 선택된 가게가 있으면 모달에 메뉴 표시
                 if (section === "menu" && state.globalPicked) {
                     await renderMenuInModal(state.globalPicked);
                 }
@@ -1132,7 +1128,6 @@
         function closeModal() {
             $("modal").classList.add("hidden");
             $("modal").classList.remove("flex");
-            // ✅ 메뉴 미리보기 초기화
             const menuPreviewBox = $("menuPreviewBox");
             if (menuPreviewBox) {
                 menuPreviewBox.style.display = "none";
@@ -1148,16 +1143,14 @@
             $("textBox").style.display = (type === "text") ? "block" : "none";
             $("storeBox").style.display = (mode === "store") ? "block" : "none";
 
-            // 종료없음 체크 시 종료일 비활성화
             $("endDate").disabled = $("noEnd").checked;
             if ($("noEnd").checked) $("endDate").value = "";
         }
 
         // =========================
-        // 탭 전환 함수
+        // 탭 전환
         // =========================
         function setActiveTab(kind) {
-            // kind: "image" | "text" | "store"
             const btns = [
                 ["tabImage", "image"],
                 ["tabStore", "store"],
@@ -1175,10 +1168,8 @@
                 }
             });
 
-            // ✅ 기존 저장 로직과 연결
             if (kind === "store") {
                 $("slotMode").value = "store";
-                // store는 이미지/텍스트 둘 다 가능하지만, 기본은 section별 추천값 유지
                 const sec = state.modal.section;
                 const defaultType = (sec === "ad1" || sec === "ad2" || sec === "images") ? "image" : "text";
                 if (!$("slotType").value) $("slotType").value = defaultType;
@@ -1194,7 +1185,7 @@
         }
 
         // =========================
-        // 가게 미리보기 렌더
+        // 가게 미리보기
         // =========================
         function renderPickedStorePreview(r) {
             const box = $("pickedStorePreview");
@@ -1214,20 +1205,24 @@
 
             box.classList.remove("hidden");
             box.innerHTML = `
-    <div class="flex gap-3 items-center">
-      <div class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-        ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                <div class="flex gap-3 items-center">
+                    <div class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                        ${img
+                    ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
                     : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
-        <div class="text-sm text-gray-600">사업자: ${escapeHtml(bn)}</div>
-        <div class="text-sm text-gray-600">업종/카테고리: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
-      </div>
-    </div>
-  `;
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
+                        <div class="text-sm text-gray-600">사업자: ${escapeHtml(bn)}</div>
+                        <div class="text-sm text-gray-600">업종/카테고리: ${escapeHtml(type)} / ${escapeHtml(cat)}</div>
+                    </div>
+                </div>
+            `;
         }
 
+        // =========================
+        // 저장 / 삭제
+        // =========================
         async function saveSlot() {
             $("saveMsg").textContent = "";
             const fd = new FormData();
@@ -1244,9 +1239,10 @@
             fd.append("no_end", $("noEnd").checked ? "true" : "false");
             fd.append("priority", $("priority").value || "1");
 
-            // store mode
             if ($("slotMode").value === "store" && state.modal.pickedStore) {
-                if (state.modal.pickedStore.id != null) fd.append("store_id", String(state.modal.pickedStore.id));
+                if (state.modal.pickedStore.id != null) {
+                    fd.append("store_id", String(state.modal.pickedStore.id));
+                }
                 fd.append("business_no", state.modal.pickedStore.business_number || "");
                 fd.append("business_name", state.modal.pickedStore.business_name || "");
             } else {
@@ -1255,7 +1251,6 @@
                 fd.append("business_name", "");
             }
 
-            // image
             const f = $("imageFile").files?.[0];
             if (f) fd.append("image", f);
 
@@ -1265,17 +1260,16 @@
                     body: fd,
                 });
                 const json = await res.json().catch(() => null);
-                if (!res.ok || !json?.success) throw new Error(json?.message || `HTTP ${res.status}`);
+                if (!res.ok || !json?.success) {
+                    throw new Error(json?.message || `HTTP ${res.status}`);
+                }
 
                 $("saveMsg").className = "text-sm font-bold text-emerald-700";
                 $("saveMsg").textContent = "✅ 저장 완료";
 
-                // 화면 반영
                 await loadSection(state.modal.section);
-                // 모달 데이터 갱신
                 state.modal.slot = json.slot || null;
                 $("deleteBtn").classList.remove("hidden");
-
             } catch (e) {
                 console.error(e);
                 $("saveMsg").className = "text-sm font-bold text-red-600";
@@ -1287,11 +1281,14 @@
             if (!confirm("정말 삭제할까요?")) return;
 
             try {
-                const res = await fetch(`/ndetailmanager/ad/delete?position=${encodeURIComponent(state.modal.position)}`, {
-                    method: "DELETE",
-                });
+                const res = await fetch(
+                    `/ndetailmanager/ad/delete?position=${encodeURIComponent(state.modal.position)}`,
+                    { method: "DELETE" }
+                );
                 const json = await res.json().catch(() => null);
-                if (!res.ok || !json?.success) throw new Error(json?.message || `HTTP ${res.status}`);
+                if (!res.ok || !json?.success) {
+                    throw new Error(json?.message || `HTTP ${res.status}`);
+                }
 
                 $("saveMsg").className = "text-sm font-bold text-emerald-700";
                 $("saveMsg").textContent = "✅ 삭제 완료";
@@ -1305,6 +1302,9 @@
             }
         }
 
+        // =========================
+        // 모달 안 가게 검색
+        // =========================
         async function searchStore() {
             const q = ($("storeQuery").value || "").trim();
             if (!q) return;
@@ -1313,7 +1313,10 @@
 
             try {
                 const mode = state.mode;
-                const res = await fetch(`/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`, { cache: "no-store" });
+                const res = await fetch(
+                    `/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`,
+                    { cache: "no-store" }
+                );
                 const json = await res.json().catch(() => null);
                 const results = json?.results || [];
 
@@ -1325,20 +1328,24 @@
                 $("storeResults").innerHTML = results.map(r => {
                     const img = normalizeSrc(r.image_url || "");
                     return `
-            <button type="button"
-              class="w-full text-left rounded-xl border bg-white hover:bg-gray-50 p-3 flex gap-3 items-center"
-              data-pick='${escapeHtml(JSON.stringify(r))}'>
-              <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-                ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />` : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="font-extrabold text-gray-900 truncate">${escapeHtml(r.business_name || "-")}</div>
-                <div class="text-sm text-gray-600">사업자: ${escapeHtml(r.business_number || "-")}</div>
-                <div class="text-sm text-gray-600">업종/카테고리: ${escapeHtml((r.business_type || "") + " / " + (r.business_category || ""))}</div>
-              </div>
-              <div class="text-blue-700 font-extrabold">선택</div>
-            </button>
-          `;
+                        <button type="button"
+                            class="w-full text-left rounded-xl border bg-white hover:bg-gray-50 p-3 flex gap-3 items-center"
+                            data-pick='${escapeHtml(JSON.stringify(r))}'>
+                            <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                                ${img
+                            ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                            : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-extrabold text-gray-900 truncate">${escapeHtml(r.business_name || "-")}</div>
+                                <div class="text-sm text-gray-600">사업자: ${escapeHtml(r.business_number || "-")}</div>
+                                <div class="text-sm text-gray-600">
+                                    업종/카테고리: ${escapeHtml((r.business_type || "") + " / " + (r.business_category || ""))}
+                                </div>
+                            </div>
+                            <div class="text-blue-700 font-extrabold">선택</div>
+                        </button>
+                    `;
                 }).join("");
 
                 $("storeResults").querySelectorAll("button[data-pick]").forEach(btn => {
@@ -1351,7 +1358,7 @@
                         };
                         $("pickedStore").textContent = `${r.business_name} (${r.business_number || "-"})`;
                         $("saveMsg").textContent = "";
-                        renderPickedStorePreview(r); // ✅ 미리보기 표시
+                        renderPickedStorePreview(r);
                     });
                 });
 
@@ -1362,117 +1369,19 @@
         }
 
         // =========================
-        // 이벤트 바인딩
-        // =========================
-        $("imagePreview").innerHTML = `<span class="text-gray-400 font-bold">없음</span>`;
-        $("modeNow").textContent = state.mode;
-
-        // 각 영역 클릭 → 모달 열기
-        document.querySelectorAll("[data-section]").forEach(el => {
-            el.addEventListener("click", () => {
-                const section = el.getAttribute("data-section");
-                openModal(section);
-            });
-        });
-
-        // slotType/slotMode/noEnd 변경 시 UI 토글
-        $("slotType").addEventListener("change", toggleBoxes);
-        $("slotMode").addEventListener("change", toggleBoxes);
-        $("noEnd").addEventListener("change", toggleBoxes);
-
-        // 탭 버튼 (이미지 / 가게연결 / 텍스트)
-        $("tabImage")?.addEventListener("click", () => setActiveTab("image"));
-        $("tabStore")?.addEventListener("click", () => setActiveTab("store"));
-        $("tabText")?.addEventListener("click", () => setActiveTab("text"));
-
-        // 모달 버튼들
-        $("modalClose").addEventListener("click", closeModal);
-        $("cancelBtn").addEventListener("click", closeModal);
-        $("saveBtn").addEventListener("click", saveSlot);
-        $("deleteBtn").addEventListener("click", deleteSlot);
-
-        // 모달 안 가게 검색
-        $("storeSearchBtn").addEventListener("click", searchStore);
-        $("storeQuery").addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                searchStore();
-            }
-        });
-
-        // 상단(전역) 가게 검색 버튼/엔터
-        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", globalSearchStore);
-        document.getElementById("globalStoreQuery")?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                globalSearchStore();
-            }
-        });
-
-        // 전역 검색 결과 영역: 바깥 클릭으로 취급되지 않게
-        document.getElementById("globalStoreResults")?.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
-        document.getElementById("globalStoreQuery")?.addEventListener("click", (e) => e.stopPropagation());
-        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", (e) => e.stopPropagation());
-
-        // 문서 아무 데나 클릭하면 전역 검색 결과 닫기
-        document.addEventListener("click", () => {
-            closeGlobalResults();
-        });
-
-        // 모달 바깥 클릭 시 닫기
-        $("modal").addEventListener("click", (e) => {
-            if (e.target === $("modal")) closeModal();
-        });
-
-        // =========================
-        // 초기 슬롯 로드
-        // =========================
-        await loadAll();
-
-        $("slotType").addEventListener("change", toggleBoxes);
-        $("slotMode").addEventListener("change", toggleBoxes);
-        $("noEnd").addEventListener("change", toggleBoxes);
-
-        // ✅ 탭 버튼 이벤트 연결
-        $("tabImage")?.addEventListener("click", () => setActiveTab("image"));
-        $("tabStore")?.addEventListener("click", () => setActiveTab("store"));
-        $("tabText")?.addEventListener("click", () => setActiveTab("text"));
-
-        $("modalClose").addEventListener("click", closeModal);
-        $("cancelBtn").addEventListener("click", closeModal);
-        $("saveBtn").addEventListener("click", saveSlot);
-        $("deleteBtn").addEventListener("click", deleteSlot);
-
-        $("storeSearchBtn").addEventListener("click", searchStore);
-        $("storeQuery").addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                searchStore();
-            }
-        });
-
-        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", globalSearchStore);
-        document.getElementById("globalStoreQuery")?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                globalSearchStore();
-            }
-        });
-
-        // =========================
-        // ✅ 상단(전역) 가게 검색: food + combined 둘다 조회
+        // 상단 전역 가게 검색 (food + combined)
         // =========================
         async function globalSearchStore() {
             const q = (document.getElementById("globalStoreQuery").value || "").trim();
+            if (!q) return;
 
             const resultsBox = document.getElementById("globalStoreResults");
+            if (!resultsBox) return;
+
             resultsBox.innerHTML = `<div class="text-sm text-gray-500">검색 중...</div>`;
             openGlobalResults();
 
             try {
-                // food / combined 2번 호출해서 합치기
                 const [rf, rc] = await Promise.all([
                     fetch(`/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=food`, { cache: "no-store" }).then(r => r.json()),
                     fetch(`/ndetailmanager/ad/search-store?q=${encodeURIComponent(q)}&mode=combined`, { cache: "no-store" }).then(r => r.json()),
@@ -1491,41 +1400,42 @@
                     const img = normalizeSrc(r.image_url || "");
                     const modeLabel = r.__mode === "combined" ? "COMBINED" : "FOOD";
                     return `
-        <button type="button"
-          class="w-full text-left rounded-xl border bg-white hover:bg-gray-50 p-3 flex gap-3 items-center"
-          data-pick='${escapeHtml(JSON.stringify(r))}'>
-          <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-            ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />` : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] font-extrabold px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${modeLabel}</span>
-              <div class="font-extrabold text-gray-900 truncate">${escapeHtml(r.business_name || "-")}</div>
-            </div>
-            <div class="text-sm text-gray-600">사업자: ${escapeHtml(r.business_number || "-")}</div>
-            <div class="text-sm text-gray-600">업종/카테고리: ${escapeHtml((r.business_type || "") + " / " + (r.business_category || ""))}</div>
-          </div>
-          <div class="text-blue-700 font-extrabold">선택</div>
-        </button>
-      `;
+                        <button type="button"
+                            class="w-full text-left rounded-xl border bg-white hover:bg-gray-50 p-3 flex gap-3 items-center"
+                            data-pick='${escapeHtml(JSON.stringify(r))}'>
+                            <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+                                ${img
+                            ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
+                            : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-extrabold px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${modeLabel}</span>
+                                    <div class="font-extrabold text-gray-900 truncate">${escapeHtml(r.business_name || "-")}</div>
+                                </div>
+                                <div class="text-sm text-gray-600">사업자: ${escapeHtml(r.business_number || "-")}</div>
+                                <div class="text-sm text-gray-600">
+                                    업종/카테고리: ${escapeHtml((r.business_type || "") + " / " + (r.business_category || ""))}
+                                </div>
+                            </div>
+                            <div class="text-blue-700 font-extrabold">선택</div>
+                        </button>
+                    `;
                 }).join("");
 
                 resultsBox.querySelectorAll("button[data-pick]").forEach(btn => {
                     btn.addEventListener("click", () => {
                         const r = JSON.parse(btn.getAttribute("data-pick"));
 
-                        // ✅ 전역 선택 저장
                         state.globalPicked = r;
                         applyPickedStoreToPage(r);
 
-                        // ✅ 선택 저장(모달 store 연결에도 그대로 사용)
                         state.modal.pickedStore = {
                             id: r.id,
                             business_number: r.business_number,
                             business_name: r.business_name
                         };
 
-                        // ✅ 선택된 가게 정보 표시(상단)
                         const name = r.business_name || "-";
                         const bn = r.business_number || "-";
                         const type = r.business_type || "-";
@@ -1540,29 +1450,24 @@
                             badge.classList.remove("hidden");
                         }
 
-                        // ✅ 모달이 열려있으면 모달의 '선택된 가게'도 즉시 반영
                         const pickedEl = document.getElementById("pickedStore");
                         if (pickedEl) {
                             pickedEl.textContent = `${name} (${bn})`;
                         }
 
-                        // ✅ 미리보기 표시
                         renderPickedStorePreview(r);
-
-                        // ✅ 선택 후 검색 결과 닫기
                         closeGlobalResults();
                     });
                 });
 
             } catch (e) {
+
+
                 console.error(e);
                 resultsBox.innerHTML = `<div class="text-sm text-red-600 font-bold">검색 실패</div>`;
             }
         }
 
-        // =========================
-        // ✅ 전역 검색 결과 열기/닫기
-        // =========================
         function closeGlobalResults() {
             const box = document.getElementById("globalStoreResults");
             if (!box) return;
@@ -1576,28 +1481,70 @@
             box.classList.remove("hidden");
         }
 
-        // 결과 영역 클릭은 "바깥 클릭"으로 취급하지 않게
+        // =========================
+        // 이벤트 바인딩 & 초기 로드
+        // =========================
+        // 기본값
+        $("imagePreview").innerHTML = `<span class="text-gray-400 font-bold">없음</span>`;
+        $("modeNow").textContent = state.mode;
+
+        // 각 영역 클릭 → 모달
+        document.querySelectorAll("[data-section]").forEach(el => {
+            el.addEventListener("click", () => {
+                const section = el.getAttribute("data-section");
+                openModal(section);
+            });
+        });
+
+        // 모달 관련
+        $("slotType").addEventListener("change", toggleBoxes);
+        $("slotMode").addEventListener("change", toggleBoxes);
+        $("noEnd").addEventListener("change", toggleBoxes);
+
+        $("tabImage")?.addEventListener("click", () => setActiveTab("image"));
+        $("tabStore")?.addEventListener("click", () => setActiveTab("store"));
+        $("tabText")?.addEventListener("click", () => setActiveTab("text"));
+
+        $("modalClose").addEventListener("click", closeModal);
+        $("cancelBtn").addEventListener("click", closeModal);
+        $("saveBtn").addEventListener("click", saveSlot);
+        $("deleteBtn").addEventListener("click", deleteSlot);
+
+        $("storeSearchBtn").addEventListener("click", searchStore);
+        $("storeQuery").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                searchStore();
+            }
+        });
+
+        // 상단 전역 검색
+        document.getElementById("globalStoreSearchBtn")?.addEventListener("click", globalSearchStore);
+        document.getElementById("globalStoreQuery")?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                globalSearchStore();
+            }
+        });
+
+        // 전역 검색 결과 영역: 바깥 클릭 방지
         document.getElementById("globalStoreResults")?.addEventListener("click", (e) => {
             e.stopPropagation();
         });
-
-        // 입력/버튼 클릭도 바깥 클릭으로 취급하지 않게
         document.getElementById("globalStoreQuery")?.addEventListener("click", (e) => e.stopPropagation());
         document.getElementById("globalStoreSearchBtn")?.addEventListener("click", (e) => e.stopPropagation());
 
-        // ✅ 문서 아무데나 클릭하면 결과 닫기
+        // 문서 아무 데나 클릭 → 전역 검색 닫기
         document.addEventListener("click", () => {
             closeGlobalResults();
         });
 
-        // 모달 바깥 클릭 닫기
+        // 모달 바깥 클릭 시 닫기
         $("modal").addEventListener("click", (e) => {
             if (e.target === $("modal")) closeModal();
         });
 
-        // =========================
-        // 초기 로드
-        // =========================
+        // 초기 슬롯 로드
         await loadAll();
     </script>
 
