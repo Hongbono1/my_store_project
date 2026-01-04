@@ -156,7 +156,7 @@ export async function upsertSlot(req, res) {
         const slot_type = String(body.slot_type || "image").trim();
         const slot_mode = String(body.slot_mode || "custom").trim();
 
-        const text = String(body.text || "");
+        const text_content = String(body.text_content ?? body.text ?? "");
         const link_url = String(body.link_url || "");
 
         const start_date = normalizeDateOrNull(body.start_date);
@@ -198,30 +198,31 @@ export async function upsertSlot(req, res) {
 
         if (existing) {
             const uq = `
-        UPDATE ${SLOTS_TABLE}
-        SET
-          slot_type=$2,
-          slot_mode=$3,
-          image_url=$4,
-          text=$5,
-          link_url=$6,
-          start_date=$7,
-          end_date=$8,
-          no_end=$9,
-          priority=$10,
-          store_id=$11,
-          business_no=$12,
-          business_name=$13,
-          updated_at=NOW()
-        WHERE page='ndetail' AND position=$1
-        RETURNING *
-      `;
+  UPDATE ${SLOTS_TABLE}
+  SET
+    slot_type=$2,
+    slot_mode=$3,
+    image_url=$4,
+    text_content=$5,
+    link_url=$6,
+    start_date=$7,
+    end_date=$8,
+    no_end=$9,
+    priority=$10,
+    store_id=$11,
+    business_no=$12,
+    business_name=$13,
+    updated_at=NOW()
+  WHERE page='ndetail' AND position=$1
+  RETURNING *
+`;
+
             const ur = await pool.query(uq, [
                 position,
                 slot_type,
                 slot_mode,
                 image_url,
-                text,
+                text_content,
                 link_url,
                 start_date,
                 end_date,
@@ -236,12 +237,12 @@ export async function upsertSlot(req, res) {
 
         const iq = `
       INSERT INTO ${SLOTS_TABLE} (
-        page, position, slot_type, slot_mode,
-        image_url, text, link_url,
-        start_date, end_date, no_end,
-        priority, store_id, business_no, business_name,
-        created_at, updated_at
-      )
+  page, position, slot_type, slot_mode,
+  image_url, text_content, link_url,
+  start_date, end_date, no_end,
+  priority, store_id, business_no, business_name,
+  created_at, updated_at
+)
       VALUES (
         $1, $2, $3, $4,
         $5, $6, $7,
@@ -259,7 +260,7 @@ export async function upsertSlot(req, res) {
             slot_type,
             slot_mode,
             image_url,
-            text,
+            text_content,
             link_url,
             start_date,
             end_date,
