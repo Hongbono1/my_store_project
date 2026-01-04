@@ -6,13 +6,18 @@ import pool from "../db.js";
 
 /**
  * ----------------------------------------------------------
- *  NDETAIL Manager - Controller
+ *  NDETAIL Manager - Controller (FULL)
  *  - Upload dir: /data/uploads/manager_ad (영구)
  *  - Public URL: /uploads/manager_ad/*
  *  - Slot table: public.admin_ad_slots (기존 재사용)
  *  - Store search:
  *      food     -> public.store_info  (또는 public.food_stores 등 후보)
  *      combined -> public.combined_store_info
+ *
+ *  FIXES:
+ *   1) 검색(q 있을 때)에서도 store_info 대표이미지를 store_images에서 1장 JOIN해서 내려줌
+ *   2) 슬롯 저장 시 store_type / table_source 컬럼도 함께 저장(메뉴 타입 꼬임 방지)
+ *   3) 컬럼 alias(s.) 정리, 안전한 select 구성
  * ----------------------------------------------------------
  */
 
@@ -82,7 +87,6 @@ async function pickFoodTable() {
         // eslint-disable-next-line no-await-in-loop
         if (await tableExists(t)) return t;
     }
-    // 최후: 기본 store_info
     return "public.store_info";
 }
 
@@ -94,14 +98,16 @@ async function getColumns(tableName) {
     WHERE table_schema=$1 AND table_name=$2
   `;
     const r = await pool.query(q, [schema, name]);
-    return new Set((r.rows || []).map(x => x.column_name));
+    return new Set((r.rows || []).map((x) => x.column_name));
 }
 
-function buildImageSelect(cols) {
+function buildImageSelect(cols, alias = "s") {
     const candidates = ["main_image_url", "image_url", "main_image", "image1", "image"];
-    const exist = candidates.filter(c => cols.has(c));
+    const exist = candidates.filter((c) => cols.has(c));
     if (exist.length === 0) return `''::text AS image_url`;
-    return `COALESCE(${exist.join(", ")}, '') AS image_url`;
+    // s.main_image_url, s.image_url ... 를 COALESCE로 묶음
+    const expr = exist.map((c) => `${alias}.${c}`).join(", ");
+    return `COALESCE(${expr}, '') AS image_url`;
 }
 
 // ---------- Slots ----------
@@ -117,28 +123,9 @@ export async function getSlot(req, res) {
       WHERE page='ndetail' AND position=$1
       LIMIT 1
     `;
-        console.log("[ndetailmanager:getSlot] 실행 쿼리:", q);
-        console.log("[ndetailmanager:getSlot] 파라미터:", [position]);
 
         const r = await pool.query(q, [position]);
-        console.log("[ndetailmanager:getSlot] 조회된 행 수:", r.rowCount);
-
         const slot = r.rows?.[0] || null;
-        if (slot) {
-            console.log("[ndetailmanager:getSlot] 슬롯 발견:", {
-                id: slot.id,
-                page: slot.page,
-                position: slot.position,
-                slot_type: slot.slot_type,
-                slot_mode: slot.slot_mode
-            });
-        } else {
-            console.log("[ndetailmanager:getSlot] 슬롯 없음 - DB 전체 ndetail 데이터 확인 필요");
-            // 전체 ndetail 데이터 확인
-            const checkQ = `SELECT page, position FROM ${SLOTS_TABLE} WHERE page='ndetail' LIMIT 5`;
-            const checkR = await pool.query(checkQ);
-            console.log("[ndetailmanager:getSlot] DB에 있는 ndetail 슬롯들:", checkR.rows);
-        }
 
         return res.json({ success: true, slot });
     } catch (e) {
@@ -153,9 +140,10 @@ export async function upsertSlot(req, res) {
         const position = String(body.position || "").trim();
         if (!position) return res.status(400).json({ success: false, message: "position required" });
 
-        const slot_type = String(body.slot_type || "image").trim();
-        const slot_mode = String(body.slot_mode || "custom").trim();
+        const slot_type = String(body.slot_type || "image").trim(); // image | text
+        const slot_mode = String(body.slot_mode || "custom").trim(); // custom | store
 
+        // ✅ DB 컬럼명은 text_content
         const text_content = String(body.text_content ?? body.text ?? "");
         const link_url = String(body.link_url || "");
 
@@ -164,9 +152,17 @@ export async function upsertSlot(req, res) {
         const no_end = normalizeBool(body.no_end);
         const priority = safeInt(body.priority, 1);
 
-        const store_id = body.store_id ? Number(body.store_id) : null;
+        const store_id = body.store_id !== undefined && body.store_id !== null && String(body.store_id).trim() !== ""
+            ? Number(body.store_id)
+            : null;
+
         const business_no = String(body.business_no || "");
         const business_name = String(body.business_name || "");
+
+        // ✅ (추가) store_type / table_source 저장 (menu 타입 꼬임 방지)
+        // - 프론트가 mode( food/combined )를 넘겨주면 store_type에 저장 가능
+        const store_type = String(body.store_type || body.mode || "").trim(); // "food" | "combined"
+        const table_source = String(body.table_source || "").trim();          // optional
 
         // 파일 업로드가 있으면 저장 + URL 만들기
         let image_url = "";
@@ -185,7 +181,6 @@ export async function upsertSlot(req, res) {
         if (req.file?.filename && existing?.image_url) {
             try {
                 const old = String(existing.image_url);
-                // /uploads/manager_ad/xxxx.jpg 형태만 처리
                 if (old.startsWith(UPLOAD_PUBLIC_PREFIX + "/")) {
                     const oldName = old.replace(UPLOAD_PUBLIC_PREFIX + "/", "");
                     const oldAbs = path.join(UPLOAD_ABS_DIR, oldName);
@@ -198,24 +193,26 @@ export async function upsertSlot(req, res) {
 
         if (existing) {
             const uq = `
-  UPDATE ${SLOTS_TABLE}
-  SET
-    slot_type=$2,
-    slot_mode=$3,
-    image_url=$4,
-    text_content=$5,
-    link_url=$6,
-    start_date=$7,
-    end_date=$8,
-    no_end=$9,
-    priority=$10,
-    store_id=$11,
-    business_no=$12,
-    business_name=$13,
-    updated_at=NOW()
-  WHERE page='ndetail' AND position=$1
-  RETURNING *
-`;
+        UPDATE ${SLOTS_TABLE}
+        SET
+          slot_type=$2,
+          slot_mode=$3,
+          image_url=$4,
+          text_content=$5,
+          link_url=$6,
+          start_date=$7,
+          end_date=$8,
+          no_end=$9,
+          priority=$10,
+          store_id=$11,
+          business_no=$12,
+          business_name=$13,
+          store_type=$14,
+          table_source=$15,
+          updated_at=NOW()
+        WHERE page='ndetail' AND position=$1
+        RETURNING *
+      `;
 
             const ur = await pool.query(uq, [
                 position,
@@ -231,23 +228,28 @@ export async function upsertSlot(req, res) {
                 store_id,
                 business_no,
                 business_name,
+                store_type,
+                table_source,
             ]);
+
             return res.json({ success: true, slot: ur.rows?.[0] || null });
         }
 
         const iq = `
       INSERT INTO ${SLOTS_TABLE} (
-  page, position, slot_type, slot_mode,
-  image_url, text_content, link_url,
-  start_date, end_date, no_end,
-  priority, store_id, business_no, business_name,
-  created_at, updated_at
-)
+        page, position, slot_type, slot_mode,
+        image_url, text_content, link_url,
+        start_date, end_date, no_end,
+        priority, store_id, business_no, business_name,
+        store_type, table_source,
+        created_at, updated_at
+      )
       VALUES (
         $1, $2, $3, $4,
         $5, $6, $7,
         $8, $9, $10,
         $11, $12, $13, $14,
+        $15, $16,
         NOW(), NOW()
       )
       RETURNING *
@@ -269,6 +271,8 @@ export async function upsertSlot(req, res) {
             store_id,
             business_no,
             business_name,
+            store_type,
+            table_source,
         ]);
 
         return res.json({ success: true, slot: ir.rows?.[0] || null });
@@ -330,65 +334,65 @@ export async function searchStore(req, res) {
 
         const foodImagesJoin = useFoodImagesJoin
             ? `LEFT JOIN LATERAL (
-       SELECT url
-       FROM public.store_images
-       WHERE store_id = s.id
-       ORDER BY id ASC
-       LIMIT 1
-     ) img ON true`
+           SELECT url
+           FROM public.store_images
+           WHERE store_id = s.id
+           ORDER BY id ASC
+           LIMIT 1
+         ) img ON true`
             : "";
-
 
         // 컬럼 동적 확인
         const cols = await getColumns(table);
-        const imageSelect = buildImageSelect(cols);
 
-        // business_* 컬럼도 혹시 다를 수 있으니 최소 방어 (없으면 빈 문자열로)
         const hasBN = cols.has("business_number");
         const hasName = cols.has("business_name");
         const hasType = cols.has("business_type");
         const hasCat = cols.has("business_category");
 
-        const bnCol = hasBN ? "business_number" : "''::text AS business_number";
-        const nameCol = hasName ? "business_name" : "''::text AS business_name";
-        const typeCol = hasType ? "business_type" : "''::text AS business_type";
-        const catCol = hasCat ? "business_category" : "''::text AS business_category";
+        const bnSel = hasBN ? "s.business_number" : "''::text";
+        const nameSel = hasName ? "s.business_name" : "''::text";
+        const typeSel = hasType ? "s.business_type" : "''::text";
+        const catSel = hasCat ? "s.business_category" : "''::text";
+
+        const imageSelect = buildImageSelect(cols, "s");
+        const imageSelFinal = useFoodImagesJoin ? "COALESCE(img.url, '') AS image_url" : imageSelect;
 
         // ✅ q가 없으면 최근 10개
         if (!q) {
             const sqlRecent = `
-  SELECT
-    s.id,
-    ${bnCol},
-    ${nameCol},
-    ${typeCol},
-    ${catCol},
-    ${useFoodImagesJoin ? "COALESCE(img.url, '') AS image_url" : imageSelect}
-  FROM ${table} s
-  ${foodImagesJoin}
-  ORDER BY s.id DESC
-  LIMIT 10
-`;
-
+        SELECT
+          s.id,
+          ${bnSel} AS business_number,
+          ${nameSel} AS business_name,
+          ${typeSel} AS business_type,
+          ${catSel} AS business_category,
+          ${imageSelFinal}
+        FROM ${table} s
+        ${foodImagesJoin}
+        ORDER BY s.id DESC
+        LIMIT 10
+      `;
             const r = await pool.query(sqlRecent);
             return res.json({ success: true, mode, q: "", results: r.rows || [] });
         }
 
-        // ✅ q 있을 때 검색
+        // ✅ q 있을 때 검색 (중요: 여기에도 foodImagesJoin 적용)
         const sql = `
       SELECT
-        id,
-        ${bnCol},
-        ${nameCol},
-        ${typeCol},
-        ${catCol},
-        ${imageSelect}
-      FROM ${table}
+        s.id,
+        ${bnSel} AS business_number,
+        ${nameSel} AS business_name,
+        ${typeSel} AS business_type,
+        ${catSel} AS business_category,
+        ${imageSelFinal}
+      FROM ${table} s
+      ${foodImagesJoin}
       WHERE
-        ${hasBN ? "business_number ILIKE $1" : "FALSE"}
+        ${hasBN ? "s.business_number ILIKE $1" : "FALSE"}
         OR
-        ${hasName ? "business_name ILIKE $1" : "FALSE"}
-      ORDER BY id DESC
+        ${hasName ? "s.business_name ILIKE $1" : "FALSE"}
+      ORDER BY s.id DESC
       LIMIT 30
     `;
 
