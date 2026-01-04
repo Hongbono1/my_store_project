@@ -973,6 +973,15 @@
                     console.log('[openModal] 슬롯 데이터 있음 - UI 업데이트');
                     $("slotType").value = slot.slot_type || defaultType;
                     $("slotMode").value = slot.slot_mode || "custom";
+
+                    // ✅ 먼저 탭/박스 상태부터 맞춘다 (imageBox가 보여야 preview가 의미 있음)
+                    const t = String(slot.slot_type || "").toLowerCase();
+                    const m = String(slot.slot_mode || "").toLowerCase();
+                    if (m === "store") setActiveTab("store");
+                    else if (t === "image") setActiveTab("image");
+                    else setActiveTab("text");
+
+                    // ✅ 그 다음에 값/미리보기 넣기
                     $("textValue").value = slot.text || "";
                     $("linkUrl").value = slot.link_url || "";
                     $("startDate").value = slot.start_date ? String(slot.start_date).slice(0, 10) : "";
@@ -997,13 +1006,6 @@
                     }
 
                     $("deleteBtn").classList.remove("hidden");
-
-                    // ✅ slot 로드 후 탭 동기화
-                    const t = String(slot.slot_type || "").toLowerCase();
-                    const m = String(slot.slot_mode || "").toLowerCase();
-                    if (m === "store") setActiveTab("store");
-                    else if (t === "image") setActiveTab("image");
-                    else setActiveTab("text");
                 } else {
                     console.log('[openModal] 슬롯 데이터 없음 - 신규 등록 모드');
                     $("deleteBtn").classList.add("hidden");
@@ -1109,7 +1111,7 @@
     <div class="flex gap-3 items-center">
       <div class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
         ${img ? `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`
-              : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
+                    : `<span class="text-xs text-gray-400 font-bold">NO IMG</span>`}
       </div>
       <div class="min-w-0 flex-1">
         <div class="font-extrabold text-gray-900 truncate">${escapeHtml(name)}</div>
@@ -1255,10 +1257,25 @@
         // =========================
         // 이벤트 바인딩
         // =========================
-        $("modeSelect").addEventListener("change", (e) => {
-            state.mode = e.target.value;
-            $("modeNow").textContent = state.mode;
-        });
+        $("imagePreview").innerHTML = `<span class="text-gray-400 font-bold">없음</span>`;
+        $("modeNow").textContent = state.mode;
+
+        // ✅ (중요) DB 슬롯이 없어도, 전역 선택(미리보기)이 있으면 모달에 먼저 보여주기
+        if (state.globalPicked) {
+            const r = state.globalPicked;
+
+            // storeBox 미리보기
+            renderPickedStorePreview(r);
+
+            // 대표이미지 슬롯이면 이미지 미리보기도 같이 채움
+            if (section === "images") {
+                const img = normalizeSrc(r.image_url || "");
+                if (img) {
+                    $("imagePreview").innerHTML =
+                        `<img src="${escapeHtml(img)}" class="w-full h-full object-cover" />`;
+                }
+            }
+        }
 
         document.querySelectorAll("[data-section]").forEach(el => {
             el.addEventListener("click", () => {
